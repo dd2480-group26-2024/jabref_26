@@ -98,6 +98,28 @@ class ArgumentProcessorTest {
 
         assertTrue(Files.exists(outputBib));
     }
+    
+    @Test
+    void notBibImport(@TempDir Path tempDir) throws Exception {
+        String auxFile = Path.of(AuxCommandLineTest.class.getResource("paper.aux").toURI()).toAbsolutePath().toString();
+        String originBib = Path.of(AuxCommandLineTest.class.getResource("origin.bib").toURI()).toAbsolutePath().toString();
+        String notBib = "nonexistant";
+
+        Path outputBib = tempDir.resolve("output.bisb").toAbsolutePath();
+        String outputBibFile = outputBib.toAbsolutePath().toString();
+
+        List<String> args = List.of("--nogui", "--debug", "--aux", auxFile + "," + outputBibFile, originBib, notBib);
+
+        ArgumentProcessor processor = new ArgumentProcessor(
+                args.toArray(String[]::new),
+                Mode.INITIAL_START,
+                preferencesService,
+                mock(FileUpdateMonitor.class),
+                entryTypesManager);
+        processor.processArguments();
+
+        assertTrue(Files.exists(outputBib));
+    }
 
     @Test
     void exportMatches(@TempDir Path tempDir) throws Exception {
