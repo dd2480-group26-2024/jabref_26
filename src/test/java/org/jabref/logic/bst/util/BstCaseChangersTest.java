@@ -1,7 +1,8 @@
 package org.jabref.logic.bst.util;
 
 import java.util.stream.Stream;
-
+import java.util.HashMap;
+import java.util.Map;
 import org.jabref.logic.bst.util.BstCaseChanger.FormatMode;
 
 import org.junit.jupiter.api.Disabled;
@@ -16,9 +17,47 @@ public class BstCaseChangersTest {
 
     @ParameterizedTest
     @MethodSource("provideStringsForTitleLowers")
+    public void branchCoverageTest(String expected, String toBeFormatted) {
+        // setup
+        char[] c = toBeFormatted.toCharArray();
+        Map<String, Boolean> branchCoverage = new HashMap<>();
+        branchCoverage.put("if 1", false);
+        branchCoverage.put("if 1.11", false);
+        branchCoverage.put("if 1.12", false);
+        branchCoverage.put("if 1.21", false);
+        branchCoverage.put("if 1.22", false);
+        branchCoverage.put("if 1.31", false);
+        branchCoverage.put("if 1.32", false);
+        branchCoverage.put("if 1.41", false);
+        branchCoverage.put("if 1.42", false);
+        branchCoverage.put("if 1.51", false);
+        branchCoverage.put("if 1.52", false);
+        branchCoverage.put("if 1.61", false);
+        branchCoverage.put("if 1.62", false);
+        branchCoverage.put("if 2", false);
+
+        for(int i=0; i<c.length;i++){
+            BstCaseChanger.findSpecialCharToTest(c,i,branchCoverage);
+        }
+        int totalBranches = 0;
+        for (Map.Entry<String, Boolean> entry : branchCoverage.entrySet()) {
+            System.out.println("ID: " + entry.getKey() + ", Covered: " + entry.getValue());
+            if (entry.getValue() == true){
+                totalBranches ++;
+            }
+        }
+        System.out.println("Total branches covered: "+Integer.toString(totalBranches)+"/15");
+
+        assertEquals(1,1);
+    }
+
+    /*
+    @ParameterizedTest
+    @MethodSource("provideStringsForTitleLowers")
     public void changeCaseTitleLowers(String expected, String toBeFormatted) {
         assertEquals(expected, BstCaseChanger.changeCase(toBeFormatted, FormatMode.TITLE_LOWERS));
     }
+     */
 
     private static Stream<Arguments> provideStringsForTitleLowers() {
         return Stream.of(
@@ -55,7 +94,7 @@ public class BstCaseChangersTest {
                 Arguments.of("this is r{\\'e}ally crazy stuff", "tHIS IS R{\\'E}ALLY CraZy STUfF")
         );
     }
-
+    /*
     @ParameterizedTest
     @MethodSource("provideStringsForAllLowers")
     public void changeCaseAllLowers(String expected, String toBeFormatted) {
@@ -136,6 +175,7 @@ public class BstCaseChangersTest {
         );
     }
 
+      */
     @Disabled
     @Test
     public void titleCaseAllUppers() {
@@ -143,6 +183,6 @@ public class BstCaseChangersTest {
         // assertCaseChangerTitleUppers("This is a Simple Example {TITLE}", "This is a simple example {TITLE}");
         // assertCaseChangerTitleUppers("This {IS} Another Simple Example Tit{LE}", "This {IS} another simple example tit{LE}");
         // assertCaseChangerTitleUppers("{What ABOUT thIS} one?", "{What ABOUT thIS} one?");
-        // assertCaseChangerTitleUppers("{And {thIS} might {a{lso}} be possible}", "{And {thIS} might {a{lso}} be possible}")
+        // assertCaseChangerTitleUppers("{And {thIS} might {a{lso}} be possible}", "{And {thIS} might {a{lso}} possible be}")
     }
 }

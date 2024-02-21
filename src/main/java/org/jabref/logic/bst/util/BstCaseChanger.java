@@ -1,5 +1,6 @@
 package org.jabref.logic.bst.util;
-
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -265,6 +266,7 @@ public final class BstCaseChanger {
      * @return the special LaTeX character or null
      */
     public static Optional<String> findSpecialChar(char[] c, int pos) {
+        System.out.println("\n\nPRINT SOMETHING\n\n");
         if ((pos + 1) < c.length) {
             if ((c[pos] == 'o') && (c[pos + 1] == 'e')) {
                 return Optional.of("oe");
@@ -293,4 +295,126 @@ public final class BstCaseChanger {
         }
         return Optional.empty();
     }
+
+
+
+    public static Optional<String> findSpecialCharToTest(char[] c, int pos, Map<String, Boolean> branchCoverage ) {
+        if ((pos + 1) < c.length){
+            branchCoverage.put("if 1", true);
+        }
+        if ((pos + 1) < c.length) {
+            ////////// IF 1.1
+            if (c[pos] == 'o'){
+                branchCoverage.put("if 1.11", true);
+            }
+            if (c[pos + 1] == 'e'){
+                branchCoverage.put("if 1.12", true);
+            }
+            ////////// IF 1.1
+            if ((c[pos] == 'o') && (c[pos + 1] == 'e')) {
+                return Optional.of("oe");
+            }
+
+
+
+            ////////// IF 1.2
+            if (c[pos] == 'O'){
+                branchCoverage.put("if 1.21", true);
+            }
+            if (c[pos + 1] == 'E'){
+                branchCoverage.put("if 1.22", true);
+            }
+
+            ////////// 1.2
+            if ((c[pos] == 'O') && (c[pos + 1] == 'E')) {
+                return Optional.of("OE");
+            }
+
+
+
+            ////////// IF 1.3
+            if (c[pos] == 'a'){
+                branchCoverage.put("if 1.31", true);
+            }
+            if (c[pos + 1] == 'e'){
+                branchCoverage.put("if 1.32", true);
+            }
+
+            ////////// IF 1.3
+
+            if ((c[pos] == 'a') && (c[pos + 1] == 'e')) {
+                return Optional.of("ae");
+            }
+
+
+
+            ////////// IF 1.4
+            if (c[pos] == 'A'){
+                branchCoverage.put("if 1.41", true);
+            }
+            if (c[pos + 1] == 'E'){
+                branchCoverage.put("if 1.42", true);
+            }
+
+            ////////// IF 1.4
+
+            if ((c[pos] == 'A') && (c[pos + 1] == 'E')) {
+                return Optional.of("AE");
+            }
+
+
+
+            ////////// IF 1.5
+            if (c[pos] == 's'){
+                branchCoverage.put("if 1.51", true);
+            }
+            if (c[pos + 1] == 's'){
+                branchCoverage.put("if 1.52", true);
+            }
+
+            ////////// IF 1.5
+
+            if ((c[pos] == 's') && (c[pos + 1] == 's')) {
+                return Optional.of("ss");
+            }
+
+
+
+            ////////// IF 1.6
+            if (c[pos] == 'A'){
+                branchCoverage.put("if 1.61", true);
+            }
+            if (c[pos + 1] == 'A'){
+                branchCoverage.put("if 1.62", true);
+            }
+            //////////
+
+            if ((c[pos] == 'A') && (c[pos + 1] == 'A')) {
+                return Optional.of("AA");
+            }
+            /////////// IF 1.7
+            if (c[pos] == 'a'){
+                branchCoverage.put("if 1.71", true);
+            }
+            if (c[pos + 1] == 'a'){
+                branchCoverage.put("if 1.72", true);
+            }
+            //////////
+
+            if ((c[pos] == 'a') && (c[pos + 1] == 'a')) {
+                return Optional.of("aa");
+            }
+        }
+        /////////// IF 2
+        if  ("ijoOlL".indexOf(c[pos]) >= 0) {
+            branchCoverage.put("if 1.2", true);
+        }
+        //////////  IF 2
+
+        if ("ijoOlL".indexOf(c[pos]) >= 0) {
+            return Optional.of(String.valueOf(c[pos]));
+        }
+        return Optional.empty();
+    }
+
 }
