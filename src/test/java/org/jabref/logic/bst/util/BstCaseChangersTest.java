@@ -34,6 +34,8 @@ public class BstCaseChangersTest {
         branchCoverage.put("if 1.52", false);
         branchCoverage.put("if 1.61", false);
         branchCoverage.put("if 1.62", false);
+        branchCoverage.put("if 1.71", false);
+        branchCoverage.put("if 1.72", false);
         branchCoverage.put("if 2", false);
 
         for(int i=0; i<c.length;i++){
@@ -46,7 +48,7 @@ public class BstCaseChangersTest {
                 totalBranches ++;
             }
         }
-        System.out.println("Total branches covered: "+Integer.toString(totalBranches)+"/15");
+        System.out.println("Total branches covered: "+Integer.toString(totalBranches)+"/16");
 
         assertEquals(1,1);
     }
