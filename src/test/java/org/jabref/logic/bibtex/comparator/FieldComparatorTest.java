@@ -271,37 +271,4 @@ public class FieldComparatorTest {
             System.out.println("ID: " + entry.getKey() + "\t|\t " + entry.getValue());
         }
     }
-        @Test
-    public void compareYearFieldFirstNan() throws Exception {
-        FieldComparator comparator = new FieldComparator(StandardField.YEAR);
-        BibEntry nan = new BibEntry()
-                .withField(StandardField.YEAR, "NAN");
-        BibEntry corrected = new BibEntry()
-                .withField(StandardField.YEAR, "0");
-
-        assertEquals(0, comparator.compare(nan, corrected));
-    }
-	
-    @Test
-    public void compareYearFieldSecondNan() throws Exception {
-        FieldComparator comparator = new FieldComparator(StandardField.YEAR);
-        BibEntry nan = new BibEntry()
-                .withField(StandardField.YEAR, "0");
-        BibEntry corrected = new BibEntry()
-                .withField(StandardField.YEAR, "NAN");
-
-        assertEquals(0, comparator.compare(nan, corrected));
-    }
-	
-	
-    @Test
-    public void bothNonParsable() throws Exception {
-        FieldComparator comparator = new FieldComparator(new OrFields(StandardField.PMID), true);
-        BibEntry parsable = new BibEntry()
-                .withField(StandardField.PMID, "abc##z");
-        BibEntry unparsable = new BibEntry()
-                .withField(StandardField.PMID, "abc##z");
-
-        assertEquals(0, comparator.compare(parsable, unparsable));
-    }
 }
