@@ -1,5 +1,7 @@
 package org.jabref.logic.bst.util;
 
+
+import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,33 +18,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class BstCaseChangersTest {
 
     @ParameterizedTest
-    @MethodSource("provideStringsForTitleLowers")
-    public void branchCoverageTest(String expected, String toBeFormatted) {
+    @MethodSource("provideStringForAllCovered")
+    public void branchCoverageTestAllCovered(String e, String toBeFormatted) {
+        int expected = 16;
+
         // setup
         char[] c = toBeFormatted.toCharArray();
-        Map<String, Boolean> branchCoverage = new HashMap<>();
-        branchCoverage.put("if 1", false);
-        branchCoverage.put("if 1.11", false);
-        branchCoverage.put("if 1.12", false);
-        branchCoverage.put("if 1.21", false);
-        branchCoverage.put("if 1.22", false);
-        branchCoverage.put("if 1.31", false);
-        branchCoverage.put("if 1.32", false);
-        branchCoverage.put("if 1.41", false);
-        branchCoverage.put("if 1.42", false);
-        branchCoverage.put("if 1.51", false);
-        branchCoverage.put("if 1.52", false);
-        branchCoverage.put("if 1.61", false);
-        branchCoverage.put("if 1.62", false);
-        branchCoverage.put("if 1.71", false);
-        branchCoverage.put("if 1.72", false);
-        branchCoverage.put("if 2", false);
-
-        for(int i=0; i<c.length;i++){
-            BstCaseChanger.findSpecialCharToTest(c,i,branchCoverage);
+        Map<Integer, Boolean> branchCoverage = new HashMap<>();
+        for (int i=1;i<=16;i++){
+             branchCoverage.put(i, false);
         }
+        // run
+        for(int i=0; i<c.length;i++){
+            Optional<String> s = BstCaseChanger.findSpecialCharToTest(c,i,branchCoverage);
+        }
+        // Print result
         int totalBranches = 0;
-        for (Map.Entry<String, Boolean> entry : branchCoverage.entrySet()) {
+        for (Map.Entry<Integer, Boolean> entry : branchCoverage.entrySet()) {
             System.out.println("ID: " + entry.getKey() + ", Covered: " + entry.getValue());
             if (entry.getValue() == true){
                 totalBranches ++;
@@ -50,17 +42,52 @@ public class BstCaseChangersTest {
         }
         System.out.println("Total branches covered: "+Integer.toString(totalBranches)+"/16");
 
-        assertEquals(1,1);
+        assertEquals(expected,totalBranches);
+    }
+    private static Stream<Arguments> provideStringForAllCovered() {
+        return Stream.of(
+                 Arguments.of("oeOEaeAEssAAaaijoOlL", "oeOEaeAEssAAaaijoOl") // covers the whole branch
+        );
     }
 
-    /*
+    @ParameterizedTest
+    @MethodSource("provideStringForNoneCovered")
+    public void branchCoverageTestNoneCovered(String e, String toBeFormatted) {
+        int expected = 0;
+        // setup
+        char[] c = toBeFormatted.toCharArray();
+        Map<Integer, Boolean> branchCoverage = new HashMap<>();
+        for (int i=1;i<=16;i++){
+             branchCoverage.put(i, false);
+        }
+        // run
+        for(int i=0; i<c.length;i++){
+            Optional<String> s = BstCaseChanger.findSpecialCharToTest(c,i,branchCoverage);
+        }
+        // Print result
+        int totalBranches = 0;
+        for (Map.Entry<Integer, Boolean> entry : branchCoverage.entrySet()) {
+            System.out.println("ID: " + entry.getKey() + ", Covered: " + entry.getValue());
+            if (entry.getValue() == true){
+                totalBranches ++;
+            }
+        }
+        System.out.println("Total branches covered: "+Integer.toString(totalBranches)+"/16");
+
+        assertEquals(expected,totalBranches);
+    }
+    private static Stream<Arguments> provideStringForNoneCovered() {
+        return Stream.of(
+                 Arguments.of("", "") // covers the whole branch
+        );
+    }
+
+
     @ParameterizedTest
     @MethodSource("provideStringsForTitleLowers")
     public void changeCaseTitleLowers(String expected, String toBeFormatted) {
         assertEquals(expected, BstCaseChanger.changeCase(toBeFormatted, FormatMode.TITLE_LOWERS));
     }
-     */
-
     private static Stream<Arguments> provideStringsForTitleLowers() {
         return Stream.of(
                 Arguments.of("i", "i"),
@@ -96,7 +123,6 @@ public class BstCaseChangersTest {
                 Arguments.of("this is r{\\'e}ally crazy stuff", "tHIS IS R{\\'E}ALLY CraZy STUfF")
         );
     }
-    /*
     @ParameterizedTest
     @MethodSource("provideStringsForAllLowers")
     public void changeCaseAllLowers(String expected, String toBeFormatted) {
@@ -177,7 +203,6 @@ public class BstCaseChangersTest {
         );
     }
 
-      */
     @Disabled
     @Test
     public void titleCaseAllUppers() {

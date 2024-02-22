@@ -298,17 +298,17 @@ public final class BstCaseChanger {
 
 
 
-    public static Optional<String> findSpecialCharToTest(char[] c, int pos, Map<String, Boolean> branchCoverage ) {
+    public static Optional<String> findSpecialCharToTest(char[] c, int pos, Map<Integer, Boolean> branchCoverage ) {
         if ((pos + 1) < c.length){
-            branchCoverage.put("if 1", true);
+            branchCoverage.put(1, true);
         }
         if ((pos + 1) < c.length) {
             ////////// IF 1.1
             if (c[pos] == 'o'){
-                branchCoverage.put("if 1.11", true);
+                branchCoverage.put(2, true);
             }
             if (c[pos + 1] == 'e'){
-                branchCoverage.put("if 1.12", true);
+                branchCoverage.put(3, true);
             }
             ////////// IF 1.1
             if ((c[pos] == 'o') && (c[pos + 1] == 'e')) {
@@ -319,10 +319,10 @@ public final class BstCaseChanger {
 
             ////////// IF 1.2
             if (c[pos] == 'O'){
-                branchCoverage.put("if 1.21", true);
+                branchCoverage.put(4, true);
             }
             if (c[pos + 1] == 'E'){
-                branchCoverage.put("if 1.22", true);
+                branchCoverage.put(5, true);
             }
 
             ////////// 1.2
@@ -334,10 +334,10 @@ public final class BstCaseChanger {
 
             ////////// IF 1.3
             if (c[pos] == 'a'){
-                branchCoverage.put("if 1.31", true);
+                branchCoverage.put(6, true);
             }
             if (c[pos + 1] == 'e'){
-                branchCoverage.put("if 1.32", true);
+                branchCoverage.put(7, true);
             }
 
             ////////// IF 1.3
@@ -350,10 +350,10 @@ public final class BstCaseChanger {
 
             ////////// IF 1.4
             if (c[pos] == 'A'){
-                branchCoverage.put("if 1.41", true);
+                branchCoverage.put(8, true);
             }
             if (c[pos + 1] == 'E'){
-                branchCoverage.put("if 1.42", true);
+                branchCoverage.put(9, true);
             }
 
             ////////// IF 1.4
@@ -366,10 +366,10 @@ public final class BstCaseChanger {
 
             ////////// IF 1.5
             if (c[pos] == 's'){
-                branchCoverage.put("if 1.51", true);
+                branchCoverage.put(10, true);
             }
             if (c[pos + 1] == 's'){
-                branchCoverage.put("if 1.52", true);
+                branchCoverage.put(11, true);
             }
 
             ////////// IF 1.5
@@ -382,10 +382,10 @@ public final class BstCaseChanger {
 
             ////////// IF 1.6
             if (c[pos] == 'A'){
-                branchCoverage.put("if 1.61", true);
+                branchCoverage.put(12, true);
             }
             if (c[pos + 1] == 'A'){
-                branchCoverage.put("if 1.62", true);
+                branchCoverage.put(13, true);
             }
             //////////
 
@@ -394,10 +394,10 @@ public final class BstCaseChanger {
             }
             /////////// IF 1.7
             if (c[pos] == 'a'){
-                branchCoverage.put("if 1.71", true);
+                branchCoverage.put(14, true);
             }
             if (c[pos + 1] == 'a'){
-                branchCoverage.put("if 1.72", true);
+                branchCoverage.put(15, true);
             }
             //////////
 
@@ -407,7 +407,7 @@ public final class BstCaseChanger {
         }
         /////////// IF 2
         if  ("ijoOlL".indexOf(c[pos]) >= 0) {
-            branchCoverage.put("if 1.2", true);
+            branchCoverage.put(16, true);
         }
         //////////  IF 2
 
