@@ -9,6 +9,9 @@ import org.slf4j.LoggerFactory;
 
 public final class BstCaseChanger {
 
+
+    static Map<Integer, Boolean> branchCoverage = new HashMap<>();
+
     private static final Logger LOGGER = LoggerFactory.getLogger(BstCaseChanger.class);
 
     // stores whether the char before the current char was a colon
@@ -298,7 +301,7 @@ public final class BstCaseChanger {
 
 
 
-    public static Optional<String> findSpecialCharToTest(char[] c, int pos, Map<Integer, Boolean> branchCoverage ) {
+    public static Optional<String> findSpecialCharToTest(char[] c, int pos ) {
         if ((pos + 1) < c.length){
             branchCoverage.put(1, true);
         }

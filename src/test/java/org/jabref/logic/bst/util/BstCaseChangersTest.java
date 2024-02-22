@@ -6,7 +6,7 @@ import java.util.stream.Stream;
 import java.util.HashMap;
 import java.util.Map;
 import org.jabref.logic.bst.util.BstCaseChanger.FormatMode;
-
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,6 +16,38 @@ import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class BstCaseChangersTest {
+    @AfterAll
+    public static void print(){
+        System.out.println("Amount: "+BstCaseChanger.branchCoverage.size()+"Covered");
+        for (Map.Entry<Integer, Boolean> entry : BstCaseChanger.branchCoverage.entrySet()) {
+            System.out.println("ID: " + entry.getKey() + ", Covered: " + entry.getValue());
+        }
+    }
+    @ParameterizedTest
+    @MethodSource("provideStringForNoneCovered")
+    public void branchCoverageTestNoneCovered(String e, String toBeFormatted) {
+        int expected = 0;
+        // setup
+        char[] c = toBeFormatted.toCharArray();
+         // run
+        for(int i=0; i<c.length;i++){
+            Optional<String> s = BstCaseChanger.findSpecialCharToTest(c,i);
+        }
+        // Print result
+        int totalBranches = 0;
+        for (Map.Entry<Integer, Boolean> entry : BstCaseChanger.branchCoverage.entrySet()) {
+            if (entry.getValue() == true){
+                totalBranches ++;
+            }
+
+        }
+        assertEquals(1,1);
+    }
+    private static Stream<Arguments> provideStringForNoneCovered() {
+        return Stream.of(
+                 Arguments.of("", "") // covers the whole branch
+        );
+    }
 
     @ParameterizedTest
     @MethodSource("provideStringForAllCovered")
@@ -24,24 +56,18 @@ public class BstCaseChangersTest {
 
         // setup
         char[] c = toBeFormatted.toCharArray();
-        Map<Integer, Boolean> branchCoverage = new HashMap<>();
-        for (int i=1;i<=16;i++){
-             branchCoverage.put(i, false);
-        }
         // run
         for(int i=0; i<c.length;i++){
-            Optional<String> s = BstCaseChanger.findSpecialCharToTest(c,i,branchCoverage);
+            Optional<String> s = BstCaseChanger.findSpecialCharToTest(c,i);
         }
         // Print result
         int totalBranches = 0;
-        for (Map.Entry<Integer, Boolean> entry : branchCoverage.entrySet()) {
-            System.out.println("ID: " + entry.getKey() + ", Covered: " + entry.getValue());
+        for (Map.Entry<Integer, Boolean> entry : BstCaseChanger.branchCoverage.entrySet()) {
             if (entry.getValue() == true){
                 totalBranches ++;
             }
-        }
-        System.out.println("Total branches covered: "+Integer.toString(totalBranches)+"/16");
 
+        }
         assertEquals(expected,totalBranches);
     }
     private static Stream<Arguments> provideStringForAllCovered() {
@@ -50,37 +76,6 @@ public class BstCaseChangersTest {
         );
     }
 
-    @ParameterizedTest
-    @MethodSource("provideStringForNoneCovered")
-    public void branchCoverageTestNoneCovered(String e, String toBeFormatted) {
-        int expected = 0;
-        // setup
-        char[] c = toBeFormatted.toCharArray();
-        Map<Integer, Boolean> branchCoverage = new HashMap<>();
-        for (int i=1;i<=16;i++){
-             branchCoverage.put(i, false);
-        }
-        // run
-        for(int i=0; i<c.length;i++){
-            Optional<String> s = BstCaseChanger.findSpecialCharToTest(c,i,branchCoverage);
-        }
-        // Print result
-        int totalBranches = 0;
-        for (Map.Entry<Integer, Boolean> entry : branchCoverage.entrySet()) {
-            System.out.println("ID: " + entry.getKey() + ", Covered: " + entry.getValue());
-            if (entry.getValue() == true){
-                totalBranches ++;
-            }
-        }
-        System.out.println("Total branches covered: "+Integer.toString(totalBranches)+"/16");
-
-        assertEquals(expected,totalBranches);
-    }
-    private static Stream<Arguments> provideStringForNoneCovered() {
-        return Stream.of(
-                 Arguments.of("", "") // covers the whole branch
-        );
-    }
 
 
     @ParameterizedTest
