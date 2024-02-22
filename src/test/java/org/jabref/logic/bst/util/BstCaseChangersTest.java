@@ -1,6 +1,6 @@
 package org.jabref.logic.bst.util;
 
-
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.HashMap;
@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -26,20 +27,11 @@ public class BstCaseChangersTest {
     @ParameterizedTest
     @MethodSource("provideStringForNoneCovered")
     public void branchCoverageTestNoneCovered(String e, String toBeFormatted) {
-        int expected = 0;
         // setup
         char[] c = toBeFormatted.toCharArray();
          // run
         for(int i=0; i<c.length;i++){
             Optional<String> s = BstCaseChanger.findSpecialCharToTest(c,i);
-        }
-        // Print result
-        int totalBranches = 0;
-        for (Map.Entry<Integer, Boolean> entry : BstCaseChanger.branchCoverage.entrySet()) {
-            if (entry.getValue() == true){
-                totalBranches ++;
-            }
-
         }
         assertEquals(1,1);
     }
@@ -52,23 +44,49 @@ public class BstCaseChangersTest {
     @ParameterizedTest
     @MethodSource("provideStringForAllCovered")
     public void branchCoverageTestAllCovered(String e, String toBeFormatted) {
-        int expected = 16;
-
+        ArrayList<Optional<String>> expected = new ArrayList<>();
+        expected.add(Optional.of("oe"));
+        expected.add(Optional.empty());
+        expected.add(Optional.of("OE"));
+        expected.add(Optional.empty());
+        expected.add(Optional.of("ae"));
+        expected.add(Optional.empty());
+        expected.add(Optional.of("AE"));
+        expected.add(Optional.empty());
+        expected.add(Optional.of("ss"));
+        expected.add(Optional.empty());
+        expected.add(Optional.of("AA"));
+        expected.add(Optional.empty());
+        expected.add(Optional.of("aa"));
+        expected.add(Optional.empty());
+        expected.add(Optional.of("i"));
+        expected.add(Optional.of("j"));
+        expected.add(Optional.of("o"));
+        expected.add(Optional.of("O"));
+        expected.add(Optional.of("l"));
+        expected.add(Optional.of("L"));
+        ArrayList<Optional<String>> toCheck = new ArrayList<>();
         // setup
         char[] c = toBeFormatted.toCharArray();
         // run
         for(int i=0; i<c.length;i++){
             Optional<String> s = BstCaseChanger.findSpecialCharToTest(c,i);
+            toCheck.add(s);
         }
-        // Print result
-        int totalBranches = 0;
-        for (Map.Entry<Integer, Boolean> entry : BstCaseChanger.branchCoverage.entrySet()) {
-            if (entry.getValue() == true){
-                totalBranches ++;
+        boolean checker = true;
+        for(int i=0; i<19; i++ ){
+            if (toCheck.get(i).isPresent() && expected.get(i).isPresent()){
+                String a = expected.get(i).get();
+                String b = toCheck.get(i).get();
+                if(!a.equals(b)){
+                    System.out.println("Was false");
+                    System.out.println(expected.get(i).toString());
+                    System.out.println(toCheck.get(i).toString());
+                    checker = false;
+                }
             }
-
         }
-        assertEquals(expected,totalBranches);
+        assertEquals(true,checker);
     }
     private static Stream<Arguments> provideStringForAllCovered() {
         return Stream.of(
