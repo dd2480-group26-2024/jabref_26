@@ -7,6 +7,8 @@ import org.jabref.model.entry.field.InternalField;
 import org.jabref.model.entry.field.OrFields;
 import org.jabref.model.entry.field.StandardField;
 import org.jabref.model.entry.types.StandardEntryType;
+import org.junit.jupiter.api.AfterAll;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -262,6 +264,14 @@ public class FieldComparatorTest {
         assertEquals(1, comparator.compare(smaller, bigger));
     }
 
+    @AfterAll
+    public static void print(){
+        System.out.println("Amount: "+FieldComparator.branchCoverage.size()+" branches covered");
+        for (Map.Entry<String, Boolean> entry : FieldComparator.branchCoverage.entrySet()) {
+            System.out.println("ID: " + entry.getKey() + "\t|\t " + entry.getValue());
+        }
+    }
+  
         @Test
     public void compareYearFieldFirstNan() throws Exception {
         FieldComparator comparator = new FieldComparator(StandardField.YEAR);
