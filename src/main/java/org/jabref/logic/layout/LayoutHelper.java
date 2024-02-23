@@ -286,87 +286,86 @@ public class LayoutHelper {
     }
 
     private void parseField() throws IOException {
-        int c;
-        StringBuilder buffer = null;
+        String name = readFieldName();
+        processFieldName(name);
+    }
 
+    private String readFieldName() throws IOException {
+        StringBuilder buffer = new StringBuilder();
+        int c;
         while (!endOfFile) {
             c = read();
             if (c == -1) {
                 endOfFile = true;
+                branchCoverage.put(2, true);
+                break;
             }
-
             if (!Character.isLetter((char) c) && (c != '_')) {
                 unread(c);
-                handleNonLetterCharacter(buffer);
-                return;
+                branchCoverage.put(3, true);
+                break;
             } else {
-                buffer = handleLetterCharacter(buffer, c);
+                branchCoverage.put(18, true);
+                buffer.append((char) c);
             }
         }
+        return buffer.toString();
     }
 
-    private void handleNonLetterCharacter(StringBuilder buffer) throws IOException {
-        String name = buffer == null ? "" : buffer.toString();
-
+    private void processFieldName(String name) throws IOException {
         if (name.isEmpty()) {
-            handleEmptyName();
-        } else {
-            handleNonEmptyName(name);
+            handleEmptyFieldNameError();
+            return;
+        }
+
+        switch (name.toLowerCase()) {
+            case "begin":
+                doBracketedField(LayoutHelper.IS_FIELD_START);
+                break;
+            case "begingroup":
+                doBracketedField(LayoutHelper.IS_GROUP_START);
+                break;
+            case "format":
+                handleFormatField();
+                break;
+            case "filename":
+                parsedEntries.add(new StringInt(name, LayoutHelper.IS_FILENAME));
+                break;
+            case "filepath":
+                parsedEntries.add(new StringInt(name, LayoutHelper.IS_FILEPATH));
+                break;
+            case "end":
+                doBracketedField(LayoutHelper.IS_FIELD_END);
+                break;
+            case "endgroup":
+                doBracketedField(LayoutHelper.IS_GROUP_END);
+                break;
+            case "encoding":
+                parsedEntries.add(new StringInt(name, LayoutHelper.IS_ENCODING_NAME));
+                break;
+            default:
+                parsedEntries.add(new StringInt(name, LayoutHelper.IS_SIMPLE_COMMAND));
         }
     }
 
-    private StringBuilder handleLetterCharacter(StringBuilder buffer, int c) {
-        if (buffer == null) {
-            buffer = new StringBuilder(100);
-        }
-        buffer.append((char) c);
-        return buffer;
-    }
-
-    private void handleEmptyName() throws IOException {
-        StringBuilder lastFive = new StringBuilder(10);
-        if (parsedEntries.isEmpty()) {
-            lastFive.append("unknown");
-        } else {
-            for (StringInt entry : parsedEntries.subList(Math.max(0, parsedEntries.size() - 6), parsedEntries.size() - 1)) {
-                lastFive.append(entry.s);
-            }
-        }
-        throw new IOException(
-                "Backslash parsing error near \'" + lastFive.toString().replace("\n", " ") + '\'');
-    }
-
-    private void handleNonEmptyName(String name) throws IOException{
-        String lowerCaseName = name.toLowerCase();
-
-        if ("begin".equals(lowerCaseName)) {
-            doBracketedField(LayoutHelper.IS_FIELD_START);
-        } else if ("begingroup".equals(lowerCaseName)) {
-            doBracketedField(LayoutHelper.IS_GROUP_START);
-        } else if ("format".equals(lowerCaseName)) {
-            handleFormat();
-        } else if ("filename".equals(lowerCaseName)) {
-            parsedEntries.add(new StringInt(name, LayoutHelper.IS_FILENAME));
-        } else if ("filepath".equals(lowerCaseName)) {
-            parsedEntries.add(new StringInt(name, LayoutHelper.IS_FILEPATH));
-        } else if ("end".equals(lowerCaseName)) {
-            doBracketedField(LayoutHelper.IS_FIELD_END);
-        } else if ("endgroup".equals(lowerCaseName)) {
-            doBracketedField(LayoutHelper.IS_GROUP_END);
-        } else if ("encoding".equals(lowerCaseName)) {
-            parsedEntries.add(new StringInt(name, LayoutHelper.IS_ENCODING_NAME));
-        } else {
-            parsedEntries.add(new StringInt(name, LayoutHelper.IS_SIMPLE_COMMAND));
-        }
-    }
-
-    private void handleFormat() throws IOException {
-        int c = read();
+    private void handleFormatField() throws IOException {
+        int c = peek();
         if (c == '[') {
             doBracketedOptionField();
         } else {
             doBracketedField(LayoutHelper.IS_OPTION_FIELD);
         }
+    }
+
+    private void handleEmptyFieldNameError() throws IOException {
+        StringBuilder lastFive = new StringBuilder(10);
+        if (parsedEntries.isEmpty()) {
+            lastFive.append("unknown");
+        } else {
+            parsedEntries.subList(Math.max(0, parsedEntries.size() - 6), parsedEntries.size() - 1)
+                    .forEach(entry -> lastFive.append(entry.s));
+        }
+        throw new IOException("Backslash parsing error near \'" + lastFive.toString().replace("\n", " ") + "'");
     }
 
 
