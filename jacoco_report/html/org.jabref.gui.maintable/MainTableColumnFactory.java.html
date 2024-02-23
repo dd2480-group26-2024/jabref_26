@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MainTableColumnFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.maintable</a> &gt; <span class="el_source">MainTableColumnFactory.java</span></div><h1>MainTableColumnFactory.java</h1><pre class="source lang-java linenums">package org.jabref.gui.maintable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Text;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.gui.maintable.columns.FieldColumn;
+import org.jabref.gui.maintable.columns.FileColumn;
+import org.jabref.gui.maintable.columns.LibraryColumn;
+import org.jabref.gui.maintable.columns.LinkedIdentifierColumn;
+import org.jabref.gui.maintable.columns.MainTableColumn;
+import org.jabref.gui.maintable.columns.SpecialFieldColumn;
+import org.jabref.gui.specialfields.SpecialFieldValueViewModel;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.model.groups.AbstractGroup;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class MainTableColumnFactory {
+
+    public static final String STYLE_ICON_COLUMN = &quot;column-icon&quot;;
+
+<span class="nc" id="L53">    private static final Logger LOGGER = LoggerFactory.getLogger(MainTableColumnFactory.class);</span>
+
+    private final PreferencesService preferencesService;
+    private final ColumnPreferences columnPreferences;
+    private final BibDatabaseContext database;
+    private final CellFactory cellFactory;
+    private final UndoManager undoManager;
+    private final DialogService dialogService;
+    private final TaskExecutor taskExecutor;
+    private final StateManager stateManager;
+
+    public MainTableColumnFactory(BibDatabaseContext database,
+                                  PreferencesService preferencesService,
+                                  ColumnPreferences abstractColumnPrefs,
+                                  UndoManager undoManager,
+                                  DialogService dialogService,
+                                  StateManager stateManager,
+<span class="nc" id="L70">                                  TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L71">        this.database = Objects.requireNonNull(database);</span>
+<span class="nc" id="L72">        this.preferencesService = Objects.requireNonNull(preferencesService);</span>
+<span class="nc" id="L73">        this.columnPreferences = abstractColumnPrefs;</span>
+<span class="nc" id="L74">        this.dialogService = dialogService;</span>
+<span class="nc" id="L75">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L76">        this.cellFactory = new CellFactory(preferencesService, undoManager);</span>
+<span class="nc" id="L77">        this.undoManager = undoManager;</span>
+<span class="nc" id="L78">        this.stateManager = stateManager;</span>
+<span class="nc" id="L79">    }</span>
+
+    public TableColumn&lt;BibEntryTableViewModel, ?&gt; createColumn(MainTableColumnModel column) {
+<span class="nc" id="L82">        TableColumn&lt;BibEntryTableViewModel, ?&gt; returnColumn = null;</span>
+<span class="nc bnc" id="L83" title="All 9 branches missed.">        switch (column.getType()) {</span>
+            case INDEX:
+<span class="nc" id="L85">                returnColumn = createIndexColumn(column);</span>
+<span class="nc" id="L86">                break;</span>
+            case GROUPS:
+<span class="nc" id="L88">                returnColumn = createGroupColumn(column);</span>
+<span class="nc" id="L89">                break;</span>
+            case GROUP_ICONS:
+<span class="nc" id="L91">                returnColumn = createGroupIconColumn(column);</span>
+<span class="nc" id="L92">                break;</span>
+            case FILES:
+<span class="nc" id="L94">                returnColumn = createFilesColumn(column);</span>
+<span class="nc" id="L95">                break;</span>
+            case LINKED_IDENTIFIER:
+<span class="nc" id="L97">                returnColumn = createIdentifierColumn(column);</span>
+<span class="nc" id="L98">                break;</span>
+            case LIBRARY_NAME:
+<span class="nc" id="L100">                returnColumn = createLibraryColumn(column);</span>
+<span class="nc" id="L101">                break;</span>
+            case EXTRAFILE:
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                if (!column.getQualifier().isBlank()) {</span>
+<span class="nc" id="L104">                    returnColumn = createExtraFileColumn(column);</span>
+                }
+                break;
+            case SPECIALFIELD:
+<span class="nc bnc" id="L108" title="All 2 branches missed.">                if (!column.getQualifier().isBlank()) {</span>
+<span class="nc" id="L109">                    Field field = FieldFactory.parseField(column.getQualifier());</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">                    if (field instanceof SpecialField) {</span>
+<span class="nc" id="L111">                        returnColumn = createSpecialFieldColumn(column);</span>
+                    } else {
+<span class="nc" id="L113">                        LOGGER.warn(&quot;Special field type '{}' is unknown. Using normal column type.&quot;, column.getQualifier());</span>
+<span class="nc" id="L114">                        returnColumn = createFieldColumn(column);</span>
+                    }
+<span class="nc" id="L116">                }</span>
+                break;
+            default:
+            case NORMALFIELD:
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                if (!column.getQualifier().isBlank()) {</span>
+<span class="nc" id="L121">                    returnColumn = createFieldColumn(column);</span>
+                }
+                break;
+        }
+<span class="nc" id="L125">        return returnColumn;</span>
+    }
+
+    public List&lt;TableColumn&lt;BibEntryTableViewModel, ?&gt;&gt; createColumns() {
+<span class="nc" id="L129">        List&lt;TableColumn&lt;BibEntryTableViewModel, ?&gt;&gt; columns = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L131">        columnPreferences.getColumns().forEach(column -&gt; {</span>
+<span class="nc" id="L132">            columns.add(createColumn(column));</span>
+<span class="nc" id="L133">        });</span>
+
+<span class="nc" id="L135">        return columns;</span>
+    }
+
+    public static void setExactWidth(TableColumn&lt;?, ?&gt; column, double width) {
+<span class="nc" id="L139">        column.setMinWidth(width);</span>
+<span class="nc" id="L140">        column.setPrefWidth(width);</span>
+<span class="nc" id="L141">        column.setMaxWidth(width);</span>
+<span class="nc" id="L142">    }</span>
+
+    /**
+     * Creates a column with a continous number
+     */
+    private TableColumn&lt;BibEntryTableViewModel, String&gt; createIndexColumn(MainTableColumnModel columnModel) {
+<span class="nc" id="L148">        TableColumn&lt;BibEntryTableViewModel, String&gt; column = new MainTableColumn&lt;&gt;(columnModel);</span>
+<span class="nc" id="L149">        Node header = new Text(&quot;#&quot;);</span>
+<span class="nc" id="L150">        header.getStyleClass().add(&quot;mainTable-header&quot;);</span>
+<span class="nc" id="L151">        Tooltip.install(header, new Tooltip(MainTableColumnModel.Type.INDEX.getDisplayName()));</span>
+<span class="nc" id="L152">        column.setGraphic(header);</span>
+<span class="nc" id="L153">        column.setStyle(&quot;-fx-alignment: CENTER-RIGHT;&quot;);</span>
+<span class="nc" id="L154">        column.setCellValueFactory(cellData -&gt; new ReadOnlyObjectWrapper&lt;&gt;(</span>
+<span class="nc" id="L155">                String.valueOf(cellData.getTableView().getItems().indexOf(cellData.getValue()) + 1)));</span>
+<span class="nc" id="L156">        new ValueTableCellFactory&lt;BibEntryTableViewModel, String&gt;()</span>
+<span class="nc" id="L157">                .withText(text -&gt; text)</span>
+<span class="nc" id="L158">                .install(column);</span>
+<span class="nc" id="L159">        column.setSortable(false);</span>
+<span class="nc" id="L160">        return column;</span>
+    }
+
+    /**
+     * Creates a column for group color bars.
+     */
+    private TableColumn&lt;BibEntryTableViewModel, ?&gt; createGroupColumn(MainTableColumnModel columnModel) {
+<span class="nc" id="L167">        TableColumn&lt;BibEntryTableViewModel, List&lt;AbstractGroup&gt;&gt; column = new MainTableColumn&lt;&gt;(columnModel);</span>
+<span class="nc" id="L168">        Node headerGraphic = IconTheme.JabRefIcons.DEFAULT_GROUP_ICON.getGraphicNode();</span>
+<span class="nc" id="L169">        Tooltip.install(headerGraphic, new Tooltip(Localization.lang(&quot;Group color&quot;)));</span>
+<span class="nc" id="L170">        column.setGraphic(headerGraphic);</span>
+<span class="nc" id="L171">        column.getStyleClass().add(STYLE_ICON_COLUMN);</span>
+<span class="nc" id="L172">        setExactWidth(column, ColumnPreferences.ICON_COLUMN_WIDTH);</span>
+<span class="nc" id="L173">        column.setResizable(false);</span>
+<span class="nc" id="L174">        column.setCellValueFactory(cellData -&gt; cellData.getValue().getMatchedGroups());</span>
+<span class="nc" id="L175">        new ValueTableCellFactory&lt;BibEntryTableViewModel, List&lt;AbstractGroup&gt;&gt;()</span>
+<span class="nc" id="L176">                .withGraphic(this::createGroupColorRegion)</span>
+<span class="nc" id="L177">                .install(column);</span>
+<span class="nc" id="L178">        column.setStyle(&quot;-fx-padding: 0 0 0 0;&quot;);</span>
+<span class="nc" id="L179">        column.setSortable(true);</span>
+<span class="nc" id="L180">        return column;</span>
+    }
+
+    /**
+     * Creates a column for group icons
+     */
+    private TableColumn&lt;BibEntryTableViewModel, ?&gt; createGroupIconColumn(MainTableColumnModel columnModel) {
+<span class="nc" id="L187">        TableColumn&lt;BibEntryTableViewModel, List&lt;AbstractGroup&gt;&gt; column = new MainTableColumn&lt;&gt;(columnModel);</span>
+<span class="nc" id="L188">        Node headerGraphic = IconTheme.JabRefIcons.DEFAULT_GROUP_ICON_COLUMN.getGraphicNode();</span>
+<span class="nc" id="L189">        Tooltip.install(headerGraphic, new Tooltip(Localization.lang(&quot;Group icons&quot;)));</span>
+<span class="nc" id="L190">        column.setGraphic(headerGraphic);</span>
+<span class="nc" id="L191">        column.getStyleClass().add(STYLE_ICON_COLUMN);</span>
+<span class="nc" id="L192">        column.setResizable(true);</span>
+<span class="nc" id="L193">        column.setCellValueFactory(cellData -&gt; cellData.getValue().getMatchedGroups());</span>
+<span class="nc" id="L194">        new ValueTableCellFactory&lt;BibEntryTableViewModel, List&lt;AbstractGroup&gt;&gt;()</span>
+<span class="nc" id="L195">                .withGraphic(this::createGroupIconRegion)</span>
+<span class="nc" id="L196">                .install(column);</span>
+<span class="nc" id="L197">        column.setStyle(&quot;-fx-padding: 0 0 0 0;&quot;);</span>
+<span class="nc" id="L198">        column.setSortable(true);</span>
+<span class="nc" id="L199">        return column;</span>
+    }
+
+    private Node createGroupColorRegion(BibEntryTableViewModel entry, List&lt;AbstractGroup&gt; matchedGroups) {
+<span class="nc" id="L203">        List&lt;Color&gt; groupColors = matchedGroups.stream()</span>
+<span class="nc" id="L204">                                               .flatMap(group -&gt; group.getColor().stream())</span>
+<span class="nc" id="L205">                                               .toList();</span>
+
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        if (!groupColors.isEmpty()) {</span>
+<span class="nc" id="L208">            HBox container = new HBox();</span>
+<span class="nc" id="L209">            container.setSpacing(2);</span>
+<span class="nc" id="L210">            container.setMinWidth(10);</span>
+<span class="nc" id="L211">            container.setAlignment(Pos.CENTER_LEFT);</span>
+<span class="nc" id="L212">            container.setPadding(new Insets(0, 2, 0, 2));</span>
+
+<span class="nc" id="L214">            groupColors.stream().distinct().forEach(groupColor -&gt; {</span>
+<span class="nc" id="L215">                Rectangle groupRectangle = new Rectangle();</span>
+<span class="nc" id="L216">                groupRectangle.getStyleClass().add(&quot;groupColumnBackground&quot;);</span>
+<span class="nc" id="L217">                groupRectangle.setWidth(3);</span>
+<span class="nc" id="L218">                groupRectangle.setHeight(18);</span>
+<span class="nc" id="L219">                groupRectangle.setFill(groupColor);</span>
+<span class="nc" id="L220">                groupRectangle.setStrokeWidth(1);</span>
+<span class="nc" id="L221">                container.getChildren().add(groupRectangle);</span>
+<span class="nc" id="L222">            });</span>
+
+<span class="nc" id="L224">            String matchedGroupsString = matchedGroups.stream()</span>
+<span class="nc" id="L225">                                                      .distinct()</span>
+<span class="nc" id="L226">                                                      .map(AbstractGroup::getName)</span>
+<span class="nc" id="L227">                                                      .collect(Collectors.joining(&quot;, &quot;));</span>
+<span class="nc" id="L228">            Tooltip tooltip = new Tooltip(Localization.lang(&quot;Entry is contained in the following groups:&quot;) + &quot;\n&quot; + matchedGroupsString);</span>
+<span class="nc" id="L229">            Tooltip.install(container, tooltip);</span>
+<span class="nc" id="L230">            return container;</span>
+        }
+<span class="nc" id="L232">        return new Pane();</span>
+    }
+
+    private Node createGroupIconRegion(BibEntryTableViewModel entry, List&lt;AbstractGroup&gt; matchedGroups) {
+<span class="nc" id="L236">        List&lt;JabRefIcon&gt; groupIcons = matchedGroups.stream()</span>
+<span class="nc" id="L237">                                                   .filter(abstractGroup -&gt; abstractGroup.getIconName().isPresent())</span>
+<span class="nc" id="L238">                                                   .flatMap(group -&gt; IconTheme.findIcon(group.getIconName().get(), group.getColor().orElse(IconTheme.getDefaultGroupColor())).stream()</span>
+                                                   )
+<span class="nc" id="L240">                                                   .toList();</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (!groupIcons.isEmpty()) {</span>
+<span class="nc" id="L242">            HBox container = new HBox();</span>
+<span class="nc" id="L243">            container.setSpacing(2);</span>
+<span class="nc" id="L244">            container.setMinWidth(10);</span>
+<span class="nc" id="L245">            container.setAlignment(Pos.CENTER_LEFT);</span>
+<span class="nc" id="L246">            container.setPadding(new Insets(0, 2, 0, 2));</span>
+
+<span class="nc" id="L248">            groupIcons.stream().distinct().forEach(groupIcon -&gt; {</span>
+<span class="nc" id="L249">                container.getChildren().add(groupIcon.getGraphicNode());</span>
+<span class="nc" id="L250">            });</span>
+
+<span class="nc" id="L252">            String matchedGroupsString = matchedGroups.stream()</span>
+<span class="nc" id="L253">                                                      .distinct()</span>
+<span class="nc" id="L254">                                                      .map(AbstractGroup::getName)</span>
+<span class="nc" id="L255">                                                      .collect(Collectors.joining(&quot;, &quot;));</span>
+<span class="nc" id="L256">            Tooltip tooltip = new Tooltip(Localization.lang(&quot;Entry is contained in the following groups:&quot;) + &quot;\n&quot; + matchedGroupsString);</span>
+<span class="nc" id="L257">            Tooltip.install(container, tooltip);</span>
+<span class="nc" id="L258">            return container;</span>
+        }
+<span class="nc" id="L260">        return new Pane();</span>
+    }
+
+    /**
+     * Creates a text column to display any standard field.
+     */
+    private TableColumn&lt;BibEntryTableViewModel, ?&gt; createFieldColumn(MainTableColumnModel columnModel) {
+<span class="nc" id="L267">        return new FieldColumn(columnModel);</span>
+    }
+
+    /**
+     * Creates a clickable icons column for DOIs, URLs, URIs and EPrints.
+     */
+    private TableColumn&lt;BibEntryTableViewModel, Map&lt;Field, String&gt;&gt; createIdentifierColumn(MainTableColumnModel columnModel) {
+<span class="nc" id="L274">        return new LinkedIdentifierColumn(columnModel, cellFactory, database, dialogService, preferencesService, stateManager);</span>
+    }
+
+    /**
+     * Creates a column that displays a {@link SpecialField}
+     */
+    private TableColumn&lt;BibEntryTableViewModel, Optional&lt;SpecialFieldValueViewModel&gt;&gt; createSpecialFieldColumn(MainTableColumnModel columnModel) {
+<span class="nc" id="L281">        return new SpecialFieldColumn(columnModel, preferencesService, undoManager);</span>
+    }
+
+    /**
+     * Creates a column for all the linked files. Instead of creating a column for a single file type, like {@link
+     * #createExtraFileColumn(MainTableColumnModel)} createExtraFileColumn} does, this creates one single column collecting all file links.
+     */
+    private TableColumn&lt;BibEntryTableViewModel, List&lt;LinkedFile&gt;&gt; createFilesColumn(MainTableColumnModel columnModel) {
+<span class="nc" id="L289">        return new FileColumn(columnModel,</span>
+                database,
+                dialogService,
+                preferencesService,
+                taskExecutor);
+    }
+
+    /**
+     * Creates a column for all the linked files of a single file type.
+     */
+    private TableColumn&lt;BibEntryTableViewModel, List&lt;LinkedFile&gt;&gt; createExtraFileColumn(MainTableColumnModel columnModel) {
+<span class="nc" id="L300">        return new FileColumn(columnModel,</span>
+                database,
+                dialogService,
+                preferencesService,
+<span class="nc" id="L304">                columnModel.getQualifier(),</span>
+                taskExecutor);
+    }
+
+    /**
+     * Create library column containing the Filename of the library's bib file
+     */
+    private TableColumn&lt;BibEntryTableViewModel, String&gt; createLibraryColumn(MainTableColumnModel columnModel) {
+<span class="nc" id="L312">        return new LibraryColumn(columnModel);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

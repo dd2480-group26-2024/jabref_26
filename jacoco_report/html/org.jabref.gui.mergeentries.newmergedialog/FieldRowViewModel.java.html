@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldRowViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries.newmergedialog</a> &gt; <span class="el_source">FieldRowViewModel.java</span></div><h1>FieldRowViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries.newmergedialog;
+
+import javax.swing.undo.AbstractUndoableEdit;
+import javax.swing.undo.CannotRedoException;
+import javax.swing.undo.CannotUndoException;
+import javax.swing.undo.CompoundEdit;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+import org.jabref.gui.mergeentries.newmergedialog.fieldsmerger.FieldMerger;
+import org.jabref.gui.mergeentries.newmergedialog.fieldsmerger.FieldMergerFactory;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.InternalField;
+import org.jabref.model.entry.types.EntryTypeFactory;
+import org.jabref.model.strings.StringUtil;
+
+import com.tobiasdiez.easybind.EasyBind;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+<span class="fc" id="L29">public class FieldRowViewModel {</span>
+<span class="fc" id="L30">    public enum Selection {</span>
+<span class="fc" id="L31">        LEFT,</span>
+<span class="fc" id="L32">        RIGHT,</span>
+        /**
+         * When the user types something into the merged field value and neither the left nor
+         * right values match it, NONE is selected
+         * */
+<span class="fc" id="L37">        NONE</span>
+    }
+
+<span class="fc" id="L40">    private final Logger LOGGER = LoggerFactory.getLogger(FieldRowViewModel.class);</span>
+<span class="fc" id="L41">    private final BooleanProperty isFieldsMerged = new SimpleBooleanProperty(Boolean.FALSE);</span>
+
+<span class="fc" id="L43">    private final ObjectProperty&lt;Selection&gt; selection = new SimpleObjectProperty&lt;&gt;();</span>
+
+<span class="fc" id="L45">    private final StringProperty leftFieldValue = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L46">    private final StringProperty rightFieldValue = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L47">    private final StringProperty mergedFieldValue = new SimpleStringProperty(&quot;&quot;);</span>
+
+    private final Field field;
+
+    private final BibEntry leftEntry;
+
+    private final BibEntry rightEntry;
+
+    private final BibEntry mergedEntry;
+
+    private final BooleanBinding hasEqualLeftAndRight;
+
+    private final FieldMergerFactory fieldMergerFactory;
+
+<span class="fc" id="L61">    private final CompoundEdit fieldsMergedEdit = new CompoundEdit();</span>
+
+<span class="fc" id="L63">    public FieldRowViewModel(Field field, BibEntry leftEntry, BibEntry rightEntry, BibEntry mergedEntry, FieldMergerFactory fieldMergerFactory) {</span>
+<span class="fc" id="L64">        this.field = field;</span>
+<span class="fc" id="L65">        this.leftEntry = leftEntry;</span>
+<span class="fc" id="L66">        this.rightEntry = rightEntry;</span>
+<span class="fc" id="L67">        this.mergedEntry = mergedEntry;</span>
+<span class="fc" id="L68">        this.fieldMergerFactory = fieldMergerFactory;</span>
+
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (field.equals(InternalField.TYPE_HEADER)) {</span>
+<span class="nc" id="L71">            setLeftFieldValue(leftEntry.getType().getDisplayName());</span>
+<span class="nc" id="L72">            setRightFieldValue(rightEntry.getType().getDisplayName());</span>
+        } else {
+<span class="fc" id="L74">            setLeftFieldValue(leftEntry.getField(field).orElse(&quot;&quot;));</span>
+<span class="fc" id="L75">            setRightFieldValue(rightEntry.getField(field).orElse(&quot;&quot;));</span>
+        }
+
+<span class="fc" id="L78">        EasyBind.listen(leftFieldValueProperty(), (obs, old, leftValue) -&gt; leftEntry.setField(field, leftValue));</span>
+<span class="fc" id="L79">        EasyBind.listen(rightFieldValueProperty(), (obs, old, rightValue) -&gt; rightEntry.setField(field, rightValue));</span>
+<span class="fc" id="L80">        EasyBind.listen(mergedFieldValueProperty(), (obs, old, mergedFieldValue) -&gt; {</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            if (field.equals(InternalField.TYPE_HEADER)) {</span>
+<span class="nc" id="L82">                getMergedEntry().setType(EntryTypeFactory.parse(mergedFieldValue));</span>
+            } else {
+<span class="fc" id="L84">                getMergedEntry().setField(field, mergedFieldValue);</span>
+            }
+<span class="fc" id="L86">        });</span>
+
+<span class="fc" id="L88">        hasEqualLeftAndRight = Bindings.createBooleanBinding(this::hasEqualLeftAndRightValues, leftFieldValueProperty(), rightFieldValueProperty());</span>
+
+<span class="fc" id="L90">        selectNonEmptyValue();</span>
+
+<span class="fc" id="L92">        EasyBind.listen(isFieldsMergedProperty(), (obs, old, areFieldsMerged) -&gt; {</span>
+<span class="fc" id="L93">            LOGGER.debug(&quot;Field are merged: {}&quot;, areFieldsMerged);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (areFieldsMerged) {</span>
+<span class="fc" id="L95">                selectLeftValue();</span>
+            } else {
+<span class="fc" id="L97">                selectNonEmptyValue();</span>
+            }
+<span class="fc" id="L99">        });</span>
+
+<span class="fc" id="L101">        EasyBind.subscribe(selectionProperty(), selection -&gt; {</span>
+<span class="fc" id="L102">            LOGGER.debug(&quot;Selecting {}' value for field {}&quot;, selection, field.getDisplayName());</span>
+<span class="pc bpc" id="L103" title="1 of 3 branches missed.">            switch (selection) {</span>
+<span class="fc" id="L104">                case LEFT -&gt; EasyBind.subscribe(leftFieldValueProperty(), this::setMergedFieldValue);</span>
+<span class="fc" id="L105">                case RIGHT -&gt; EasyBind.subscribe(rightFieldValueProperty(), this::setMergedFieldValue);</span>
+            }
+<span class="fc" id="L107">        });</span>
+
+<span class="fc" id="L109">        EasyBind.subscribe(mergedFieldValueProperty(), mergedValue -&gt; {</span>
+<span class="fc" id="L110">            LOGGER.debug(&quot;Merged value is {} for field {}&quot;, mergedValue, field.getDisplayName());</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (mergedValue.equals(getLeftFieldValue())) {</span>
+<span class="fc" id="L112">                selectLeftValue();</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            } else if (getMergedFieldValue().equals(getRightFieldValue())) {</span>
+<span class="fc" id="L114">                selectRightValue();</span>
+            } else {
+<span class="nc" id="L116">                selectNone();</span>
+            }
+<span class="fc" id="L118">        });</span>
+
+<span class="fc" id="L120">        EasyBind.subscribe(hasEqualLeftAndRightBinding(), this::setIsFieldsMerged);</span>
+<span class="fc" id="L121">    }</span>
+
+    public void selectNonEmptyValue() {
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (StringUtil.isNullOrEmpty(leftFieldValue.get())) {</span>
+<span class="fc" id="L125">            selectRightValue();</span>
+        } else {
+<span class="fc" id="L127">            selectLeftValue();</span>
+        }
+<span class="fc" id="L129">    }</span>
+
+    public boolean hasEqualLeftAndRightValues() {
+<span class="fc" id="L132">        return leftFieldValue.get().equals(rightFieldValue.get());</span>
+    }
+
+    public void selectLeftValue() {
+<span class="fc" id="L136">        setSelection(Selection.LEFT);</span>
+<span class="fc" id="L137">    }</span>
+
+    public void selectRightValue() {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (isFieldsMerged()) {</span>
+<span class="nc" id="L141">            selectLeftValue();</span>
+        } else {
+<span class="fc" id="L143">            setSelection(Selection.RIGHT);</span>
+        }
+<span class="fc" id="L145">    }</span>
+
+    public void selectNone() {
+<span class="nc" id="L148">        setSelection(Selection.NONE);</span>
+<span class="nc" id="L149">    }</span>
+
+    public void setMergedFieldValue(String mergedFieldValue) {
+<span class="fc" id="L152">        mergedFieldValueProperty().set(mergedFieldValue);</span>
+<span class="fc" id="L153">    }</span>
+
+    public StringProperty mergedFieldValueProperty() {
+<span class="fc" id="L156">        return mergedFieldValue;</span>
+    }
+
+    public String getMergedFieldValue() {
+<span class="fc" id="L160">        return mergedFieldValue.get();</span>
+    }
+
+    public void mergeFields() {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        assert !hasEqualLeftAndRightValues();</span>
+
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (!FieldMergerFactory.canMerge(field)) {</span>
+<span class="fc" id="L167">            throw new UnsupportedOperationException();</span>
+        }
+
+<span class="fc" id="L170">        String oldLeftFieldValue = getLeftFieldValue();</span>
+<span class="fc" id="L171">        String oldRightFieldValue = getRightFieldValue();</span>
+
+<span class="fc" id="L173">        FieldMerger fieldMerger = fieldMergerFactory.create(field);</span>
+<span class="fc" id="L174">        String mergedFields = fieldMerger.merge(getLeftFieldValue(), getRightFieldValue());</span>
+<span class="fc" id="L175">        setLeftFieldValue(mergedFields);</span>
+<span class="fc" id="L176">        setRightFieldValue(mergedFields);</span>
+
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (fieldsMergedEdit.canRedo()) {</span>
+<span class="nc" id="L179">            fieldsMergedEdit.redo();</span>
+        } else {
+<span class="fc" id="L181">            fieldsMergedEdit.addEdit(new MergeFieldsUndo(oldLeftFieldValue, oldRightFieldValue, mergedFields));</span>
+<span class="fc" id="L182">            fieldsMergedEdit.end();</span>
+        }
+<span class="fc" id="L184">    }</span>
+
+    public void unmergeFields() {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (fieldsMergedEdit.canUndo()) {</span>
+<span class="fc" id="L188">            fieldsMergedEdit.undo();</span>
+        }
+<span class="fc" id="L190">    }</span>
+
+    public BooleanBinding hasEqualLeftAndRightBinding() {
+<span class="fc" id="L193">        return hasEqualLeftAndRight;</span>
+    }
+
+    public ObjectProperty&lt;Selection&gt; selectionProperty() {
+<span class="fc" id="L197">        return selection;</span>
+    }
+
+    public void setSelection(Selection select) {
+<span class="fc" id="L201">        selectionProperty().set(select);</span>
+<span class="fc" id="L202">    }</span>
+
+    public Selection getSelection() {
+<span class="fc" id="L205">        return selectionProperty().get();</span>
+    }
+
+    public boolean isFieldsMerged() {
+<span class="fc" id="L209">        return isFieldsMerged.get();</span>
+    }
+
+    public BooleanProperty isFieldsMergedProperty() {
+<span class="fc" id="L213">        return isFieldsMerged;</span>
+    }
+
+    public void setIsFieldsMerged(boolean isFieldsMerged) {
+<span class="fc" id="L217">        this.isFieldsMerged.set(isFieldsMerged);</span>
+<span class="fc" id="L218">    }</span>
+
+    public String getLeftFieldValue() {
+<span class="fc" id="L221">        return leftFieldValue.get();</span>
+    }
+
+    public StringProperty leftFieldValueProperty() {
+<span class="fc" id="L225">        return leftFieldValue;</span>
+    }
+
+    public void setLeftFieldValue(String leftFieldValue) {
+<span class="fc" id="L229">        this.leftFieldValue.set(leftFieldValue);</span>
+<span class="fc" id="L230">    }</span>
+
+    public String getRightFieldValue() {
+<span class="fc" id="L233">        return rightFieldValue.get();</span>
+    }
+
+    public StringProperty rightFieldValueProperty() {
+<span class="fc" id="L237">        return rightFieldValue;</span>
+    }
+
+    public void setRightFieldValue(String rightFieldValue) {
+<span class="fc" id="L241">        this.rightFieldValue.set(rightFieldValue);</span>
+<span class="fc" id="L242">    }</span>
+
+    public Field getField() {
+<span class="nc" id="L245">        return field;</span>
+    }
+
+    public BibEntry getLeftEntry() {
+<span class="nc" id="L249">        return leftEntry;</span>
+    }
+
+    public BibEntry getRightEntry() {
+<span class="nc" id="L253">        return rightEntry;</span>
+    }
+
+    public BibEntry getMergedEntry() {
+<span class="fc" id="L257">        return mergedEntry;</span>
+    }
+
+    class MergeFieldsUndo extends AbstractUndoableEdit {
+        private final String oldLeft;
+        private final String oldRight;
+        private final String mergedFields;
+
+<span class="fc" id="L265">        MergeFieldsUndo(String oldLeft, String oldRight, String mergedFields) {</span>
+<span class="fc" id="L266">            this.oldLeft = oldLeft;</span>
+<span class="fc" id="L267">            this.oldRight = oldRight;</span>
+<span class="fc" id="L268">            this.mergedFields = mergedFields;</span>
+<span class="fc" id="L269">        }</span>
+
+        @Override
+        public void undo() throws CannotUndoException {
+<span class="fc" id="L273">            super.undo();</span>
+<span class="fc" id="L274">            setLeftFieldValue(oldLeft);</span>
+<span class="fc" id="L275">            setRightFieldValue(oldRight);</span>
+<span class="fc" id="L276">        }</span>
+
+        @Override
+        public void redo() throws CannotRedoException {
+<span class="nc" id="L280">            super.redo();</span>
+<span class="nc" id="L281">            setLeftFieldValue(mergedFields);</span>
+<span class="nc" id="L282">            setRightFieldValue(mergedFields);</span>
+<span class="nc" id="L283">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

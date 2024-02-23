@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PersistenceVisualStateTable.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.maintable</a> &gt; <span class="el_source">PersistenceVisualStateTable.java</span></div><h1>PersistenceVisualStateTable.java</h1><pre class="source lang-java linenums">package org.jabref.gui.maintable;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+import javafx.beans.InvalidationListener;
+import javafx.collections.ListChangeListener;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+
+import org.jabref.gui.maintable.columns.MainTableColumn;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Keep track of changes made to the columns (reordering, resorting, resizing).
+ */
+public class PersistenceVisualStateTable {
+
+<span class="nc" id="L21">    private static final Logger LOGGER = LoggerFactory.getLogger(PersistenceVisualStateTable.class);</span>
+
+    protected final TableView&lt;BibEntryTableViewModel&gt; table;
+    protected final ColumnPreferences preferences;
+
+<span class="nc" id="L26">    public PersistenceVisualStateTable(TableView&lt;BibEntryTableViewModel&gt; table, ColumnPreferences preferences) {</span>
+<span class="nc" id="L27">        this.table = table;</span>
+<span class="nc" id="L28">        this.preferences = preferences;</span>
+<span class="nc" id="L29">    }</span>
+
+    public void addListeners() {
+<span class="nc" id="L32">        table.getColumns().addListener((InvalidationListener) obs -&gt; updateColumns());</span>
+<span class="nc" id="L33">        table.getSortOrder().addListener((ListChangeListener&lt;? super TableColumn&lt;BibEntryTableViewModel, ?&gt;&gt;) obs -&gt; updateSortOrder());</span>
+
+        // As we store the ColumnModels of the MainTable, we need to add the listener to the ColumnModel properties,
+        // since the value is bound to the model after the listener to the column itself is called.
+
+<span class="nc" id="L38">        table.getColumns().stream()</span>
+<span class="nc" id="L39">             .map(col -&gt; ((MainTableColumn&lt;?&gt;) col).getModel())</span>
+<span class="nc" id="L40">             .forEach(model -&gt; {</span>
+<span class="nc" id="L41">                 model.widthProperty().addListener(obs -&gt; updateColumns());</span>
+<span class="nc" id="L42">                 model.sortTypeProperty().addListener(obs -&gt; updateColumns());</span>
+<span class="nc" id="L43">             });</span>
+<span class="nc" id="L44">    }</span>
+
+    /**
+     * Stores shown columns, their width and their {@link TableColumn.SortType} in preferences.
+     * The conversion to the &quot;real&quot; string in the preferences is made at
+     * {@link org.jabref.preferences.JabRefPreferences#getColumnSortTypesAsStringList(ColumnPreferences)}
+     */
+    private void updateColumns() {
+<span class="nc" id="L52">        List&lt;MainTableColumnModel&gt; list = toList(table.getColumns());</span>
+<span class="nc" id="L53">        LOGGER.debug(&quot;Updating columns to {}&quot;, list);</span>
+<span class="nc" id="L54">        preferences.setColumns(list);</span>
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * Stores the SortOrder of the Table in the preferences. This includes {@link TableColumn.SortType}.
+     * &lt;br&gt;
+     * Cannot be combined with updateColumns, because JavaFX would provide just an empty list for the sort order
+     * on other changes.
+     */
+    private void updateSortOrder() {
+<span class="nc" id="L64">        LOGGER.debug(&quot;Updating sort order&quot;);</span>
+<span class="nc" id="L65">        preferences.setColumnSortOrder(toList(table.getSortOrder()));</span>
+<span class="nc" id="L66">    }</span>
+
+    private List&lt;MainTableColumnModel&gt; toList(List&lt;TableColumn&lt;BibEntryTableViewModel, ?&gt;&gt; columns) {
+<span class="nc" id="L69">        return columns.stream()</span>
+<span class="nc" id="L70">                .filter(col -&gt; col instanceof MainTableColumn&lt;?&gt;)</span>
+<span class="nc" id="L71">                .map(column -&gt; ((MainTableColumn&lt;?&gt;) column).getModel())</span>
+<span class="nc" id="L72">                .collect(Collectors.toList());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

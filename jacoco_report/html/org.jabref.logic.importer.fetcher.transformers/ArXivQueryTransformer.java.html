@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ArXivQueryTransformer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher.transformers</a> &gt; <span class="el_source">ArXivQueryTransformer.java</span></div><h1>ArXivQueryTransformer.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher.transformers;
+
+import java.util.Optional;
+
+<span class="fc" id="L5">public class ArXivQueryTransformer extends YearRangeByFilteringQueryTransformer {</span>
+    @Override
+    protected String getLogicalAndOperator() {
+<span class="fc" id="L8">        return &quot; AND &quot;;</span>
+    }
+
+    @Override
+    protected String getLogicalOrOperator() {
+<span class="fc" id="L13">        return &quot; OR &quot;;</span>
+    }
+
+    @Override
+    protected String getLogicalNotOperator() {
+<span class="fc" id="L18">        return &quot; ANDNOT &quot;;</span>
+    }
+
+    @Override
+    protected String handleAuthor(String author) {
+<span class="fc" id="L23">        return createKeyValuePair(&quot;au&quot;, author);</span>
+    }
+
+    @Override
+    protected String handleTitle(String title) {
+<span class="fc" id="L28">        return createKeyValuePair(&quot;ti&quot;, title);</span>
+    }
+
+    @Override
+    protected String handleJournal(String journalTitle) {
+<span class="fc" id="L33">        return createKeyValuePair(&quot;jr&quot;, journalTitle);</span>
+    }
+
+    /**
+     * Manual testing shows that this works if added as an unfielded term, might lead to false positives
+     */
+    @Override
+    protected String handleYear(String year) {
+<span class="nc" id="L41">        startYear = Math.min(startYear, Integer.parseInt(year));</span>
+<span class="nc" id="L42">        endYear = Math.max(endYear, Integer.parseInt(year));</span>
+<span class="nc" id="L43">        return year;</span>
+    }
+
+    @Override
+    protected Optional&lt;String&gt; handleUnFieldedTerm(String term) {
+<span class="fc" id="L48">        return Optional.of(createKeyValuePair(&quot;all&quot;, term));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TooltipTextUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">TooltipTextUtil.java</span></div><h1>TooltipTextUtil.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javafx.scene.text.Text;
+
+/**
+ * Utility class with static methods for javafx {@link Text} objects
+ */
+<span class="nc" id="L14">public class TooltipTextUtil {</span>
+
+    // (?s) tells Java that &quot;.&quot; also matches the newline character
+    // (?&lt;...&gt;...) are named groups in Java regular expressions: https://stackoverflow.com/a/415635/873282
+    // .*? tells to match non-greedy (see https://stackoverflow.com/q/7124778/873282 for details)
+<span class="fc" id="L19">    private static final Pattern TT_TEXT = Pattern.compile(&quot;(?s)(?&lt;before&gt;.*?)&lt;tt&gt;(?&lt;in&gt;.*?)&lt;/tt&gt;&quot;);</span>
+
+<span class="fc" id="L21">    private static final Pattern B_TEXT = Pattern.compile(&quot;(?s)(?&lt;before&gt;.*?)&lt;b&gt;(?&lt;in&gt;.*?)&lt;/b&gt;&quot;);</span>
+
+<span class="fc" id="L23">    public enum TextType {</span>
+<span class="fc" id="L24">        NORMAL, BOLD, ITALIC, MONOSPACED</span>
+    }
+
+    public static Text createText(String textString, TextType textType) {
+<span class="fc" id="L28">        Text text = new Text(textString);</span>
+<span class="fc bfc" id="L29" title="All 4 branches covered.">        switch (textType) {</span>
+            case BOLD:
+<span class="fc" id="L31">                text.getStyleClass().setAll(&quot;tooltip-text-bold&quot;);</span>
+<span class="fc" id="L32">                break;</span>
+            case ITALIC:
+<span class="fc" id="L34">                text.getStyleClass().setAll(&quot;tooltip-text-italic&quot;);</span>
+<span class="fc" id="L35">                break;</span>
+            case MONOSPACED:
+<span class="fc" id="L37">                text.getStyleClass().setAll(&quot;tooltip-text-monospaced&quot;);</span>
+<span class="fc" id="L38">                break;</span>
+            default:
+                break;
+        }
+<span class="fc" id="L42">        return text;</span>
+    }
+
+    public static Text createText(String textString) {
+<span class="fc" id="L46">        return createText(textString, TextType.NORMAL);</span>
+    }
+
+    /**
+     * Creates a list of Text elements respecting &lt;code&gt;tt&lt;/code&gt; and &lt;code&gt;b&lt;/code&gt; markers.
+     * Nesting of these markers is not possible.
+     */
+    public static List&lt;Text&gt; createTextsFromHtml(String htmlString) {
+<span class="nc" id="L54">        List&lt;Text&gt; result = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L56">        Matcher matcher = TT_TEXT.matcher(htmlString);</span>
+<span class="nc" id="L57">        int lastMatchPos = 0;</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L59">            lastMatchPos = matcher.end();</span>
+<span class="nc" id="L60">            String before = matcher.group(&quot;before&quot;);</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            if (!before.isBlank()) {</span>
+<span class="nc" id="L62">                result.addAll(convertHtmlBold(before));</span>
+            }
+<span class="nc" id="L64">            String in = matcher.group(&quot;in&quot;);</span>
+<span class="nc" id="L65">            result.add(TooltipTextUtil.createText(in, TooltipTextUtil.TextType.MONOSPACED));</span>
+<span class="nc" id="L66">        }</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (lastMatchPos &lt; htmlString.length()) {</span>
+<span class="nc" id="L68">            String remaining = htmlString.substring(lastMatchPos);</span>
+<span class="nc" id="L69">            result.addAll(convertHtmlBold(remaining));</span>
+        }
+
+<span class="nc" id="L72">        return result;</span>
+    }
+
+    private static List&lt;Text&gt; convertHtmlBold(String htmlString) {
+<span class="nc" id="L76">        List&lt;Text&gt; result = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L78">        Matcher matcher = B_TEXT.matcher(htmlString);</span>
+<span class="nc" id="L79">        int lastMatchPos = 0;</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L81">            lastMatchPos = matcher.end();</span>
+<span class="nc" id="L82">            String before = matcher.group(&quot;before&quot;);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (!before.isBlank()) {</span>
+<span class="nc" id="L84">                result.add(TooltipTextUtil.createText(before));</span>
+            }
+<span class="nc" id="L86">            String in = matcher.group(&quot;in&quot;);</span>
+<span class="nc" id="L87">            result.add(TooltipTextUtil.createText(in, TextType.BOLD));</span>
+<span class="nc" id="L88">        }</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (lastMatchPos &lt; htmlString.length()) {</span>
+<span class="nc" id="L90">            String remaining = htmlString.substring(lastMatchPos);</span>
+<span class="nc" id="L91">            result.add(TooltipTextUtil.createText(remaining));</span>
+        }
+
+<span class="nc" id="L94">        return result;</span>
+    }
+
+    /**
+     * Formats a String to multiple Texts by replacing some parts and adding font characteristics.
+     */
+    public static List&lt;Text&gt; formatToTexts(String original, TextReplacement... replacements) {
+<span class="fc" id="L101">        List&lt;Text&gt; textList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L102">        textList.add(new Text(original));</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (TextReplacement replacement : replacements) {</span>
+<span class="fc" id="L104">            splitReplace(textList, replacement);</span>
+        }
+
+<span class="fc" id="L107">        return textList;</span>
+    }
+
+    private static void splitReplace(List&lt;Text&gt; textList, TextReplacement replacement) {
+<span class="fc" id="L111">        Optional&lt;Text&gt; textContainingReplacement = textList.stream().filter(it -&gt; it.getText().contains(replacement.toReplace)).findFirst();</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (textContainingReplacement.isPresent()) {</span>
+<span class="fc" id="L113">            int index = textList.indexOf(textContainingReplacement.get());</span>
+<span class="fc" id="L114">            String original = textContainingReplacement.get().getText();</span>
+<span class="fc" id="L115">            textList.remove(index);</span>
+<span class="fc" id="L116">            String[] textParts = original.split(replacement.toReplace);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (textParts.length == 2) {</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                if (&quot;&quot;.equals(textParts[0])) {</span>
+<span class="fc" id="L119">                    textList.add(index, TooltipTextUtil.createText(replacement.replacement, replacement.textType));</span>
+<span class="fc" id="L120">                    textList.add(index + 1, TooltipTextUtil.createText(textParts[1], TooltipTextUtil.TextType.NORMAL));</span>
+                } else {
+<span class="fc" id="L122">                    textList.add(index, TooltipTextUtil.createText(textParts[0], TooltipTextUtil.TextType.NORMAL));</span>
+<span class="fc" id="L123">                    textList.add(index + 1, TooltipTextUtil.createText(replacement.replacement, replacement.textType));</span>
+<span class="fc" id="L124">                    textList.add(index + 2, TooltipTextUtil.createText(textParts[1], TooltipTextUtil.TextType.NORMAL));</span>
+                }
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            } else if (textParts.length == 1) {</span>
+<span class="fc" id="L127">                textList.add(index, TooltipTextUtil.createText(textParts[0], TooltipTextUtil.TextType.NORMAL));</span>
+<span class="fc" id="L128">                textList.add(index + 1, TooltipTextUtil.createText(replacement.replacement, replacement.textType));</span>
+            } else {
+<span class="nc" id="L130">                throw new IllegalStateException(&quot;It is not allowed that the toReplace string: '&quot; + replacement.toReplace</span>
+                        + &quot;' exists multiple times in the original string&quot;);
+            }
+<span class="fc" id="L133">        } else {</span>
+<span class="nc" id="L134">            throw new IllegalStateException(&quot;It is not allowed that the toReplace string: '&quot; + replacement.toReplace</span>
+                    + &quot;' does not exist in the original string&quot;);
+        }
+<span class="fc" id="L137">    }</span>
+
+    public static class TextReplacement {
+        private final String toReplace;
+        private final String replacement;
+        private final TooltipTextUtil.TextType textType;
+
+<span class="fc" id="L144">        public TextReplacement(String toReplace, String replacement, TooltipTextUtil.TextType textType) {</span>
+<span class="fc" id="L145">            this.toReplace = toReplace;</span>
+<span class="fc" id="L146">            this.replacement = replacement;</span>
+<span class="fc" id="L147">            this.textType = textType;</span>
+<span class="fc" id="L148">        }</span>
+    }
+
+    public static String textToHtmlString(Text text) {
+<span class="fc" id="L152">        String textString = text.getText();</span>
+<span class="fc" id="L153">        textString = textString.replace(&quot;\n&quot;, &quot;&lt;br&gt;&quot;);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (text.getStyleClass().toString().contains(&quot;tooltip-text-monospaced&quot;)) {</span>
+<span class="fc" id="L155">            textString = &quot;&lt;tt&gt;%s&lt;/tt&gt;&quot;.formatted(textString);</span>
+        }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (text.getStyleClass().toString().contains(&quot;tooltip-text-bold&quot;)) {</span>
+<span class="fc" id="L158">            textString = &quot;&lt;b&gt;%s&lt;/b&gt;&quot;.formatted(textString);</span>
+        }
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (text.getStyleClass().toString().contains(&quot;tooltip-text-italic&quot;)) {</span>
+<span class="fc" id="L161">            textString = &quot;&lt;i&gt;%s&lt;/i&gt;&quot;.formatted(textString);</span>
+        }
+<span class="fc" id="L163">        return textString;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

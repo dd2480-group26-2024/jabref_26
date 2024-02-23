@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManageStudyDefinitionViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.slr</a> &gt; <span class="el_source">ManageStudyDefinitionViewModel.java</span></div><h1>ManageStudyDefinitionViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.slr;
+
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import javafx.beans.property.Property;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.gui.DialogService;
+import org.jabref.logic.crawler.StudyRepository;
+import org.jabref.logic.crawler.StudyYamlParser;
+import org.jabref.logic.git.GitHandler;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ImporterPreferences;
+import org.jabref.logic.importer.SearchBasedFetcher;
+import org.jabref.logic.importer.WebFetchers;
+import org.jabref.logic.importer.fetcher.ACMPortalFetcher;
+import org.jabref.logic.importer.fetcher.CompositeSearchBasedFetcher;
+import org.jabref.logic.importer.fetcher.DBLPFetcher;
+import org.jabref.logic.importer.fetcher.IEEE;
+import org.jabref.logic.importer.fetcher.SpringerFetcher;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.study.Study;
+import org.jabref.model.study.StudyDatabase;
+import org.jabref.model.study.StudyQuery;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class provides a model for managing study definitions.
+ * To visualize the model one can bind the properties to UI elements.
+ */
+public class ManageStudyDefinitionViewModel {
+<span class="fc" id="L44">    private static final Logger LOGGER = LoggerFactory.getLogger(ManageStudyDefinitionViewModel.class);</span>
+
+<span class="fc" id="L46">    private static final Set&lt;String&gt; DEFAULT_SELECTION = Set.of(</span>
+            ACMPortalFetcher.FETCHER_NAME,
+            IEEE.FETCHER_NAME,
+            SpringerFetcher.FETCHER_NAME,
+            DBLPFetcher.FETCHER_NAME);
+
+<span class="fc" id="L52">    private final StringProperty title = new SimpleStringProperty();</span>
+<span class="fc" id="L53">    private final ObservableList&lt;String&gt; authors = FXCollections.observableArrayList();</span>
+<span class="fc" id="L54">    private final ObservableList&lt;String&gt; researchQuestions = FXCollections.observableArrayList();</span>
+<span class="fc" id="L55">    private final ObservableList&lt;String&gt; queries = FXCollections.observableArrayList();</span>
+<span class="fc" id="L56">    private final ObservableList&lt;StudyCatalogItem&gt; databases = FXCollections.observableArrayList();</span>
+
+    // Hold the complement of databases for the selector
+<span class="fc" id="L59">    private final SimpleStringProperty directory = new SimpleStringProperty();</span>
+
+    private final DialogService dialogService;
+
+    /**
+     * Constructor for a new study
+     */
+    public ManageStudyDefinitionViewModel(ImportFormatPreferences importFormatPreferences,
+                                          ImporterPreferences importerPreferences,
+<span class="fc" id="L68">                                          DialogService dialogService) {</span>
+<span class="fc" id="L69">        databases.addAll(WebFetchers.getSearchBasedFetchers(importFormatPreferences, importerPreferences)</span>
+<span class="fc" id="L70">                                    .stream()</span>
+<span class="fc" id="L71">                                    .map(SearchBasedFetcher::getName)</span>
+                                    // The user wants to select specific fetchers
+                                    // The fetcher summarizing ALL fetchers can be emulated by selecting ALL fetchers (which happens rarely when doing an SLR)
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                                    .filter(name -&gt; !name.equals(CompositeSearchBasedFetcher.FETCHER_NAME))</span>
+<span class="fc" id="L75">                                    .map(name -&gt; {</span>
+<span class="fc" id="L76">                                        boolean enabled = DEFAULT_SELECTION.contains(name);</span>
+<span class="fc" id="L77">                                        return new StudyCatalogItem(name, enabled);</span>
+                                    })
+<span class="fc" id="L79">                                    .toList());</span>
+<span class="fc" id="L80">        this.dialogService = Objects.requireNonNull(dialogService);</span>
+<span class="fc" id="L81">    }</span>
+
+    /**
+     * Constructor for an existing study
+     *
+     * @param study          The study to initialize the UI from
+     * @param studyDirectory The path where the study resides
+     */
+    public ManageStudyDefinitionViewModel(Study study,
+                                          Path studyDirectory,
+                                          ImportFormatPreferences importFormatPreferences,
+                                          ImporterPreferences importerPreferences,
+<span class="fc" id="L93">                                          DialogService dialogService) {</span>
+        // copy the content of the study object into the UI fields
+<span class="fc" id="L95">        authors.addAll(Objects.requireNonNull(study).getAuthors());</span>
+<span class="fc" id="L96">        title.setValue(study.getTitle());</span>
+<span class="fc" id="L97">        researchQuestions.addAll(study.getResearchQuestions());</span>
+<span class="fc" id="L98">        queries.addAll(study.getQueries().stream().map(StudyQuery::getQuery).toList());</span>
+<span class="fc" id="L99">        List&lt;StudyDatabase&gt; studyDatabases = study.getDatabases();</span>
+<span class="fc" id="L100">        databases.addAll(WebFetchers.getSearchBasedFetchers(importFormatPreferences, importerPreferences)</span>
+<span class="fc" id="L101">                                    .stream()</span>
+<span class="fc" id="L102">                                    .map(SearchBasedFetcher::getName)</span>
+                                    // The user wants to select specific fetchers
+                                    // The fetcher summarizing ALL fetchers can be emulated by selecting ALL fetchers (which happens rarely when doing an SLR)
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                                    .filter(name -&gt; !name.equals(CompositeSearchBasedFetcher.FETCHER_NAME))</span>
+<span class="fc" id="L106">                                    .map(name -&gt; {</span>
+<span class="fc" id="L107">                                        boolean enabled = studyDatabases.contains(new StudyDatabase(name, true));</span>
+<span class="fc" id="L108">                                        return new StudyCatalogItem(name, enabled);</span>
+                                    })
+<span class="fc" id="L110">                                    .toList());</span>
+
+<span class="fc" id="L112">        this.directory.set(Objects.requireNonNull(studyDirectory).toString());</span>
+<span class="fc" id="L113">        this.dialogService = Objects.requireNonNull(dialogService);</span>
+<span class="fc" id="L114">    }</span>
+
+    public StringProperty getTitle() {
+<span class="nc" id="L117">        return title;</span>
+    }
+
+    public StringProperty getDirectory() {
+<span class="nc" id="L121">        return directory;</span>
+    }
+
+    public ObservableList&lt;String&gt; getAuthors() {
+<span class="nc" id="L125">        return authors;</span>
+    }
+
+    public ObservableList&lt;String&gt; getResearchQuestions() {
+<span class="nc" id="L129">        return researchQuestions;</span>
+    }
+
+    public ObservableList&lt;String&gt; getQueries() {
+<span class="nc" id="L133">        return queries;</span>
+    }
+
+    public ObservableList&lt;StudyCatalogItem&gt; getCatalogs() {
+<span class="fc" id="L137">        return databases;</span>
+    }
+
+    public void addAuthor(String author) {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (author.isBlank()) {</span>
+<span class="nc" id="L142">            return;</span>
+        }
+<span class="nc" id="L144">        authors.add(author);</span>
+<span class="nc" id="L145">    }</span>
+
+    public void addResearchQuestion(String researchQuestion) {
+<span class="nc bnc" id="L148" title="All 4 branches missed.">        if (researchQuestion.isBlank() || researchQuestions.contains(researchQuestion)) {</span>
+<span class="nc" id="L149">            return;</span>
+        }
+<span class="nc" id="L151">        researchQuestions.add(researchQuestion);</span>
+<span class="nc" id="L152">    }</span>
+
+    public void addQuery(String query) {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (query.isBlank()) {</span>
+<span class="nc" id="L156">            return;</span>
+        }
+<span class="nc" id="L158">        queries.add(query);</span>
+<span class="nc" id="L159">    }</span>
+
+    public SlrStudyAndDirectory saveStudy() {
+<span class="nc" id="L162">        Study study = new Study(</span>
+                authors,
+<span class="nc" id="L164">                title.getValueSafe(),</span>
+                researchQuestions,
+<span class="nc" id="L166">                queries.stream().map(StudyQuery::new).collect(Collectors.toList()),</span>
+<span class="nc" id="L167">                databases.stream().map(studyDatabaseItem -&gt; new StudyDatabase(studyDatabaseItem.getName(), studyDatabaseItem.isEnabled())).filter(StudyDatabase::isEnabled).collect(Collectors.toList()));</span>
+        Path studyDirectory;
+<span class="nc" id="L169">        final String studyDirectoryAsString = directory.getValueSafe();</span>
+        try {
+<span class="nc" id="L171">            studyDirectory = Path.of(studyDirectoryAsString);</span>
+<span class="nc" id="L172">        } catch (InvalidPathException e) {</span>
+<span class="nc" id="L173">            LOGGER.error(&quot;Invalid path was provided: {}&quot;, studyDirectoryAsString);</span>
+<span class="nc" id="L174">            dialogService.notify(Localization.lang(&quot;Unable to write to %0.&quot;, studyDirectoryAsString));</span>
+            // We do not assume another path - we return that there is an invalid object.
+<span class="nc" id="L176">            return null;</span>
+<span class="nc" id="L177">        }</span>
+<span class="nc" id="L178">        Path studyDefinitionFile = studyDirectory.resolve(StudyRepository.STUDY_DEFINITION_FILE_NAME);</span>
+        try {
+<span class="nc" id="L180">            new StudyYamlParser().writeStudyYamlFile(study, studyDefinitionFile);</span>
+<span class="nc" id="L181">        } catch (IOException e) {</span>
+<span class="nc" id="L182">            LOGGER.error(&quot;Could not write study file {}&quot;, studyDefinitionFile, e);</span>
+<span class="nc" id="L183">            dialogService.notify(Localization.lang(&quot;Please enter a valid file path.&quot;) +</span>
+                    &quot;: &quot; + studyDirectoryAsString);
+            // We do not assume another path - we return that there is an invalid object.
+<span class="nc" id="L186">            return null;</span>
+<span class="nc" id="L187">        }</span>
+
+        try {
+<span class="nc" id="L190">            new GitHandler(studyDirectory).createCommitOnCurrentBranch(&quot;Update study definition&quot;, false);</span>
+<span class="nc" id="L191">        } catch (Exception e) {</span>
+<span class="nc" id="L192">            LOGGER.error(&quot;Could not commit study definition file in directory {}&quot;, studyDirectory, e);</span>
+<span class="nc" id="L193">            dialogService.notify(Localization.lang(&quot;Please enter a valid file path.&quot;) +</span>
+                    &quot;: &quot; + studyDirectory);
+            // We continue nevertheless as the directory itself could be valid
+<span class="nc" id="L196">        }</span>
+
+<span class="nc" id="L198">        return new SlrStudyAndDirectory(study, studyDirectory);</span>
+    }
+
+    public Property&lt;String&gt; titleProperty() {
+<span class="nc" id="L202">        return title;</span>
+    }
+
+    public void setStudyDirectory(Optional&lt;Path&gt; studyRepositoryRoot) {
+<span class="nc" id="L206">        getDirectory().setValue(studyRepositoryRoot.map(Path::toString).orElseGet(() -&gt; getDirectory().getValueSafe()));</span>
+<span class="nc" id="L207">    }</span>
+
+    public void deleteAuthor(String item) {
+<span class="nc" id="L210">        authors.remove(item);</span>
+<span class="nc" id="L211">    }</span>
+
+    public void deleteQuestion(String item) {
+<span class="nc" id="L214">        researchQuestions.remove(item);</span>
+<span class="nc" id="L215">    }</span>
+
+    public void deleteQuery(String item) {
+<span class="nc" id="L218">        queries.remove(item);</span>
+<span class="nc" id="L219">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

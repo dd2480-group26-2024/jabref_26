@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryEditorTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.entryeditor</a> &gt; <span class="el_source">EntryEditorTabViewModel.java</span></div><h1>EntryEditorTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.entryeditor;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.entryeditor.EntryEditorPreferences;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.logic.citationkeypattern.CitationKeyGenerator;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.preferences.MrDlibPreferences;
+import org.jabref.preferences.PreferencesService;
+
+public class EntryEditorTabViewModel implements PreferenceTabViewModel {
+
+<span class="nc" id="L24">    private final BooleanProperty openOnNewEntryProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L25">    private final BooleanProperty defaultSourceProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L26">    private final BooleanProperty enableRelatedArticlesTabProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L27">    private final BooleanProperty acceptRecommendationsProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L28">    private final BooleanProperty enableLatexCitationsTabProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L29">    private final BooleanProperty enableValidationProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L30">    private final BooleanProperty allowIntegerEditionProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L31">    private final BooleanProperty journalPopupProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L32">    private final BooleanProperty autoLinkEnabledProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L33">    private final BooleanProperty enableSciteTabProperty = new SimpleBooleanProperty();</span>
+
+<span class="nc" id="L35">    private final BooleanProperty showUserCommentsProperty = new SimpleBooleanProperty();</span>
+
+<span class="nc" id="L37">    private final StringProperty fieldsProperty = new SimpleStringProperty();</span>
+
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+    private final EntryEditorPreferences entryEditorPreferences;
+    private final MrDlibPreferences mrDlibPreferences;
+
+<span class="nc" id="L44">    public EntryEditorTabViewModel(DialogService dialogService, PreferencesService preferencesService) {</span>
+<span class="nc" id="L45">        this.dialogService = dialogService;</span>
+<span class="nc" id="L46">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L47">        this.entryEditorPreferences = preferencesService.getEntryEditorPreferences();</span>
+<span class="nc" id="L48">        this.mrDlibPreferences = preferencesService.getMrDlibPreferences();</span>
+<span class="nc" id="L49">    }</span>
+
+    @Override
+    public void setValues() {
+        // ToDo: Include CustomizeGeneralFieldsDialog in PreferencesDialog
+        // therefore yet unused: entryEditorPreferences.getEntryEditorTabList();
+
+<span class="nc" id="L56">        openOnNewEntryProperty.setValue(entryEditorPreferences.shouldOpenOnNewEntry());</span>
+<span class="nc" id="L57">        defaultSourceProperty.setValue(entryEditorPreferences.showSourceTabByDefault());</span>
+<span class="nc" id="L58">        enableRelatedArticlesTabProperty.setValue(entryEditorPreferences.shouldShowRecommendationsTab());</span>
+<span class="nc" id="L59">        acceptRecommendationsProperty.setValue(mrDlibPreferences.shouldAcceptRecommendations());</span>
+<span class="nc" id="L60">        enableLatexCitationsTabProperty.setValue(entryEditorPreferences.shouldShowLatexCitationsTab());</span>
+<span class="nc" id="L61">        enableValidationProperty.setValue(entryEditorPreferences.shouldEnableValidation());</span>
+<span class="nc" id="L62">        allowIntegerEditionProperty.setValue(entryEditorPreferences.shouldAllowIntegerEditionBibtex());</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        journalPopupProperty.setValue(entryEditorPreferences.shouldEnableJournalPopup() == EntryEditorPreferences.JournalPopupEnabled.ENABLED);</span>
+<span class="nc" id="L64">        autoLinkEnabledProperty.setValue(entryEditorPreferences.autoLinkFilesEnabled());</span>
+<span class="nc" id="L65">        enableSciteTabProperty.setValue(entryEditorPreferences.shouldShowSciteTab());</span>
+<span class="nc" id="L66">        showUserCommentsProperty.setValue(entryEditorPreferences.shouldShowUserCommentsFields());</span>
+
+<span class="nc" id="L68">        setFields(entryEditorPreferences.getEntryEditorTabs());</span>
+<span class="nc" id="L69">    }</span>
+
+    public void resetToDefaults() {
+<span class="nc" id="L72">        setFields(preferencesService.getEntryEditorPreferences().getDefaultEntryEditorTabs());</span>
+<span class="nc" id="L73">    }</span>
+
+    private void setFields(Map&lt;String, Set&lt;Field&gt;&gt; tabNamesAndFields) {
+<span class="nc" id="L76">        StringBuilder sb = new StringBuilder();</span>
+
+        // Fill with customized vars
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        for (Map.Entry&lt;String, Set&lt;Field&gt;&gt; tab : tabNamesAndFields.entrySet()) {</span>
+<span class="nc" id="L80">            sb.append(tab.getKey());</span>
+<span class="nc" id="L81">            sb.append(':');</span>
+<span class="nc" id="L82">            sb.append(FieldFactory.serializeFieldsList(tab.getValue()));</span>
+<span class="nc" id="L83">            sb.append('\n');</span>
+<span class="nc" id="L84">        }</span>
+<span class="nc" id="L85">        fieldsProperty.set(sb.toString());</span>
+<span class="nc" id="L86">    }</span>
+
+    @Override
+    public void storeSettings() {
+        // entryEditorPreferences.setEntryEditorTabList();
+<span class="nc" id="L91">        entryEditorPreferences.setShouldOpenOnNewEntry(openOnNewEntryProperty.getValue());</span>
+<span class="nc" id="L92">        entryEditorPreferences.setShouldShowRecommendationsTab(enableRelatedArticlesTabProperty.getValue());</span>
+<span class="nc" id="L93">        mrDlibPreferences.setAcceptRecommendations(acceptRecommendationsProperty.getValue());</span>
+<span class="nc" id="L94">        entryEditorPreferences.setShouldShowLatexCitationsTab(enableLatexCitationsTabProperty.getValue());</span>
+<span class="nc" id="L95">        entryEditorPreferences.setShowSourceTabByDefault(defaultSourceProperty.getValue());</span>
+<span class="nc" id="L96">        entryEditorPreferences.setEnableValidation(enableValidationProperty.getValue());</span>
+<span class="nc" id="L97">        entryEditorPreferences.setAllowIntegerEditionBibtex(allowIntegerEditionProperty.getValue());</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        entryEditorPreferences.setEnableJournalPopup(journalPopupProperty.getValue()</span>
+<span class="nc" id="L99">                ? EntryEditorPreferences.JournalPopupEnabled.ENABLED</span>
+<span class="nc" id="L100">                : EntryEditorPreferences.JournalPopupEnabled.DISABLED);</span>
+        // entryEditorPreferences.setDividerPosition();
+<span class="nc" id="L102">        entryEditorPreferences.setAutoLinkFilesEnabled(autoLinkEnabledProperty.getValue());</span>
+<span class="nc" id="L103">        entryEditorPreferences.setShouldShowSciteTab(enableSciteTabProperty.getValue());</span>
+<span class="nc" id="L104">        entryEditorPreferences.setShowUserCommentsFields(showUserCommentsProperty.getValue());</span>
+
+<span class="nc" id="L106">        Map&lt;String, Set&lt;Field&gt;&gt; customTabsMap = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L107">        String[] lines = fieldsProperty.get().split(&quot;\n&quot;);</span>
+
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        for (String line : lines) {</span>
+<span class="nc" id="L110">            String[] parts = line.split(&quot;:&quot;);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (parts.length != 2) {</span>
+<span class="nc" id="L112">                dialogService.showInformationDialogAndWait(</span>
+<span class="nc" id="L113">                        Localization.lang(&quot;Error&quot;),</span>
+<span class="nc" id="L114">                        Localization.lang(&quot;Each line must be of the following form: 'tab:field1;field2;...;fieldN'.&quot;));</span>
+<span class="nc" id="L115">                return;</span>
+            }
+
+            // Use literal string of unwanted characters specified below as opposed to exporting characters
+            // from preferences because the list of allowable characters in this particular differs
+            // i.e. ';' character is allowed in this window, but it's on the list of unwanted chars in preferences
+<span class="nc" id="L121">            String unwantedChars = &quot;#{}()~,^&amp;-\&quot;'`ʹ\\&quot;;</span>
+<span class="nc" id="L122">            String testString = CitationKeyGenerator.cleanKey(parts[1], unwantedChars);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">            if (!testString.equals(parts[1])) {</span>
+<span class="nc" id="L124">                dialogService.showInformationDialogAndWait(</span>
+<span class="nc" id="L125">                        Localization.lang(&quot;Error&quot;),</span>
+<span class="nc" id="L126">                        Localization.lang(&quot;Field names are not allowed to contain white spaces or certain characters (%0).&quot;,</span>
+                                &quot;# { } ( ) ~ , ^ &amp; - \&quot; ' ` ʹ \\&quot;));
+<span class="nc" id="L128">                return;</span>
+            }
+
+<span class="nc" id="L131">            customTabsMap.put(parts[0], FieldFactory.parseFieldList(parts[1]));</span>
+        }
+
+<span class="nc" id="L134">        entryEditorPreferences.setEntryEditorTabList(customTabsMap);</span>
+<span class="nc" id="L135">    }</span>
+
+    public BooleanProperty openOnNewEntryProperty() {
+<span class="nc" id="L138">        return openOnNewEntryProperty;</span>
+    }
+
+    public BooleanProperty defaultSourceProperty() {
+<span class="nc" id="L142">        return defaultSourceProperty;</span>
+    }
+
+    public BooleanProperty enableRelatedArticlesTabProperty() {
+<span class="nc" id="L146">        return enableRelatedArticlesTabProperty;</span>
+    }
+
+    public BooleanProperty acceptRecommendationsProperty() {
+<span class="nc" id="L150">        return acceptRecommendationsProperty;</span>
+    }
+
+    public BooleanProperty enableLatexCitationsTabProperty() {
+<span class="nc" id="L154">        return enableLatexCitationsTabProperty;</span>
+    }
+
+    public BooleanProperty enableValidationProperty() {
+<span class="nc" id="L158">        return enableValidationProperty;</span>
+    }
+
+    public BooleanProperty allowIntegerEditionProperty() {
+<span class="nc" id="L162">        return this.allowIntegerEditionProperty;</span>
+    }
+
+    public BooleanProperty journalPopupProperty() {
+<span class="nc" id="L166">        return journalPopupProperty;</span>
+    }
+
+    public StringProperty fieldsProperty() {
+<span class="nc" id="L170">        return fieldsProperty;</span>
+    }
+
+    public BooleanProperty autoLinkFilesEnabledProperty() {
+<span class="nc" id="L174">        return autoLinkEnabledProperty;</span>
+    }
+
+    public BooleanProperty enableSciteTabProperty() {
+<span class="nc" id="L178">        return enableSciteTabProperty;</span>
+    }
+
+    public BooleanProperty showUserCommentsProperty() {
+<span class="nc" id="L182">        return this.showUserCommentsProperty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

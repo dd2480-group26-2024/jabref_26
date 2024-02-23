@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RegexFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.formatter.bibtexfields</a> &gt; <span class="el_source">RegexFormatter.java</span></div><h1>RegexFormatter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.formatter.bibtexfields;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
+import org.jabref.logic.cleanup.Formatter;
+import org.jabref.logic.l10n.Localization;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class RegexFormatter extends Formatter {
+    public static final String KEY = &quot;regex&quot;;
+<span class="fc" id="L18">    private static final Logger LOGGER = LoggerFactory.getLogger(RegexFormatter.class);</span>
+<span class="fc" id="L19">    private static final Pattern ESCAPED_OPENING_CURLY_BRACE = Pattern.compile(&quot;\\\\\\{&quot;);</span>
+<span class="fc" id="L20">    private static final Pattern ESCAPED_CLOSING_CURLY_BRACE = Pattern.compile(&quot;\\\\\\}&quot;);</span>
+    /**
+     * Matches text enclosed in curly brackets. The capturing group is used to prevent part of the input from being
+     * replaced.
+     */
+<span class="fc" id="L25">    private static final Pattern ENCLOSED_IN_CURLY_BRACES = Pattern.compile(&quot;\\{.*?}&quot;);</span>
+    private static final String REGEX_CAPTURING_GROUP = &quot;regex&quot;;
+    private static final String REPLACEMENT_CAPTURING_GROUP = &quot;replacement&quot;;
+    /**
+     * Matches a valid argument to the constructor. Two capturing groups are used to parse the {@link
+     * RegexFormatter#regex} and {@link RegexFormatter#replacement} used in {@link RegexFormatter#format(String)}
+     */
+<span class="fc" id="L32">    private static final Pattern CONSTRUCTOR_ARGUMENT = Pattern.compile(</span>
+            &quot;^\\(\&quot;(?&lt;&quot; + REGEX_CAPTURING_GROUP + &quot;&gt;.*?)\&quot; *?, *?\&quot;(?&lt;&quot; + REPLACEMENT_CAPTURING_GROUP + &quot;&gt;.*)\&quot;\\)$&quot;);
+    // Magic arbitrary unicode char, which will never appear in bibtex files
+<span class="fc" id="L35">    private static final String PLACEHOLDER_FOR_PROTECTED_GROUP = Character.toString('\u0A14');</span>
+<span class="fc" id="L36">    private static final String PLACEHOLDER_FOR_OPENING_CURLY_BRACE = Character.toString('\u0A15');</span>
+<span class="fc" id="L37">    private static final String PLACEHOLDER_FOR_CLOSING_CURLY_BRACE = Character.toString('\u0A16');</span>
+    private final String regex;
+    private final String replacement;
+
+    /**
+     * Constructs a new regular expression-based formatter with the given RegEx.
+     *
+     * @param input the regular expressions for matching and replacing given in the form {@code (&quot;&lt;regex&gt;&quot;,
+     *              &quot;&lt;replace&gt;&quot;)}.
+     */
+<span class="fc" id="L47">    public RegexFormatter(String input) {</span>
+<span class="fc" id="L48">        Objects.requireNonNull(input);</span>
+<span class="fc" id="L49">        input = input.trim();</span>
+<span class="fc" id="L50">        Matcher constructorArgument = CONSTRUCTOR_ARGUMENT.matcher(input);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (constructorArgument.matches()) {</span>
+<span class="fc" id="L52">            regex = constructorArgument.group(REGEX_CAPTURING_GROUP);</span>
+<span class="fc" id="L53">            replacement = constructorArgument.group(REPLACEMENT_CAPTURING_GROUP);</span>
+        } else {
+<span class="fc" id="L55">            regex = null;</span>
+<span class="fc" id="L56">            replacement = null;</span>
+<span class="fc" id="L57">            LOGGER.warn(&quot;RegexFormatter could not parse the input: {}&quot;, input);</span>
+        }
+<span class="fc" id="L59">    }</span>
+
+    @Override
+    public String getName() {
+<span class="nc" id="L63">        return Localization.lang(&quot;regular expression&quot;);</span>
+    }
+
+    @Override
+    public String getKey() {
+<span class="nc" id="L68">        return KEY;</span>
+    }
+
+    private String replaceHonoringProtectedGroups(final String input) {
+<span class="fc" id="L72">        Matcher matcher = ENCLOSED_IN_CURLY_BRACES.matcher(input);</span>
+
+<span class="fc" id="L74">        List&lt;String&gt; replaced = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L76">            replaced.add(matcher.group());</span>
+        }
+<span class="fc" id="L78">        String workingString = matcher.replaceAll(PLACEHOLDER_FOR_PROTECTED_GROUP);</span>
+        try {
+<span class="fc" id="L80">            workingString = workingString.replaceAll(regex, replacement);</span>
+<span class="fc" id="L81">        } catch (PatternSyntaxException e) {</span>
+<span class="fc" id="L82">            LOGGER.warn(&quot;There is a syntax error in the regular expression \&quot;{}\&quot; used by the regex modifier&quot;, regex, e);</span>
+<span class="fc" id="L83">            return input;</span>
+<span class="fc" id="L84">        }</span>
+
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (String r : replaced) {</span>
+<span class="fc" id="L87">            workingString = workingString.replaceFirst(PLACEHOLDER_FOR_PROTECTED_GROUP, r);</span>
+<span class="fc" id="L88">        }</span>
+<span class="fc" id="L89">        return workingString;</span>
+    }
+
+    @Override
+    public String format(final String input) {
+<span class="fc" id="L94">        Objects.requireNonNull(input);</span>
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">        if (regex == null || replacement == null) {</span>
+<span class="fc" id="L96">            return input;</span>
+        }
+
+<span class="fc" id="L99">        Matcher escapedOpeningCurlyBrace = ESCAPED_OPENING_CURLY_BRACE.matcher(input);</span>
+<span class="fc" id="L100">        String inputWithPlaceholder = escapedOpeningCurlyBrace.replaceAll(PLACEHOLDER_FOR_OPENING_CURLY_BRACE);</span>
+
+<span class="fc" id="L102">        Matcher escapedClosingCurlyBrace = ESCAPED_CLOSING_CURLY_BRACE.matcher(inputWithPlaceholder);</span>
+<span class="fc" id="L103">        inputWithPlaceholder = escapedClosingCurlyBrace.replaceAll(PLACEHOLDER_FOR_CLOSING_CURLY_BRACE);</span>
+
+<span class="fc" id="L105">        final String regexMatchesReplaced = replaceHonoringProtectedGroups(inputWithPlaceholder);</span>
+
+<span class="fc" id="L107">        return regexMatchesReplaced</span>
+<span class="fc" id="L108">                .replaceAll(PLACEHOLDER_FOR_OPENING_CURLY_BRACE, &quot;\\\\{&quot;)</span>
+<span class="fc" id="L109">                .replaceAll(PLACEHOLDER_FOR_CLOSING_CURLY_BRACE, &quot;\\\\}&quot;);</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="nc" id="L114">        return Localization.lang(&quot;Add a regular expression for the key pattern.&quot;);</span>
+    }
+
+    @Override
+    public String getExampleInput() {
+<span class="fc" id="L119">        return &quot;Please replace the spaces&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

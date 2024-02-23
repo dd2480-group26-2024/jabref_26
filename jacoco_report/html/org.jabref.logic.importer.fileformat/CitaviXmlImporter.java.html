@@ -1,0 +1,518 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitaviXmlImporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fileformat</a> &gt; <span class="el_source">CitaviXmlImporter.java</span></div><h1>CitaviXmlImporter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fileformat;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PushbackInputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.StringJoiner;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+
+import org.jabref.logic.formatter.bibtexfields.HtmlToLatexFormatter;
+import org.jabref.logic.formatter.bibtexfields.NormalizePagesFormatter;
+import org.jabref.logic.importer.Importer;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.importer.fileformat.citavi.CitaviExchangeData;
+import org.jabref.logic.importer.fileformat.citavi.CitaviExchangeData.KnowledgeItems;
+import org.jabref.logic.importer.fileformat.citavi.CitaviExchangeData.KnowledgeItems.KnowledgeItem;
+import org.jabref.logic.importer.fileformat.citavi.CitaviExchangeData.Persons.Person;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.Keyword;
+import org.jabref.model.entry.KeywordList;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.IEEETranEntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Unmarshaller;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class CitaviXmlImporter extends Importer implements Parser {
+
+<span class="fc" id="L63">    private static final Logger LOGGER = LoggerFactory.getLogger(CitaviXmlImporter.class);</span>
+    private static final byte UUID_LENGTH = 36;
+    private static final byte UUID_SEMICOLON_OFFSET_INDEX = 37;
+<span class="fc" id="L66">    private static final EnumSet&lt;QuotationTypeMapping&gt; QUOTATION_TYPES = EnumSet.allOf(QuotationTypeMapping.class);</span>
+<span class="fc" id="L67">    private final HtmlToLatexFormatter htmlToLatexFormatter = new HtmlToLatexFormatter();</span>
+<span class="fc" id="L68">    private final NormalizePagesFormatter pagesFormatter = new NormalizePagesFormatter();</span>
+
+<span class="fc" id="L70">    private final Map&lt;String, Author&gt; knownPersons = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L71">    private final Map&lt;String, Keyword&gt; knownKeywords = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L72">    private final Map&lt;String, String&gt; knownPublishers = new HashMap&lt;&gt;();</span>
+    private final XMLInputFactory xmlInputFactory;
+<span class="fc" id="L74">    private Map&lt;String, String&gt; refIdWithAuthors = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L75">    private Map&lt;String, String&gt; refIdWithEditors = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L76">    private Map&lt;String, String&gt; refIdWithKeywords = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L77">    private Map&lt;String, String&gt; refIdWithPublishers = new HashMap&lt;&gt;();</span>
+
+    private CitaviExchangeData.Persons persons;
+    private CitaviExchangeData.Keywords keywords;
+    private CitaviExchangeData.Publishers publishers;
+    private KnowledgeItems knowledgeItems;
+
+    private CitaviExchangeData.ReferenceAuthors refAuthors;
+    private CitaviExchangeData.ReferenceEditors refEditors;
+    private CitaviExchangeData.ReferenceKeywords refKeywords;
+    private CitaviExchangeData.ReferencePublishers refPublishers;
+
+    private Unmarshaller unmarshaller;
+
+<span class="fc" id="L91">    public CitaviXmlImporter() {</span>
+<span class="fc" id="L92">        xmlInputFactory = XMLInputFactory.newFactory();</span>
+<span class="fc" id="L93">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L97">        return &quot;Citavi XML&quot;;</span>
+    }
+
+    @Override
+    public StandardFileType getFileType() {
+<span class="fc" id="L102">        return StandardFileType.CITAVI;</span>
+    }
+
+    @Override
+    public String getId() {
+<span class="fc" id="L107">        return &quot;citavi&quot;;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="fc" id="L112">        return &quot;Importer for the Citavi XML format.&quot;;</span>
+    }
+
+    @Override
+    public boolean isRecognizedFormat(BufferedReader reader) throws IOException {
+<span class="fc" id="L117">        Objects.requireNonNull(reader);</span>
+<span class="fc" id="L118">        return false;</span>
+    }
+
+    @Override
+    public boolean isRecognizedFormat(Path filePath) throws IOException {
+<span class="fc" id="L123">        try (BufferedReader reader = getReaderFromZip(filePath)) {</span>
+            String str;
+<span class="fc" id="L125">            int i = 0;</span>
+<span class="pc bpc" id="L126" title="1 of 4 branches missed.">            while (((str = reader.readLine()) != null) &amp;&amp; (i &lt; 50)) {</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                if (str.toLowerCase(Locale.ROOT).contains(&quot;citaviexchangedata&quot;)) {</span>
+<span class="fc" id="L128">                    return true;</span>
+                }
+<span class="fc" id="L130">                i++;</span>
+            }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        }</span>
+<span class="fc" id="L133">        return false;</span>
+    }
+
+    @Override
+    public ParserResult importDatabase(Path filePath) throws IOException {
+<span class="fc" id="L138">        try (BufferedReader reader = getReaderFromZip(filePath)) {</span>
+<span class="fc" id="L139">            Object unmarshalledObject = unmarshallRoot(reader);</span>
+
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            if (unmarshalledObject instanceof CitaviExchangeData data) {</span>
+<span class="fc" id="L142">                List&lt;BibEntry&gt; bibEntries = parseDataList(data);</span>
+
+<span class="fc" id="L144">                return new ParserResult(bibEntries);</span>
+            } else {
+<span class="nc" id="L146">                return ParserResult.fromErrorMessage(&quot;File does not start with xml tag.&quot;);</span>
+            }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        } catch (JAXBException | XMLStreamException e) {</span>
+<span class="nc" id="L149">            LOGGER.debug(&quot;could not parse document&quot;, e);</span>
+<span class="nc" id="L150">            return ParserResult.fromError(e);</span>
+        }
+    }
+
+    private List&lt;BibEntry&gt; parseDataList(CitaviExchangeData data) {
+        List&lt;BibEntry&gt; bibEntries;
+
+<span class="fc" id="L157">        persons = data.getPersons();</span>
+<span class="fc" id="L158">        keywords = data.getKeywords();</span>
+<span class="fc" id="L159">        publishers = data.getPublishers();</span>
+<span class="fc" id="L160">        knowledgeItems = data.getKnowledgeItems();</span>
+
+<span class="fc" id="L162">        refAuthors = data.getReferenceAuthors();</span>
+<span class="fc" id="L163">        refEditors = data.getReferenceEditors();</span>
+<span class="fc" id="L164">        refKeywords = data.getReferenceKeywords();</span>
+<span class="fc" id="L165">        refPublishers = data.getReferencePublishers();</span>
+
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (refAuthors != null) {</span>
+<span class="fc" id="L168">            this.refIdWithAuthors = buildPersonList(refAuthors.getOnetoN());</span>
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (refEditors != null) {</span>
+<span class="fc" id="L171">            this.refIdWithEditors = buildPersonList(refEditors.getOnetoN());</span>
+        }
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (refKeywords != null) {</span>
+<span class="fc" id="L174">            this.refIdWithKeywords = buildKeywordList(refKeywords.getOnetoN());</span>
+        }
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (refPublishers != null) {</span>
+<span class="fc" id="L177">            this.refIdWithPublishers = buildPublisherList(refPublishers.getOnetoN());</span>
+        }
+
+<span class="fc" id="L180">        bibEntries = data</span>
+<span class="fc" id="L181">                         .getReferences().getReference()</span>
+<span class="fc" id="L182">                         .stream()</span>
+<span class="fc" id="L183">                         .map(this::parseData)</span>
+<span class="fc" id="L184">                         .collect(Collectors.toList());</span>
+
+<span class="fc" id="L186">        return bibEntries;</span>
+    }
+
+    private BibEntry parseData(CitaviExchangeData.References.Reference data) {
+<span class="fc" id="L190">        BibEntry entry = new BibEntry();</span>
+
+<span class="fc" id="L192">        entry.setType(getType(data));</span>
+<span class="fc" id="L193">        Optional.ofNullable(data.getTitle())</span>
+<span class="fc" id="L194">                .ifPresent(value -&gt; entry.setField(StandardField.TITLE, clean(value)));</span>
+<span class="fc" id="L195">        Optional.ofNullable(data.getAbstract())</span>
+<span class="fc" id="L196">                .ifPresent(value -&gt; entry.setField(StandardField.ABSTRACT, clean(value)));</span>
+<span class="fc" id="L197">        Optional.ofNullable(data.getYear())</span>
+<span class="fc" id="L198">                .ifPresent(value -&gt; entry.setField(StandardField.YEAR, clean(value)));</span>
+<span class="fc" id="L199">        Optional.ofNullable(data.getDoi())</span>
+<span class="pc" id="L200">                .ifPresent(value -&gt; entry.setField(StandardField.DOI, clean(value)));</span>
+<span class="fc" id="L201">        Optional.ofNullable(data.getIsbn())</span>
+<span class="pc" id="L202">                .ifPresent(value -&gt; entry.setField(StandardField.ISBN, clean(value)));</span>
+
+<span class="fc" id="L204">        String pages = clean(getPages(data));</span>
+        // Cleans also unicode minus signs
+<span class="fc" id="L206">        pages = pagesFormatter.format(pages);</span>
+<span class="fc" id="L207">        entry.setField(StandardField.PAGES, pages);</span>
+
+<span class="fc" id="L209">        Optional.ofNullable(data.getVolume())</span>
+<span class="fc" id="L210">                .ifPresent(value -&gt; entry.setField(StandardField.VOLUME, clean(value)));</span>
+<span class="fc" id="L211">        Optional.ofNullable(getAuthorName(data))</span>
+<span class="fc" id="L212">                .ifPresent(value -&gt; entry.setField(StandardField.AUTHOR, clean(value)));</span>
+<span class="fc" id="L213">        Optional.ofNullable(getEditorName(data))</span>
+<span class="fc" id="L214">                .ifPresent(value -&gt; entry.setField(StandardField.EDITOR, clean(value)));</span>
+<span class="fc" id="L215">        Optional.ofNullable(getKeywords(data))</span>
+<span class="fc" id="L216">                .ifPresent(value -&gt; entry.setField(StandardField.KEYWORDS, clean(value)));</span>
+<span class="fc" id="L217">        Optional.ofNullable(getPublisher(data))</span>
+<span class="fc" id="L218">                .ifPresent(value -&gt; entry.setField(StandardField.PUBLISHER, clean(value)));</span>
+<span class="fc" id="L219">        Optional.ofNullable(getKnowledgeItem(data))</span>
+<span class="fc" id="L220">                .ifPresent(value -&gt; entry.setField(StandardField.COMMENT, StringUtil.unifyLineBreaks(value, &quot;\n&quot;)));</span>
+<span class="fc" id="L221">        return entry;</span>
+    }
+
+    private EntryType getType(CitaviExchangeData.References.Reference data) {
+<span class="fc" id="L225">        return Optional.ofNullable(data.getReferenceType())</span>
+<span class="fc" id="L226">                       .map(CitaviXmlImporter::convertRefNameToType)</span>
+<span class="fc" id="L227">                       .orElse(StandardEntryType.Article);</span>
+    }
+
+    private static EntryType convertRefNameToType(String refName) {
+<span class="pc bpc" id="L231" title="3 of 6 branches missed.">        return switch (refName.toLowerCase().trim()) {</span>
+<span class="fc" id="L232">            case &quot;artwork&quot;, &quot;generic&quot;, &quot;musicalbum&quot;, &quot;audioorvideodocument&quot;, &quot;movie&quot; -&gt; StandardEntryType.Misc;</span>
+<span class="nc" id="L233">            case &quot;electronic article&quot; -&gt; IEEETranEntryType.Electronic;</span>
+<span class="nc" id="L234">            case &quot;book section&quot; -&gt; StandardEntryType.InBook;</span>
+<span class="fc" id="L235">            case &quot;book&quot;, &quot;bookedited&quot;, &quot;audiobook&quot; -&gt; StandardEntryType.Book;</span>
+<span class="nc" id="L236">            case &quot;report&quot; -&gt; StandardEntryType.Report;</span>
+            // case &quot;journal article&quot; -&gt; StandardEntryType.Article;
+<span class="fc" id="L238">            default -&gt; StandardEntryType.Article;</span>
+        };
+    }
+
+    private String getPages(CitaviExchangeData.References.Reference data) {
+<span class="fc" id="L243">        String tmpStr = &quot;&quot;;</span>
+<span class="pc bpc" id="L244" title="1 of 4 branches missed.">        if ((data.getPageCount() != null) &amp;&amp; (data.getPageRange() == null)) {</span>
+<span class="fc" id="L245">            tmpStr = data.getPageCount();</span>
+<span class="pc bpc" id="L246" title="1 of 4 branches missed.">        } else if ((data.getPageCount() == null) &amp;&amp; (data.getPageRange() != null)) {</span>
+<span class="fc" id="L247">            tmpStr = data.getPageRange();</span>
+<span class="pc bpc" id="L248" title="2 of 4 branches missed.">        } else if ((data.getPageCount() == null) &amp;&amp; (data.getPageRange() == null)) {</span>
+<span class="fc" id="L249">            return tmpStr;</span>
+        }
+<span class="fc" id="L251">        int count = 0;</span>
+<span class="fc" id="L252">        String pages = &quot;&quot;;</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        for (int i = tmpStr.length() - 1; i &gt;= 0; i--) {</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            if (count == 2) {</span>
+<span class="fc" id="L255">                pages = tmpStr.substring(i + 2, (tmpStr.length() - 1 - 5) + 1);</span>
+<span class="fc" id="L256">                break;</span>
+            } else {
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                if (tmpStr.charAt(i) == '&gt;') {</span>
+<span class="fc" id="L259">                    count++;</span>
+                }
+            }
+        }
+<span class="fc" id="L263">        return pages;</span>
+    }
+
+    private String getAuthorName(CitaviExchangeData.References.Reference data) {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (refAuthors == null) {</span>
+<span class="nc" id="L268">            return null;</span>
+        }
+
+<span class="fc" id="L271">        return this.refIdWithAuthors.get(data.getId());</span>
+    }
+
+    private Map&lt;String, String&gt; buildPersonList(List&lt;String&gt; authorsOrEditors) {
+<span class="fc" id="L275">        Map&lt;String, String&gt; refToPerson = new HashMap&lt;&gt;();</span>
+
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        for (String idStringsWithSemicolon : authorsOrEditors) {</span>
+<span class="fc" id="L278">            String refId = idStringsWithSemicolon.substring(0, UUID_LENGTH);</span>
+<span class="fc" id="L279">            String rest = idStringsWithSemicolon.substring(UUID_SEMICOLON_OFFSET_INDEX);</span>
+
+<span class="fc" id="L281">            String[] personIds = rest.split(&quot;;&quot;);</span>
+
+<span class="fc" id="L283">            List&lt;Author&gt; jabrefAuthors = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            for (String personId : personIds) {</span>
+                // Store persons we already encountered, we can have the same author multiple times in the whole database
+<span class="fc" id="L287">                knownPersons.computeIfAbsent(personId, k -&gt; {</span>
+<span class="fc" id="L288">                    Optional&lt;Person&gt; person = persons.getPerson().stream().filter(p -&gt; p.getId().equals(k)).findFirst();</span>
+<span class="fc" id="L289">                    return person.map(p -&gt; new Author(p.getFirstName(), &quot;&quot;, &quot;&quot;, p.getLastName(), &quot;&quot;)).orElse(null);</span>
+                });
+<span class="fc" id="L291">                jabrefAuthors.add(knownPersons.get(personId));</span>
+            }
+<span class="fc" id="L293">            String stringifiedAuthors = AuthorList.of(jabrefAuthors).getAsLastFirstNamesWithAnd(false);</span>
+<span class="fc" id="L294">            refToPerson.put(refId, stringifiedAuthors);</span>
+<span class="fc" id="L295">        }</span>
+<span class="fc" id="L296">        return refToPerson;</span>
+    }
+
+    private Map&lt;String, String&gt; buildKeywordList(List&lt;String&gt; keywordsList) {
+<span class="fc" id="L300">        Map&lt;String, String&gt; refToKeywords = new HashMap&lt;&gt;();</span>
+
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        for (String idStringsWithSemicolon : keywordsList) {</span>
+<span class="fc" id="L303">            String refId = idStringsWithSemicolon.substring(0, UUID_LENGTH);</span>
+<span class="fc" id="L304">            String rest = idStringsWithSemicolon.substring(UUID_SEMICOLON_OFFSET_INDEX);</span>
+
+<span class="fc" id="L306">            String[] keywordIds = rest.split(&quot;;&quot;);</span>
+
+<span class="fc" id="L308">            List&lt;Keyword&gt; jabrefKeywords = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            for (String keywordId : keywordIds) {</span>
+                // store keywords already encountered
+<span class="fc" id="L312">                knownKeywords.computeIfAbsent(keywordId, k -&gt; {</span>
+<span class="fc" id="L313">                    Optional&lt;CitaviExchangeData.Keywords.Keyword&gt; keyword = keywords.getKeyword().stream().filter(p -&gt; p.getId().equals(k)).findFirst();</span>
+<span class="fc" id="L314">                    return keyword.map(kword -&gt; new Keyword(kword.getName())).orElse(null);</span>
+                });
+<span class="fc" id="L316">                jabrefKeywords.add(knownKeywords.get(keywordId));</span>
+            }
+
+<span class="fc" id="L319">            KeywordList list = new KeywordList(List.copyOf(jabrefKeywords));</span>
+<span class="fc" id="L320">            String stringifiedKeywords = list.toString();</span>
+<span class="fc" id="L321">            refToKeywords.put(refId, stringifiedKeywords);</span>
+<span class="fc" id="L322">        }</span>
+<span class="fc" id="L323">        return refToKeywords;</span>
+    }
+
+    private Map&lt;String, String&gt; buildPublisherList(List&lt;String&gt; publishersList) {
+<span class="fc" id="L327">        Map&lt;String, String&gt; refToPublishers = new HashMap&lt;&gt;();</span>
+
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        for (String idStringsWithSemicolon : publishersList) {</span>
+<span class="fc" id="L330">            String refId = idStringsWithSemicolon.substring(0, UUID_LENGTH);</span>
+<span class="fc" id="L331">            String rest = idStringsWithSemicolon.substring(UUID_SEMICOLON_OFFSET_INDEX);</span>
+
+<span class="fc" id="L333">            String[] publisherIds = rest.split(&quot;;&quot;);</span>
+
+<span class="fc" id="L335">            List&lt;String&gt; jabrefPublishers = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L337" title="All 2 branches covered.">            for (String pubId : publisherIds) {</span>
+                // store publishers already encountered
+<span class="fc" id="L339">                knownPublishers.computeIfAbsent(pubId, k -&gt; {</span>
+<span class="fc" id="L340">                    Optional&lt;CitaviExchangeData.Publishers.Publisher&gt; publisher = publishers.getPublisher().stream().filter(p -&gt; p.getId().equals(k)).findFirst();</span>
+<span class="fc" id="L341">                    return publisher.map(CitaviExchangeData.Publishers.Publisher::getName).orElse(null);</span>
+                });
+<span class="fc" id="L343">                jabrefPublishers.add(knownPublishers.get(pubId));</span>
+            }
+
+<span class="fc" id="L346">            String stringifiedKeywords = String.join(&quot;,&quot;, jabrefPublishers);</span>
+<span class="fc" id="L347">            refToPublishers.put(refId, stringifiedKeywords);</span>
+<span class="fc" id="L348">        }</span>
+<span class="fc" id="L349">        return refToPublishers;</span>
+    }
+
+    private String getEditorName(CitaviExchangeData.References.Reference data) {
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        if (refEditors == null) {</span>
+<span class="fc" id="L354">            return null;</span>
+        }
+<span class="fc" id="L356">        return this.refIdWithEditors.get(data.getId());</span>
+    }
+
+    private String getKeywords(CitaviExchangeData.References.Reference data) {
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (refKeywords == null) {</span>
+<span class="fc" id="L361">            return null;</span>
+        }
+<span class="fc" id="L363">        return this.refIdWithKeywords.get(data.getId());</span>
+    }
+
+    private String getPublisher(CitaviExchangeData.References.Reference data) {
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (refPublishers == null) {</span>
+<span class="fc" id="L368">            return null;</span>
+        }
+<span class="fc" id="L370">        return this.refIdWithPublishers.get(data.getId());</span>
+    }
+
+    private String getKnowledgeItem(CitaviExchangeData.References.Reference data) {
+<span class="fc" id="L374">        StringJoiner comment = new StringJoiner(&quot;\n\n&quot;);</span>
+<span class="fc" id="L375">        List&lt;KnowledgeItem&gt; foundItems = knowledgeItems.getKnowledgeItem().stream().filter(p -&gt; data.getId().equals(p.getReferenceID())).toList();</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        for (KnowledgeItem knowledgeItem : foundItems) {</span>
+<span class="fc" id="L377">            Optional&lt;String&gt; title = Optional.ofNullable(knowledgeItem.getCoreStatement()).filter(Predicate.not(String::isEmpty));</span>
+<span class="fc" id="L378">            title.ifPresent(t -&gt; comment.add(&quot;# &quot; + cleanUpText(t)));</span>
+
+<span class="fc" id="L380">            Optional&lt;String&gt; text = Optional.ofNullable(knowledgeItem.getText()).filter(Predicate.not(String::isEmpty));</span>
+<span class="fc" id="L381">            text.ifPresent(t -&gt; comment.add(cleanUpText(t)));</span>
+
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            Optional&lt;Integer&gt; pages = Optional.of(knowledgeItem.getPageRangeNumber()).filter(range -&gt; range != -1);</span>
+<span class="fc" id="L384">            pages.ifPresent(p -&gt; comment.add(&quot;page range: &quot; + p));</span>
+
+<span class="fc" id="L386">            Optional&lt;String&gt; quotationTypeDesc = Optional.of(knowledgeItem.getQuotationType()).flatMap(type -&gt;</span>
+<span class="fc" id="L387">                                                                    QUOTATION_TYPES.stream()</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">                                                                    .filter(qt -&gt; type == qt.getCitaviIndexType())</span>
+<span class="fc" id="L389">                                                                    .map(QuotationTypeMapping::getName).findFirst());</span>
+<span class="fc" id="L390">            quotationTypeDesc.ifPresent(qt -&gt; comment.add(&quot;quotation type: %s&quot;.formatted(qt)));</span>
+
+<span class="fc" id="L392">            Optional&lt;Short&gt; quotationIndex = Optional.of(knowledgeItem.getQuotationIndex());</span>
+<span class="fc" id="L393">            quotationIndex.ifPresent(index -&gt; comment.add(&quot;quotation index: %d&quot;.formatted(index)));</span>
+<span class="fc" id="L394">        }</span>
+<span class="fc" id="L395">        return comment.toString();</span>
+    }
+
+    String cleanUpText(String text) {
+<span class="fc" id="L399">        String result = removeSpacesBeforeLineBreak(text);</span>
+<span class="fc" id="L400">        result = result.replaceAll(&quot;(?&lt;!\\\\)\\{&quot;, &quot;\\\\{&quot;);</span>
+<span class="fc" id="L401">        result = result.replaceAll(&quot;(?&lt;!\\\\)}&quot;, &quot;\\\\}&quot;);</span>
+<span class="fc" id="L402">        return result;</span>
+    }
+
+    private String removeSpacesBeforeLineBreak(String string) {
+<span class="fc" id="L406">        return string.replaceAll(&quot; +\r\n&quot;, &quot;\r\n&quot;)</span>
+<span class="fc" id="L407">              .replaceAll(&quot; +\n&quot;, &quot;\n&quot;);</span>
+    }
+
+    private void initUnmarshaller() throws JAXBException {
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">        if (unmarshaller == null) {</span>
+            // Lazy init because this is expensive
+<span class="fc" id="L413">            JAXBContext context = JAXBContext.newInstance(&quot;org.jabref.logic.importer.fileformat.citavi&quot;);</span>
+<span class="fc" id="L414">            unmarshaller = context.createUnmarshaller();</span>
+        }
+<span class="fc" id="L416">    }</span>
+
+    private Object unmarshallRoot(BufferedReader reader) throws XMLStreamException, JAXBException {
+<span class="fc" id="L419">        initUnmarshaller();</span>
+
+<span class="fc" id="L421">        XMLStreamReader xmlStreamReader = xmlInputFactory.createXMLStreamReader(reader);</span>
+
+        // Go to the root element
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        while (!xmlStreamReader.isStartElement()) {</span>
+<span class="fc" id="L425">            xmlStreamReader.next();</span>
+        }
+
+<span class="fc" id="L428">        return unmarshaller.unmarshal(xmlStreamReader);</span>
+    }
+
+    @Override
+    public ParserResult importDatabase(BufferedReader reader) throws IOException {
+<span class="nc" id="L433">        Objects.requireNonNull(reader);</span>
+<span class="nc" id="L434">        throw new UnsupportedOperationException(&quot;CitaviXmlImporter does not support importDatabase(BufferedReader reader).&quot;</span>
+                                                + &quot;Instead use importDatabase(Path filePath, Charset defaultEncoding).&quot;);
+    }
+
+    @Override
+    public List&lt;BibEntry&gt; parseEntries(InputStream inputStream) {
+        try {
+<span class="nc" id="L441">            return importDatabase(</span>
+<span class="nc" id="L442">                                  new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))).getDatabase().getEntries();</span>
+<span class="nc" id="L443">        } catch (IOException e) {</span>
+<span class="nc" id="L444">            LOGGER.error(e.getLocalizedMessage(), e);</span>
+        }
+<span class="nc" id="L446">        return Collections.emptyList();</span>
+    }
+
+    private BufferedReader getReaderFromZip(Path filePath) throws IOException {
+<span class="fc" id="L450">        ZipInputStream zis = new ZipInputStream(new FileInputStream(filePath.toFile()));</span>
+<span class="fc" id="L451">        ZipEntry zipEntry = zis.getNextEntry();</span>
+
+<span class="fc" id="L453">        Path newFile = Files.createTempFile(&quot;citavicontent&quot;, &quot;.xml&quot;);</span>
+
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        while (zipEntry != null) {</span>
+<span class="fc" id="L456">            Files.copy(zis, newFile, StandardCopyOption.REPLACE_EXISTING);</span>
+
+<span class="fc" id="L458">            zipEntry = zis.getNextEntry();</span>
+        }
+
+<span class="fc" id="L461">        zis.closeEntry();</span>
+
+<span class="fc" id="L463">        InputStream stream = Files.newInputStream(newFile, StandardOpenOption.READ);</span>
+
+        // check and delete the utf-8 BOM bytes
+<span class="fc" id="L466">        InputStream newStream = checkForUtf8BOMAndDiscardIfAny(stream);</span>
+
+        // clean up the temp file
+<span class="fc" id="L469">        Files.delete(newFile);</span>
+
+<span class="fc" id="L471">        return new BufferedReader(new InputStreamReader(newStream, StandardCharsets.UTF_8));</span>
+    }
+
+    private static InputStream checkForUtf8BOMAndDiscardIfAny(InputStream inputStream) throws IOException {
+<span class="fc" id="L475">        PushbackInputStream pushbackInputStream = new PushbackInputStream(new BufferedInputStream(inputStream), 3);</span>
+<span class="fc" id="L476">        byte[] bom = new byte[3];</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (pushbackInputStream.read(bom) != -1) {</span>
+<span class="pc bpc" id="L478" title="2 of 6 branches missed.">            if (!((bom[0] == (byte) 0xEF) &amp;&amp; (bom[1] == (byte) 0xBB) &amp;&amp; (bom[2] == (byte) 0xBF))) {</span>
+<span class="fc" id="L479">                pushbackInputStream.unread(bom);</span>
+            }
+        }
+<span class="fc" id="L482">        return pushbackInputStream;</span>
+    }
+
+    private String clean(String input) {
+<span class="fc" id="L486">        String result = StringUtil.unifyLineBreaks(input, &quot; &quot;)</span>
+<span class="fc" id="L487">                         .trim()</span>
+<span class="fc" id="L488">                         .replaceAll(&quot; +&quot;, &quot; &quot;);</span>
+<span class="fc" id="L489">        return htmlToLatexFormatter.format(result);</span>
+    }
+
+<span class="fc" id="L492">    enum QuotationTypeMapping {</span>
+<span class="fc" id="L493">        IMAGE_QUOTATION(0, &quot;Image quotation&quot;),</span>
+<span class="fc" id="L494">        DIRECT_QUOTATION(1, &quot;Direct quotation&quot;),</span>
+<span class="fc" id="L495">        INDIRECT_QUOTATION(2, &quot;Indirect quotation&quot;),</span>
+<span class="fc" id="L496">        SUMMARY(3, &quot;Summary&quot;),</span>
+<span class="fc" id="L497">        COMMENT(4, &quot;Comment&quot;),</span>
+<span class="fc" id="L498">        HIGHLIGHT(5, &quot;Highlight&quot;),</span>
+<span class="fc" id="L499">        HIGHLIGHT_RED(6, &quot;Highlight in red&quot;);</span>
+
+        final int citaviType;
+        final String name;
+
+<span class="fc" id="L504">        QuotationTypeMapping(int citaviType, String name) {</span>
+<span class="fc" id="L505">            this.name = name;</span>
+<span class="fc" id="L506">            this.citaviType = citaviType;</span>
+<span class="fc" id="L507">        }</span>
+
+        String getName() {
+<span class="fc" id="L510">            return name;</span>
+        }
+
+        int getCitaviIndexType() {
+<span class="fc" id="L514">            return citaviType;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

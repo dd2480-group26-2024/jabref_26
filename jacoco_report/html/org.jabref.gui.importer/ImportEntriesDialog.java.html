@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImportEntriesDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.importer</a> &gt; <span class="el_source">ImportEntriesDialog.java</span></div><h1>ImportEntriesDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui.importer;
+
+import java.util.EnumSet;
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
+import javafx.css.PseudoClass;
+import javafx.fxml.FXML;
+import javafx.geometry.Insets;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.Border;
+import javafx.scene.layout.BorderStroke;
+import javafx.scene.layout.BorderStrokeStyle;
+import javafx.scene.layout.BorderWidths;
+import javafx.scene.layout.CornerRadii;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Text;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.NoSelectionModel;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.gui.util.TextFlowLimited;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.shared.DatabaseLocation;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import jakarta.inject.Inject;
+import org.controlsfx.control.CheckListView;
+import org.fxmisc.richtext.CodeArea;
+
+public class ImportEntriesDialog extends BaseDialog&lt;Boolean&gt; {
+
+    public CheckListView&lt;BibEntry&gt; entriesListView;
+    public ComboBox&lt;BibDatabaseContext&gt; libraryListView;
+    public ButtonType importButton;
+    public Label totalItems;
+    public Label selectedItems;
+    public Label bibTeXDataLabel;
+    public CheckBox downloadLinkedOnlineFiles;
+    public CheckBox showEntryInformation;
+    public CodeArea bibTeXData;
+    public VBox bibTeXDataBox;
+    private final BackgroundTask&lt;ParserResult&gt; task;
+    private final BibDatabaseContext database;
+    private ImportEntriesViewModel viewModel;
+    @Inject private TaskExecutor taskExecutor;
+    @Inject private DialogService dialogService;
+    @Inject private UndoManager undoManager;
+    @Inject private PreferencesService preferences;
+    @Inject private StateManager stateManager;
+    @Inject private BibEntryTypesManager entryTypesManager;
+    @Inject private FileUpdateMonitor fileUpdateMonitor;
+
+    /**
+     * Imports the given entries into the given database. The entries are provided using the BackgroundTask
+     *
+     * @param database the database to import into
+     * @param task     the task executed for parsing the selected files(s).
+     */
+<span class="nc" id="L89">    public ImportEntriesDialog(BibDatabaseContext database, BackgroundTask&lt;ParserResult&gt; task) {</span>
+<span class="nc" id="L90">        this.database = database;</span>
+<span class="nc" id="L91">        this.task = task;</span>
+<span class="nc" id="L92">        ViewLoader.view(this)</span>
+<span class="nc" id="L93">                  .load()</span>
+<span class="nc" id="L94">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L96">        BooleanBinding booleanBind = Bindings.isEmpty(entriesListView.getCheckModel().getCheckedItems());</span>
+<span class="nc" id="L97">        Button btn = (Button) this.getDialogPane().lookupButton(importButton);</span>
+<span class="nc" id="L98">        btn.disableProperty().bind(booleanBind);</span>
+
+<span class="nc" id="L100">        downloadLinkedOnlineFiles.setSelected(preferences.getFilePreferences().shouldDownloadLinkedFiles());</span>
+
+<span class="nc" id="L102">        setResultConverter(button -&gt; {</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (button == importButton) {</span>
+<span class="nc" id="L104">                viewModel.importEntries(entriesListView.getCheckModel().getCheckedItems(), downloadLinkedOnlineFiles.isSelected());</span>
+            } else {
+<span class="nc" id="L106">                dialogService.notify(Localization.lang(&quot;Import canceled&quot;));</span>
+            }
+
+<span class="nc" id="L109">            return false;</span>
+        });
+<span class="nc" id="L111">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L115">        viewModel = new ImportEntriesViewModel(task, taskExecutor, database, dialogService, undoManager, preferences, stateManager, entryTypesManager, fileUpdateMonitor);</span>
+<span class="nc" id="L116">        Label placeholder = new Label();</span>
+<span class="nc" id="L117">        placeholder.textProperty().bind(viewModel.messageProperty());</span>
+<span class="nc" id="L118">        entriesListView.setPlaceholder(placeholder);</span>
+<span class="nc" id="L119">        entriesListView.setItems(viewModel.getEntries());</span>
+
+<span class="nc" id="L121">        libraryListView.setEditable(false);</span>
+<span class="nc" id="L122">        libraryListView.getItems().addAll(stateManager.getOpenDatabases());</span>
+<span class="nc" id="L123">        new ViewModelListCellFactory&lt;BibDatabaseContext&gt;()</span>
+<span class="nc" id="L124">                .withText(database -&gt; {</span>
+<span class="nc" id="L125">                    Optional&lt;String&gt; dbOpt = Optional.empty();</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                    if (database.getDatabasePath().isPresent()) {</span>
+<span class="nc" id="L127">                        dbOpt = FileUtil.getUniquePathFragment(stateManager.collectAllDatabasePaths(), database.getDatabasePath().get());</span>
+                    }
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                    if (database.getLocation() == DatabaseLocation.SHARED) {</span>
+<span class="nc" id="L130">                        return database.getDBMSSynchronizer().getDBName() + &quot; [&quot; + Localization.lang(&quot;shared&quot;) + &quot;]&quot;;</span>
+                    }
+
+<span class="nc" id="L133">                    return dbOpt.orElseGet(() -&gt; Localization.lang(&quot;untitled&quot;));</span>
+                })
+<span class="nc" id="L135">                .install(libraryListView);</span>
+<span class="nc" id="L136">        viewModel.selectedDbProperty().bind(libraryListView.getSelectionModel().selectedItemProperty());</span>
+<span class="nc" id="L137">        stateManager.getActiveDatabase().ifPresent(database1 -&gt; libraryListView.getSelectionModel().select(database1));</span>
+
+<span class="nc" id="L139">        PseudoClass entrySelected = PseudoClass.getPseudoClass(&quot;entry-selected&quot;);</span>
+<span class="nc" id="L140">        new ViewModelListCellFactory&lt;BibEntry&gt;()</span>
+<span class="nc" id="L141">                .withGraphic(entry -&gt; {</span>
+<span class="nc" id="L142">                    ToggleButton addToggle = IconTheme.JabRefIcons.ADD.asToggleButton();</span>
+<span class="nc" id="L143">                    EasyBind.subscribe(addToggle.selectedProperty(), selected -&gt; {</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                        if (selected) {</span>
+<span class="nc" id="L145">                            addToggle.setGraphic(IconTheme.JabRefIcons.ADD_FILLED.withColor(IconTheme.SELECTED_COLOR).getGraphicNode());</span>
+                        } else {
+<span class="nc" id="L147">                            addToggle.setGraphic(IconTheme.JabRefIcons.ADD.getGraphicNode());</span>
+                        }
+<span class="nc" id="L149">                    });</span>
+<span class="nc" id="L150">                    addToggle.getStyleClass().add(&quot;addEntryButton&quot;);</span>
+<span class="nc" id="L151">                    addToggle.selectedProperty().bindBidirectional(entriesListView.getItemBooleanProperty(entry));</span>
+<span class="nc" id="L152">                    HBox separator = new HBox();</span>
+<span class="nc" id="L153">                    HBox.setHgrow(separator, Priority.SOMETIMES);</span>
+<span class="nc" id="L154">                    Node entryNode = getEntryNode(entry);</span>
+<span class="nc" id="L155">                    HBox.setHgrow(entryNode, Priority.ALWAYS);</span>
+<span class="nc" id="L156">                    HBox container = new HBox(entryNode, separator, addToggle);</span>
+<span class="nc" id="L157">                    container.getStyleClass().add(&quot;entry-container&quot;);</span>
+
+<span class="nc" id="L159">                    BackgroundTask.wrap(() -&gt; viewModel.hasDuplicate(entry)).onSuccess(duplicateFound -&gt; {</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                        if (duplicateFound) {</span>
+<span class="nc" id="L161">                            Button duplicateButton = IconTheme.JabRefIcons.DUPLICATE.asButton();</span>
+<span class="nc" id="L162">                            duplicateButton.setTooltip(new Tooltip(Localization.lang(&quot;Possible duplicate of existing entry. Click to resolve.&quot;)));</span>
+<span class="nc" id="L163">                            duplicateButton.setOnAction(event -&gt; viewModel.resolveDuplicate(entry));</span>
+<span class="nc" id="L164">                            container.getChildren().add(1, duplicateButton);</span>
+                        }
+<span class="nc" id="L166">                    }).executeWith(taskExecutor);</span>
+
+                    /*
+                    inserted the if-statement here, since a Platform.runLater() call did not work.
+                    also tried to move it to the end of the initialize method, but it did not select the entry.
+                    */
+<span class="nc bnc" id="L172" title="All 2 branches missed.">                    if (entriesListView.getItems().size() == 1) {</span>
+<span class="nc" id="L173">                        selectAllNewEntries();</span>
+                    }
+
+<span class="nc" id="L176">                    return container;</span>
+                })
+<span class="nc" id="L178">                .withOnMouseClickedEvent((entry, event) -&gt; {</span>
+<span class="nc" id="L179">                    entriesListView.getCheckModel().toggleCheckState(entry);</span>
+<span class="nc" id="L180">                    displayBibTeX(entry, viewModel.getSourceString(entry));</span>
+<span class="nc" id="L181">                })</span>
+<span class="nc" id="L182">                .withPseudoClass(entrySelected, entriesListView::getItemBooleanProperty)</span>
+<span class="nc" id="L183">                .install(entriesListView);</span>
+
+<span class="nc" id="L185">        selectedItems.textProperty().bind(Bindings.size(entriesListView.getCheckModel().getCheckedItems()).asString());</span>
+<span class="nc" id="L186">        totalItems.textProperty().bind(Bindings.size(entriesListView.getItems()).asString());</span>
+<span class="nc" id="L187">        entriesListView.setSelectionModel(new NoSelectionModel&lt;&gt;());</span>
+<span class="nc" id="L188">        initBibTeX();</span>
+<span class="nc" id="L189">    }</span>
+
+    private void displayBibTeX(BibEntry entry, String bibTeX) {
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (entriesListView.getCheckModel().isChecked(entry)) {</span>
+<span class="nc" id="L193">            bibTeXData.clear();</span>
+<span class="nc" id="L194">            bibTeXData.appendText(bibTeX);</span>
+<span class="nc" id="L195">            bibTeXData.moveTo(0);</span>
+<span class="nc" id="L196">            bibTeXData.requestFollowCaret();</span>
+        } else {
+<span class="nc" id="L198">            bibTeXData.clear();</span>
+        }
+<span class="nc" id="L200">    }</span>
+
+    private void initBibTeX() {
+<span class="nc" id="L203">        bibTeXDataLabel.setText(Localization.lang(&quot;%0 source&quot;, &quot;BibTeX&quot;));</span>
+<span class="nc" id="L204">        bibTeXData.setBorder(new Border(new BorderStroke(Color.GREY, BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT)));</span>
+<span class="nc" id="L205">        bibTeXData.setPadding(new Insets(5.0));</span>
+<span class="nc" id="L206">        showEntryInformation.selectedProperty().addListener((observableValue, old_val, new_val) -&gt; {</span>
+<span class="nc" id="L207">            bibTeXDataBox.setVisible(new_val);</span>
+<span class="nc" id="L208">            bibTeXDataBox.setManaged(new_val);</span>
+<span class="nc" id="L209">        });</span>
+<span class="nc" id="L210">    }</span>
+
+    private Node getEntryNode(BibEntry entry) {
+<span class="nc" id="L213">        Node entryType = getIcon(entry.getType()).getGraphicNode();</span>
+<span class="nc" id="L214">        entryType.getStyleClass().add(&quot;type&quot;);</span>
+<span class="nc" id="L215">        Label authors = new Label(entry.getFieldOrAliasLatexFree(StandardField.AUTHOR).orElse(&quot;&quot;));</span>
+<span class="nc" id="L216">        authors.getStyleClass().add(&quot;authors&quot;);</span>
+<span class="nc" id="L217">        Label title = new Label(entry.getFieldOrAliasLatexFree(StandardField.TITLE).orElse(&quot;&quot;));</span>
+<span class="nc" id="L218">        title.getStyleClass().add(&quot;title&quot;);</span>
+<span class="nc" id="L219">        Label year = new Label(entry.getFieldOrAliasLatexFree(StandardField.YEAR).orElse(&quot;&quot;));</span>
+<span class="nc" id="L220">        year.getStyleClass().add(&quot;year&quot;);</span>
+<span class="nc" id="L221">        Label journal = new Label(entry.getFieldOrAliasLatexFree(StandardField.JOURNAL).orElse(&quot;&quot;));</span>
+<span class="nc" id="L222">        journal.getStyleClass().add(&quot;journal&quot;);</span>
+
+<span class="nc" id="L224">        VBox entryContainer = new VBox(</span>
+                new HBox(10, entryType, title),
+                new HBox(5, year, journal),
+                authors
+        );
+<span class="nc" id="L229">        entry.getFieldOrAliasLatexFree(StandardField.ABSTRACT).ifPresent(summaryText -&gt; {</span>
+<span class="nc" id="L230">            TextFlowLimited summary = new TextFlowLimited(new Text(summaryText));</span>
+<span class="nc" id="L231">            summary.getStyleClass().add(&quot;summary&quot;);</span>
+<span class="nc" id="L232">            entryContainer.getChildren().add(summary);</span>
+<span class="nc" id="L233">        });</span>
+
+<span class="nc" id="L235">        entryContainer.getStyleClass().add(&quot;bibEntry&quot;);</span>
+<span class="nc" id="L236">        return entryContainer;</span>
+    }
+
+    private IconTheme.JabRefIcons getIcon(EntryType type) {
+<span class="nc" id="L240">        EnumSet&lt;StandardEntryType&gt; crossRefTypes = EnumSet.of(StandardEntryType.InBook, StandardEntryType.InProceedings, StandardEntryType.InCollection);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (type == StandardEntryType.Book) {</span>
+<span class="nc" id="L242">            return IconTheme.JabRefIcons.BOOK;</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        } else if (crossRefTypes.contains(type)) {</span>
+<span class="nc" id="L244">            return IconTheme.JabRefIcons.OPEN_LINK;</span>
+        }
+<span class="nc" id="L246">        return IconTheme.JabRefIcons.ARTICLE;</span>
+    }
+
+    public void unselectAll() {
+<span class="nc" id="L250">        entriesListView.getCheckModel().clearChecks();</span>
+<span class="nc" id="L251">    }</span>
+
+    public void selectAllNewEntries() {
+<span class="nc" id="L254">        unselectAll();</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        for (BibEntry entry : entriesListView.getItems()) {</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            if (!viewModel.hasDuplicate(entry)) {</span>
+<span class="nc" id="L257">                entriesListView.getCheckModel().check(entry);</span>
+<span class="nc" id="L258">                displayBibTeX(entry, viewModel.getSourceString(entry));</span>
+            }
+<span class="nc" id="L260">        }</span>
+<span class="nc" id="L261">    }</span>
+
+    public void selectAllEntries() {
+<span class="nc" id="L264">        unselectAll();</span>
+<span class="nc" id="L265">        entriesListView.getCheckModel().checkAll();</span>
+<span class="nc" id="L266">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

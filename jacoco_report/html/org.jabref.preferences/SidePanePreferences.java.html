@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SidePanePreferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.preferences</a> &gt; <span class="el_source">SidePanePreferences.java</span></div><h1>SidePanePreferences.java</h1><pre class="source lang-java linenums">package org.jabref.preferences;
+
+import java.util.Map;
+import java.util.Set;
+
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableMap;
+import javafx.collections.ObservableSet;
+
+import org.jabref.gui.sidepane.SidePaneType;
+
+public class SidePanePreferences {
+    private final ObservableSet&lt;SidePaneType&gt; visiblePanes;
+    private final ObservableMap&lt;SidePaneType, Integer&gt; preferredPositions;
+    private final IntegerProperty webSearchFetcherSelected;
+
+    public SidePanePreferences(Set&lt;SidePaneType&gt; visiblePanes,
+                               Map&lt;SidePaneType, Integer&gt; preferredPositions,
+<span class="fc" id="L21">                               int webSearchFetcherSelected) {</span>
+<span class="fc" id="L22">        this.visiblePanes = FXCollections.observableSet(visiblePanes);</span>
+<span class="fc" id="L23">        this.preferredPositions = FXCollections.observableMap(preferredPositions);</span>
+<span class="fc" id="L24">        this.webSearchFetcherSelected = new SimpleIntegerProperty(webSearchFetcherSelected);</span>
+<span class="fc" id="L25">    }</span>
+
+    public ObservableSet&lt;SidePaneType&gt; visiblePanes() {
+<span class="fc" id="L28">        return visiblePanes;</span>
+    }
+
+    public ObservableMap&lt;SidePaneType, Integer&gt; getPreferredPositions() {
+<span class="fc" id="L32">        return preferredPositions;</span>
+    }
+
+    public void setPreferredPositions(Map&lt;SidePaneType, Integer&gt; positions) {
+<span class="fc" id="L36">        preferredPositions.clear();</span>
+<span class="fc" id="L37">        preferredPositions.putAll(positions);</span>
+<span class="fc" id="L38">    }</span>
+
+    public int getWebSearchFetcherSelected() {
+<span class="nc" id="L41">        return webSearchFetcherSelected.get();</span>
+    }
+
+    public IntegerProperty webSearchFetcherSelectedProperty() {
+<span class="nc" id="L45">        return webSearchFetcherSelected;</span>
+    }
+
+    public void setWebSearchFetcherSelected(int webSearchFetcherSelected) {
+<span class="nc" id="L49">        this.webSearchFetcherSelected.set(webSearchFetcherSelected);</span>
+<span class="nc" id="L50">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

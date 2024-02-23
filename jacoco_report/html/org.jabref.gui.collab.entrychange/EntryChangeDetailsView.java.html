@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryChangeDetailsView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.collab.entrychange</a> &gt; <span class="el_source">EntryChangeDetailsView.java</span></div><h1>EntryChangeDetailsView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.collab.entrychange;
+
+import javafx.event.Event;
+import javafx.geometry.Orientation;
+import javafx.scene.control.Label;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.TabPane;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.VBox;
+import javafx.scene.web.WebView;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.collab.DatabaseChangeDetailsView;
+import org.jabref.gui.preview.PreviewViewer;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+
+public final class EntryChangeDetailsView extends DatabaseChangeDetailsView {
+<span class="nc" id="L27">    private final PreviewWithSourceTab oldPreviewWithSourcesTab = new PreviewWithSourceTab();</span>
+<span class="nc" id="L28">    private final PreviewWithSourceTab newPreviewWithSourcesTab = new PreviewWithSourceTab();</span>
+<span class="nc" id="L29">    private boolean scrolling = false;</span>
+
+    public EntryChangeDetailsView(BibEntry oldEntry,
+                                  BibEntry newEntry,
+                                  BibDatabaseContext databaseContext,
+                                  DialogService dialogService,
+                                  StateManager stateManager,
+                                  ThemeManager themeManager,
+                                  PreferencesService preferencesService,
+                                  BibEntryTypesManager entryTypesManager,
+                                  PreviewViewer previewViewer,
+<span class="nc" id="L40">                                  TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L41">        Label inJabRef = new Label(Localization.lang(&quot;In JabRef&quot;));</span>
+<span class="nc" id="L42">        inJabRef.getStyleClass().add(&quot;lib-change-header&quot;);</span>
+<span class="nc" id="L43">        Label onDisk = new Label(Localization.lang(&quot;On disk&quot;));</span>
+<span class="nc" id="L44">        onDisk.getStyleClass().add(&quot;lib-change-header&quot;);</span>
+
+        // we need a copy here as we otherwise would set the same entry twice
+<span class="nc" id="L47">        PreviewViewer previewClone = new PreviewViewer(databaseContext, dialogService, preferencesService, stateManager, themeManager, taskExecutor);</span>
+
+        // The scroll bar used is not part of ScrollPane, but the attached WebView.
+<span class="nc" id="L50">        WebView previewCloneView = (WebView) previewClone.getContent();</span>
+<span class="nc" id="L51">        WebView previewViewerView = (WebView) previewViewer.getContent();</span>
+<span class="nc" id="L52">        synchronizeScrolling(previewCloneView, previewViewerView);</span>
+<span class="nc" id="L53">        synchronizeScrolling(previewViewerView, previewCloneView);</span>
+        // TODO: Also sync scrolling for BibTeX view.
+
+<span class="nc" id="L56">        TabPane oldEntryTabPane = oldPreviewWithSourcesTab.getPreviewWithSourceTab(oldEntry, databaseContext, preferencesService, entryTypesManager, previewClone, Localization.lang(&quot;Entry Preview&quot;));</span>
+<span class="nc" id="L57">        TabPane newEntryTabPane = newPreviewWithSourcesTab.getPreviewWithSourceTab(newEntry, databaseContext, preferencesService, entryTypesManager, previewViewer, Localization.lang(&quot;Entry Preview&quot;));</span>
+
+<span class="nc" id="L59">        EasyBind.subscribe(oldEntryTabPane.getSelectionModel().selectedIndexProperty(), selectedIndex -&gt; {</span>
+<span class="nc" id="L60">            newEntryTabPane.getSelectionModel().select(selectedIndex.intValue());</span>
+<span class="nc" id="L61">        });</span>
+
+<span class="nc" id="L63">        EasyBind.subscribe(newEntryTabPane.getSelectionModel().selectedIndexProperty(), selectedIndex -&gt; {</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            if (oldEntryTabPane.getSelectionModel().getSelectedIndex() != selectedIndex.intValue()) {</span>
+<span class="nc" id="L65">                oldEntryTabPane.getSelectionModel().select(selectedIndex.intValue());</span>
+            }
+<span class="nc" id="L67">        });</span>
+
+<span class="nc" id="L69">        VBox containerOld = new VBox(inJabRef, oldEntryTabPane);</span>
+<span class="nc" id="L70">        VBox containerNew = new VBox(onDisk, newEntryTabPane);</span>
+
+<span class="nc" id="L72">        SplitPane split = new SplitPane(containerOld, containerNew);</span>
+<span class="nc" id="L73">        split.setOrientation(Orientation.HORIZONTAL);</span>
+
+<span class="nc" id="L75">        setLeftAnchor(split, 8d);</span>
+<span class="nc" id="L76">        setTopAnchor(split, 8d);</span>
+<span class="nc" id="L77">        setRightAnchor(split, 8d);</span>
+<span class="nc" id="L78">        setBottomAnchor(split, 8d);</span>
+
+<span class="nc" id="L80">        this.getChildren().add(split);</span>
+<span class="nc" id="L81">    }</span>
+
+    // Method adapted from:
+    // https://stackoverflow.com/questions/49509395/synchronize-scrollbars-of-two-javafx-webviews
+    // https://stackoverflow.com/questions/31264847/how-to-set-remember-scrollbar-thumb-position-in-javafx-8-webview
+    private void synchronizeScrolling(WebView webView, WebView otherWebView) {
+<span class="nc" id="L87">        webView.addEventHandler(Event.ANY, event -&gt; {</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            if (!scrolling) {</span>
+<span class="nc" id="L89">                scrolling = true;</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                if (event instanceof MouseEvent) {</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                    if (((MouseEvent) event).isPrimaryButtonDown()) {</span>
+<span class="nc" id="L92">                        int value = (Integer) webView.getEngine().executeScript(&quot;window.scrollY&quot;);</span>
+<span class="nc" id="L93">                        otherWebView.getEngine().executeScript(&quot;window.scrollTo(0, &quot; + value + &quot;)&quot;);</span>
+<span class="nc" id="L94">                    }</span>
+                } else {
+<span class="nc" id="L96">                    otherWebView.fireEvent(event.copyFor(otherWebView, otherWebView));</span>
+                }
+<span class="nc" id="L98">                scrolling = false;</span>
+            }
+<span class="nc" id="L100">        });</span>
+<span class="nc" id="L101">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutoLinkPreferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.util.io</a> &gt; <span class="el_source">AutoLinkPreferences.java</span></div><h1>AutoLinkPreferences.java</h1><pre class="source lang-java linenums">package org.jabref.logic.util.io;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+public class AutoLinkPreferences {
+
+<span class="fc" id="L13">    public enum CitationKeyDependency {</span>
+<span class="fc" id="L14">        START, // Filenames starting with the citation key</span>
+<span class="fc" id="L15">        EXACT, // Filenames exactly matching the citation key</span>
+<span class="fc" id="L16">        REGEX // Filenames matching a regular expression pattern</span>
+    }
+
+    private final ObjectProperty&lt;CitationKeyDependency&gt; citationKeyDependency;
+    private final StringProperty regularExpression;
+    private final BooleanProperty askAutoNamingPdfs;
+    private final ReadOnlyObjectProperty&lt;Character&gt; keywordSeparator;
+
+    public AutoLinkPreferences(CitationKeyDependency citationKeyDependency,
+                               String regularExpression,
+                               boolean askAutoNamingPdfs,
+<span class="nc" id="L27">                               ObjectProperty&lt;Character&gt; keywordSeparatorProperty) {</span>
+<span class="nc" id="L28">        this.citationKeyDependency = new SimpleObjectProperty&lt;&gt;(citationKeyDependency);</span>
+<span class="nc" id="L29">        this.regularExpression = new SimpleStringProperty(regularExpression);</span>
+<span class="nc" id="L30">        this.askAutoNamingPdfs = new SimpleBooleanProperty(askAutoNamingPdfs);</span>
+<span class="nc" id="L31">        this.keywordSeparator = keywordSeparatorProperty;</span>
+<span class="nc" id="L32">    }</span>
+
+    /**
+     * For testing purpose
+     */
+    public AutoLinkPreferences(CitationKeyDependency citationKeyDependency,
+                               String regularExpression,
+                               boolean askAutoNamingPdfs,
+<span class="fc" id="L40">                               Character keywordSeparator) {</span>
+<span class="fc" id="L41">        this.citationKeyDependency = new SimpleObjectProperty&lt;&gt;(citationKeyDependency);</span>
+<span class="fc" id="L42">        this.regularExpression = new SimpleStringProperty(regularExpression);</span>
+<span class="fc" id="L43">        this.askAutoNamingPdfs = new SimpleBooleanProperty(askAutoNamingPdfs);</span>
+<span class="fc" id="L44">        this.keywordSeparator = new SimpleObjectProperty&lt;&gt;(keywordSeparator);</span>
+<span class="fc" id="L45">    }</span>
+
+    public CitationKeyDependency getCitationKeyDependency() {
+<span class="fc" id="L48">        return citationKeyDependency.getValue();</span>
+    }
+
+    public ObjectProperty&lt;CitationKeyDependency&gt; citationKeyDependencyProperty() {
+<span class="nc" id="L52">        return citationKeyDependency;</span>
+    }
+
+    public void setCitationKeyDependency(CitationKeyDependency citationKeyDependency) {
+<span class="nc" id="L56">        this.citationKeyDependency.set(citationKeyDependency);</span>
+<span class="nc" id="L57">    }</span>
+
+    public String getRegularExpression() {
+<span class="nc" id="L60">        return regularExpression.getValue();</span>
+    }
+
+    public StringProperty regularExpressionProperty() {
+<span class="nc" id="L64">        return regularExpression;</span>
+    }
+
+    public void setRegularExpression(String regularExpression) {
+<span class="nc" id="L68">        this.regularExpression.set(regularExpression);</span>
+<span class="nc" id="L69">    }</span>
+
+    public boolean shouldAskAutoNamingPdfs() {
+<span class="nc" id="L72">        return askAutoNamingPdfs.getValue();</span>
+    }
+
+    public BooleanProperty askAutoNamingPdfsProperty() {
+<span class="nc" id="L76">        return askAutoNamingPdfs;</span>
+    }
+
+    public void setAskAutoNamingPdfs(boolean askAutoNamingPdfs) {
+<span class="nc" id="L80">        this.askAutoNamingPdfs.set(askAutoNamingPdfs);</span>
+<span class="nc" id="L81">    }</span>
+
+    public Character getKeywordSeparator() {
+<span class="nc" id="L84">        return keywordSeparator.getValue();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextFlowLimited.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">TextFlowLimited.java</span></div><h1>TextFlowLimited.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import javafx.animation.Animation;
+import javafx.animation.Transition;
+import javafx.geometry.HPos;
+import javafx.geometry.VPos;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.layout.Region;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
+import javafx.util.Duration;
+
+import org.jabref.logic.l10n.Localization;
+
+public class TextFlowLimited extends TextFlow {
+<span class="nc" id="L17">    private boolean isCollapsed = true;</span>
+<span class="nc" id="L18">    private Hyperlink moreLink = new Hyperlink(Localization.lang(&quot;(more)&quot;));</span>
+<span class="nc" id="L19">    private Rectangle clip = new Rectangle();</span>
+
+    public TextFlowLimited(Text... texts) {
+<span class="nc" id="L22">        super(texts);</span>
+
+<span class="nc" id="L24">        this.setPrefWidth(Region.USE_PREF_SIZE);</span>
+
+<span class="nc" id="L26">        moreLink.setOnAction(event -&gt; expand());</span>
+<span class="nc" id="L27">        moreLink.setStyle(&quot;-fx-background-color: white&quot;);</span>
+
+<span class="nc" id="L29">        this.setOnMouseClicked(event -&gt; expand());</span>
+<span class="nc" id="L30">    }</span>
+
+    private void expand() {
+<span class="nc" id="L33">        double newPrefHeight = super.computePrefHeight(getWidth());</span>
+<span class="nc" id="L34">        final Animation expandPanel = new Transition() {</span>
+            {
+<span class="nc" id="L36">                setCycleDuration(Duration.millis(200));</span>
+<span class="nc" id="L37">            }</span>
+
+            @Override
+            protected void interpolate(double fraction) {
+<span class="nc" id="L41">                setPrefHeight(newPrefHeight * fraction);</span>
+<span class="nc" id="L42">            }</span>
+        };
+
+<span class="nc" id="L45">        expandPanel.setOnFinished(event -&gt; {</span>
+<span class="nc" id="L46">            isCollapsed = false;</span>
+<span class="nc" id="L47">            requestLayout();</span>
+<span class="nc" id="L48">        });</span>
+<span class="nc" id="L49">        expandPanel.play();</span>
+<span class="nc" id="L50">    }</span>
+
+    @Override
+    protected double computePrefHeight(double width) {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (isCollapsed) {</span>
+<span class="nc" id="L55">            return 38;</span>
+        } else {
+<span class="nc" id="L57">            return super.computePrefHeight(width);</span>
+        }
+    }
+
+    @Override
+    protected void layoutChildren() {
+<span class="nc" id="L63">        super.layoutChildren();</span>
+
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (isCollapsed) {</span>
+            // Display link to expand text
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            if (!this.getChildren().contains(moreLink)) {</span>
+<span class="nc" id="L68">                this.getChildren().add(moreLink);</span>
+            }
+<span class="nc" id="L70">            layoutInArea(moreLink, 0, 0, getWidth(), getHeight(), getBaselineOffset(), HPos.RIGHT, VPos.BOTTOM);</span>
+
+            // Clip content if it expands above pref height (no idea why this is needed, but otherwise sometimes the text is still visible)
+<span class="nc" id="L73">            clip.setHeight(computePrefHeight(this.getWidth()));</span>
+<span class="nc" id="L74">            clip.setWidth(this.getWidth());</span>
+<span class="nc" id="L75">            this.setClip(clip);</span>
+        } else {
+<span class="nc" id="L77">            this.getChildren().remove(moreLink);</span>
+<span class="nc" id="L78">            this.setClip(null);</span>
+        }
+<span class="nc" id="L80">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

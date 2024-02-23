@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchFieldRightClickMenu.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.search</a> &gt; <span class="el_source">SearchFieldRightClickMenu.java</span></div><h1>SearchFieldRightClickMenu.java</h1><pre class="source lang-java linenums">package org.jabref.gui.search;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.edit.EditAction;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.logic.l10n.Localization;
+
+import org.controlsfx.control.textfield.CustomTextField;
+
+<span class="nc" id="L21">public class SearchFieldRightClickMenu {</span>
+    public static ContextMenu create(KeyBindingRepository keyBindingRepository,
+                                     StateManager stateManager,
+                                     CustomTextField searchField,
+                                     LibraryTabContainer tabContainer,
+                                     UndoManager undoManager) {
+<span class="nc" id="L27">        ActionFactory factory = new ActionFactory(keyBindingRepository);</span>
+<span class="nc" id="L28">        ContextMenu contextMenu = new ContextMenu();</span>
+
+<span class="nc" id="L30">        contextMenu.getItems().addAll(</span>
+<span class="nc" id="L31">                factory.createMenuItem(StandardActions.UNDO, new EditAction(StandardActions.UNDO, tabContainer::getCurrentLibraryTab, stateManager, undoManager)),</span>
+<span class="nc" id="L32">                factory.createMenuItem(StandardActions.REDO, new EditAction(StandardActions.REDO, tabContainer::getCurrentLibraryTab, stateManager, undoManager)),</span>
+<span class="nc" id="L33">                factory.createMenuItem(StandardActions.CUT, new EditAction(StandardActions.CUT, tabContainer::getCurrentLibraryTab, stateManager, undoManager)),</span>
+<span class="nc" id="L34">                factory.createMenuItem(StandardActions.COPY, new EditAction(StandardActions.COPY, tabContainer::getCurrentLibraryTab, stateManager, undoManager)),</span>
+<span class="nc" id="L35">                factory.createMenuItem(StandardActions.PASTE, new EditAction(StandardActions.PASTE, tabContainer::getCurrentLibraryTab, stateManager, undoManager)),</span>
+<span class="nc" id="L36">                factory.createMenuItem(StandardActions.DELETE, new EditAction(StandardActions.DELETE, tabContainer::getCurrentLibraryTab, stateManager, undoManager)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L40">                factory.createMenuItem(StandardActions.SELECT_ALL, new EditAction(StandardActions.SELECT_ALL, null, stateManager, undoManager)),</span>
+<span class="nc" id="L41">                createSearchFromHistorySubMenu(factory, stateManager, searchField)</span>
+        );
+
+<span class="nc" id="L44">        return contextMenu;</span>
+    }
+
+    private static Menu createSearchFromHistorySubMenu(ActionFactory factory,
+                                                       StateManager stateManager,
+                                                       CustomTextField searchField) {
+<span class="nc" id="L50">        Menu searchFromHistorySubMenu = factory.createMenu(() -&gt; Localization.lang(&quot;Search from history...&quot;));</span>
+
+<span class="nc" id="L52">        int num = stateManager.getLastSearchHistory(10).size();</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (num == 0) {</span>
+<span class="nc" id="L54">            MenuItem item = new MenuItem(Localization.lang(&quot;your search history is empty&quot;));</span>
+<span class="nc" id="L55">            searchFromHistorySubMenu.getItems().addAll(item);</span>
+<span class="nc" id="L56">        } else {</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            for (int i = 0; i &lt; num; i++) {</span>
+<span class="nc" id="L58">                int finalI = i;</span>
+<span class="nc" id="L59">                MenuItem item = factory.createMenuItem(() -&gt; stateManager.getLastSearchHistory(10).get(finalI), new SimpleCommand() {</span>
+                    @Override
+                    public void execute() {
+<span class="nc" id="L62">                        searchField.setText(stateManager.getLastSearchHistory(10).get(finalI));</span>
+<span class="nc" id="L63">                    }</span>
+                });
+<span class="nc" id="L65">                searchFromHistorySubMenu.getItems().addAll(item);</span>
+            }
+<span class="nc" id="L67">            MenuItem clear = factory.createMenuItem(() -&gt; Localization.lang(&quot;Clear history&quot;), new SimpleCommand() {</span>
+                @Override
+                public void execute() {
+<span class="nc" id="L70">                    stateManager.clearSearchHistory();</span>
+<span class="nc" id="L71">                }</span>
+            });
+<span class="nc" id="L73">            searchFromHistorySubMenu.getItems().addAll(new SeparatorMenuItem(), clear);</span>
+        }
+<span class="nc" id="L75">        return searchFromHistorySubMenu;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

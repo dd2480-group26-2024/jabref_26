@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BackupResolverDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.backup</a> &gt; <span class="el_source">BackupResolverDialog.java</span></div><h1>BackupResolverDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui.backup;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Hyperlink;
+
+import org.jabref.gui.FXDialog;
+import org.jabref.gui.desktop.JabRefDesktop;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.BackupFileType;
+import org.jabref.logic.util.io.BackupFileUtil;
+import org.jabref.preferences.ExternalApplicationsPreferences;
+
+import org.controlsfx.control.HyperlinkLabel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class BackupResolverDialog extends FXDialog {
+<span class="nc" id="L23">    public static final ButtonType RESTORE_FROM_BACKUP = new ButtonType(Localization.lang(&quot;Restore from backup&quot;), ButtonBar.ButtonData.OK_DONE);</span>
+<span class="nc" id="L24">    public static final ButtonType REVIEW_BACKUP = new ButtonType(Localization.lang(&quot;Review backup&quot;), ButtonBar.ButtonData.LEFT);</span>
+<span class="nc" id="L25">    public static final ButtonType IGNORE_BACKUP = new ButtonType(Localization.lang(&quot;Ignore backup&quot;), ButtonBar.ButtonData.CANCEL_CLOSE);</span>
+
+<span class="nc" id="L27">    private static final Logger LOGGER = LoggerFactory.getLogger(BackupResolverDialog.class);</span>
+
+    public BackupResolverDialog(Path originalPath, Path backupDir, ExternalApplicationsPreferences externalApplicationsPreferences) {
+<span class="nc" id="L30">        super(AlertType.CONFIRMATION, Localization.lang(&quot;Backup found&quot;), true);</span>
+<span class="nc" id="L31">        setHeaderText(null);</span>
+<span class="nc" id="L32">        getDialogPane().setMinHeight(180);</span>
+<span class="nc" id="L33">        getDialogPane().getButtonTypes().setAll(RESTORE_FROM_BACKUP, REVIEW_BACKUP, IGNORE_BACKUP);</span>
+
+<span class="nc" id="L35">        Optional&lt;Path&gt; backupPathOpt = BackupFileUtil.getPathOfLatestExistingBackupFile(originalPath, BackupFileType.BACKUP, backupDir);</span>
+<span class="nc" id="L36">        String backupFilename = backupPathOpt.map(Path::getFileName).map(Path::toString).orElse(Localization.lang(&quot;File not found&quot;));</span>
+<span class="nc" id="L37">        String content = Localization.lang(&quot;A backup file for '%0' was found at [%1]&quot;, originalPath.getFileName().toString(), backupFilename) + &quot;\n&quot; +</span>
+<span class="nc" id="L38">                Localization.lang(&quot;This could indicate that JabRef did not shut down cleanly last time the file was used.&quot;) + &quot;\n\n&quot; +</span>
+<span class="nc" id="L39">                Localization.lang(&quot;Do you want to recover the library from the backup file?&quot;);</span>
+<span class="nc" id="L40">        setContentText(content);</span>
+
+<span class="nc" id="L42">        HyperlinkLabel contentLabel = new HyperlinkLabel(content);</span>
+<span class="nc" id="L43">        contentLabel.setPrefWidth(360);</span>
+<span class="nc" id="L44">        contentLabel.setOnAction(e -&gt; {</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">            if (backupPathOpt.isPresent()) {</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">                if (!(e.getSource() instanceof Hyperlink)) {</span>
+<span class="nc" id="L47">                    return;</span>
+                }
+<span class="nc" id="L49">                String clickedLinkText = ((Hyperlink) (e.getSource())).getText();</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">                if (backupFilename.equals(clickedLinkText)) {</span>
+                    try {
+<span class="nc" id="L52">                        JabRefDesktop.openFolderAndSelectFile(backupPathOpt.get(), externalApplicationsPreferences, null);</span>
+<span class="nc" id="L53">                    } catch (IOException ex) {</span>
+<span class="nc" id="L54">                        LOGGER.error(&quot;Could not open backup folder&quot;, ex);</span>
+<span class="nc" id="L55">                    }</span>
+                }
+            }
+<span class="nc" id="L58">        });</span>
+<span class="nc" id="L59">        getDialogPane().setContent(contentLabel);</span>
+<span class="nc" id="L60">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

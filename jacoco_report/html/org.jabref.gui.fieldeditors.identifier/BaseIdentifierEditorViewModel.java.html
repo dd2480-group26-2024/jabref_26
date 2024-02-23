@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BaseIdentifierEditorViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors.identifier</a> &gt; <span class="el_source">BaseIdentifierEditorViewModel.java</span></div><h1>BaseIdentifierEditorViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors.identifier;
+
+import java.io.IOException;
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.autocompleter.SuggestionProvider;
+import org.jabref.gui.desktop.JabRefDesktop;
+import org.jabref.gui.fieldeditors.AbstractEditorViewModel;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.importer.FetcherClientException;
+import org.jabref.logic.importer.FetcherServerException;
+import org.jabref.logic.importer.IdFetcher;
+import org.jabref.logic.importer.util.IdentifierParser;
+import org.jabref.logic.integrity.FieldCheckers;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.identifier.Identifier;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public abstract class BaseIdentifierEditorViewModel&lt;T extends Identifier&gt; extends AbstractEditorViewModel {
+<span class="nc" id="L34">    private static final Logger LOGGER = LoggerFactory.getLogger(BaseIdentifierEditorViewModel.class);</span>
+<span class="nc" id="L35">    protected BooleanProperty isInvalidIdentifier = new SimpleBooleanProperty();</span>
+<span class="nc" id="L36">    protected final BooleanProperty identifierLookupInProgress = new SimpleBooleanProperty(false);</span>
+<span class="nc" id="L37">    protected final BooleanProperty canLookupIdentifier = new SimpleBooleanProperty(true);</span>
+<span class="nc" id="L38">    protected final BooleanProperty canFetchBibliographyInformationById = new SimpleBooleanProperty();</span>
+    protected IdentifierParser identifierParser;
+<span class="nc" id="L40">    protected final ObjectProperty&lt;Optional&lt;T&gt;&gt; identifier = new SimpleObjectProperty&lt;&gt;(Optional.empty());</span>
+    protected DialogService dialogService;
+    protected TaskExecutor taskExecutor;
+    protected PreferencesService preferences;
+
+    public BaseIdentifierEditorViewModel(Field field,
+                                         SuggestionProvider&lt;?&gt; suggestionProvider,
+                                         FieldCheckers fieldCheckers,
+                                         DialogService dialogService,
+                                         TaskExecutor taskExecutor,
+                                         PreferencesService preferences,
+                                         UndoManager undoManager) {
+<span class="nc" id="L52">        super(field, suggestionProvider, fieldCheckers, undoManager);</span>
+<span class="nc" id="L53">        this.dialogService = dialogService;</span>
+<span class="nc" id="L54">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L55">        this.preferences = preferences;</span>
+<span class="nc" id="L56">    }</span>
+
+    /**
+     * Since it's not possible to perform the same actions on all identifiers, specific implementations can call the {@code configure}
+     * method to tell the actions they can perform and the actions they can't. Based on this configuration, the view will enable/disable or
+     * show/hide certain UI elements for certain identifier editors.
+     * &lt;p&gt;
+     * &lt;b&gt;NOTE: This method MUST be called by all the implementation view models in their principal constructor&lt;/b&gt;
+     * */
+    protected final void configure(boolean canFetchBibliographyInformationById, boolean canLookupIdentifier) {
+<span class="nc" id="L66">        this.canLookupIdentifier.set(canLookupIdentifier);</span>
+<span class="nc" id="L67">        this.canFetchBibliographyInformationById.set(canFetchBibliographyInformationById);</span>
+<span class="nc" id="L68">    }</span>
+
+    protected Optional&lt;T&gt; updateIdentifier() {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (identifierParser == null) {</span>
+<span class="nc" id="L72">            return Optional.empty();</span>
+        }
+
+<span class="nc" id="L75">        identifier.set((Optional&lt;T&gt;) identifierParser.parse(field));</span>
+<span class="nc" id="L76">        return identifier.get();</span>
+    }
+
+    protected void handleIdentifierFetchingError(Exception exception, IdFetcher&lt;T&gt; fetcher) {
+<span class="nc" id="L80">        LOGGER.error(&quot;Error while fetching identifier&quot;, exception);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (exception instanceof FetcherClientException) {</span>
+<span class="nc" id="L82">            dialogService.showInformationDialogAndWait(Localization.lang(&quot;Look up %0&quot;, fetcher.getName()), Localization.lang(&quot;No data was found for the identifier&quot;));</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        } else if (exception instanceof FetcherServerException) {</span>
+<span class="nc" id="L84">            dialogService.showInformationDialogAndWait(Localization.lang(&quot;Look up %0&quot;, fetcher.getName()), Localization.lang(&quot;Server not available&quot;));</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        } else if (exception.getCause() != null) {</span>
+<span class="nc" id="L86">            dialogService.showWarningDialogAndWait(Localization.lang(&quot;Look up %0&quot;, fetcher.getName()), Localization.lang(&quot;Error occurred %0&quot;, exception.getCause().getMessage()));</span>
+        } else {
+<span class="nc" id="L88">            dialogService.showWarningDialogAndWait(Localization.lang(&quot;Look up %0&quot;, fetcher.getName()), Localization.lang(&quot;Error occurred %0&quot;, exception.getCause().getMessage()));</span>
+        }
+<span class="nc" id="L90">    }</span>
+
+    public BooleanProperty canFetchBibliographyInformationByIdProperty() {
+<span class="nc" id="L93">        return canFetchBibliographyInformationById;</span>
+    }
+
+    public boolean getCanFetchBibliographyInformationById() {
+<span class="nc" id="L97">        return canFetchBibliographyInformationById.get();</span>
+    }
+
+    public BooleanProperty canLookupIdentifierProperty() {
+<span class="nc" id="L101">        return canLookupIdentifier;</span>
+    }
+
+    public boolean getCanLookupIdentifier() {
+<span class="nc" id="L105">        return canLookupIdentifier.get();</span>
+    }
+
+    public BooleanProperty isInvalidIdentifierProperty() {
+<span class="nc" id="L109">        return isInvalidIdentifier;</span>
+    }
+
+    public boolean getIsInvalidIdentifier() {
+<span class="nc" id="L113">        return isInvalidIdentifier.get();</span>
+    }
+
+    public boolean getIdentifierLookupInProgress() {
+<span class="nc" id="L117">        return identifierLookupInProgress.get();</span>
+    }
+
+    public BooleanProperty identifierLookupInProgressProperty() {
+<span class="nc" id="L121">        return identifierLookupInProgress;</span>
+    }
+
+    public void fetchBibliographyInformation(BibEntry bibEntry) {
+<span class="nc" id="L125">        LOGGER.warn(&quot;Unable to fetch bibliography information using the '{}' identifier&quot;, field.getDisplayName());</span>
+<span class="nc" id="L126">    }</span>
+
+    public void lookupIdentifier(BibEntry bibEntry) {
+<span class="nc" id="L129">        LOGGER.warn(&quot;Unable to lookup identifier for '{}'&quot;, field.getDisplayName());</span>
+<span class="nc" id="L130">    }</span>
+
+    public void openExternalLink() {
+<span class="nc" id="L133">        identifier.get().flatMap(Identifier::getExternalURI).ifPresent(url -&gt; {</span>
+                    try {
+<span class="nc" id="L135">                        JabRefDesktop.openBrowser(url, preferences.getFilePreferences());</span>
+<span class="nc" id="L136">                    } catch (IOException ex) {</span>
+<span class="nc" id="L137">                        dialogService.showErrorDialogAndWait(Localization.lang(&quot;Unable to open link.&quot;), ex);</span>
+<span class="nc" id="L138">                    }</span>
+<span class="nc" id="L139">                }</span>
+        );
+<span class="nc" id="L141">    }</span>
+
+    @Override
+    public void bindToEntry(BibEntry entry) {
+<span class="nc" id="L145">        super.bindToEntry(entry);</span>
+<span class="nc" id="L146">        identifierParser = new IdentifierParser(entry);</span>
+<span class="nc" id="L147">        EasyBind.subscribe(textProperty(), ignored -&gt; updateIdentifier());</span>
+<span class="nc" id="L148">        EasyBind.subscribe(identifier, newIdentifier -&gt; isInvalidIdentifier.set(newIdentifier.isEmpty()));</span>
+<span class="nc" id="L149">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveFieldValueAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.edit.automaticfiededitor</a> &gt; <span class="el_source">MoveFieldValueAction.java</span></div><h1>MoveFieldValueAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.edit.automaticfiededitor;
+
+import java.util.List;
+
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.gui.undo.UndoableFieldChange;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.strings.StringUtil;
+
+public class MoveFieldValueAction extends SimpleCommand {
+    private final Field fromField;
+    private final Field toField;
+    private final List&lt;BibEntry&gt; entries;
+
+    private final NamedCompound edits;
+
+    private int affectedEntriesCount;
+
+    private final boolean overwriteToFieldContent;
+
+<span class="fc" id="L23">    public MoveFieldValueAction(Field fromField, Field toField, List&lt;BibEntry&gt; entries, NamedCompound edits, boolean overwriteToFieldContent) {</span>
+<span class="fc" id="L24">        this.fromField = fromField;</span>
+<span class="fc" id="L25">        this.toField = toField;</span>
+<span class="fc" id="L26">        this.entries = entries;</span>
+<span class="fc" id="L27">        this.edits = edits;</span>
+<span class="fc" id="L28">        this.overwriteToFieldContent = overwriteToFieldContent;</span>
+<span class="fc" id="L29">    }</span>
+
+    public MoveFieldValueAction(Field fromField, Field toField, List&lt;BibEntry&gt; entries, NamedCompound edits) {
+<span class="fc" id="L32">        this(fromField, toField, entries, edits, true);</span>
+<span class="fc" id="L33">    }</span>
+
+    @Override
+    public void execute() {
+<span class="fc" id="L37">        affectedEntriesCount = 0;</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (BibEntry entry : entries) {</span>
+<span class="fc" id="L39">            String fromFieldValue = entry.getField(fromField).orElse(&quot;&quot;);</span>
+<span class="fc" id="L40">            String toFieldValue = entry.getField(toField).orElse(&quot;&quot;);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            if (StringUtil.isNotBlank(fromFieldValue)) {</span>
+<span class="fc bfc" id="L42" title="All 4 branches covered.">                if (overwriteToFieldContent || toFieldValue.isEmpty()) {</span>
+<span class="fc" id="L43">                    entry.setField(toField, fromFieldValue);</span>
+<span class="fc" id="L44">                    entry.setField(fromField, &quot;&quot;);</span>
+
+<span class="fc" id="L46">                    edits.addEdit(new UndoableFieldChange(entry, fromField, fromFieldValue, null));</span>
+<span class="fc" id="L47">                    edits.addEdit(new UndoableFieldChange(entry, toField, toFieldValue, fromFieldValue));</span>
+<span class="fc" id="L48">                    affectedEntriesCount++;</span>
+                }
+            }
+<span class="fc" id="L51">        }</span>
+
+<span class="fc" id="L53">        edits.end();</span>
+<span class="fc" id="L54">    }</span>
+
+    /**
+     * @return the number of affected entries
+     * */
+    public int executeAndGetAffectedEntriesCount() {
+<span class="fc" id="L60">        execute();</span>
+<span class="fc" id="L61">        return affectedEntriesCount;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

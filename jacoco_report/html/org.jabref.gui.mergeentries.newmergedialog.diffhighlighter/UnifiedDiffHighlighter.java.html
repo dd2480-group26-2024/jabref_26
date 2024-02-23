@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnifiedDiffHighlighter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries.newmergedialog.diffhighlighter</a> &gt; <span class="el_source">UnifiedDiffHighlighter.java</span></div><h1>UnifiedDiffHighlighter.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries.newmergedialog.diffhighlighter;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.gui.mergeentries.newmergedialog.DiffMethod;
+
+import com.github.difflib.DiffUtils;
+import com.github.difflib.patch.AbstractDelta;
+import com.github.difflib.patch.DeltaType;
+import org.fxmisc.richtext.StyleClassedTextArea;
+
+/**
+ * A diff highlighter in which differences of type {@link DeltaType#CHANGE} are unified and represented by an insertion
+ * and deletion in the target text view. Normal addition and deletion are kept as they are.
+ */
+public final class UnifiedDiffHighlighter extends DiffHighlighter {
+
+    public UnifiedDiffHighlighter(StyleClassedTextArea sourceTextview, StyleClassedTextArea targetTextview, DiffMethod diffMethod) {
+<span class="nc" id="L21">        super(sourceTextview, targetTextview, diffMethod);</span>
+<span class="nc" id="L22">    }</span>
+
+    @Override
+    public void highlight() {
+<span class="nc" id="L26">        String sourceContent = sourceTextview.getText();</span>
+<span class="nc" id="L27">        String targetContent = targetTextview.getText();</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">        if (sourceContent.equals(targetContent)) {</span>
+<span class="nc" id="L29">            return;</span>
+        }
+
+<span class="nc" id="L32">        List&lt;String&gt; sourceWords = splitString(sourceContent);</span>
+<span class="nc" id="L33">        List&lt;String&gt; targetWords = splitString(targetContent);</span>
+<span class="nc" id="L34">        List&lt;String&gt; unifiedWords = new ArrayList&lt;&gt;(targetWords);</span>
+
+<span class="nc" id="L36">        List&lt;AbstractDelta&lt;String&gt;&gt; deltaList = DiffUtils.diff(sourceWords, targetWords).getDeltas();</span>
+
+<span class="nc" id="L38">        List&lt;Change&gt; changeList = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L40">        int deletionCount = 0;</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        for (AbstractDelta&lt;String&gt; delta : deltaList) {</span>
+<span class="nc bnc" id="L42" title="All 4 branches missed.">            switch (delta.getType()) {</span>
+                case CHANGE -&gt; {
+<span class="nc" id="L44">                    int changePosition = delta.getTarget().getPosition();</span>
+<span class="nc" id="L45">                    int deletionPoint = changePosition + deletionCount;</span>
+<span class="nc" id="L46">                    int insertionPoint = deletionPoint + 1;</span>
+<span class="nc" id="L47">                    List&lt;String&gt; deltaSourceWords = delta.getSource().getLines();</span>
+<span class="nc" id="L48">                    List&lt;String&gt; deltaTargetWords = delta.getTarget().getLines();</span>
+
+<span class="nc" id="L50">                    unifiedWords.add(deletionPoint, join(deltaSourceWords));</span>
+
+<span class="nc" id="L52">                    changeList.add(new Change(deletionPoint, 1, ChangeType.CHANGE_DELETION));</span>
+<span class="nc" id="L53">                    changeList.add(new Change(insertionPoint, deltaTargetWords.size(), ChangeType.ADDITION));</span>
+<span class="nc" id="L54">                    deletionCount++;</span>
+<span class="nc" id="L55">                }</span>
+                case DELETE -&gt; {
+<span class="nc" id="L57">                    int deletionPoint = delta.getTarget().getPosition() + deletionCount;</span>
+<span class="nc" id="L58">                    unifiedWords.add(deletionPoint, join(delta.getSource().getLines()));</span>
+
+<span class="nc" id="L60">                    changeList.add(new Change(deletionPoint, 1, ChangeType.DELETION));</span>
+<span class="nc" id="L61">                    deletionCount++;</span>
+<span class="nc" id="L62">                }</span>
+                case INSERT -&gt; {
+<span class="nc" id="L64">                    int insertionPoint = delta.getTarget().getPosition() + deletionCount;</span>
+<span class="nc" id="L65">                    changeList.add(new Change(insertionPoint, delta.getTarget().getLines().size(), ChangeType.ADDITION));</span>
+                }
+            }
+<span class="nc" id="L68">        }</span>
+<span class="nc" id="L69">        targetTextview.clear();</span>
+
+<span class="nc" id="L71">        boolean changeInProgress = false;</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        for (int position = 0; position &lt; unifiedWords.size(); position++) {</span>
+<span class="nc" id="L73">            String word = unifiedWords.get(position);</span>
+<span class="nc" id="L74">            Optional&lt;Change&gt; changeAtPosition = findChange(position, changeList);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">            if (changeAtPosition.isEmpty()) {</span>
+<span class="nc" id="L76">                appendToTextArea(targetTextview, getSeparator() + word, &quot;unchanged&quot;);</span>
+            } else {
+<span class="nc" id="L78">                Change change = changeAtPosition.get();</span>
+<span class="nc" id="L79">                List&lt;String&gt; changeWords = unifiedWords.subList(change.position(), change.position() + change.spanSize());</span>
+
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                if (change.type() == ChangeType.DELETION) {</span>
+<span class="nc" id="L82">                    appendToTextArea(targetTextview, getSeparator() + join(changeWords), &quot;deletion&quot;);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                } else if (change.type() == ChangeType.ADDITION) {</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                    if (changeInProgress) {</span>
+<span class="nc" id="L85">                        appendToTextArea(targetTextview, join(changeWords), &quot;addition&quot;);</span>
+<span class="nc" id="L86">                        changeInProgress = false;</span>
+                    } else {
+<span class="nc" id="L88">                        appendToTextArea(targetTextview, getSeparator() + join(changeWords), &quot;addition&quot;);</span>
+                    }
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                } else if (change.type() == ChangeType.CHANGE_DELETION) {</span>
+<span class="nc" id="L91">                    appendToTextArea(targetTextview, getSeparator() + join(changeWords), &quot;deletion&quot;);</span>
+<span class="nc" id="L92">                    changeInProgress = true;</span>
+                }
+<span class="nc" id="L94">                position = (position + changeWords.size()) - 1;</span>
+            }
+        }
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (targetTextview.getLength() &gt;= getSeparator().length()) {</span>
+            // There always going to be an extra separator at the start
+<span class="nc" id="L99">            targetTextview.deleteText(0, getSeparator().length());</span>
+        }
+<span class="nc" id="L101">    }</span>
+
+    private void appendToTextArea(StyleClassedTextArea textArea, String text, String styleClass) {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (text.isEmpty()) {</span>
+<span class="nc" id="L105">            return;</span>
+        }
+        // Append separator without styling it
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (text.startsWith(getSeparator())) {</span>
+<span class="nc" id="L109">            textArea.append(getSeparator(), &quot;unchanged&quot;);</span>
+<span class="nc" id="L110">            textArea.append(text.substring(getSeparator().length()), styleClass);</span>
+        } else {
+<span class="nc" id="L112">            textArea.append(text, styleClass);</span>
+        }
+<span class="nc" id="L114">    }</span>
+
+    private Optional&lt;Change&gt; findChange(int position, List&lt;Change&gt; changeList) {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        return changeList.stream().filter(change -&gt; change.position() == position).findAny();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

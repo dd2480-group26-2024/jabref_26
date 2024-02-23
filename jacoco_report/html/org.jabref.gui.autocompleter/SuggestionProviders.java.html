@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SuggestionProviders.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.autocompleter</a> &gt; <span class="el_source">SuggestionProviders.java</span></div><h1>SuggestionProviders.java</h1><pre class="source lang-java linenums">package org.jabref.gui.autocompleter;
+
+import java.util.Set;
+
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldProperty;
+import org.jabref.model.entry.field.StandardField;
+
+public class SuggestionProviders {
+
+    private final boolean isEmpty;
+    private BibDatabase database;
+    private JournalAbbreviationRepository abbreviationRepository;
+    private AutoCompletePreferences autoCompletePreferences;
+
+<span class="fc" id="L18">    public SuggestionProviders(BibDatabase database, JournalAbbreviationRepository abbreviationRepository, AutoCompletePreferences autoCompletePreferences) {</span>
+<span class="fc" id="L19">        this.database = database;</span>
+<span class="fc" id="L20">        this.abbreviationRepository = abbreviationRepository;</span>
+<span class="fc" id="L21">        this.autoCompletePreferences = autoCompletePreferences;</span>
+<span class="fc" id="L22">        this.isEmpty = false;</span>
+<span class="fc" id="L23">    }</span>
+
+<span class="nc" id="L25">    public SuggestionProviders(BibDatabase database) {</span>
+<span class="nc" id="L26">        this.database = database;</span>
+<span class="nc" id="L27">        this.isEmpty = true;</span>
+<span class="nc" id="L28">    }</span>
+
+<span class="fc" id="L30">    public SuggestionProviders() {</span>
+<span class="fc" id="L31">        this.isEmpty = true;</span>
+<span class="fc" id="L32">    }</span>
+
+    public SuggestionProvider&lt;?&gt; getForField(Field field) {
+<span class="fc bfc" id="L35" title="All 4 branches covered.">        if (isEmpty || !autoCompletePreferences.getCompleteFields().contains(field)) {</span>
+<span class="fc" id="L36">            Set&lt;FieldProperty&gt; fieldProperties = field.getProperties();</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (fieldProperties.contains(FieldProperty.SINGLE_ENTRY_LINK)) {</span>
+<span class="nc" id="L38">                return new BibEntrySuggestionProvider(database);</span>
+            }
+<span class="fc" id="L40">            return new EmptySuggestionProvider();</span>
+        }
+
+<span class="fc" id="L43">        Set&lt;FieldProperty&gt; fieldProperties = field.getProperties();</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (fieldProperties.contains(FieldProperty.PERSON_NAMES)) {</span>
+<span class="fc" id="L45">            return new PersonNameSuggestionProvider(field, database);</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        } else if (fieldProperties.contains(FieldProperty.SINGLE_ENTRY_LINK) || fieldProperties.contains(FieldProperty.MULTIPLE_ENTRY_LINK)) {</span>
+<span class="fc" id="L47">            return new BibEntrySuggestionProvider(database);</span>
+<span class="fc bfc" id="L48" title="All 4 branches covered.">        } else if (fieldProperties.contains(FieldProperty.JOURNAL_NAME) || StandardField.PUBLISHER == field) {</span>
+<span class="fc" id="L49">            return new JournalsSuggestionProvider(field, database, abbreviationRepository);</span>
+        } else {
+<span class="fc" id="L51">            return new WordSuggestionProvider(field, database);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

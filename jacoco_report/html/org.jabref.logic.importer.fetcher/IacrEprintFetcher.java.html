@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IacrEprintFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">IacrEprintFetcher.java</span></div><h1>IacrEprintFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.net.URL;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.FulltextFetcher;
+import org.jabref.logic.importer.IdBasedFetcher;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.fileformat.BibtexParser;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.strings.StringUtil;
+
+public class IacrEprintFetcher implements FulltextFetcher, IdBasedFetcher {
+
+    public static final String NAME = &quot;IACR eprints&quot;;
+
+<span class="fc" id="L26">    private static final Pattern WITHOUT_LETTERS_SPACE = Pattern.compile(&quot;[^0-9/]&quot;);</span>
+
+<span class="fc" id="L28">    private static final Predicate&lt;String&gt; IDENTIFIER_PREDICATE = Pattern.compile(&quot;\\d{4}/\\d{3,5}&quot;).asPredicate();</span>
+    private static final String CITATION_URL_PREFIX = &quot;https://eprint.iacr.org/&quot;;
+    private static final String DESCRIPTION_URL_PREFIX = &quot;https://eprint.iacr.org/&quot;;
+    private static final String FULLTEXT_URL_PREFIX = &quot;https://eprint.iacr.org/&quot;;
+    private static final String VERSION_URL_PREFIX = &quot;https://eprint.iacr.org/archive/versions/&quot;;
+
+    private final ImportFormatPreferences prefs;
+
+<span class="fc" id="L36">    public IacrEprintFetcher(ImportFormatPreferences prefs) {</span>
+<span class="fc" id="L37">        this.prefs = prefs;</span>
+<span class="fc" id="L38">    }</span>
+
+    @Override
+    public Optional&lt;BibEntry&gt; performSearchById(String identifier) throws FetcherException {
+<span class="fc" id="L42">        String identifierWithoutLettersAndSpaces = WITHOUT_LETTERS_SPACE.matcher(identifier).replaceAll(&quot; &quot;).trim();</span>
+
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (!IDENTIFIER_PREDICATE.test(identifierWithoutLettersAndSpaces)) {</span>
+<span class="fc" id="L45">            throw new FetcherException(Localization.lang(&quot;Invalid identifier: '%0'.&quot;, identifier));</span>
+        }
+
+<span class="fc" id="L48">        Optional&lt;BibEntry&gt; entry = createEntryFromIacrCitation(identifierWithoutLettersAndSpaces);</span>
+
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (entry.isPresent()) {</span>
+<span class="fc" id="L51">            setAdditionalFields(entry.get(), identifierWithoutLettersAndSpaces);</span>
+        }
+
+<span class="fc" id="L54">        return entry;</span>
+    }
+
+    private Optional&lt;BibEntry&gt; createEntryFromIacrCitation(String validIdentifier) throws FetcherException {
+<span class="fc" id="L58">        String bibtexCitationHtml = getHtml(CITATION_URL_PREFIX + validIdentifier);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (bibtexCitationHtml.contains(&quot;No such report found&quot;)) {</span>
+<span class="nc" id="L60">            throw new FetcherException(Localization.lang(&quot;No results found.&quot;));</span>
+        }
+<span class="fc" id="L62">        String actualEntry = getRequiredValueBetween(&quot;&lt;pre id=\&quot;bibtex\&quot;&gt;&quot;, &quot;&lt;/pre&gt;&quot;, bibtexCitationHtml);</span>
+
+        try {
+<span class="fc" id="L65">            return BibtexParser.singleFromString(actualEntry, prefs);</span>
+<span class="nc" id="L66">        } catch (ParseException e) {</span>
+<span class="nc" id="L67">            throw new FetcherException(Localization.lang(&quot;Entry from %0 could not be parsed.&quot;, &quot;IACR&quot;), e);</span>
+        }
+    }
+
+    private void setAdditionalFields(BibEntry entry, String identifier) throws FetcherException {
+<span class="fc" id="L72">        String entryUrl = DESCRIPTION_URL_PREFIX + identifier;</span>
+<span class="fc" id="L73">        String descriptiveHtml = getHtml(entryUrl);</span>
+
+<span class="fc" id="L75">        entry.setField(StandardField.ABSTRACT, getAbstract(descriptiveHtml));</span>
+<span class="fc" id="L76">        entry.setField(StandardField.DATE, getDate(descriptiveHtml));</span>
+
+        // Version information for entries after year 2000
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (isFromOrAfterYear2000(entry)) {</span>
+<span class="fc" id="L80">            String entryVersion = VERSION_URL_PREFIX + identifier;</span>
+<span class="fc" id="L81">            String versionHtml = getHtml(entryVersion);</span>
+<span class="fc" id="L82">            String version = getVersion(identifier, versionHtml);</span>
+<span class="fc" id="L83">            entry.setField(StandardField.VERSION, version);</span>
+<span class="fc" id="L84">            entry.setField(StandardField.URL, entryUrl + &quot;/&quot; + version);</span>
+        }
+<span class="fc" id="L86">    }</span>
+
+    private String getVersion(String identifier, String versionHtml) throws FetcherException {
+<span class="fc" id="L89">        String startOfVersionString = &quot;&lt;li&gt;&lt;a href=\&quot;/archive/&quot; + identifier + &quot;/&quot;;</span>
+<span class="fc" id="L90">        String version = getRequiredValueBetween(startOfVersionString, &quot;\&quot;&gt;&quot;, versionHtml);</span>
+<span class="fc" id="L91">        return version;</span>
+    }
+
+    private String getAbstract(String descriptiveHtml) throws FetcherException {
+<span class="fc" id="L95">        String startOfAbstractString = &quot;&lt;h5 class=\&quot;mt-3\&quot;&gt;Abstract&lt;/h5&gt;\n    &lt;p style=\&quot;white-space: pre-wrap;\&quot;&gt;&quot;;</span>
+<span class="fc" id="L96">        String abstractText = getRequiredValueBetween(startOfAbstractString, &quot;&lt;/p&gt;&quot;, descriptiveHtml);</span>
+<span class="fc" id="L97">        return abstractText;</span>
+    }
+
+    private String getDate(String descriptiveHtml) throws FetcherException {
+<span class="fc" id="L101">        String startOfHistoryString = &quot;&lt;dt&gt;History&lt;/dt&gt;\n      \n      \n      &lt;dd&gt;&quot;;</span>
+<span class="fc" id="L102">        String dateStringAsInHtml = getRequiredValueBetween(startOfHistoryString, &quot;:&quot;, descriptiveHtml);</span>
+<span class="fc" id="L103">        return dateStringAsInHtml;</span>
+    }
+
+    private String getHtml(String url) throws FetcherException {
+        try {
+<span class="fc" id="L108">            URLDownload download = new URLDownload(url);</span>
+<span class="fc" id="L109">            return download.asString();</span>
+<span class="fc" id="L110">        } catch (IOException e) {</span>
+<span class="fc" id="L111">            throw new FetcherException(Localization.lang(&quot;Could not retrieve entry data from '%0'.&quot;, url), e);</span>
+        }
+    }
+
+    private String getRequiredValueBetween(String from, String to, String haystack) throws FetcherException {
+<span class="fc" id="L116">        String value = StringUtil.substringBetween(haystack, from, to);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L118">            throw new FetcherException(Localization.lang(&quot;Entry from %0 could not be parsed.&quot;, &quot;IACR&quot;));</span>
+        } else {
+<span class="fc" id="L120">            return value;</span>
+        }
+    }
+
+    private boolean isFromOrAfterYear2000(BibEntry entry) throws FetcherException {
+<span class="fc" id="L125">        Optional&lt;String&gt; yearField = entry.getField(StandardField.YEAR);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (yearField.isPresent()) {</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            return Integer.parseInt(yearField.get()) &gt; 2000;</span>
+        }
+<span class="nc" id="L129">        throw new FetcherException(Localization.lang(&quot;Entry from %0 could not be parsed.&quot;, &quot;IACR&quot;));</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L134">        return NAME;</span>
+    }
+
+    @Override
+    public Optional&lt;URL&gt; findFullText(BibEntry entry) throws IOException, FetcherException {
+<span class="fc" id="L139">        Objects.requireNonNull(entry);</span>
+
+<span class="fc" id="L141">        Optional&lt;String&gt; urlField = entry.getField(StandardField.URL);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (urlField.isPresent()) {</span>
+<span class="fc" id="L143">            String descriptiveHtml = getHtml(urlField.get());</span>
+<span class="fc" id="L144">            String startOfFulltextLink = &quot;&lt;a class=\&quot;btn btn-sm btn-outline-dark\&quot;&quot;;</span>
+<span class="fc" id="L145">            String fulltextLinkAsInHtml = getRequiredValueBetween(startOfFulltextLink, &quot;.pdf&quot;, descriptiveHtml);</span>
+            // There is an additional &quot;\n           href=\&quot;/archive/&quot; we have to remove - and for some reason,
+            // getRequiredValueBetween refuses to match across the line break.
+<span class="fc" id="L148">            fulltextLinkAsInHtml = fulltextLinkAsInHtml.replaceFirst(&quot;.*href=\&quot;/&quot;, &quot;&quot;).trim();</span>
+<span class="fc" id="L149">            String fulltextLink = FULLTEXT_URL_PREFIX + fulltextLinkAsInHtml + &quot;.pdf&quot;;</span>
+<span class="fc" id="L150">            return Optional.of(new URL(fulltextLink));</span>
+        }
+<span class="fc" id="L152">        return Optional.empty();</span>
+    }
+
+    @Override
+    public TrustLevel getTrustLevel() {
+<span class="nc" id="L157">        return TrustLevel.PREPRINT;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

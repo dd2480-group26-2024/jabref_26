@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Server.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.http.server</a> &gt; <span class="el_source">Server.java</span></div><h1>Server.java</h1><pre class="source lang-java linenums">package org.jabref.http.server;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+
+import javax.net.ssl.SSLContext;
+
+import javafx.collections.ObservableList;
+
+import org.jabref.architecture.AllowedToUseStandardStreams;
+import org.jabref.logic.util.OS;
+import org.jabref.preferences.JabRefPreferences;
+
+import jakarta.ws.rs.SeBootstrap;
+import net.harawata.appdirs.AppDirsFactory;
+import org.glassfish.grizzly.ssl.SSLContextConfigurator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.bridge.SLF4JBridgeHandler;
+
+@AllowedToUseStandardStreams(&quot;This is a CLI application. It resides in the package http.server to be close to the other http server related classes.&quot;)
+<span class="nc" id="L26">public class Server {</span>
+<span class="nc" id="L27">    private static final Logger LOGGER = LoggerFactory.getLogger(Server.class);</span>
+
+    private static SeBootstrap.Instance serverInstance;
+
+    /**
+     * Starts an http server serving the last files opened in JabRef&lt;br&gt;
+     * More files can be provided as args.
+     */
+    public static void main(final String[] args) throws InterruptedException, URISyntaxException {
+<span class="nc" id="L36">        SLF4JBridgeHandler.removeHandlersForRootLogger();</span>
+<span class="nc" id="L37">        SLF4JBridgeHandler.install();</span>
+
+<span class="nc" id="L39">        final ObservableList&lt;Path&gt; lastFilesOpened = JabRefPreferences.getInstance().getGuiPreferences().getLastFilesOpened();</span>
+
+        // The server serves the last opened files (see org.jabref.http.server.LibraryResource.getLibraryPath)
+        // In a testing environment, this might be difficult to handle
+        // This is a quick solution. The architectural fine solution would use some http context or other @Inject_ed variables in org.jabref.http.server.LibraryResource
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (args.length &gt; 0) {</span>
+<span class="nc" id="L45">            LOGGER.debug(&quot;Command line parameters passed&quot;);</span>
+<span class="nc" id="L46">            List&lt;Path&gt; filesToAdd = Arrays.stream(args)</span>
+<span class="nc" id="L47">                                          .map(Path::of)</span>
+<span class="nc" id="L48">                                          .filter(Files::exists)</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">                                          .filter(path -&gt; !lastFilesOpened.contains(path))</span>
+<span class="nc" id="L50">                                          .toList();</span>
+
+<span class="nc" id="L52">            LOGGER.debug(&quot;Adding following files to the list of opened libraries: {}&quot;, filesToAdd);</span>
+
+            // add the files in the front of the last opened libraries
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            for (Path path : filesToAdd.reversed()) {</span>
+<span class="nc" id="L56">                lastFilesOpened.addFirst(path);</span>
+<span class="nc" id="L57">            }</span>
+        }
+
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (lastFilesOpened.isEmpty()) {</span>
+<span class="nc" id="L61">            LOGGER.debug(&quot;still no library available to serve, serve the demo library&quot;);</span>
+            // Server.class.getResource(&quot;...&quot;) is always null here, thus trying relative path
+            // Path bibPath = Path.of(Server.class.getResource(&quot;http-server-demo.bib&quot;).toURI());
+<span class="nc" id="L64">            Path bibPath = Path.of(&quot;src/main/resources/org/jabref/http/server/http-server-demo.bib&quot;).toAbsolutePath();</span>
+<span class="nc" id="L65">            LOGGER.debug(&quot;Location of demo library: {}&quot;, bibPath);</span>
+<span class="nc" id="L66">            lastFilesOpened.add(bibPath);</span>
+        }
+
+<span class="nc" id="L69">        LOGGER.debug(&quot;Libraries served: {}&quot;, lastFilesOpened);</span>
+
+<span class="nc" id="L71">        Server.startServer();</span>
+
+        // Keep the http server running until user kills the process (e.g., presses Ctrl+C)
+<span class="nc" id="L74">        Thread.currentThread().join();</span>
+<span class="nc" id="L75">    }</span>
+
+    private static void startServer() {
+<span class="nc" id="L78">        SSLContext sslContext = getSslContext();</span>
+        SeBootstrap.Configuration configuration = SeBootstrap.Configuration
+<span class="nc" id="L80">                .builder()</span>
+<span class="nc" id="L81">                .sslContext(sslContext)</span>
+<span class="nc" id="L82">                .protocol(&quot;HTTPS&quot;)</span>
+<span class="nc" id="L83">                .port(6051)</span>
+<span class="nc" id="L84">                .build();</span>
+<span class="nc" id="L85">        LOGGER.debug(&quot;Starting server...&quot;);</span>
+<span class="nc" id="L86">        SeBootstrap.start(Application.class, configuration).thenAccept(instance -&gt; {</span>
+<span class="nc" id="L87">            LOGGER.debug(&quot;Server started.&quot;);</span>
+<span class="nc" id="L88">            instance.stopOnShutdown(stopResult -&gt;</span>
+<span class="nc" id="L89">                    System.out.printf(&quot;Stop result: %s [Native stop result: %s].%n&quot;, stopResult,</span>
+<span class="nc" id="L90">                            stopResult.unwrap(Object.class)));</span>
+<span class="nc" id="L91">            final URI uri = instance.configuration().baseUri();</span>
+<span class="nc" id="L92">            System.out.printf(&quot;Instance %s running at %s [Native handle: %s].%n&quot;, instance, uri,</span>
+<span class="nc" id="L93">                    instance.unwrap(Object.class));</span>
+<span class="nc" id="L94">            System.out.println(&quot;Send SIGKILL to shutdown.&quot;);</span>
+<span class="nc" id="L95">            serverInstance = instance;</span>
+<span class="nc" id="L96">        });</span>
+<span class="nc" id="L97">    }</span>
+
+    private static SSLContext getSslContext() {
+<span class="nc" id="L100">        SSLContextConfigurator sslContextConfig = new SSLContextConfigurator();</span>
+<span class="nc" id="L101">        Path serverKeyStore = Path.of(AppDirsFactory.getInstance()</span>
+<span class="nc" id="L102">                                         .getUserDataDir(</span>
+                                                 OS.APP_DIR_APP_NAME,
+                                                 &quot;ssl&quot;,
+                                                 OS.APP_DIR_APP_AUTHOR))
+<span class="nc" id="L106">                       .resolve(&quot;server.p12&quot;);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (Files.exists(serverKeyStore)) {</span>
+<span class="nc" id="L108">            sslContextConfig.setKeyStoreFile(serverKeyStore.toString());</span>
+<span class="nc" id="L109">            sslContextConfig.setKeyStorePass(&quot;changeit&quot;);</span>
+        } else {
+<span class="nc" id="L111">            LOGGER.error(&quot;Could not find server key store {}.&quot;, serverKeyStore);</span>
+<span class="nc" id="L112">            LOGGER.error(&quot;One create one by following the steps described in [http-server.md](/docs/code-howtos/http-server.md), which is rendered at &lt;https://devdocs.jabref.org/code-howtos/http-server.html&gt;&quot;);</span>
+        }
+<span class="nc" id="L114">        return sslContextConfig.createSSLContext();</span>
+    }
+
+    static void stopServer() {
+<span class="nc" id="L118">        serverInstance.stop();</span>
+<span class="nc" id="L119">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

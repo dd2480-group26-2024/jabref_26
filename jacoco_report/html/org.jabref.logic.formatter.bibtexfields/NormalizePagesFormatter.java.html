@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NormalizePagesFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.formatter.bibtexfields</a> &gt; <span class="el_source">NormalizePagesFormatter.java</span></div><h1>NormalizePagesFormatter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.formatter.bibtexfields;
+
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.cleanup.Formatter;
+import org.jabref.logic.formatter.casechanger.UnprotectTermsFormatter;
+import org.jabref.logic.l10n.Localization;
+
+/**
+ * This class includes sensible defaults for consistent formatting of BibTeX page numbers.
+ * &lt;p&gt;
+ * Format page numbers, separated either by commas or double-hyphens.
+ * Converts the range number format of the &lt;code&gt;pages&lt;/code&gt; field to page_number--page_number.
+ * Removes unwanted literals except letters, numbers and -+ signs.
+ * Keeps the existing String if the resulting field does not match the expected Regex.
+ * &lt;p&gt;
+ * From BibTeX manual:
+ * One or more page numbers or range of numbers, such as 42--111 or 7,41,73--97 or 43+
+ * (the '+' in this last example indicates pages following that don't form a simple range).
+ * To make it easier to maintain Scribe-compatible databases, the standard styles convert
+ * a single dash (as in 7-33) to the double dash used in TEX to denote number ranges (as in 7--33).
+ * &lt;p&gt;
+ * Examples:
+ *
+ * &lt;ul&gt;
+ *     &lt;li&gt;&lt;code&gt;1-2 -&gt; 1--2&lt;/code&gt;&lt;/li&gt;
+ *     &lt;li&gt;&lt;code&gt;1---2 -&gt; 1--2&lt;/code&gt;&lt;/li&gt;
+ *     &lt;li&gt;&lt;code&gt;1-2 -&gt; 1--2&lt;/code&gt;&lt;/li&gt;
+ *     &lt;li&gt;&lt;code&gt;1,2,3 -&gt; 1,2,3&lt;/code&gt;&lt;/li&gt;
+ *     &lt;li&gt;&lt;code&gt;{1}-{2} -&gt; 1--2&lt;/code&gt;&lt;/li&gt;
+ *     &lt;li&gt;&lt;code&gt;43+ -&gt; 43+&lt;/code&gt;&lt;/li&gt;
+ *     &lt;li&gt;Invalid -&gt; Invalid&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+<span class="fc" id="L37">public class NormalizePagesFormatter extends Formatter {</span>
+
+<span class="fc" id="L39">    private static final Pattern EM_EN_DASH_PATTERN = Pattern.compile(&quot;\u2013|\u2014&quot;);</span>
+<span class="fc" id="L40">    private static final Pattern DASHES_DETECT_PATTERN = Pattern.compile(&quot;[ ]*-+[ ]*&quot;);</span>
+
+<span class="fc" id="L42">    private final Formatter unprotectTermsFormatter = new UnprotectTermsFormatter();</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L46">        return Localization.lang(&quot;Normalize page numbers&quot;);</span>
+    }
+
+    @Override
+    public String getKey() {
+<span class="fc" id="L51">        return &quot;normalize_page_numbers&quot;;</span>
+    }
+
+    @Override
+    public String format(String value) {
+<span class="fc" id="L56">        Objects.requireNonNull(value);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (value.isEmpty()) {</span>
+<span class="fc" id="L58">            return value;</span>
+        }
+
+<span class="fc" id="L61">        value = value.trim();</span>
+
+        // Remove pages prefix
+<span class="fc" id="L64">        value = value.replace(&quot;pp.&quot;, &quot;&quot;).replace(&quot;p.&quot;, &quot;&quot;).trim();</span>
+
+        // replace em and en dashes by --
+<span class="fc" id="L67">        value = EM_EN_DASH_PATTERN.matcher(value).replaceAll(&quot;--&quot;);</span>
+
+<span class="fc" id="L69">        Matcher matcher = DASHES_DETECT_PATTERN.matcher(value);</span>
+<span class="pc bpc" id="L70" title="1 of 4 branches missed.">        if (matcher.find() &amp;&amp; matcher.start() &gt;= 0) {</span>
+<span class="fc" id="L71">            String fixedValue = matcher.replaceFirst(&quot;--&quot;);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (matcher.find()) {</span>
+                // multiple occurrences --&gt; better do no replacement
+<span class="fc" id="L74">                return value;</span>
+            }
+<span class="fc" id="L76">            return unprotectTermsFormatter.format(fixedValue);</span>
+        }
+
+<span class="fc" id="L79">        return value;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="fc" id="L84">        return Localization.lang(&quot;Normalize pages to BibTeX standard.&quot;);</span>
+    }
+
+    @Override
+    public String getExampleInput() {
+<span class="fc" id="L89">        return &quot;1 - 2&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

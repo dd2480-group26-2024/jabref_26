@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibStringDiff.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.bibtex.comparator</a> &gt; <span class="el_source">BibStringDiff.java</span></div><h1>BibStringDiff.java</h1><pre class="source lang-java linenums">package org.jabref.logic.bibtex.comparator;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibtexString;
+
+public class BibStringDiff {
+
+    private final BibtexString originalString;
+    private final BibtexString newString;
+
+<span class="fc" id="L20">    BibStringDiff(BibtexString originalString, BibtexString newString) {</span>
+<span class="fc" id="L21">        this.originalString = originalString;</span>
+<span class="fc" id="L22">        this.newString = newString;</span>
+<span class="fc" id="L23">    }</span>
+
+    public static List&lt;BibStringDiff&gt; compare(BibDatabase originalDatabase, BibDatabase newDatabase) {
+<span class="pc bpc" id="L26" title="1 of 4 branches missed.">        if (originalDatabase.hasNoStrings() &amp;&amp; newDatabase.hasNoStrings()) {</span>
+<span class="fc" id="L27">            return Collections.emptyList();</span>
+        }
+
+<span class="fc" id="L30">        List&lt;BibStringDiff&gt; differences = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L32">        Set&lt;BibtexString&gt; used = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L33">        Set&lt;BibtexString&gt; notMatched = new HashSet&lt;&gt;();</span>
+
+        // First try to match by string names.
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (BibtexString original : originalDatabase.getStringValues()) {</span>
+<span class="fc" id="L37">            Optional&lt;BibtexString&gt; match = newDatabase</span>
+<span class="fc" id="L38">                    .getStringValues().stream()</span>
+<span class="fc" id="L39">                    .filter(test -&gt; test.getName().equals(original.getName()))</span>
+<span class="fc" id="L40">                    .findAny();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            if (match.isPresent()) {</span>
+                // We have found a string with a matching name.
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                if (!Objects.equals(original.getContent(), match.get().getContent())) {</span>
+                    // But they have non-matching contents, so we've found a change.
+<span class="fc" id="L45">                    differences.add(new BibStringDiff(original, match.get()));</span>
+                }
+<span class="fc" id="L47">                used.add(match.get());</span>
+            } else {
+                // No match for this string.
+<span class="fc" id="L50">                notMatched.add(original);</span>
+            }
+<span class="fc" id="L52">        }</span>
+
+        // See if we can detect a name change for those entries that we couldn't match, based on their content
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (Iterator&lt;BibtexString&gt; iterator = notMatched.iterator(); iterator.hasNext(); ) {</span>
+<span class="fc" id="L56">            BibtexString original = iterator.next();</span>
+
+<span class="fc" id="L58">            Optional&lt;BibtexString&gt; match = newDatabase</span>
+<span class="fc" id="L59">                    .getStringValues().stream()</span>
+<span class="fc" id="L60">                    .filter(test -&gt; test.getContent().equals(original.getContent()))</span>
+<span class="fc" id="L61">                    .findAny();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (match.isPresent()) {</span>
+                // We have found a string with the same content. It cannot have the same
+                // name, or we would have found it above.
+<span class="fc" id="L65">                differences.add(new BibStringDiff(original, match.get()));</span>
+<span class="fc" id="L66">                iterator.remove();</span>
+<span class="fc" id="L67">                used.add(match.get());</span>
+            }
+<span class="fc" id="L69">        }</span>
+
+        // Strings that are still not found must have been removed.
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (BibtexString original : notMatched) {</span>
+<span class="fc" id="L73">            differences.add(new BibStringDiff(original, null));</span>
+<span class="fc" id="L74">        }</span>
+
+        // Finally, see if there are remaining strings in the new database. They must have been added.
+<span class="fc" id="L77">        newDatabase.getStringValues().stream()</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">                   .filter(test -&gt; !used.contains(test))</span>
+<span class="fc" id="L79">                   .forEach(newString -&gt; differences.add(new BibStringDiff(null, newString)));</span>
+
+<span class="fc" id="L81">        return differences;</span>
+    }
+
+    public BibtexString getOriginalString() {
+<span class="fc" id="L85">        return originalString;</span>
+    }
+
+    public BibtexString getNewString() {
+<span class="fc" id="L89">        return newString;</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (this == other) {</span>
+<span class="fc" id="L95">            return true;</span>
+        }
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">        if ((other == null) || (getClass() != other.getClass())) {</span>
+<span class="fc" id="L98">            return false;</span>
+        }
+
+<span class="fc" id="L101">        BibStringDiff that = (BibStringDiff) other;</span>
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        return Objects.equals(newString, that.newString) &amp;&amp; Objects.equals(originalString, that.originalString);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L107">        return Objects.hash(originalString, newString);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

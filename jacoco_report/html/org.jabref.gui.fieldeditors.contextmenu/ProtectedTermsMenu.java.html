@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtectedTermsMenu.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors.contextmenu</a> &gt; <span class="el_source">ProtectedTermsMenu.java</span></div><h1>ProtectedTermsMenu.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors.contextmenu;
+
+import java.util.Objects;
+import java.util.Optional;
+
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TextInputControl;
+
+import org.jabref.gui.Globals;
+import org.jabref.gui.actions.Action;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.logic.cleanup.Formatter;
+import org.jabref.logic.formatter.casechanger.ProtectTermsFormatter;
+import org.jabref.logic.formatter.casechanger.UnprotectTermsFormatter;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.protectedterms.ProtectedTermsList;
+
+class ProtectedTermsMenu extends Menu {
+
+<span class="nc" id="L25">    private static final Formatter FORMATTER = new ProtectTermsFormatter(Globals.protectedTermsLoader);</span>
+    private final TextInputControl textInputControl;
+<span class="nc" id="L27">    private final ActionFactory factory = new ActionFactory(Globals.getKeyPrefs());</span>
+
+<span class="nc" id="L29">    private final Action protectSelectionActionInformation = new Action() {</span>
+        @Override
+        public String getText() {
+<span class="nc" id="L32">            return Localization.lang(&quot;Protect selection&quot;);</span>
+        }
+
+        @Override
+        public Optional&lt;JabRefIcon&gt; getIcon() {
+<span class="nc" id="L37">            return Optional.of(IconTheme.JabRefIcons.PROTECT_STRING);</span>
+        }
+
+        @Override
+        public String getDescription() {
+<span class="nc" id="L42">            return Localization.lang(&quot;Add {} around selected text&quot;);</span>
+        }
+    };
+
+<span class="nc" id="L46">    private final Action unprotectSelectionActionInformation = new Action() {</span>
+        @Override
+        public String getText() {
+<span class="nc" id="L49">            return Localization.lang(&quot;Unprotect selection&quot;);</span>
+        }
+
+        @Override
+        public String getDescription() {
+<span class="nc" id="L54">            return Localization.lang(&quot;Remove all {} in selected text&quot;);</span>
+        }
+    };
+
+    private class ProtectSelectionAction extends SimpleCommand {
+<span class="nc" id="L59">        ProtectSelectionAction() {</span>
+<span class="nc" id="L60">            this.executable.bind(textInputControl.selectedTextProperty().isNotEmpty());</span>
+<span class="nc" id="L61">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc" id="L65">            String selectedText = textInputControl.getSelectedText();</span>
+<span class="nc" id="L66">            String firstStr = &quot;{&quot;;</span>
+<span class="nc" id="L67">            String lastStr = &quot;}&quot;;</span>
+            // If the selected text contains spaces at the beginning and end, then add spaces before or after the brackets
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            if (selectedText.startsWith(&quot; &quot;)) {</span>
+<span class="nc" id="L70">                firstStr = &quot; {&quot;;</span>
+            }
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            if (selectedText.endsWith(&quot; &quot;)) {</span>
+<span class="nc" id="L73">                lastStr = &quot;} &quot;;</span>
+            }
+<span class="nc" id="L75">            textInputControl.replaceSelection(firstStr + selectedText.strip() + lastStr);</span>
+<span class="nc" id="L76">        }</span>
+    }
+
+    private class UnprotectSelectionAction extends SimpleCommand {
+
+<span class="nc" id="L81">        public UnprotectSelectionAction() {</span>
+<span class="nc" id="L82">            this.executable.bind(textInputControl.selectedTextProperty().isNotEmpty());</span>
+<span class="nc" id="L83">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc" id="L87">            String selectedText = textInputControl.getSelectedText();</span>
+<span class="nc" id="L88">            String formattedString = new UnprotectTermsFormatter().format(selectedText);</span>
+<span class="nc" id="L89">            textInputControl.replaceSelection(formattedString);</span>
+<span class="nc" id="L90">        }</span>
+    }
+
+    private class FormatFieldAction extends SimpleCommand {
+<span class="nc" id="L94">        FormatFieldAction() {</span>
+<span class="nc" id="L95">            this.executable.bind(textInputControl.textProperty().isNotEmpty());</span>
+<span class="nc" id="L96">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc" id="L100">            textInputControl.setText(FORMATTER.format(textInputControl.getText()));</span>
+<span class="nc" id="L101">        }</span>
+    }
+
+    private class AddToProtectedTermsAction extends SimpleCommand {
+        ProtectedTermsList list;
+
+<span class="nc" id="L107">        public AddToProtectedTermsAction(ProtectedTermsList list) {</span>
+<span class="nc" id="L108">            Objects.requireNonNull(list);</span>
+
+<span class="nc" id="L110">            this.list = list;</span>
+<span class="nc" id="L111">            this.executable.bind(textInputControl.focusedProperty());</span>
+<span class="nc" id="L112">        }</span>
+
+        @Override
+        public void execute() {
+            // If no selected term, then add the word after or at the cursor
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (textInputControl.getSelectedText().isEmpty()) {</span>
+<span class="nc" id="L118">                int beginIdx = textInputControl.getCaretPosition();</span>
+<span class="nc" id="L119">                int endIdx = textInputControl.getCaretPosition();</span>
+<span class="nc" id="L120">                String text = textInputControl.getText();</span>
+                // While the beginIdx &gt; 0 and the previous char is not a space
+<span class="nc bnc" id="L122" title="All 4 branches missed.">                while (beginIdx &gt; 0 &amp;&amp; text.charAt(beginIdx - 1) != ' ') {</span>
+<span class="nc" id="L123">                    --beginIdx;</span>
+                }
+                // While the endIdx &lt; length and the current char is not a space
+<span class="nc bnc" id="L126" title="All 4 branches missed.">                while (endIdx &lt; text.length() &amp;&amp; text.charAt(endIdx) != ' ') {</span>
+<span class="nc" id="L127">                    ++endIdx;</span>
+                }
+<span class="nc" id="L129">                list.addProtectedTerm(text.substring(beginIdx, endIdx));</span>
+<span class="nc" id="L130">            } else {</span>
+                // Remove leading and trailing whitespaces
+<span class="nc" id="L132">                list.addProtectedTerm(textInputControl.getSelectedText().strip());</span>
+            }
+<span class="nc" id="L134">        }</span>
+    }
+
+    public ProtectedTermsMenu(final TextInputControl textInputControl) {
+<span class="nc" id="L138">        super(Localization.lang(&quot;Protect terms&quot;));</span>
+<span class="nc" id="L139">        this.textInputControl = textInputControl;</span>
+
+<span class="nc" id="L141">        getItems().addAll(factory.createMenuItem(protectSelectionActionInformation, new ProtectSelectionAction()),</span>
+<span class="nc" id="L142">                getExternalFilesMenu(),</span>
+                new SeparatorMenuItem(),
+<span class="nc" id="L144">                factory.createMenuItem(() -&gt; Localization.lang(&quot;Format field&quot;), new FormatFieldAction()),</span>
+<span class="nc" id="L145">                factory.createMenuItem(unprotectSelectionActionInformation, new UnprotectSelectionAction()));</span>
+<span class="nc" id="L146">    }</span>
+
+    private Menu getExternalFilesMenu() {
+<span class="nc" id="L149">        Menu protectedTermsMenu = factory.createSubMenu(() -&gt; Localization.lang(&quot;Add selected text to list&quot;));</span>
+
+<span class="nc" id="L151">        Globals.protectedTermsLoader.getProtectedTermsLists().stream()</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                                    .filter(list -&gt; !list.isInternalList())</span>
+<span class="nc" id="L153">                                    .forEach(list -&gt; protectedTermsMenu.getItems().add(</span>
+<span class="nc" id="L154">                                            factory.createMenuItem(list::getDescription, new AddToProtectedTermsAction(list))));</span>
+
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (protectedTermsMenu.getItems().isEmpty()) {</span>
+<span class="nc" id="L157">            MenuItem emptyItem = new MenuItem(Localization.lang(&quot;No list enabled&quot;));</span>
+<span class="nc" id="L158">            emptyItem.setDisable(true);</span>
+<span class="nc" id="L159">            protectedTermsMenu.getItems().add(emptyItem);</span>
+        }
+
+<span class="nc" id="L162">        return protectedTermsMenu;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

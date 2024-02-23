@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibtexExtractor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.bibtexextractor</a> &gt; <span class="el_source">BibtexExtractor.java</span></div><h1>BibtexExtractor.java</h1><pre class="source lang-java linenums">package org.jabref.gui.bibtexextractor;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+
+<span class="nc" id="L15">public class BibtexExtractor {</span>
+
+    private static final String AUTHOR_TAG = &quot;[author_tag]&quot;;
+    private static final String URL_TAG = &quot;[url_tag]&quot;;
+    private static final String YEAR_TAG = &quot;[year_tag]&quot;;
+    private static final String PAGES_TAG = &quot;[pages_tag]&quot;;
+
+    private static final String INITIALS_GROUP = &quot;INITIALS&quot;;
+    private static final String LASTNAME_GROUP = &quot;LASTNAME&quot;;
+
+<span class="nc" id="L25">    private static final Pattern URL_PATTERN = Pattern.compile(</span>
+            &quot;(?:^|[\\W])((ht|f)tp(s?):\\/\\/|www\\.)&quot; +
+                    &quot;(([\\w\\-]+\\.)+?([\\w\\-.~]+\\/?)*&quot; +
+                    &quot;[\\p{Alnum}.,%_=?&amp;#\\-+()\\[\\]\\*$~@!:/{};']*)&quot;,
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL);
+
+<span class="nc" id="L31">    private static final Pattern YEAR_PATTERN = Pattern.compile(</span>
+            &quot;\\d{4}&quot;,
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL);
+
+<span class="nc" id="L35">    private static final Pattern AUTHOR_PATTERN = Pattern.compile(</span>
+            &quot;(?&lt;&quot; + LASTNAME_GROUP + &quot;&gt;\\p{Lu}\\w+),?\\s(?&lt;&quot; + INITIALS_GROUP + &quot;&gt;(\\p{Lu}\\.\\s){1,2})&quot; +
+                    &quot;\\s*(and|,|\\.)*&quot;,
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL);
+
+<span class="nc" id="L40">    private static final Pattern AUTHOR_PATTERN_2 = Pattern.compile(</span>
+            &quot;(?&lt;&quot; + INITIALS_GROUP + &quot;&gt;(\\p{Lu}\\.\\s){1,2})(?&lt;&quot; + LASTNAME_GROUP + &quot;&gt;\\p{Lu}\\w+)&quot; +
+                    &quot;\\s*(and|,|\\.)*&quot;,
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL);
+
+<span class="nc" id="L45">    private static final Pattern PAGES_PATTERN = Pattern.compile(</span>
+            &quot;(p.)?\\s?\\d+(-\\d+)?&quot;,
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL);
+
+<span class="nc" id="L49">    private final List&lt;String&gt; urls = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L50">    private final List&lt;String&gt; authors = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L51">    private String year = &quot;&quot;;</span>
+<span class="nc" id="L52">    private String pages = &quot;&quot;;</span>
+<span class="nc" id="L53">    private String title = &quot;&quot;;</span>
+<span class="nc" id="L54">    private boolean isArticle = true;</span>
+<span class="nc" id="L55">    private String journalOrPublisher = &quot;&quot;;</span>
+
+    public BibEntry extract(String input) {
+<span class="nc" id="L58">        String inputWithoutUrls = findUrls(input);</span>
+<span class="nc" id="L59">        String inputWithoutAuthors = findAuthors(inputWithoutUrls);</span>
+<span class="nc" id="L60">        String inputWithoutYear = findYear(inputWithoutAuthors);</span>
+<span class="nc" id="L61">        String inputWithoutPages = findPages(inputWithoutYear);</span>
+<span class="nc" id="L62">        String nonParsed = findParts(inputWithoutPages);</span>
+<span class="nc" id="L63">        return generateEntity(nonParsed);</span>
+    }
+
+    private BibEntry generateEntity(String input) {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        EntryType type = isArticle ? StandardEntryType.Article : StandardEntryType.Book;</span>
+<span class="nc" id="L68">        BibEntry extractedEntity = new BibEntry(type);</span>
+<span class="nc" id="L69">        extractedEntity.setField(StandardField.AUTHOR, String.join(&quot; and &quot;, authors));</span>
+<span class="nc" id="L70">        extractedEntity.setField(StandardField.URL, String.join(&quot;, &quot;, urls));</span>
+<span class="nc" id="L71">        extractedEntity.setField(StandardField.YEAR, year);</span>
+<span class="nc" id="L72">        extractedEntity.setField(StandardField.PAGES, pages);</span>
+<span class="nc" id="L73">        extractedEntity.setField(StandardField.TITLE, title);</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (isArticle) {</span>
+<span class="nc" id="L75">            extractedEntity.setField(StandardField.JOURNAL, journalOrPublisher);</span>
+        } else {
+<span class="nc" id="L77">            extractedEntity.setField(StandardField.PUBLISHER, journalOrPublisher);</span>
+        }
+<span class="nc" id="L79">        extractedEntity.setField(StandardField.COMMENT, input);</span>
+<span class="nc" id="L80">        return extractedEntity;</span>
+    }
+
+    private String findUrls(String input) {
+<span class="nc" id="L84">        Matcher matcher = URL_PATTERN.matcher(input);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L86">            urls.add(input.substring(matcher.start(1), matcher.end()));</span>
+        }
+<span class="nc" id="L88">        return fixSpaces(matcher.replaceAll(URL_TAG));</span>
+    }
+
+    private String findYear(String input) {
+<span class="nc" id="L92">        Matcher matcher = YEAR_PATTERN.matcher(input);</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L94">            String yearCandidate = input.substring(matcher.start(), matcher.end());</span>
+<span class="nc" id="L95">            int intYearCandidate = Integer.parseInt(yearCandidate);</span>
+<span class="nc bnc" id="L96" title="All 4 branches missed.">            if ((intYearCandidate &gt; 1700) &amp;&amp; (intYearCandidate &lt;= Calendar.getInstance().get(Calendar.YEAR))) {</span>
+<span class="nc" id="L97">                year = yearCandidate;</span>
+<span class="nc" id="L98">                return fixSpaces(input.replace(year, YEAR_TAG));</span>
+            }
+<span class="nc" id="L100">        }</span>
+<span class="nc" id="L101">        return input;</span>
+    }
+
+    private String findAuthors(String input) {
+<span class="nc" id="L105">        String currentInput = findAuthorsByPattern(input, AUTHOR_PATTERN);</span>
+<span class="nc" id="L106">        return findAuthorsByPattern(currentInput, AUTHOR_PATTERN_2);</span>
+    }
+
+    private String findAuthorsByPattern(String input, Pattern pattern) {
+<span class="nc" id="L110">        Matcher matcher = pattern.matcher(input);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L112">            authors.add(GenerateAuthor(matcher.group(LASTNAME_GROUP), matcher.group(INITIALS_GROUP)));</span>
+        }
+<span class="nc" id="L114">        return fixSpaces(matcher.replaceAll(AUTHOR_TAG));</span>
+    }
+
+    private String GenerateAuthor(String lastName, String initials) {
+<span class="nc" id="L118">        return lastName + &quot;, &quot; + initials;</span>
+    }
+
+    private String findPages(String input) {
+<span class="nc" id="L122">        Matcher matcher = PAGES_PATTERN.matcher(input);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (matcher.find()) {</span>
+<span class="nc" id="L124">            pages = input.substring(matcher.start(), matcher.end());</span>
+        }
+<span class="nc" id="L126">        return fixSpaces(matcher.replaceFirst(PAGES_TAG));</span>
+    }
+
+    private String fixSpaces(String input) {
+<span class="nc" id="L130">        return input.replaceAll(&quot;[,.!?;:]&quot;, &quot;$0 &quot;)</span>
+<span class="nc" id="L131">                    .replaceAll(&quot;\\p{Lt}&quot;, &quot; $0&quot;)</span>
+<span class="nc" id="L132">                    .replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim();</span>
+    }
+
+    private String findParts(String input) {
+<span class="nc" id="L136">        ArrayList&lt;String&gt; lastParts = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L137">        int afterAuthorsIndex = input.lastIndexOf(AUTHOR_TAG);</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (afterAuthorsIndex == -1) {</span>
+<span class="nc" id="L139">            return input;</span>
+        } else {
+<span class="nc" id="L141">            afterAuthorsIndex += AUTHOR_TAG.length();</span>
+        }
+<span class="nc" id="L143">        int delimiterIndex = input.lastIndexOf(&quot;//&quot;);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (delimiterIndex != -1) {</span>
+<span class="nc" id="L145">            lastParts.add(input.substring(afterAuthorsIndex, delimiterIndex)</span>
+<span class="nc" id="L146">                               .replace(YEAR_TAG, &quot;&quot;)</span>
+<span class="nc" id="L147">                               .replace(PAGES_TAG, &quot;&quot;));</span>
+<span class="nc" id="L148">            lastParts.addAll(Arrays.asList(input.substring(delimiterIndex + 2).split(&quot;,|\\.&quot;)));</span>
+        } else {
+<span class="nc" id="L150">            lastParts.addAll(Arrays.asList(input.substring(afterAuthorsIndex).split(&quot;,|\\.&quot;)));</span>
+        }
+<span class="nc" id="L152">        int nonDigitParts = 0;</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        for (String part : lastParts) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            if (part.matches(&quot;.*\\d.*&quot;)) {</span>
+<span class="nc" id="L155">                break;</span>
+            }
+<span class="nc" id="L157">            nonDigitParts++;</span>
+<span class="nc" id="L158">        }</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (nonDigitParts &gt; 0) {</span>
+<span class="nc" id="L160">            title = lastParts.getFirst();</span>
+        }
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (nonDigitParts &gt; 1) {</span>
+<span class="nc" id="L163">            journalOrPublisher = lastParts.get(1);</span>
+        }
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (nonDigitParts &gt; 2) {</span>
+<span class="nc" id="L166">            isArticle = false;</span>
+        }
+<span class="nc" id="L168">        return fixSpaces(input);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

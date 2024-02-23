@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DBMSConnection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.shared</a> &gt; <span class="el_source">DBMSConnection.java</span></div><h1>DBMSConnection.java</h1><pre class="source lang-java linenums">package org.jabref.logic.shared;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.shared.exception.InvalidDBMSConnectionPropertiesException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class DBMSConnection implements DatabaseConnection {
+
+<span class="fc" id="L17">    private static final Logger LOGGER = LoggerFactory.getLogger(DBMSConnection.class);</span>
+
+    private final Connection connection;
+    private final DBMSConnectionProperties properties;
+
+<span class="fc" id="L22">    public DBMSConnection(DBMSConnectionProperties connectionProperties) throws SQLException, InvalidDBMSConnectionPropertiesException {</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        if (!connectionProperties.isValid()) {</span>
+<span class="nc" id="L24">            throw new InvalidDBMSConnectionPropertiesException();</span>
+        }
+<span class="fc" id="L26">        this.properties = connectionProperties;</span>
+
+        try {
+<span class="fc" id="L29">            DriverManager.setLoginTimeout(3);</span>
+            // ensure that all SQL drivers are loaded - source: http://stackoverflow.com/a/22384826/873282
+            // we use the side effect of getAvailableDBMSTypes() - it loads all available drivers
+<span class="fc" id="L32">            DBMSConnection.getAvailableDBMSTypes();</span>
+<span class="nc" id="L33">            this.connection = DriverManager.getConnection(connectionProperties.getUrl(), connectionProperties.asProperties());</span>
+<span class="fc" id="L34">        } catch (SQLException e) {</span>
+            // Some systems like PostgreSQL retrieves 0 to every exception.
+            // Therefore a stable error determination is not possible.
+<span class="fc" id="L37">            LOGGER.error(&quot;Could not connect to database: &quot; + e.getMessage() + &quot; - Error code: &quot; + e.getErrorCode());</span>
+<span class="fc" id="L38">            throw e;</span>
+<span class="nc" id="L39">        }</span>
+<span class="nc" id="L40">    }</span>
+
+    @Override
+    public Connection getConnection() {
+<span class="nc" id="L44">        return this.connection;</span>
+    }
+
+    @Override
+    public DBMSConnectionProperties getProperties() {
+<span class="nc" id="L49">        return this.properties;</span>
+    }
+
+    /**
+     * Returns a Set of {@link DBMSType} which is supported by available drivers.
+     */
+    public static Set&lt;DBMSType&gt; getAvailableDBMSTypes() {
+<span class="fc" id="L56">        Set&lt;DBMSType&gt; dbmsTypes = new HashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (DBMSType dbms : DBMSType.values()) {</span>
+            try {
+<span class="fc" id="L60">                Class.forName(dbms.getDriverClassPath());</span>
+<span class="fc" id="L61">                dbmsTypes.add(dbms);</span>
+<span class="nc" id="L62">            } catch (ClassNotFoundException e) {</span>
+                // In case that the driver is not available do not perform tests for this system.
+<span class="nc" id="L64">                LOGGER.info(Localization.lang(&quot;%0 driver not available.&quot;, dbms.toString()));</span>
+<span class="fc" id="L65">            }</span>
+        }
+<span class="fc" id="L67">        return dbmsTypes;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

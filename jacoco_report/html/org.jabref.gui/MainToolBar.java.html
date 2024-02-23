@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MainToolBar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui</a> &gt; <span class="el_source">MainToolBar.java</span></div><h1>MainToolBar.java</h1><pre class="source lang-java linenums">package org.jabref.gui;
+
+import javafx.concurrent.Task;
+import javafx.geometry.Orientation;
+import javafx.scene.Group;
+import javafx.scene.control.Button;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.Separator;
+import javafx.scene.control.ToolBar;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.shape.Rectangle;
+
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.bibtexextractor.ExtractBibtexAction;
+import org.jabref.gui.citationkeypattern.GenerateCitationKeyAction;
+import org.jabref.gui.cleanup.CleanupAction;
+import org.jabref.gui.edit.EditAction;
+import org.jabref.gui.edit.OpenBrowserAction;
+import org.jabref.gui.exporter.SaveAction;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.importer.GenerateEntryFromIdDialog;
+import org.jabref.gui.importer.NewDatabaseAction;
+import org.jabref.gui.importer.NewEntryAction;
+import org.jabref.gui.importer.actions.OpenDatabaseAction;
+import org.jabref.gui.push.PushToApplicationCommand;
+import org.jabref.gui.search.GlobalSearchBar;
+import org.jabref.gui.undo.CountingUndoManager;
+import org.jabref.gui.undo.UndoRedoAction;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+import org.controlsfx.control.PopOver;
+import org.controlsfx.control.TaskProgressView;
+
+public class MainToolBar extends ToolBar {
+    private final LibraryTabContainer frame;
+    private final PushToApplicationCommand pushToApplicationCommand;
+    private final GlobalSearchBar globalSearchBar;
+    private final DialogService dialogService;
+    private final StateManager stateManager;
+    private final PreferencesService preferencesService;
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final TaskExecutor taskExecutor;
+    private final BibEntryTypesManager entryTypesManager;
+    private final CountingUndoManager undoManager;
+
+    private PopOver entryFromIdPopOver;
+    private PopOver progressViewPopOver;
+
+    public MainToolBar(LibraryTabContainer tabContainer,
+                       PushToApplicationCommand pushToApplicationCommand,
+                       GlobalSearchBar globalSearchBar,
+                       DialogService dialogService,
+                       StateManager stateManager,
+                       PreferencesService preferencesService,
+                       FileUpdateMonitor fileUpdateMonitor,
+                       TaskExecutor taskExecutor,
+                       BibEntryTypesManager entryTypesManager,
+<span class="nc" id="L70">                       CountingUndoManager undoManager) {</span>
+<span class="nc" id="L71">        this.frame = tabContainer;</span>
+<span class="nc" id="L72">        this.pushToApplicationCommand = pushToApplicationCommand;</span>
+<span class="nc" id="L73">        this.globalSearchBar = globalSearchBar;</span>
+<span class="nc" id="L74">        this.dialogService = dialogService;</span>
+<span class="nc" id="L75">        this.stateManager = stateManager;</span>
+<span class="nc" id="L76">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L77">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="nc" id="L78">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L79">        this.entryTypesManager = entryTypesManager;</span>
+<span class="nc" id="L80">        this.undoManager = undoManager;</span>
+
+<span class="nc" id="L82">        createToolBar();</span>
+<span class="nc" id="L83">    }</span>
+
+    private void createToolBar() {
+<span class="nc" id="L86">        final ActionFactory factory = new ActionFactory(Globals.getKeyPrefs());</span>
+
+<span class="nc" id="L88">        final Region leftSpacer = new Region();</span>
+<span class="nc" id="L89">        final Region rightSpacer = new Region();</span>
+
+<span class="nc" id="L91">        final Button pushToApplicationButton = factory.createIconButton(pushToApplicationCommand.getAction(), pushToApplicationCommand);</span>
+<span class="nc" id="L92">        pushToApplicationCommand.registerReconfigurable(pushToApplicationButton);</span>
+
+        // Setup Toolbar
+
+<span class="nc" id="L96">        getItems().addAll(</span>
+                new HBox(
+<span class="nc" id="L98">                        factory.createIconButton(StandardActions.NEW_LIBRARY, new NewDatabaseAction(frame, preferencesService)),</span>
+<span class="nc" id="L99">                        factory.createIconButton(StandardActions.OPEN_LIBRARY, new OpenDatabaseAction(frame, preferencesService, dialogService, stateManager, fileUpdateMonitor, entryTypesManager, undoManager, taskExecutor)),</span>
+<span class="nc" id="L100">                        factory.createIconButton(StandardActions.SAVE_LIBRARY, new SaveAction(SaveAction.SaveMethod.SAVE, frame::getCurrentLibraryTab, dialogService, preferencesService, stateManager))),</span>
+
+                leftSpacer,
+
+                globalSearchBar,
+
+                rightSpacer,
+
+                new HBox(
+<span class="nc" id="L109">                        factory.createIconButton(StandardActions.NEW_ARTICLE, new NewEntryAction(frame::getCurrentLibraryTab, StandardEntryType.Article, dialogService, preferencesService, stateManager)),</span>
+<span class="nc" id="L110">                        factory.createIconButton(StandardActions.NEW_ENTRY, new NewEntryAction(frame::getCurrentLibraryTab, dialogService, preferencesService, stateManager)),</span>
+<span class="nc" id="L111">                        createNewEntryFromIdButton(),</span>
+<span class="nc" id="L112">                        factory.createIconButton(StandardActions.NEW_ENTRY_FROM_PLAIN_TEXT, new ExtractBibtexAction(dialogService, preferencesService, stateManager)),</span>
+<span class="nc" id="L113">                        factory.createIconButton(StandardActions.DELETE_ENTRY, new EditAction(StandardActions.DELETE_ENTRY, frame::getCurrentLibraryTab, stateManager, undoManager))),</span>
+
+                new Separator(Orientation.VERTICAL),
+
+                new HBox(
+<span class="nc" id="L118">                        factory.createIconButton(StandardActions.UNDO, new UndoRedoAction(StandardActions.UNDO, frame::getCurrentLibraryTab, dialogService, stateManager)),</span>
+<span class="nc" id="L119">                        factory.createIconButton(StandardActions.REDO, new UndoRedoAction(StandardActions.REDO, frame::getCurrentLibraryTab, dialogService, stateManager)),</span>
+<span class="nc" id="L120">                        factory.createIconButton(StandardActions.CUT, new EditAction(StandardActions.CUT, frame::getCurrentLibraryTab, stateManager, undoManager)),</span>
+<span class="nc" id="L121">                        factory.createIconButton(StandardActions.COPY, new EditAction(StandardActions.COPY, frame::getCurrentLibraryTab, stateManager, undoManager)),</span>
+<span class="nc" id="L122">                        factory.createIconButton(StandardActions.PASTE, new EditAction(StandardActions.PASTE, frame::getCurrentLibraryTab, stateManager, undoManager))),</span>
+
+                new Separator(Orientation.VERTICAL),
+
+                new HBox(
+                        pushToApplicationButton,
+<span class="nc" id="L128">                        factory.createIconButton(StandardActions.GENERATE_CITE_KEYS, new GenerateCitationKeyAction(frame::getCurrentLibraryTab, dialogService, stateManager, taskExecutor, preferencesService, undoManager)),</span>
+<span class="nc" id="L129">                        factory.createIconButton(StandardActions.CLEANUP_ENTRIES, new CleanupAction(frame::getCurrentLibraryTab, preferencesService, dialogService, stateManager, taskExecutor, undoManager))),</span>
+
+                new Separator(Orientation.VERTICAL),
+
+                new HBox(
+<span class="nc" id="L134">                        createTaskIndicator()),</span>
+
+                new Separator(Orientation.VERTICAL),
+
+                new HBox(
+<span class="nc" id="L139">                        factory.createIconButton(StandardActions.OPEN_GITHUB, new OpenBrowserAction(&quot;https://github.com/JabRef/jabref&quot;, dialogService, preferencesService.getFilePreferences()))));</span>
+
+<span class="nc" id="L141">        leftSpacer.setPrefWidth(50);</span>
+<span class="nc" id="L142">        leftSpacer.setMinWidth(Region.USE_PREF_SIZE);</span>
+<span class="nc" id="L143">        leftSpacer.setMaxWidth(Region.USE_PREF_SIZE);</span>
+<span class="nc" id="L144">        HBox.setHgrow(globalSearchBar, Priority.ALWAYS);</span>
+<span class="nc" id="L145">        HBox.setHgrow(rightSpacer, Priority.SOMETIMES);</span>
+
+<span class="nc" id="L147">        getStyleClass().add(&quot;mainToolbar&quot;);</span>
+<span class="nc" id="L148">    }</span>
+
+    Button createNewEntryFromIdButton() {
+<span class="nc" id="L151">        Button newEntryFromIdButton = new Button();</span>
+
+<span class="nc" id="L153">        newEntryFromIdButton.setGraphic(IconTheme.JabRefIcons.IMPORT.getGraphicNode());</span>
+<span class="nc" id="L154">        newEntryFromIdButton.getStyleClass().setAll(&quot;icon-button&quot;);</span>
+<span class="nc" id="L155">        newEntryFromIdButton.setFocusTraversable(false);</span>
+<span class="nc" id="L156">        newEntryFromIdButton.disableProperty().bind(ActionHelper.needsDatabase(stateManager).not());</span>
+<span class="nc" id="L157">        newEntryFromIdButton.setOnMouseClicked(event -&gt; {</span>
+<span class="nc" id="L158">            GenerateEntryFromIdDialog entryFromId = new GenerateEntryFromIdDialog(frame.getCurrentLibraryTab(), dialogService, preferencesService, taskExecutor, stateManager);</span>
+
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            if (entryFromIdPopOver == null) {</span>
+<span class="nc" id="L161">                entryFromIdPopOver = new PopOver(entryFromId.getDialogPane());</span>
+<span class="nc" id="L162">                entryFromIdPopOver.setTitle(Localization.lang(&quot;Import by ID&quot;));</span>
+<span class="nc" id="L163">                entryFromIdPopOver.setArrowLocation(PopOver.ArrowLocation.TOP_CENTER);</span>
+<span class="nc" id="L164">                entryFromIdPopOver.setContentNode(entryFromId.getDialogPane());</span>
+<span class="nc" id="L165">                entryFromIdPopOver.show(newEntryFromIdButton);</span>
+<span class="nc" id="L166">                entryFromId.setEntryFromIdPopOver(entryFromIdPopOver);</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">            } else if (entryFromIdPopOver.isShowing()) {</span>
+<span class="nc" id="L168">                entryFromIdPopOver.hide();</span>
+            } else {
+<span class="nc" id="L170">                entryFromIdPopOver.setContentNode(entryFromId.getDialogPane());</span>
+<span class="nc" id="L171">                entryFromIdPopOver.show(newEntryFromIdButton);</span>
+<span class="nc" id="L172">                entryFromId.setEntryFromIdPopOver(entryFromIdPopOver);</span>
+            }
+<span class="nc" id="L174">        });</span>
+<span class="nc" id="L175">        newEntryFromIdButton.setTooltip(new Tooltip(Localization.lang(&quot;Import by ID&quot;)));</span>
+
+<span class="nc" id="L177">        return newEntryFromIdButton;</span>
+    }
+
+    Group createTaskIndicator() {
+<span class="nc" id="L181">        ProgressIndicator indicator = new ProgressIndicator();</span>
+<span class="nc" id="L182">        indicator.getStyleClass().add(&quot;progress-indicatorToolbar&quot;);</span>
+<span class="nc" id="L183">        indicator.progressProperty().bind(stateManager.getTasksProgress());</span>
+
+<span class="nc" id="L185">        Tooltip someTasksRunning = new Tooltip(Localization.lang(&quot;Background Tasks are running&quot;));</span>
+<span class="nc" id="L186">        Tooltip noTasksRunning = new Tooltip(Localization.lang(&quot;Background Tasks are done&quot;));</span>
+<span class="nc" id="L187">        indicator.setTooltip(noTasksRunning);</span>
+<span class="nc" id="L188">        stateManager.getAnyTaskRunning().addListener((observable, oldValue, newValue) -&gt; {</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (newValue) {</span>
+<span class="nc" id="L190">                indicator.setTooltip(someTasksRunning);</span>
+            } else {
+<span class="nc" id="L192">                indicator.setTooltip(noTasksRunning);</span>
+            }
+<span class="nc" id="L194">        });</span>
+
+        /*
+        The label of the indicator cannot be removed with styling. Therefore,
+        hide it and clip it to a square of (width x width) each time width is updated.
+         */
+<span class="nc" id="L200">        indicator.widthProperty().addListener((observable, oldValue, newValue) -&gt; {</span>
+            /*
+            The indeterminate spinner is wider than the determinate spinner.
+            We must make sure they are the same width for the clipping to result in a square of the same size always.
+             */
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            if (!indicator.isIndeterminate()) {</span>
+<span class="nc" id="L206">                indicator.setPrefWidth(newValue.doubleValue());</span>
+            }
+<span class="nc bnc" id="L208" title="All 2 branches missed.">            if (newValue.doubleValue() &gt; 0) {</span>
+<span class="nc" id="L209">                Rectangle clip = new Rectangle(newValue.doubleValue(), newValue.doubleValue());</span>
+<span class="nc" id="L210">                indicator.setClip(clip);</span>
+            }
+<span class="nc" id="L212">        });</span>
+
+<span class="nc" id="L214">        indicator.setOnMouseClicked(event -&gt; {</span>
+<span class="nc" id="L215">            TaskProgressView&lt;Task&lt;?&gt;&gt; taskProgressView = new TaskProgressView&lt;Task&lt;?&gt;&gt;();</span>
+<span class="nc" id="L216">            EasyBind.bindContent(taskProgressView.getTasks(), stateManager.getBackgroundTasks());</span>
+<span class="nc" id="L217">            taskProgressView.setRetainTasks(true);</span>
+<span class="nc" id="L218">            taskProgressView.setGraphicFactory(BackgroundTask::getIcon);</span>
+
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            if (progressViewPopOver == null) {</span>
+<span class="nc" id="L221">                progressViewPopOver = new PopOver(taskProgressView);</span>
+<span class="nc" id="L222">                progressViewPopOver.setTitle(Localization.lang(&quot;Background Tasks&quot;));</span>
+<span class="nc" id="L223">                progressViewPopOver.setArrowLocation(PopOver.ArrowLocation.RIGHT_TOP);</span>
+<span class="nc" id="L224">                progressViewPopOver.setContentNode(taskProgressView);</span>
+<span class="nc" id="L225">                progressViewPopOver.show(indicator);</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            } else if (progressViewPopOver.isShowing()) {</span>
+<span class="nc" id="L227">                progressViewPopOver.hide();</span>
+            } else {
+<span class="nc" id="L229">                progressViewPopOver.setContentNode(taskProgressView);</span>
+<span class="nc" id="L230">                progressViewPopOver.show(indicator);</span>
+            }
+<span class="nc" id="L232">        });</span>
+
+<span class="nc" id="L234">        return new Group(indicator);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

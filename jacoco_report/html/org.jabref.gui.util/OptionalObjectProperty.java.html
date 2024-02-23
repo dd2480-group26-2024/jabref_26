@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OptionalObjectProperty.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">OptionalObjectProperty.java</span></div><h1>OptionalObjectProperty.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import java.util.Optional;
+
+import javafx.beans.binding.BooleanExpression;
+import javafx.beans.binding.ObjectBinding;
+import javafx.beans.property.SimpleObjectProperty;
+
+import com.tobiasdiez.easybind.PreboundBinding;
+
+/**
+ * Similar to {@link com.tobiasdiez.easybind.monadic.MonadicObservableValue}
+ */
+public class OptionalObjectProperty&lt;T&gt; extends SimpleObjectProperty&lt;Optional&lt;T&gt;&gt; {
+
+    private OptionalObjectProperty(Optional&lt;T&gt; initialValue) {
+<span class="fc" id="L17">        super(initialValue);</span>
+<span class="fc" id="L18">    }</span>
+
+    public static &lt;T&gt; OptionalObjectProperty&lt;T&gt; empty() {
+<span class="fc" id="L21">        return new OptionalObjectProperty&lt;&gt;(Optional.empty());</span>
+    }
+
+    /**
+     * Returns a new ObservableValue that holds the value held by this
+     * ObservableValue, or {@code other} when this ObservableValue is empty.
+     */
+    public ObjectBinding&lt;T&gt; orElseOpt(T other) {
+<span class="fc" id="L29">        return new PreboundBinding&lt;&gt;(this) {</span>
+            @Override
+            protected T computeValue() {
+<span class="fc" id="L32">                return OptionalObjectProperty.this.getValue().orElse(other);</span>
+            }
+        };
+    }
+
+    public BooleanExpression isPresent() {
+<span class="fc" id="L38">        return BooleanExpression.booleanExpression(new PreboundBinding&lt;Boolean&gt;(this) {</span>
+            @Override
+            protected Boolean computeValue() {
+<span class="fc" id="L41">                return OptionalObjectProperty.this.getValue().isPresent();</span>
+            }
+        });
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

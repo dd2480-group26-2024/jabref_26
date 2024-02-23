@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThreeWayMergeViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries.newmergedialog</a> &gt; <span class="el_source">ThreeWayMergeViewModel.java</span></div><h1>ThreeWayMergeViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries.newmergedialog;
+
+import java.util.Comparator;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.gui.AbstractViewModel;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.InternalField;
+
+public class ThreeWayMergeViewModel extends AbstractViewModel {
+
+<span class="fc" id="L24">    private final ObjectProperty&lt;BibEntry&gt; leftEntry = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="fc" id="L25">    private final ObjectProperty&lt;BibEntry&gt; rightEntry = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="fc" id="L26">    private final ObjectProperty&lt;BibEntry&gt; mergedEntry = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="fc" id="L27">    private final StringProperty leftHeader = new SimpleStringProperty();</span>
+<span class="fc" id="L28">    private final StringProperty rightHeader = new SimpleStringProperty();</span>
+
+<span class="fc" id="L30">    private final ObservableList&lt;Field&gt; visibleFields = FXCollections.observableArrayList();</span>
+
+<span class="fc" id="L32">    public ThreeWayMergeViewModel(BibEntry leftEntry, BibEntry rightEntry, String leftHeader, String rightHeader) {</span>
+<span class="fc" id="L33">        Objects.requireNonNull(leftEntry, &quot;Left entry is required&quot;);</span>
+<span class="fc" id="L34">        Objects.requireNonNull(rightEntry, &quot;Right entry is required&quot;);</span>
+<span class="fc" id="L35">        Objects.requireNonNull(leftHeader, &quot;Left header entry is required&quot;);</span>
+<span class="fc" id="L36">        Objects.requireNonNull(rightHeader, &quot;Right header is required&quot;);</span>
+
+<span class="fc" id="L38">        setLeftEntry(leftEntry);</span>
+<span class="fc" id="L39">        setRightEntry(rightEntry);</span>
+<span class="fc" id="L40">        setLeftHeader(leftHeader);</span>
+<span class="fc" id="L41">        setRightHeader(rightHeader);</span>
+
+<span class="fc" id="L43">        mergedEntry.set(new BibEntry());</span>
+
+<span class="fc" id="L45">        setVisibleFields(Stream.concat(</span>
+<span class="fc" id="L46">                leftEntry.getFields().stream(),</span>
+<span class="fc" id="L47">                rightEntry.getFields().stream()).collect(Collectors.toSet()));</span>
+<span class="fc" id="L48">    }</span>
+
+    public StringProperty leftHeaderProperty() {
+<span class="fc" id="L51">        return leftHeader;</span>
+    }
+
+    public String getLeftHeader() {
+<span class="nc" id="L55">        return leftHeader.get();</span>
+    }
+
+    public void setLeftHeader(String leftHeader) {
+<span class="fc" id="L59">        leftHeaderProperty().set(leftHeader);</span>
+<span class="fc" id="L60">    }</span>
+
+    public StringProperty rightHeaderProperty() {
+<span class="fc" id="L63">        return rightHeader;</span>
+    }
+
+    public String getRightHeader() {
+<span class="nc" id="L67">        return rightHeaderProperty().get();</span>
+    }
+
+    public void setRightHeader(String rightHeader) {
+<span class="fc" id="L71">        rightHeaderProperty().set(rightHeader);</span>
+<span class="fc" id="L72">    }</span>
+
+    public BibEntry getLeftEntry() {
+<span class="nc" id="L75">        return leftEntry.get();</span>
+    }
+
+    private void setLeftEntry(BibEntry bibEntry) {
+<span class="fc" id="L79">        leftEntry.set(bibEntry);</span>
+<span class="fc" id="L80">    }</span>
+
+    public BibEntry getRightEntry() {
+<span class="nc" id="L83">        return rightEntry.get();</span>
+    }
+
+    private void setRightEntry(BibEntry bibEntry) {
+<span class="fc" id="L87">        rightEntry.set(bibEntry);</span>
+<span class="fc" id="L88">    }</span>
+
+    public BibEntry getMergedEntry() {
+<span class="nc" id="L91">        return mergedEntry.get();</span>
+    }
+
+    public ObservableList&lt;Field&gt; getVisibleFields() {
+<span class="fc" id="L95">        return visibleFields;</span>
+    }
+
+    /**
+     * Convince method to determine the total number of fields in the union of the left and right fields.
+     */
+    public int numberOfVisibleFields() {
+<span class="fc" id="L102">        return visibleFields.size();</span>
+    }
+
+    private void setVisibleFields(Set&lt;Field&gt; fields) {
+<span class="fc" id="L106">        visibleFields.clear();</span>
+<span class="fc" id="L107">        visibleFields.addAll(fields);</span>
+        // Don't show internal fields. See org.jabref.model.entry.field.InternalField
+<span class="fc" id="L109">        visibleFields.removeIf(FieldFactory::isInternalField);</span>
+
+<span class="fc" id="L111">        visibleFields.sort(Comparator.comparing(Field::getName));</span>
+
+        // Add the entry type field as the first field to display
+<span class="fc" id="L114">        visibleFields.addFirst(InternalField.TYPE_HEADER);</span>
+<span class="fc" id="L115">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

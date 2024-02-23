@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextInputKeyBindings.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.keyboard</a> &gt; <span class="el_source">TextInputKeyBindings.java</span></div><h1>TextInputKeyBindings.java</h1><pre class="source lang-java linenums">package org.jabref.gui.keyboard;
+
+import javafx.scene.Scene;
+import javafx.scene.control.TextInputControl;
+import javafx.scene.input.KeyEvent;
+
+import org.jabref.gui.Globals;
+import org.jabref.logic.util.strings.StringManipulator;
+import org.jabref.model.util.ResultingStringState;
+
+<span class="nc" id="L11">public class TextInputKeyBindings {</span>
+
+    public static void call(Scene scene, KeyEvent event) {
+<span class="nc bnc" id="L14" title="All 2 branches missed.">        if (scene.focusOwnerProperty().get() instanceof TextInputControl) {</span>
+<span class="nc" id="L15">            KeyBindingRepository keyBindingRepository = Globals.getKeyPrefs();</span>
+<span class="nc" id="L16">            TextInputControl focusedTextField = (TextInputControl) scene.focusOwnerProperty().get();</span>
+<span class="nc" id="L17">            keyBindingRepository.mapToKeyBinding(event).ifPresent(binding -&gt; {</span>
+<span class="nc bnc" id="L18" title="All 15 branches missed.">                switch (binding) {</span>
+                    case EDITOR_DELETE -&gt; {
+<span class="nc" id="L20">                        focusedTextField.deleteNextChar();</span>
+<span class="nc" id="L21">                        event.consume();</span>
+<span class="nc" id="L22">                    }</span>
+                    case EDITOR_BACKWARD -&gt; {
+<span class="nc" id="L24">                        focusedTextField.backward();</span>
+<span class="nc" id="L25">                        event.consume();</span>
+<span class="nc" id="L26">                    }</span>
+                    case EDITOR_FORWARD -&gt; {
+<span class="nc" id="L28">                        focusedTextField.forward();</span>
+<span class="nc" id="L29">                        event.consume();</span>
+<span class="nc" id="L30">                    }</span>
+                    case EDITOR_WORD_BACKWARD -&gt; {
+<span class="nc" id="L32">                        focusedTextField.previousWord();</span>
+<span class="nc" id="L33">                        event.consume();</span>
+<span class="nc" id="L34">                    }</span>
+                    case EDITOR_WORD_FORWARD -&gt; {
+<span class="nc" id="L36">                        focusedTextField.nextWord();</span>
+<span class="nc" id="L37">                        event.consume();</span>
+<span class="nc" id="L38">                    }</span>
+                    case EDITOR_BEGINNING, EDITOR_UP, EDITOR_BEGINNING_DOC -&gt; {
+<span class="nc" id="L40">                        focusedTextField.home();</span>
+<span class="nc" id="L41">                        event.consume();</span>
+<span class="nc" id="L42">                    }</span>
+                    case EDITOR_END, EDITOR_DOWN, EDITOR_END_DOC -&gt; {
+<span class="nc" id="L44">                        focusedTextField.end();</span>
+<span class="nc" id="L45">                        event.consume();</span>
+<span class="nc" id="L46">                    }</span>
+                    case EDITOR_CAPITALIZE -&gt; {
+<span class="nc" id="L48">                        int pos = focusedTextField.getCaretPosition();</span>
+<span class="nc" id="L49">                        String text = focusedTextField.getText(0, focusedTextField.getText().length());</span>
+<span class="nc" id="L50">                        ResultingStringState res = StringManipulator.capitalize(pos, text);</span>
+<span class="nc" id="L51">                        focusedTextField.setText(res.text);</span>
+<span class="nc" id="L52">                        focusedTextField.positionCaret(res.caretPosition);</span>
+<span class="nc" id="L53">                        event.consume();</span>
+<span class="nc" id="L54">                    }</span>
+                    case EDITOR_LOWERCASE -&gt; {
+<span class="nc" id="L56">                        int pos = focusedTextField.getCaretPosition();</span>
+<span class="nc" id="L57">                        String text = focusedTextField.getText(0, focusedTextField.getText().length());</span>
+<span class="nc" id="L58">                        ResultingStringState res = StringManipulator.lowercase(pos, text);</span>
+<span class="nc" id="L59">                        focusedTextField.setText(res.text);</span>
+<span class="nc" id="L60">                        focusedTextField.positionCaret(res.caretPosition);</span>
+<span class="nc" id="L61">                        event.consume();</span>
+<span class="nc" id="L62">                    }</span>
+                    case EDITOR_UPPERCASE -&gt; {
+<span class="nc" id="L64">                        int pos = focusedTextField.getCaretPosition();</span>
+<span class="nc" id="L65">                        String text = focusedTextField.getText(0, focusedTextField.getText().length());</span>
+<span class="nc" id="L66">                        ResultingStringState res = StringManipulator.uppercase(pos, text);</span>
+<span class="nc" id="L67">                        focusedTextField.setText(res.text);</span>
+<span class="nc" id="L68">                        focusedTextField.positionCaret(res.caretPosition);</span>
+<span class="nc" id="L69">                        event.consume();</span>
+<span class="nc" id="L70">                    }</span>
+                    case EDITOR_KILL_LINE -&gt; {
+<span class="nc" id="L72">                        int pos = focusedTextField.getCaretPosition();</span>
+<span class="nc" id="L73">                        focusedTextField.setText(focusedTextField.getText(0, pos));</span>
+<span class="nc" id="L74">                        focusedTextField.positionCaret(pos);</span>
+<span class="nc" id="L75">                        event.consume();</span>
+<span class="nc" id="L76">                    }</span>
+                    case EDITOR_KILL_WORD -&gt; {
+<span class="nc" id="L78">                        int pos = focusedTextField.getCaretPosition();</span>
+<span class="nc" id="L79">                        String text = focusedTextField.getText(0, focusedTextField.getText().length());</span>
+<span class="nc" id="L80">                        ResultingStringState res = StringManipulator.killWord(pos, text);</span>
+<span class="nc" id="L81">                        focusedTextField.setText(res.text);</span>
+<span class="nc" id="L82">                        focusedTextField.positionCaret(res.caretPosition);</span>
+<span class="nc" id="L83">                        event.consume();</span>
+<span class="nc" id="L84">                    }</span>
+                    case EDITOR_KILL_WORD_BACKWARD -&gt; {
+<span class="nc" id="L86">                        int pos = focusedTextField.getCaretPosition();</span>
+<span class="nc" id="L87">                        String text = focusedTextField.getText(0, focusedTextField.getText().length());</span>
+<span class="nc" id="L88">                        ResultingStringState res = StringManipulator.backwardKillWord(pos, text);</span>
+<span class="nc" id="L89">                        focusedTextField.setText(res.text);</span>
+<span class="nc" id="L90">                        focusedTextField.positionCaret(res.caretPosition);</span>
+<span class="nc" id="L91">                        event.consume();</span>
+<span class="nc" id="L92">                    }</span>
+                    case CLOSE -&gt; {
+<span class="nc" id="L94">                        focusedTextField.clear();</span>
+<span class="nc" id="L95">                        event.consume();</span>
+                    }
+                }
+<span class="nc" id="L98">            });</span>
+        }
+<span class="nc" id="L100">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

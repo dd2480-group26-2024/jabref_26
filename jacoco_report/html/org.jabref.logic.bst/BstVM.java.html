@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BstVM.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.bst</a> &gt; <span class="el_source">BstVM.java</span></div><h1>BstVM.java</h1><pre class="source lang-java linenums">package org.jabref.logic.bst;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Deque;
+import java.util.List;
+import java.util.Objects;
+
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+
+import org.antlr.v4.runtime.BailErrorStrategy;
+import org.antlr.v4.runtime.BaseErrorListener;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.RecognitionException;
+import org.antlr.v4.runtime.Recognizer;
+import org.antlr.v4.runtime.misc.ParseCancellationException;
+import org.antlr.v4.runtime.tree.ParseTree;
+
+public class BstVM {
+
+<span class="fc" id="L26">    protected static final Integer FALSE = 0;</span>
+<span class="fc" id="L27">    protected static final Integer TRUE = 1;</span>
+
+    protected final ParseTree tree;
+    protected BstVMContext latestContext; // for testing
+
+<span class="fc" id="L32">    private Path path = null;</span>
+
+    public BstVM(Path path) throws RecognitionException, IOException {
+<span class="fc" id="L35">        this(CharStreams.fromPath(path));</span>
+<span class="fc" id="L36">        this.path = path;</span>
+<span class="fc" id="L37">    }</span>
+
+    public BstVM(String s) throws RecognitionException {
+<span class="fc" id="L40">        this(CharStreams.fromString(s));</span>
+<span class="fc" id="L41">    }</span>
+
+    protected BstVM(CharStream bst) throws RecognitionException {
+<span class="fc" id="L44">        this(charStream2CommonTree(bst));</span>
+<span class="fc" id="L45">    }</span>
+
+<span class="fc" id="L47">    private BstVM(ParseTree tree) {</span>
+<span class="fc" id="L48">        this.tree = tree;</span>
+<span class="fc" id="L49">    }</span>
+
+    private static ParseTree charStream2CommonTree(CharStream query) {
+<span class="fc" id="L52">        BstLexer lexer = new BstLexer(query);</span>
+<span class="fc" id="L53">        lexer.removeErrorListeners();</span>
+<span class="fc" id="L54">        lexer.addErrorListener(ThrowingErrorListener.INSTANCE);</span>
+<span class="fc" id="L55">        BstParser parser = new BstParser(new CommonTokenStream(lexer));</span>
+<span class="fc" id="L56">        parser.removeErrorListeners();</span>
+<span class="fc" id="L57">        parser.addErrorListener(ThrowingErrorListener.INSTANCE);</span>
+<span class="fc" id="L58">        parser.setErrorHandler(new BailErrorStrategy());</span>
+<span class="fc" id="L59">        return parser.bstFile();</span>
+    }
+
+    /**
+     * Transforms the given list of BibEntries to a rendered list of references using the parsed bst program
+     *
+     * @param bibEntries  list of entries to convert
+     * @param bibDatabase (may be null) the bibDatabase used for resolving strings / crossref
+     * @return list of references in plain text form
+     */
+    public String render(Collection&lt;BibEntry&gt; bibEntries, BibDatabase bibDatabase) {
+<span class="fc" id="L70">        Objects.requireNonNull(bibEntries);</span>
+
+<span class="fc" id="L72">        List&lt;BstEntry&gt; entries = new ArrayList&lt;&gt;(bibEntries.size());</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (BibEntry entry : bibEntries) {</span>
+<span class="fc" id="L74">            entries.add(new BstEntry(entry));</span>
+<span class="fc" id="L75">        }</span>
+
+<span class="fc" id="L77">        StringBuilder resultBuffer = new StringBuilder();</span>
+
+<span class="fc" id="L79">        BstVMContext bstVMContext = new BstVMContext(entries, bibDatabase, path);</span>
+<span class="fc" id="L80">        bstVMContext.functions().putAll(new BstFunctions(bstVMContext, resultBuffer).getBuiltInFunctions());</span>
+<span class="fc" id="L81">        bstVMContext.integers().put(&quot;entry.max$&quot;, Integer.MAX_VALUE);</span>
+<span class="fc" id="L82">        bstVMContext.integers().put(&quot;global.max$&quot;, Integer.MAX_VALUE);</span>
+
+<span class="fc" id="L84">        BstVMVisitor bstVMVisitor = new BstVMVisitor(bstVMContext, resultBuffer);</span>
+<span class="fc" id="L85">        bstVMVisitor.visit(tree);</span>
+
+<span class="fc" id="L87">        latestContext = bstVMContext;</span>
+
+<span class="fc" id="L89">        return resultBuffer.toString();</span>
+    }
+
+    public String render(Collection&lt;BibEntry&gt; bibEntries) {
+<span class="fc" id="L93">        return render(bibEntries, null);</span>
+    }
+
+    protected Deque&lt;Object&gt; getStack() {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (latestContext != null) {</span>
+<span class="fc" id="L98">            return latestContext.stack();</span>
+        } else {
+<span class="nc" id="L100">            throw new BstVMException(&quot;BstVM must have rendered at least once to provide the latest stack&quot;);</span>
+        }
+    }
+
+    private static class ThrowingErrorListener extends BaseErrorListener {
+<span class="fc" id="L105">        public static final ThrowingErrorListener INSTANCE = new ThrowingErrorListener();</span>
+
+        @Override
+        public void syntaxError(Recognizer&lt;?, ?&gt; recognizer, Object offendingSymbol,
+                                int line, int charPositionInLine, String msg, RecognitionException e)
+                throws ParseCancellationException {
+<span class="nc" id="L111">            throw new ParseCancellationException(&quot;line &quot; + line + &quot;:&quot; + charPositionInLine + &quot; &quot; + msg);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

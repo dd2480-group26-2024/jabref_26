@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BiodiversityLibrary.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">BiodiversityLibrary.java</span></div><h1>BiodiversityLibrary.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.IntStream;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.ImporterPreferences;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.SearchBasedParserFetcher;
+import org.jabref.logic.importer.fetcher.transformers.BiodiversityLibraryTransformer;
+import org.jabref.logic.importer.util.JsonReader;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.logic.util.BuildInfo;
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.StandardEntryType;
+
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONException;
+import kong.unirest.json.JSONObject;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.tinylog.Logger;
+
+/**
+ * Fetches data from the Biodiversity Heritage Library
+ *
+ * @see &lt;a href=&quot;https://www.biodiversitylibrary.org/docs/api3.html&quot;&gt;API documentation&lt;/a&gt;
+ */
+public class BiodiversityLibrary implements SearchBasedParserFetcher, CustomizableKeyFetcher {
+
+<span class="fc" id="L41">    private static final String API_KEY = new BuildInfo().biodiversityHeritageApiKey;</span>
+    private static final String BASE_URL = &quot;https://www.biodiversitylibrary.org/api3&quot;;
+    private static final String RESPONSE_FORMAT = &quot;json&quot;;
+    private static final String TEST_URL_WITHOUT_API_KEY = &quot;https://www.biodiversitylibrary.org/api3?apikey=&quot;;
+
+    private static final String FETCHER_NAME = &quot;Biodiversity Heritage&quot;;
+
+    private final ImporterPreferences importerPreferences;
+
+<span class="fc" id="L50">    public BiodiversityLibrary(ImporterPreferences importerPreferences) {</span>
+<span class="fc" id="L51">        this.importerPreferences = importerPreferences;</span>
+<span class="fc" id="L52">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L56">        return FETCHER_NAME;</span>
+    }
+
+    @Override
+    public String getTestUrl() {
+<span class="fc" id="L61">        return TEST_URL_WITHOUT_API_KEY;</span>
+    }
+
+    public URL getBaseURL() throws URISyntaxException, MalformedURLException {
+<span class="fc" id="L65">        URIBuilder baseURI = new URIBuilder(BASE_URL);</span>
+<span class="fc" id="L66">        baseURI.addParameter(&quot;apikey&quot;, importerPreferences.getApiKey(getName()).orElse(API_KEY));</span>
+<span class="fc" id="L67">        baseURI.addParameter(&quot;format&quot;, RESPONSE_FORMAT);</span>
+
+<span class="fc" id="L69">        return baseURI.build().toURL();</span>
+    }
+
+    public URL getItemMetadataURL(String identifier) throws URISyntaxException, MalformedURLException {
+<span class="fc" id="L73">        URIBuilder uriBuilder = new URIBuilder(getBaseURL().toURI());</span>
+<span class="fc" id="L74">        uriBuilder.addParameter(&quot;op&quot;, &quot;GetItemMetadata&quot;);</span>
+<span class="fc" id="L75">        uriBuilder.addParameter(&quot;pages&quot;, &quot;f&quot;);</span>
+<span class="fc" id="L76">        uriBuilder.addParameter(&quot;ocr&quot;, &quot;f&quot;);</span>
+<span class="fc" id="L77">        uriBuilder.addParameter(&quot;ocr&quot;, &quot;f&quot;);</span>
+<span class="fc" id="L78">        uriBuilder.addParameter(&quot;id&quot;, identifier);</span>
+
+<span class="fc" id="L80">        return uriBuilder.build().toURL();</span>
+    }
+
+    public URL getPartMetadataURL(String identifier) throws URISyntaxException, MalformedURLException {
+<span class="fc" id="L84">        URIBuilder uriBuilder = new URIBuilder(getBaseURL().toURI());</span>
+<span class="fc" id="L85">        uriBuilder.addParameter(&quot;op&quot;, &quot;GetPartMetadata&quot;);</span>
+<span class="fc" id="L86">        uriBuilder.addParameter(&quot;pages&quot;, &quot;f&quot;);</span>
+<span class="fc" id="L87">        uriBuilder.addParameter(&quot;names&quot;, &quot;f&quot;);</span>
+<span class="fc" id="L88">        uriBuilder.addParameter(&quot;id&quot;, identifier);</span>
+
+<span class="fc" id="L90">        return uriBuilder.build().toURL();</span>
+    }
+
+    public JSONObject getDetails(URL url) throws IOException {
+<span class="fc" id="L94">        URLDownload download = new URLDownload(url);</span>
+<span class="fc" id="L95">        String response = download.asString();</span>
+<span class="fc" id="L96">        Logger.debug(&quot;Response {}&quot;, response);</span>
+<span class="fc" id="L97">        return new JSONObject(response).getJSONArray(&quot;Result&quot;).getJSONObject(0);</span>
+    }
+
+    public BibEntry parseBibJSONtoBibtex(JSONObject item, BibEntry entry) throws IOException, URISyntaxException {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (item.has(&quot;BHLType&quot;)) {</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (item.getString(&quot;BHLType&quot;).equals(&quot;Part&quot;)) {</span>
+<span class="fc" id="L103">                URL url = getPartMetadataURL(item.getString(&quot;PartID&quot;));</span>
+<span class="fc" id="L104">                JSONObject itemsDetails = getDetails(url);</span>
+<span class="fc" id="L105">                entry.setField(StandardField.LANGUAGE, itemsDetails.optString(&quot;Language&quot;, &quot;&quot;));</span>
+
+<span class="fc" id="L107">                entry.setField(StandardField.DOI, itemsDetails.optString(&quot;Doi&quot;, &quot;&quot;));</span>
+
+<span class="fc" id="L109">                entry.setField(StandardField.PUBLISHER, itemsDetails.optString(&quot;PublisherName&quot;, &quot;&quot;));</span>
+<span class="fc" id="L110">                entry.setField(StandardField.DATE, itemsDetails.optString(&quot;Date&quot;, &quot;&quot;));</span>
+<span class="fc" id="L111">                entry.setField(StandardField.VOLUME, itemsDetails.optString(&quot;Volume&quot;, &quot;&quot;));</span>
+<span class="fc" id="L112">                entry.setField(StandardField.URL, itemsDetails.optString(&quot;PartUrl&quot;, &quot;&quot;));</span>
+            }
+
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            if (item.getString(&quot;BHLType&quot;).equals(&quot;Item&quot;)) {</span>
+<span class="nc" id="L116">                URL url = getItemMetadataURL(item.getString(&quot;ItemID&quot;));</span>
+<span class="nc" id="L117">                JSONObject itemsDetails = getDetails(url);</span>
+<span class="nc" id="L118">                entry.setField(StandardField.EDITOR, itemsDetails.optString(&quot;Sponsor&quot;, &quot;&quot;));</span>
+<span class="nc" id="L119">                entry.setField(StandardField.PUBLISHER, itemsDetails.optString(&quot;HoldingInstitution&quot;, &quot;&quot;));</span>
+<span class="nc" id="L120">                entry.setField(StandardField.LANGUAGE, itemsDetails.optString(&quot;Language&quot;, &quot;&quot;));</span>
+<span class="nc" id="L121">                entry.setField(StandardField.URL, itemsDetails.optString(&quot;ItemUrl&quot;, &quot;&quot;));</span>
+<span class="nc bnc" id="L122" title="All 6 branches missed.">                if (itemsDetails.has(&quot;Date&quot;) &amp;&amp; !entry.hasField(StandardField.DATE) &amp;&amp; !entry.hasField(StandardField.YEAR)) {</span>
+<span class="nc" id="L123">                    entry.setField(StandardField.DATE, itemsDetails.getString(&quot;Date&quot;));</span>
+                }
+            }
+        }
+
+<span class="fc" id="L128">        return entry;</span>
+    }
+
+    public BibEntry jsonResultToBibEntry(JSONObject item) {
+<span class="fc" id="L132">        BibEntry entry = new BibEntry();</span>
+
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (&quot;Book&quot;.equals(item.optString(&quot;Genre&quot;))) {</span>
+<span class="fc" id="L135">            entry.setType(StandardEntryType.Book);</span>
+        } else {
+<span class="fc" id="L137">            entry.setType(StandardEntryType.Article);</span>
+        }
+<span class="fc" id="L139">        entry.setField(StandardField.TITLE, item.optString(&quot;Title&quot;, &quot;&quot;));</span>
+
+<span class="fc" id="L141">        entry.setField(StandardField.AUTHOR, toAuthors(item.optJSONArray(&quot;Authors&quot;)));</span>
+
+<span class="fc" id="L143">        entry.setField(StandardField.PAGES, item.optString(&quot;PageRange&quot;, &quot;&quot;));</span>
+<span class="fc" id="L144">        entry.setField(StandardField.LOCATION, item.optString(&quot;PublisherPlace&quot;, &quot;&quot;));</span>
+<span class="fc" id="L145">        entry.setField(StandardField.PUBLISHER, item.optString(&quot;PublisherName&quot;, &quot;&quot;));</span>
+
+<span class="fc" id="L147">        entry.setField(StandardField.DATE, item.optString(&quot;Date&quot;, &quot;&quot;));</span>
+<span class="fc" id="L148">        entry.setField(StandardField.YEAR, item.optString(&quot;PublicationDate&quot;, &quot;&quot;));</span>
+<span class="fc" id="L149">        entry.setField(StandardField.JOURNALTITLE, item.optString(&quot;ContainerTitle&quot;, &quot;&quot;));</span>
+<span class="fc" id="L150">        entry.setField(StandardField.VOLUME, item.optString(&quot;Volume&quot;, &quot;&quot;));</span>
+
+<span class="fc" id="L152">        return entry;</span>
+    }
+
+    private String toAuthors(JSONArray authors) {
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (authors == null) {</span>
+<span class="nc" id="L157">            return &quot;&quot;;</span>
+        }
+
+        // input: list of { &quot;Name&quot;: &quot;Author name,&quot;}
+<span class="fc" id="L161">        return IntStream.range(0, authors.length())</span>
+<span class="fc" id="L162">                        .mapToObj(authors::getJSONObject)</span>
+<span class="fc" id="L163">                        .map(author -&gt; new Author(</span>
+<span class="fc" id="L164">                                author.optString(&quot;Name&quot;, &quot;&quot;), &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;))</span>
+<span class="fc" id="L165">                        .collect(AuthorList.collect())</span>
+<span class="fc" id="L166">                        .getAsFirstLastNamesWithAnd();</span>
+    }
+
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L171">        return inputStream -&gt; {</span>
+<span class="fc" id="L172">            JSONObject response = JsonReader.toJsonObject(inputStream);</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            if (response.isEmpty()) {</span>
+<span class="nc" id="L174">                return Collections.emptyList();</span>
+            }
+
+<span class="fc" id="L177">            String errorMessage = response.getString(&quot;ErrorMessage&quot;);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if (!errorMessage.isBlank()) {</span>
+<span class="nc" id="L179">                return Collections.emptyList();</span>
+            }
+
+<span class="fc" id="L182">            JSONArray items = response.getJSONArray(&quot;Result&quot;);</span>
+<span class="fc" id="L183">            List&lt;BibEntry&gt; entries = new ArrayList&lt;&gt;(items.length());</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (int i = 0; i &lt; items.length(); i++) {</span>
+<span class="fc" id="L185">                JSONObject item = items.getJSONObject(i);</span>
+<span class="fc" id="L186">                BibEntry entry = jsonResultToBibEntry(item);</span>
+                try {
+<span class="fc" id="L188">                    entry = parseBibJSONtoBibtex(item, entry);</span>
+<span class="nc" id="L189">                } catch (</span>
+                        JSONException |
+                        IOException |
+                        URISyntaxException exception) {
+<span class="nc" id="L193">                    throw new ParseException(&quot;Error when parsing entry&quot;, exception);</span>
+<span class="fc" id="L194">                }</span>
+<span class="fc" id="L195">                entries.add(entry);</span>
+            }
+
+<span class="fc" id="L198">            return entries;</span>
+        };
+    }
+
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L204">        URIBuilder uriBuilder = new URIBuilder(getBaseURL().toURI());</span>
+<span class="fc" id="L205">        BiodiversityLibraryTransformer transformer = new BiodiversityLibraryTransformer();</span>
+<span class="fc" id="L206">        uriBuilder.addParameter(&quot;op&quot;, &quot;PublicationSearch&quot;);</span>
+<span class="fc" id="L207">        uriBuilder.addParameter(&quot;searchtype&quot;, &quot;C&quot;);</span>
+<span class="fc" id="L208">        uriBuilder.addParameter(&quot;searchterm&quot;, transformer.transformLuceneQuery(luceneQuery).orElse(&quot;&quot;));</span>
+<span class="fc" id="L209">        return uriBuilder.build().toURL();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

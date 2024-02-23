@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryTypeViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.customentrytypes</a> &gt; <span class="el_source">EntryTypeViewModel.java</span></div><h1>EntryTypeViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.customentrytypes;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.model.entry.BibEntryType;
+import org.jabref.model.entry.field.Field;
+
+import static org.jabref.gui.preferences.customentrytypes.FieldViewModel.Mandatory;
+
+public class EntryTypeViewModel {
+
+<span class="nc" id="L20">    private final ObjectProperty&lt;BibEntryType&gt; entryType = new SimpleObjectProperty&lt;&gt;();</span>
+    private final ObservableList&lt;FieldViewModel&gt; fields;
+
+<span class="nc" id="L23">    public EntryTypeViewModel(BibEntryType entryType, Predicate&lt;Field&gt; isMultiline) {</span>
+<span class="nc" id="L24">        this.entryType.set(entryType);</span>
+<span class="nc" id="L25">        List&lt;FieldViewModel&gt; allFieldsForType = entryType.getAllBibFields()</span>
+<span class="nc" id="L26">                       .stream().map(bibField -&gt; new FieldViewModel(bibField.field(),</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">                                   entryType.isRequired(bibField.field()) ? Mandatory.REQUIRED : Mandatory.OPTIONAL,</span>
+<span class="nc" id="L28">                                   bibField.priority(),</span>
+<span class="nc" id="L29">                                   isMultiline.test(bibField.field())))</span>
+<span class="nc" id="L30">                                                 .collect(Collectors.toList());</span>
+<span class="nc" id="L31">        fields = FXCollections.observableArrayList(allFieldsForType);</span>
+<span class="nc" id="L32">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L36">        return Objects.hash(entryType, fields);</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L42">            return true;</span>
+        }
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (!(obj instanceof EntryTypeViewModel)) {</span>
+<span class="nc" id="L45">            return false;</span>
+        }
+<span class="nc" id="L47">        EntryTypeViewModel other = (EntryTypeViewModel) obj;</span>
+<span class="nc bnc" id="L48" title="All 4 branches missed.">        return Objects.equals(entryType, other.entryType) &amp;&amp; Objects.equals(fields, other.fields);</span>
+    }
+
+    public void addField(FieldViewModel field) {
+<span class="nc" id="L52">        this.fields.add(field);</span>
+<span class="nc" id="L53">    }</span>
+
+    public ObservableList&lt;FieldViewModel&gt; fields() {
+<span class="nc" id="L56">        return this.fields;</span>
+    }
+
+    public ObjectProperty&lt;BibEntryType&gt; entryType() {
+<span class="nc" id="L60">        return this.entryType;</span>
+    }
+
+    public void removeField(FieldViewModel focusedItem) {
+<span class="nc" id="L64">        this.fields.remove(focusedItem);</span>
+<span class="nc" id="L65">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L69">        return &quot;CustomEntryTypeViewModel [entryType=&quot; + entryType + &quot;, fields=&quot; + fields + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebSearchTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.websearch</a> &gt; <span class="el_source">WebSearchTabViewModel.java</span></div><h1>WebSearchTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.websearch;
+
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSocketFactory;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyBooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.gui.slr.StudyCatalogItem;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ImporterPreferences;
+import org.jabref.logic.importer.SearchBasedFetcher;
+import org.jabref.logic.importer.WebFetchers;
+import org.jabref.logic.importer.fetcher.CompositeSearchBasedFetcher;
+import org.jabref.logic.importer.fetcher.CustomizableKeyFetcher;
+import org.jabref.logic.importer.fetcher.GrobidPreferences;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.logic.preferences.DOIPreferences;
+import org.jabref.logic.preferences.FetcherApiKey;
+import org.jabref.logic.util.OS;
+import org.jabref.preferences.FilePreferences;
+import org.jabref.preferences.PreferencesService;
+
+import kong.unirest.UnirestException;
+
+public class WebSearchTabViewModel implements PreferenceTabViewModel {
+<span class="nc" id="L45">    private final BooleanProperty enableWebSearchProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L46">    private final BooleanProperty generateKeyOnImportProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L47">    private final BooleanProperty warnAboutDuplicatesOnImportProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L48">    private final BooleanProperty shouldDownloadLinkedOnlineFiles = new SimpleBooleanProperty();</span>
+
+<span class="nc" id="L50">    private final BooleanProperty useCustomDOIProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L51">    private final StringProperty useCustomDOINameProperty = new SimpleStringProperty(&quot;&quot;);</span>
+
+<span class="nc" id="L53">    private final ObservableList&lt;StudyCatalogItem&gt; catalogs = FXCollections.observableArrayList();</span>
+<span class="nc" id="L54">    private final BooleanProperty grobidEnabledProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L55">    private final StringProperty grobidURLProperty = new SimpleStringProperty(&quot;&quot;);</span>
+
+<span class="nc" id="L57">    private final ListProperty&lt;FetcherApiKey&gt; apiKeys = new SimpleListProperty&lt;&gt;();</span>
+<span class="nc" id="L58">    private final ObjectProperty&lt;FetcherApiKey&gt; selectedApiKeyProperty = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="nc" id="L59">    private final BooleanProperty apikeyPersistProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L60">    private final BooleanProperty apikeyPersistAvailableProperty = new SimpleBooleanProperty();</span>
+
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+    private final DOIPreferences doiPreferences;
+    private final GrobidPreferences grobidPreferences;
+    private final ImporterPreferences importerPreferences;
+    private final FilePreferences filePreferences;
+    private final ImportFormatPreferences importFormatPreferences;
+
+<span class="nc" id="L70">    public WebSearchTabViewModel(PreferencesService preferencesService, DialogService dialogService) {</span>
+<span class="nc" id="L71">        this.dialogService = dialogService;</span>
+<span class="nc" id="L72">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L73">        this.importerPreferences = preferencesService.getImporterPreferences();</span>
+<span class="nc" id="L74">        this.grobidPreferences = preferencesService.getGrobidPreferences();</span>
+<span class="nc" id="L75">        this.doiPreferences = preferencesService.getDOIPreferences();</span>
+<span class="nc" id="L76">        this.filePreferences = preferencesService.getFilePreferences();</span>
+<span class="nc" id="L77">        this.importFormatPreferences = preferencesService.getImportFormatPreferences();</span>
+<span class="nc" id="L78">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L82">        enableWebSearchProperty.setValue(importerPreferences.areImporterEnabled());</span>
+<span class="nc" id="L83">        generateKeyOnImportProperty.setValue(importerPreferences.isGenerateNewKeyOnImport());</span>
+<span class="nc" id="L84">        warnAboutDuplicatesOnImportProperty.setValue(importerPreferences.shouldWarnAboutDuplicatesOnImport());</span>
+<span class="nc" id="L85">        shouldDownloadLinkedOnlineFiles.setValue(filePreferences.shouldDownloadLinkedFiles());</span>
+
+<span class="nc" id="L87">        useCustomDOIProperty.setValue(doiPreferences.isUseCustom());</span>
+<span class="nc" id="L88">        useCustomDOINameProperty.setValue(doiPreferences.getDefaultBaseURI());</span>
+
+<span class="nc" id="L90">        grobidEnabledProperty.setValue(grobidPreferences.isGrobidEnabled());</span>
+<span class="nc" id="L91">        grobidURLProperty.setValue(grobidPreferences.getGrobidURL());</span>
+
+<span class="nc" id="L93">        apiKeys.setValue(FXCollections.observableArrayList(preferencesService.getImporterPreferences().getApiKeys()));</span>
+<span class="nc" id="L94">        apikeyPersistAvailableProperty.setValue(OS.isKeyringAvailable());</span>
+<span class="nc" id="L95">        apikeyPersistProperty.setValue(preferencesService.getImporterPreferences().shouldPersistCustomKeys());</span>
+<span class="nc" id="L96">        catalogs.addAll(WebFetchers.getSearchBasedFetchers(importFormatPreferences, importerPreferences)</span>
+<span class="nc" id="L97">                                   .stream()</span>
+<span class="nc" id="L98">                                   .map(SearchBasedFetcher::getName)</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                                   .filter(name -&gt; !name.equals(CompositeSearchBasedFetcher.FETCHER_NAME))</span>
+<span class="nc" id="L100">                                   .map(name -&gt; {</span>
+<span class="nc" id="L101">                                       boolean enabled = importerPreferences.getCatalogs().contains(name);</span>
+<span class="nc" id="L102">                                       return new StudyCatalogItem(name, enabled);</span>
+                                   })
+<span class="nc" id="L104">                                   .toList());</span>
+<span class="nc" id="L105">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L109">        importerPreferences.setImporterEnabled(enableWebSearchProperty.getValue());</span>
+<span class="nc" id="L110">        importerPreferences.setGenerateNewKeyOnImport(generateKeyOnImportProperty.getValue());</span>
+<span class="nc" id="L111">        importerPreferences.setWarnAboutDuplicatesOnImport(warnAboutDuplicatesOnImportProperty.getValue());</span>
+<span class="nc" id="L112">        filePreferences.setDownloadLinkedFiles(shouldDownloadLinkedOnlineFiles.getValue());</span>
+
+<span class="nc" id="L114">        grobidPreferences.setGrobidEnabled(grobidEnabledProperty.getValue());</span>
+<span class="nc" id="L115">        grobidPreferences.setGrobidOptOut(grobidPreferences.isGrobidOptOut());</span>
+<span class="nc" id="L116">        grobidPreferences.setGrobidURL(grobidURLProperty.getValue());</span>
+<span class="nc" id="L117">        doiPreferences.setUseCustom(useCustomDOIProperty.get());</span>
+<span class="nc" id="L118">        doiPreferences.setDefaultBaseURI(useCustomDOINameProperty.getValue().trim());</span>
+<span class="nc" id="L119">        importerPreferences.setCatalogs(</span>
+<span class="nc" id="L120">                FXCollections.observableList(catalogs.stream()</span>
+<span class="nc" id="L121">                                                     .filter(StudyCatalogItem::isEnabled)</span>
+<span class="nc" id="L122">                                                     .map(StudyCatalogItem::getName)</span>
+<span class="nc" id="L123">                                                     .collect(Collectors.toList())));</span>
+<span class="nc" id="L124">        importerPreferences.setPersistCustomKeys(apikeyPersistProperty.get());</span>
+<span class="nc" id="L125">        preferencesService.getImporterPreferences().getApiKeys().clear();</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (apikeyPersistAvailableProperty.get()) {</span>
+<span class="nc" id="L127">            preferencesService.getImporterPreferences().getApiKeys().addAll(apiKeys);</span>
+        }
+<span class="nc" id="L129">    }</span>
+
+    public BooleanProperty enableWebSearchProperty() {
+<span class="nc" id="L132">        return enableWebSearchProperty;</span>
+    }
+
+    public BooleanProperty generateKeyOnImportProperty() {
+<span class="nc" id="L136">        return generateKeyOnImportProperty;</span>
+    }
+
+    public BooleanProperty useCustomDOIProperty() {
+<span class="nc" id="L140">        return this.useCustomDOIProperty;</span>
+    }
+
+    public StringProperty useCustomDOINameProperty() {
+<span class="nc" id="L144">        return this.useCustomDOINameProperty;</span>
+    }
+
+    public ObservableList&lt;StudyCatalogItem&gt; getCatalogs() {
+<span class="nc" id="L148">        return catalogs;</span>
+    }
+
+    public BooleanProperty grobidEnabledProperty() {
+<span class="nc" id="L152">        return grobidEnabledProperty;</span>
+    }
+
+    public StringProperty grobidURLProperty() {
+<span class="nc" id="L156">        return grobidURLProperty;</span>
+    }
+
+    public ListProperty&lt;FetcherApiKey&gt; fetcherApiKeys() {
+<span class="nc" id="L160">        return apiKeys;</span>
+    }
+
+    public ObjectProperty&lt;FetcherApiKey&gt; selectedApiKeyProperty() {
+<span class="nc" id="L164">        return selectedApiKeyProperty;</span>
+    }
+
+    public BooleanProperty warnAboutDuplicatesOnImportProperty() {
+<span class="nc" id="L168">        return warnAboutDuplicatesOnImportProperty;</span>
+    }
+
+    public BooleanProperty shouldDownloadLinkedOnlineFiles() {
+<span class="nc" id="L172">        return shouldDownloadLinkedOnlineFiles;</span>
+    }
+
+    public ReadOnlyBooleanProperty apiKeyPersistAvailable() {
+<span class="nc" id="L176">        return apikeyPersistAvailableProperty;</span>
+    }
+
+    public BooleanProperty getApikeyPersistProperty() {
+<span class="nc" id="L180">        return apikeyPersistProperty;</span>
+    }
+
+    public void checkCustomApiKey() {
+<span class="nc" id="L184">        final String apiKeyName = selectedApiKeyProperty.get().getName();</span>
+
+<span class="nc" id="L186">        final Optional&lt;CustomizableKeyFetcher&gt; fetcherOpt =</span>
+<span class="nc" id="L187">                WebFetchers.getCustomizableKeyFetchers(</span>
+<span class="nc" id="L188">                                   preferencesService.getImportFormatPreferences(),</span>
+<span class="nc" id="L189">                                   preferencesService.getImporterPreferences())</span>
+<span class="nc" id="L190">                           .stream()</span>
+<span class="nc" id="L191">                           .filter(fetcher -&gt; fetcher.getName().equals(apiKeyName))</span>
+<span class="nc" id="L192">                           .findFirst();</span>
+
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (fetcherOpt.isEmpty()) {</span>
+<span class="nc" id="L195">            dialogService.showErrorDialogAndWait(</span>
+<span class="nc" id="L196">                    Localization.lang(&quot;Check %0 API Key Setting&quot;, apiKeyName),</span>
+<span class="nc" id="L197">                    Localization.lang(&quot;Fetcher unknown!&quot;));</span>
+<span class="nc" id="L198">            return;</span>
+        }
+
+<span class="nc" id="L201">        final String testUrlWithoutApiKey = fetcherOpt.get().getTestUrl();</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (testUrlWithoutApiKey == null) {</span>
+<span class="nc" id="L203">            dialogService.showWarningDialogAndWait(</span>
+<span class="nc" id="L204">                    Localization.lang(&quot;Check %0 API Key Setting&quot;, apiKeyName),</span>
+<span class="nc" id="L205">                    Localization.lang(&quot;Fetcher cannot be tested!&quot;));</span>
+<span class="nc" id="L206">            return;</span>
+        }
+
+<span class="nc" id="L209">        final String apiKey = selectedApiKeyProperty.get().getKey();</span>
+
+        boolean keyValid;
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (!apiKey.isEmpty()) {</span>
+            URLDownload urlDownload;
+            try {
+<span class="nc" id="L215">                SSLSocketFactory defaultSslSocketFactory = HttpsURLConnection.getDefaultSSLSocketFactory();</span>
+<span class="nc" id="L216">                HostnameVerifier defaultHostnameVerifier = HttpsURLConnection.getDefaultHostnameVerifier();</span>
+
+<span class="nc" id="L218">                urlDownload = new URLDownload(testUrlWithoutApiKey + apiKey);</span>
+                // The HEAD request cannot be used because its response is not 200 (maybe 404 or 596...).
+<span class="nc" id="L220">                int statusCode = ((HttpURLConnection) urlDownload.getSource().openConnection()).getResponseCode();</span>
+<span class="nc bnc" id="L221" title="All 4 branches missed.">                keyValid = (statusCode &gt;= 200) &amp;&amp; (statusCode &lt; 300);</span>
+
+<span class="nc" id="L223">                URLDownload.setSSLVerification(defaultSslSocketFactory, defaultHostnameVerifier);</span>
+<span class="nc" id="L224">            } catch (IOException | UnirestException e) {</span>
+<span class="nc" id="L225">                keyValid = false;</span>
+<span class="nc" id="L226">            }</span>
+        } else {
+<span class="nc" id="L228">            keyValid = false;</span>
+        }
+
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        if (keyValid) {</span>
+<span class="nc" id="L232">            dialogService.showInformationDialogAndWait(Localization.lang(&quot;Check %0 API Key Setting&quot;, apiKeyName), Localization.lang(&quot;Connection successful!&quot;));</span>
+        } else {
+<span class="nc" id="L234">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Check %0 API Key Setting&quot;, apiKeyName), Localization.lang(&quot;Connection failed!&quot;));</span>
+        }
+<span class="nc" id="L236">    }</span>
+
+    @Override
+    public boolean validateSettings() {
+<span class="nc" id="L240">        return getCatalogs().stream().anyMatch(StudyCatalogItem::isEnabled);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

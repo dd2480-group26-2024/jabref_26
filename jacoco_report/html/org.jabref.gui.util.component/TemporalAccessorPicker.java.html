@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TemporalAccessorPicker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util.component</a> &gt; <span class="el_source">TemporalAccessorPicker.java</span></div><h1>TemporalAccessorPicker.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util.component;
+
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.Year;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAccessor;
+import java.time.temporal.TemporalQueries;
+import java.util.Objects;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.DatePicker;
+import javafx.util.StringConverter;
+
+import org.jabref.gui.Globals;
+import org.jabref.gui.fieldeditors.TextInputControlBehavior;
+import org.jabref.gui.fieldeditors.contextmenu.EditorContextAction;
+import org.jabref.gui.util.BindingsHelper;
+import org.jabref.model.entry.Date;
+import org.jabref.model.strings.StringUtil;
+
+/**
+ * A date picker with configurable datetime format where both date and time can be changed via the text field and the
+ * date can additionally be changed via the JavaFX default date picker. Also supports incomplete dates.
+ *
+ * First recall how the date picker normally works: - The user selects a date in the popup, which sets {@link
+ * #valueProperty()} to the selected date. - The converter ({@link #converterProperty()}) is used to transform the date
+ * to a string representation and display it in the text field.
+ *
+ * The idea is now to intercept the process and add an additional step: - The user selects a date in the popup, which
+ * sets {@link #valueProperty()} to the selected date. - The date is converted to a {@link TemporalAccessor} (i.e,
+ * enriched by a time component) using {@link #addCurrentTime(LocalDate)} - The string converter ({@link
+ * #stringConverterProperty()}) is used to transform the temporal accessor to a string representation and display it in
+ * the text field.
+ *
+ * Inspiration taken from https://github.com/edvin/tornadofx-controls/blob/master/src/main/java/tornadofx/control/DateTimePicker.java
+ */
+public class TemporalAccessorPicker extends DatePicker {
+<span class="fc" id="L45">    private final ObjectProperty&lt;TemporalAccessor&gt; temporalAccessorValue = new SimpleObjectProperty&lt;&gt;(null);</span>
+
+<span class="fc" id="L47">    private final DateTimeFormatter defaultFormatter = DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd HH:mm&quot;);</span>
+<span class="fc" id="L48">    private final ObjectProperty&lt;StringConverter&lt;TemporalAccessor&gt;&gt; converter = new SimpleObjectProperty&lt;&gt;(null);</span>
+
+<span class="fc" id="L50">    public TemporalAccessorPicker() {</span>
+<span class="fc" id="L51">        setConverter(new InternalConverter());</span>
+
+        // Synchronize changes of the underlying date value with the temporalAccessorValue
+<span class="fc" id="L54">        BindingsHelper.bindBidirectional(valueProperty(), temporalAccessorValue,</span>
+                TemporalAccessorPicker::addCurrentTime,
+                TemporalAccessorPicker::getDate);
+
+<span class="fc" id="L58">        getEditor().setOnContextMenuRequested(event -&gt; {</span>
+<span class="nc" id="L59">            ContextMenu contextMenu = new ContextMenu();</span>
+<span class="nc" id="L60">            contextMenu.getItems().setAll(EditorContextAction.getDefaultContextMenuItems(getEditor(), Globals.getKeyPrefs()));</span>
+<span class="nc" id="L61">            TextInputControlBehavior.showContextMenu(getEditor(), contextMenu, event);</span>
+<span class="nc" id="L62">        });</span>
+<span class="fc" id="L63">    }</span>
+
+    private static TemporalAccessor addCurrentTime(LocalDate date) {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (date == null) {</span>
+<span class="nc" id="L67">            return null;</span>
+        }
+<span class="nc" id="L69">        return LocalDateTime.of(date, LocalTime.now());</span>
+    }
+
+    private static LocalDate getDate(TemporalAccessor temporalAccessor) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (temporalAccessor == null) {</span>
+<span class="fc" id="L74">            return null;</span>
+        }
+
+<span class="nc" id="L77">        return getLocalDate(temporalAccessor);</span>
+    }
+
+    private static LocalDate getLocalDate(TemporalAccessor dateTime) {
+        // Return null when dateTime is null pointer
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (dateTime == null) {</span>
+<span class="nc" id="L83">            return null;</span>
+        }
+
+        // Try to get as much information from the temporal accessor
+<span class="nc" id="L87">        LocalDate date = dateTime.query(TemporalQueries.localDate());</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (date != null) {</span>
+<span class="nc" id="L89">            return date;</span>
+        }
+
+        try {
+<span class="nc" id="L93">            return YearMonth.from(dateTime).atDay(1);</span>
+<span class="nc" id="L94">        } catch (DateTimeException exception) {</span>
+<span class="nc" id="L95">            return Year.from(dateTime).atDay(1);</span>
+        }
+    }
+
+    public final ObjectProperty&lt;StringConverter&lt;TemporalAccessor&gt;&gt; stringConverterProperty() {
+<span class="nc" id="L100">        return converter;</span>
+    }
+
+    public final StringConverter&lt;TemporalAccessor&gt; getStringConverter() {
+<span class="nc" id="L104">        StringConverter&lt;TemporalAccessor&gt; newConverter = new StringConverter&lt;&gt;() {</span>
+            @Override
+            public String toString(TemporalAccessor value) {
+<span class="nc" id="L107">                return defaultFormatter.format(value);</span>
+            }
+
+            @Override
+            public TemporalAccessor fromString(String value) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                if (StringUtil.isNotBlank(value)) {</span>
+                    try {
+<span class="nc" id="L114">                        return defaultFormatter.parse(value);</span>
+<span class="nc" id="L115">                    } catch (DateTimeParseException exception) {</span>
+<span class="nc" id="L116">                        return Date.parse(value).map(Date::toTemporalAccessor).orElse(null);</span>
+                    }
+                } else {
+<span class="nc" id="L119">                    return null;</span>
+                }
+            }
+        };
+<span class="nc" id="L123">        return Objects.requireNonNullElseGet(stringConverterProperty().get(), () -&gt; newConverter);</span>
+    }
+
+    public final void setStringConverter(StringConverter&lt;TemporalAccessor&gt; value) {
+<span class="nc" id="L127">        stringConverterProperty().set(value);</span>
+<span class="nc" id="L128">    }</span>
+
+    public TemporalAccessor getTemporalAccessorValue() {
+<span class="nc" id="L131">        return temporalAccessorValue.get();</span>
+    }
+
+    public void setTemporalAccessorValue(TemporalAccessor temporalAccessorValue) {
+<span class="nc" id="L135">        this.temporalAccessorValue.set(temporalAccessorValue);</span>
+<span class="nc" id="L136">    }</span>
+
+    public ObjectProperty&lt;TemporalAccessor&gt; temporalAccessorValueProperty() {
+<span class="nc" id="L139">        return temporalAccessorValue;</span>
+    }
+
+<span class="fc" id="L142">    private class InternalConverter extends StringConverter&lt;LocalDate&gt; {</span>
+        @Override
+        public String toString(LocalDate object) {
+<span class="nc" id="L145">            TemporalAccessor value = getTemporalAccessorValue();</span>
+
+            // Keeps the original text when it is an invalid date
+<span class="nc bnc" id="L148" title="All 2 branches missed.">            return value != null ? getStringConverter().toString(value) : getEditor().getText();</span>
+        }
+
+        @Override
+        public LocalDate fromString(String value) {
+<span class="nc bnc" id="L153" title="All 4 branches missed.">            if ((value == null) || value.isEmpty()) {</span>
+<span class="nc" id="L154">                temporalAccessorValue.set(null);</span>
+<span class="nc" id="L155">                return null;</span>
+            }
+
+<span class="nc" id="L158">            TemporalAccessor dateTime = getStringConverter().fromString(value);</span>
+<span class="nc" id="L159">            temporalAccessorValue.set(dateTime);</span>
+
+<span class="nc" id="L161">            return getLocalDate(dateTime);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApsFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">ApsFetcher.java</span></div><h1>ApsFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.Objects;
+import java.util.Optional;
+
+import org.jabref.logic.importer.FulltextFetcher;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.identifier.DOI;
+
+import kong.unirest.Unirest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * FulltextFetcher implementation that attempts to find a PDF URL at APS. Also see the &lt;a
+ * href=&quot;https://harvest.aps.org/docs/harvest-api&quot;&gt;API&lt;/a&gt;, although it isn't currently used.
+ */
+<span class="fc" id="L23">public class ApsFetcher implements FulltextFetcher {</span>
+
+<span class="fc" id="L25">    private static final Logger LOGGER = LoggerFactory.getLogger(ApsFetcher.class);</span>
+
+    // The actual API needs either an API key or a header. This is a workaround.
+    private static final String DOI_URL = &quot;https://www.doi.org/&quot;;
+    private static final String PDF_URL = &quot;https://journals.aps.org/prl/pdf/&quot;;
+
+    @Override
+    public Optional&lt;URL&gt; findFullText(BibEntry entry) throws IOException {
+<span class="fc" id="L33">        Objects.requireNonNull(entry);</span>
+
+<span class="fc" id="L35">        Optional&lt;DOI&gt; doi = entry.getField(StandardField.DOI).flatMap(DOI::parse);</span>
+
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (!doi.isPresent()) {</span>
+<span class="fc" id="L38">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L41">        Optional&lt;String&gt; id = getId(doi.get().getDOI());</span>
+
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (id.isPresent()) {</span>
+<span class="fc" id="L44">            String pdfRequestUrl = PDF_URL + id.get();</span>
+<span class="fc" id="L45">            int code = Unirest.head(pdfRequestUrl).asJson().getStatus();</span>
+
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            if (code == 200) {</span>
+<span class="fc" id="L48">                LOGGER.info(&quot;Fulltext PDF found @ APS.&quot;);</span>
+                try {
+<span class="fc" id="L50">                    return Optional.of(new URL(pdfRequestUrl));</span>
+<span class="nc" id="L51">                } catch (MalformedURLException e) {</span>
+<span class="nc" id="L52">                    LOGGER.warn(&quot;APS returned malformed URL, cannot find PDF.&quot;);</span>
+                }
+            }
+        }
+<span class="fc" id="L56">        return Optional.empty();</span>
+    }
+
+    @Override
+    public TrustLevel getTrustLevel() {
+<span class="nc" id="L61">        return TrustLevel.PUBLISHER;</span>
+    }
+
+    /**
+     * Convert a DOI into an appropriate APS id.
+     *
+     * @param doi A case insensitive DOI
+     * @return A DOI cased as APS likes it
+     */
+    private Optional&lt;String&gt; getId(String doi) {
+        // DOI is not case sensitive, but the id for the PDF URL is,
+        // so we follow DOI.org redirects to get the proper id.
+        // https://stackoverflow.com/a/5270162/1729441
+
+<span class="fc" id="L75">        String doiRequest = DOI_URL + doi;</span>
+
+        URLConnection con;
+        try {
+<span class="fc" id="L79">            con = new URL(doiRequest).openConnection();</span>
+<span class="fc" id="L80">            con.connect();</span>
+<span class="fc" id="L81">            con.getInputStream();</span>
+<span class="fc" id="L82">            String[] urlParts = con.getURL().toString().split(&quot;abstract/&quot;);</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (urlParts.length == 2) {</span>
+<span class="fc" id="L84">                return Optional.of(urlParts[1]);</span>
+            }
+<span class="fc" id="L86">        } catch (IOException e) {</span>
+<span class="fc" id="L87">            LOGGER.warn(&quot;Error connecting to APS&quot;, e);</span>
+<span class="nc" id="L88">        }</span>
+<span class="fc" id="L89">        return Optional.empty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

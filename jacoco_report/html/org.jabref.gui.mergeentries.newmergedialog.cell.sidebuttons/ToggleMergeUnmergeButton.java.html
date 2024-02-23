@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ToggleMergeUnmergeButton.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries.newmergedialog.cell.sidebuttons</a> &gt; <span class="el_source">ToggleMergeUnmergeButton.java</span></div><h1>ToggleMergeUnmergeButton.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries.newmergedialog.cell.sidebuttons;
+
+import java.util.Optional;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.scene.control.Button;
+
+import org.jabref.gui.Globals;
+import org.jabref.gui.actions.Action;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.field.Field;
+
+public class ToggleMergeUnmergeButton extends Button {
+<span class="nc" id="L21">    private final ObjectProperty&lt;FieldState&gt; fieldState = new SimpleObjectProperty&lt;&gt;(FieldState.UNMERGED);</span>
+<span class="nc" id="L22">    private final BooleanProperty canMerge = new SimpleBooleanProperty(Boolean.TRUE);</span>
+
+<span class="nc" id="L24">    private final ActionFactory actionFactory = new ActionFactory(Globals.getKeyPrefs());</span>
+
+    private final Field field;
+
+<span class="nc" id="L28">    public ToggleMergeUnmergeButton(Field field) {</span>
+<span class="nc" id="L29">        this.field = field;</span>
+<span class="nc" id="L30">        setMaxHeight(Double.MAX_VALUE);</span>
+<span class="nc" id="L31">        setFocusTraversable(false);</span>
+
+<span class="nc" id="L33">        configureMergeButton();</span>
+<span class="nc" id="L34">        this.disableProperty().bind(canMergeProperty().not());</span>
+<span class="nc" id="L35">    }</span>
+
+    private void configureMergeButton() {
+<span class="nc" id="L38">        ToggleMergeCommand mergeCommand = new ToggleMergeCommand();</span>
+<span class="nc" id="L39">        actionFactory.configureIconButton(mergeCommand.mergeAction, mergeCommand, this);</span>
+<span class="nc" id="L40">    }</span>
+
+    private void configureUnmergeButton() {
+<span class="nc" id="L43">        ToggleMergeCommand unmergeCommand = new ToggleMergeCommand();</span>
+<span class="nc" id="L44">        actionFactory.configureIconButton(unmergeCommand.unmergeAction, unmergeCommand, this);</span>
+<span class="nc" id="L45">    }</span>
+
+    public ObjectProperty&lt;FieldState&gt; fieldStateProperty() {
+<span class="nc" id="L48">        return fieldState;</span>
+    }
+
+    private void setFieldState(FieldState fieldState) {
+<span class="nc" id="L52">        fieldStateProperty().set(fieldState);</span>
+<span class="nc" id="L53">    }</span>
+
+    public FieldState getFieldState() {
+<span class="nc" id="L56">        return fieldState.get();</span>
+    }
+
+    public BooleanProperty canMergeProperty() {
+<span class="nc" id="L60">        return canMerge;</span>
+    }
+
+    public boolean canMerge() {
+<span class="nc" id="L64">        return canMerge.get();</span>
+    }
+
+    /**
+     * Setting {@code canMerge} to {@code false} will disable the merge/unmerge button
+     * */
+    public void setCanMerge(boolean value) {
+<span class="nc" id="L71">        canMergeProperty().set(value);</span>
+<span class="nc" id="L72">    }</span>
+
+<span class="nc" id="L74">    private class ToggleMergeCommand extends SimpleCommand {</span>
+<span class="nc" id="L75">        private final Action mergeAction = new Action() {</span>
+            @Override
+            public Optional&lt;JabRefIcon&gt; getIcon() {
+<span class="nc" id="L78">                return Optional.of(IconTheme.JabRefIcons.MERGE_GROUPS);</span>
+            }
+
+            @Override
+            public String getText() {
+<span class="nc" id="L83">                return Localization.lang(&quot;Merge %0&quot;, field.getDisplayName());</span>
+            }
+        };
+
+<span class="nc" id="L87">        private final Action unmergeAction = new Action() {</span>
+            @Override
+            public Optional&lt;JabRefIcon&gt; getIcon() {
+<span class="nc" id="L90">                return Optional.of(IconTheme.JabRefIcons.UNDO);</span>
+            }
+
+            @Override
+            public String getText() {
+<span class="nc" id="L95">                return Localization.lang(&quot;Unmerge %0&quot;, field.getDisplayName());</span>
+            }
+        };
+
+        @Override
+        public void execute() {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (fieldStateProperty().get() == FieldState.MERGED) {</span>
+<span class="nc" id="L102">                setFieldState(FieldState.UNMERGED);</span>
+<span class="nc" id="L103">                configureMergeButton();</span>
+            } else {
+<span class="nc" id="L105">                setFieldState(FieldState.MERGED);</span>
+<span class="nc" id="L106">                configureUnmergeButton();</span>
+            }
+<span class="nc" id="L108">        }</span>
+    }
+
+<span class="nc" id="L111">    public enum FieldState {</span>
+<span class="nc" id="L112">        MERGED, UNMERGED</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

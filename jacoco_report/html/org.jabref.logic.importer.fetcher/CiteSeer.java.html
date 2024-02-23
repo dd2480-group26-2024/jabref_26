@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CiteSeer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">CiteSeer.java</span></div><h1>CiteSeer.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.net.URL;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.FulltextFetcher;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.SearchBasedFetcher;
+import org.jabref.logic.importer.fetcher.transformers.CiteSeerQueryTransformer;
+import org.jabref.logic.importer.fileformat.CiteSeerParser;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+
+import kong.unirest.JsonNode;
+import kong.unirest.Unirest;
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONElement;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+
+public class CiteSeer implements SearchBasedFetcher, FulltextFetcher {
+
+    private static final String BASE_URL = &quot;citeseerx.ist.psu.edu&quot;;
+
+    private static final String API_URL = &quot;https://citeseerx.ist.psu.edu/api/search&quot;;
+
+    private static final String PDF_URL = &quot;https://&quot; + BASE_URL + &quot;/document?repid=rep1&amp;type=pdf&amp;doi=%s&quot;;
+
+    private CiteSeerQueryTransformer transformer;
+
+<span class="fc" id="L35">    public CiteSeer() {</span>
+<span class="fc" id="L36">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L40">        return &quot;CiteSeerX&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;HelpFile&gt; getHelpPage() {
+<span class="nc" id="L45">        return Optional.of(HelpFile.FETCHER_CITESEERX);</span>
+    }
+
+    @Override
+    public List&lt;BibEntry&gt; performSearch(QueryNode luceneQuery) throws FetcherException {
+        // ADR-0014
+        try {
+<span class="fc" id="L52">            JSONElement payload = getPayloadJSON(luceneQuery);</span>
+<span class="fc" id="L53">            JsonNode requestResponse = Unirest.post(API_URL)</span>
+<span class="fc" id="L54">                                              .header(&quot;authority&quot;, BASE_URL)</span>
+<span class="fc" id="L55">                                              .header(&quot;accept&quot;, &quot;application/json, text/plain, */*&quot;)</span>
+<span class="fc" id="L56">                                              .header(&quot;content-type&quot;, &quot;application/json;charset=UTF-8&quot;)</span>
+<span class="fc" id="L57">                                              .header(&quot;origin&quot;, &quot;https://&quot; + BASE_URL)</span>
+<span class="fc" id="L58">                                              .body(payload)</span>
+<span class="fc" id="L59">                                              .asJson().getBody();</span>
+
+<span class="fc" id="L61">            Optional&lt;JSONArray&gt; jsonResponse = Optional.of(requestResponse)</span>
+<span class="fc" id="L62">                                                    .map(JsonNode::getObject)</span>
+<span class="fc" id="L63">                                                    .filter(Objects::nonNull)</span>
+<span class="fc" id="L64">                                                    .map(response -&gt; response.optJSONArray(&quot;response&quot;))</span>
+<span class="fc" id="L65">                                                    .filter(Objects::nonNull);</span>
+
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">            if (!jsonResponse.isPresent()) {</span>
+<span class="fc" id="L68">                return List.of();</span>
+            }
+
+<span class="nc" id="L71">            CiteSeerParser parser = new CiteSeerParser();</span>
+<span class="nc" id="L72">            List&lt;BibEntry&gt; fetchedEntries = parser.parseCiteSeerResponse(jsonResponse.orElse(new JSONArray()));</span>
+<span class="nc" id="L73">            return fetchedEntries;</span>
+<span class="nc" id="L74">        } catch (ParseException ex) {</span>
+<span class="nc" id="L75">            throw new FetcherException(&quot;An internal parser error occurred while parsing CiteSeer entries, &quot;, ex);</span>
+        }
+    }
+
+    private JSONElement getPayloadJSON(QueryNode luceneQuery) {
+<span class="fc" id="L80">        transformer = new CiteSeerQueryTransformer();</span>
+<span class="fc" id="L81">        String transformedQuery = transformer.transformLuceneQuery(luceneQuery).orElse(&quot;&quot;);</span>
+<span class="fc" id="L82">        return transformer.getJSONPayload();</span>
+    }
+
+    @Override
+    public Optional&lt;URL&gt; findFullText(BibEntry entry) throws IOException, FetcherException {
+<span class="fc" id="L87">        Objects.requireNonNull(entry);</span>
+
+        // does not use a valid DOI, but Cite Seer's id / hash available for each entry
+<span class="fc" id="L90">        Optional&lt;String&gt; id = entry.getField(StandardField.DOI);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (id.isPresent()) {</span>
+<span class="fc" id="L92">            String source = PDF_URL.formatted(id.get());</span>
+<span class="fc" id="L93">            return Optional.of(new URL(source));</span>
+        }
+
+        // if using id fails, we can try the source URL
+<span class="fc" id="L97">        Optional&lt;String&gt; urlString = entry.getField(StandardField.URL);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (urlString.isPresent()) {</span>
+<span class="fc" id="L99">            return Optional.of(new URL(urlString.get()));</span>
+        }
+
+<span class="fc" id="L102">        return Optional.empty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

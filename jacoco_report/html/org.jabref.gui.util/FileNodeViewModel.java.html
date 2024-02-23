@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileNodeViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">FileNodeViewModel.java</span></div><h1>FileNodeViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Objects;
+
+import javafx.beans.property.ReadOnlyListWrapper;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.logic.l10n.Localization;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class FileNodeViewModel {
+
+<span class="fc" id="L23">    private static final Logger LOGGER = LoggerFactory.getLogger(FileNodeViewModel.class);</span>
+    private final Path path;
+    private final ObservableList&lt;FileNodeViewModel&gt; children;
+    private int fileCount;
+
+<span class="fc" id="L28">    public FileNodeViewModel(Path path) {</span>
+<span class="fc" id="L29">        this.path = path;</span>
+<span class="fc" id="L30">        this.children = FXCollections.observableArrayList();</span>
+<span class="fc" id="L31">        this.fileCount = 0;</span>
+<span class="fc" id="L32">    }</span>
+
+    public Path getPath() {
+<span class="nc" id="L35">        return path;</span>
+    }
+
+    public ObservableList&lt;FileNodeViewModel&gt; getChildren() {
+<span class="fc" id="L39">        return new ReadOnlyListWrapper&lt;&gt;(children);</span>
+    }
+
+    public int getFileCount() {
+<span class="fc" id="L43">        return fileCount;</span>
+    }
+
+    public void setFileCount(int fileCount) {
+<span class="fc" id="L47">        this.fileCount = fileCount;</span>
+<span class="fc" id="L48">    }</span>
+
+    /**
+     * Return a string of a FileTime in a yyyy-MM-dd HH:mm format.
+     */
+    public static String formatDateTime(FileTime fileTime) {
+<span class="nc" id="L54">        LocalDateTime localDateTime = fileTime</span>
+<span class="nc" id="L55">                .toInstant()</span>
+<span class="nc" id="L56">                .atZone(ZoneId.systemDefault())</span>
+<span class="nc" id="L57">                .toLocalDateTime();</span>
+
+<span class="nc" id="L59">        return localDateTime.format(DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd HH:mm&quot;));</span>
+    }
+
+    /**
+     * Return a string for displaying a node name (and its number of children if it is a directory).
+     */
+    public String getDisplayText() {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (path.toFile().isDirectory()) {</span>
+<span class="nc" id="L67">            return &quot;%s (%s %s)&quot;.formatted(path.getFileName(), fileCount,</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                    fileCount == 1 ? Localization.lang(&quot;file&quot;) : Localization.lang(&quot;files&quot;));</span>
+        }
+<span class="nc" id="L70">        return path.getFileName().toString();</span>
+    }
+
+    /**
+     * Return a string for displaying a node name (and its number of children if it is a directory).
+     * along with the last edited time
+     */
+    public String getDisplayTextWithEditDate() {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (path.toFile().isDirectory()) {</span>
+<span class="nc" id="L79">            return &quot;%s (%s %s)&quot;.formatted(path.getFileName(), fileCount,</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                    fileCount == 1 ? Localization.lang(&quot;file&quot;) : Localization.lang(&quot;files&quot;));</span>
+        }
+<span class="nc" id="L82">        FileTime lastEditedTime = null;</span>
+        try {
+<span class="nc" id="L84">            lastEditedTime = Files.getLastModifiedTime(path);</span>
+<span class="nc" id="L85">        } catch (IOException e) {</span>
+<span class="nc" id="L86">            LOGGER.error(&quot;Exception Caught&quot;, e);</span>
+<span class="nc" id="L87">        }</span>
+<span class="nc" id="L88">        return &quot;%s (%s: %s)&quot;.formatted(path.getFileName().toString(), Localization.lang(&quot;last edited&quot;), formatDateTime(lastEditedTime));</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L93">        return String.format(&quot;FileNodeViewModel{path=%s, children=%s, fileCount=%s}&quot;,</span>
+                this.path,
+                this.children,
+<span class="nc" id="L96">                this.fileCount);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L101">        return Objects.hash(children, fileCount, path);</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L107">            return true;</span>
+        }
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (!(obj instanceof FileNodeViewModel)) {</span>
+<span class="nc" id="L110">            return false;</span>
+        }
+<span class="fc" id="L112">        FileNodeViewModel other = (FileNodeViewModel) obj;</span>
+<span class="pc bpc" id="L113" title="3 of 6 branches missed.">        return Objects.equals(children, other.children) &amp;&amp; (fileCount == other.fileCount) &amp;&amp; Objects.equals(path, other.path);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

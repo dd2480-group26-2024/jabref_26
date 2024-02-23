@@ -1,0 +1,695 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GroupTreeView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.groups</a> &gt; <span class="el_source">GroupTreeView.java</span></div><h1>GroupTreeView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.groups;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.text.DecimalFormat;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.ObjectProperty;
+import javafx.css.PseudoClass;
+import javafx.geometry.Orientation;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Control;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.ScrollBar;
+import javafx.scene.control.SelectionMode;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeTableColumn;
+import javafx.scene.control.TreeTableRow;
+import javafx.scene.control.TreeTableView;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.input.TransferMode;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
+import javafx.scene.text.Text;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.DragAndDropDataFormats;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.util.BindingsHelper;
+import org.jabref.gui.util.ControlHelper;
+import org.jabref.gui.util.CustomLocalDragboard;
+import org.jabref.gui.util.RecursiveTreeItem;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.gui.util.ViewModelTreeTableCellFactory;
+import org.jabref.gui.util.ViewModelTreeTableRowFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.groups.AllEntriesGroup;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+import org.controlsfx.control.textfield.CustomTextField;
+import org.controlsfx.control.textfield.TextFields;
+import org.reactfx.util.FxTimer;
+import org.reactfx.util.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class GroupTreeView extends BorderPane {
+
+<span class="nc" id="L74">    private static final Logger LOGGER = LoggerFactory.getLogger(GroupTreeView.class);</span>
+
+<span class="nc" id="L76">    private static final PseudoClass PSEUDOCLASS_ANYSELECTED = PseudoClass.getPseudoClass(&quot;any-selected&quot;);</span>
+<span class="nc" id="L77">    private static final PseudoClass PSEUDOCLASS_ALLSELECTED = PseudoClass.getPseudoClass(&quot;all-selected&quot;);</span>
+<span class="nc" id="L78">    private static final PseudoClass PSEUDOCLASS_ROOTELEMENT = PseudoClass.getPseudoClass(&quot;root&quot;);</span>
+<span class="nc" id="L79">    private static final PseudoClass PSEUDOCLASS_SUBELEMENT = PseudoClass.getPseudoClass(&quot;sub&quot;); // &gt; 1 deep</span>
+
+    private static final double SCROLL_SPEED_UP = 3.0;
+
+    private TreeTableView&lt;GroupNodeViewModel&gt; groupTree;
+    private TreeTableColumn&lt;GroupNodeViewModel, GroupNodeViewModel&gt; mainColumn;
+    private TreeTableColumn&lt;GroupNodeViewModel, GroupNodeViewModel&gt; numberColumn;
+    private TreeTableColumn&lt;GroupNodeViewModel, GroupNodeViewModel&gt; expansionNodeColumn;
+    private CustomTextField searchField;
+
+    private final StateManager stateManager;
+    private final DialogService dialogService;
+    private final TaskExecutor taskExecutor;
+    private final PreferencesService preferencesService;
+
+    private GroupTreeViewModel viewModel;
+    private CustomLocalDragboard localDragboard;
+
+    private DragExpansionHandler dragExpansionHandler;
+
+    private Timer scrollTimer;
+<span class="nc" id="L100">    private double scrollVelocity = 0;</span>
+    private double scrollableAreaHeight;
+    private double upperBorder;
+    private double lowerBorder;
+    private double baseFactor;
+
+    /**
+     * Note: This panel is deliberately not created in fxml, since parsing equivalent fxml takes about 500 msecs
+     */
+    public GroupTreeView(TaskExecutor taskExecutor,
+                         StateManager stateManager,
+                         PreferencesService preferencesService,
+<span class="nc" id="L112">                         DialogService dialogService) {</span>
+<span class="nc" id="L113">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L114">        this.stateManager = stateManager;</span>
+<span class="nc" id="L115">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L116">        this.dialogService = dialogService;</span>
+
+<span class="nc" id="L118">        createNodes();</span>
+<span class="nc" id="L119">        this.getStylesheets().add(Objects.requireNonNull(GroupTreeView.class.getResource(&quot;GroupTree.css&quot;)).toExternalForm());</span>
+<span class="nc" id="L120">        initialize();</span>
+<span class="nc" id="L121">    }</span>
+
+    private void createNodes() {
+<span class="nc" id="L124">        searchField = new CustomTextField();</span>
+
+<span class="nc" id="L126">        searchField.setPromptText(Localization.lang(&quot;Filter groups&quot;));</span>
+<span class="nc" id="L127">        searchField.setId(&quot;searchField&quot;);</span>
+<span class="nc" id="L128">        HBox.setHgrow(searchField, Priority.ALWAYS);</span>
+<span class="nc" id="L129">        HBox groupFilterBar = new HBox(searchField);</span>
+<span class="nc" id="L130">        groupFilterBar.setId(&quot;groupFilterBar&quot;);</span>
+<span class="nc" id="L131">        this.setTop(groupFilterBar);</span>
+
+<span class="nc" id="L133">        mainColumn = new TreeTableColumn&lt;&gt;();</span>
+<span class="nc" id="L134">        mainColumn.setId(&quot;mainColumn&quot;);</span>
+<span class="nc" id="L135">        mainColumn.setResizable(true);</span>
+<span class="nc" id="L136">        numberColumn = new TreeTableColumn&lt;&gt;();</span>
+<span class="nc" id="L137">        numberColumn.getStyleClass().add(&quot;numberColumn&quot;);</span>
+<span class="nc" id="L138">        numberColumn.setMinWidth(60d);</span>
+<span class="nc" id="L139">        numberColumn.setMaxWidth(60d);</span>
+<span class="nc" id="L140">        numberColumn.setPrefWidth(60d);</span>
+<span class="nc" id="L141">        numberColumn.setResizable(false);</span>
+<span class="nc" id="L142">        expansionNodeColumn = new TreeTableColumn&lt;&gt;();</span>
+<span class="nc" id="L143">        expansionNodeColumn.getStyleClass().add(&quot;expansionNodeColumn&quot;);</span>
+<span class="nc" id="L144">        expansionNodeColumn.setMaxWidth(20d);</span>
+<span class="nc" id="L145">        expansionNodeColumn.setMinWidth(20d);</span>
+<span class="nc" id="L146">        expansionNodeColumn.setPrefWidth(20d);</span>
+<span class="nc" id="L147">        expansionNodeColumn.setResizable(false);</span>
+
+<span class="nc" id="L149">        groupTree = new TreeTableView&lt;&gt;();</span>
+<span class="nc" id="L150">        groupTree.setId(&quot;groupTree&quot;);</span>
+<span class="nc" id="L151">        groupTree.setColumnResizePolicy(TreeTableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);</span>
+<span class="nc" id="L152">        groupTree.getColumns().addAll(List.of(mainColumn, numberColumn, expansionNodeColumn));</span>
+<span class="nc" id="L153">        this.setCenter(groupTree);</span>
+
+<span class="nc" id="L155">        mainColumn.prefWidthProperty().bind(groupTree.widthProperty().subtract(80d).subtract(15d));</span>
+
+<span class="nc" id="L157">        Button addNewGroup = new Button(Localization.lang(&quot;Add group&quot;));</span>
+<span class="nc" id="L158">        addNewGroup.setId(&quot;addNewGroup&quot;);</span>
+<span class="nc" id="L159">        addNewGroup.setMaxWidth(Double.MAX_VALUE);</span>
+<span class="nc" id="L160">        HBox.setHgrow(addNewGroup, Priority.ALWAYS);</span>
+<span class="nc" id="L161">        addNewGroup.setTooltip(new Tooltip(Localization.lang(&quot;New group&quot;)));</span>
+<span class="nc" id="L162">        addNewGroup.setOnAction(event -&gt; addNewGroup());</span>
+
+<span class="nc" id="L164">        HBox groupBar = new HBox(addNewGroup);</span>
+<span class="nc" id="L165">        groupBar.setId(&quot;groupBar&quot;);</span>
+<span class="nc" id="L166">        this.setBottom(groupBar);</span>
+<span class="nc" id="L167">    }</span>
+
+    private void initialize() {
+<span class="nc" id="L170">        this.localDragboard = stateManager.getLocalDragboard();</span>
+<span class="nc" id="L171">        viewModel = new GroupTreeViewModel(stateManager, dialogService, preferencesService, taskExecutor, localDragboard);</span>
+
+        // Set-up groups tree
+<span class="nc" id="L174">        groupTree.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);</span>
+<span class="nc" id="L175">        dragExpansionHandler = new DragExpansionHandler();</span>
+
+        // Set-up bindings
+<span class="nc" id="L178">        Platform.runLater(() -&gt;</span>
+<span class="nc" id="L179">                BindingsHelper.bindContentBidirectional(</span>
+<span class="nc" id="L180">                        groupTree.getSelectionModel().getSelectedItems(),</span>
+<span class="nc" id="L181">                        viewModel.selectedGroupsProperty(),</span>
+<span class="nc" id="L182">                        newSelectedGroups -&gt; newSelectedGroups.forEach(this::selectNode),</span>
+                        this::updateSelection
+                ));
+
+        // We try to prevent publishing changes in the search field directly to the search task that takes some time
+        // for larger group structures.
+<span class="nc" id="L188">        final Timer searchTask = FxTimer.create(Duration.ofMillis(400), () -&gt; {</span>
+<span class="nc" id="L189">            LOGGER.debug(&quot;Run group search {}&quot;, searchField.getText());</span>
+<span class="nc" id="L190">            viewModel.filterTextProperty().setValue(searchField.textProperty().getValue());</span>
+<span class="nc" id="L191">        });</span>
+<span class="nc" id="L192">        searchField.textProperty().addListener((observable, oldValue, newValue) -&gt; searchTask.restart());</span>
+
+<span class="nc" id="L194">        groupTree.rootProperty().bind(</span>
+<span class="nc" id="L195">                EasyBind.map(viewModel.rootGroupProperty(),</span>
+                        group -&gt; {
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                            if (group == null) {</span>
+<span class="nc" id="L198">                                return null;</span>
+                            } else {
+<span class="nc" id="L200">                                return new RecursiveTreeItem&lt;&gt;(</span>
+                                        group,
+                                        GroupNodeViewModel::getChildren,
+                                        GroupNodeViewModel::expandedProperty,
+<span class="nc" id="L204">                                        viewModel.filterPredicateProperty());</span>
+                            }
+                        }));
+
+        // Icon and group name
+<span class="nc" id="L209">        new ViewModelTreeTableCellFactory&lt;GroupNodeViewModel&gt;()</span>
+<span class="nc" id="L210">                .withText(GroupNodeViewModel::getDisplayName)</span>
+<span class="nc" id="L211">                .withIcon(GroupNodeViewModel::getIcon)</span>
+<span class="nc" id="L212">                .withTooltip(GroupNodeViewModel::getDescription)</span>
+<span class="nc" id="L213">                .install(mainColumn);</span>
+
+        // Number of hits (only if user wants to see them)
+<span class="nc" id="L216">        new ViewModelTreeTableCellFactory&lt;GroupNodeViewModel&gt;()</span>
+<span class="nc" id="L217">                .withGraphic(this::createNumberCell)</span>
+<span class="nc" id="L218">                .install(numberColumn);</span>
+
+        // Arrow indicating expanded status
+<span class="nc" id="L221">        new ViewModelTreeTableCellFactory&lt;GroupNodeViewModel&gt;()</span>
+<span class="nc" id="L222">                .withGraphic(this::getArrowCell)</span>
+<span class="nc" id="L223">                .withOnMouseClickedEvent(group -&gt; event -&gt; {</span>
+<span class="nc" id="L224">                    group.toggleExpansion();</span>
+<span class="nc" id="L225">                    event.consume();</span>
+<span class="nc" id="L226">                })</span>
+<span class="nc" id="L227">                .install(expansionNodeColumn);</span>
+
+<span class="nc" id="L229">        new ViewModelTreeTableRowFactory&lt;GroupNodeViewModel&gt;()</span>
+<span class="nc" id="L230">                .withContextMenu(this::createContextMenuForGroup)</span>
+<span class="nc" id="L231">                .withEventFilter(MouseEvent.MOUSE_PRESSED, (row, event) -&gt; {</span>
+<span class="nc bnc" id="L232" title="All 4 branches missed.">                    if (((MouseEvent) event).getButton() == MouseButton.SECONDARY &amp;&amp; !stateManager.getSelectedEntries().isEmpty()) {</span>
+                        // Prevent right-click to select group whe we have selected entries
+<span class="nc" id="L234">                        event.consume();</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                    } else if (event.getTarget() instanceof StackPane pane) {</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">                        if (pane.getStyleClass().contains(&quot;arrow&quot;) || pane.getStyleClass().contains(&quot;tree-disclosure-node&quot;)) {</span>
+<span class="nc" id="L237">                            event.consume();</span>
+                        }
+                    }
+<span class="nc" id="L240">                })</span>
+<span class="nc" id="L241">                .withCustomInitializer(row -&gt; {</span>
+                    // Remove disclosure node since we display custom version in separate column
+                    // Simply setting to null is not enough since it would be replaced by the default node on every change
+<span class="nc" id="L244">                    row.setDisclosureNode(null);</span>
+<span class="nc" id="L245">                    row.disclosureNodeProperty().addListener((observable, oldValue, newValue) -&gt; row.setDisclosureNode(null));</span>
+<span class="nc" id="L246">                })</span>
+<span class="nc" id="L247">                .setOnDragDetected(this::handleOnDragDetected)</span>
+<span class="nc" id="L248">                .setOnDragDropped(this::handleOnDragDropped)</span>
+<span class="nc" id="L249">                .setOnDragExited(this::handleOnDragExited)</span>
+<span class="nc" id="L250">                .setOnDragOver(this::handleOnDragOver)</span>
+<span class="nc" id="L251">                .withPseudoClass(PSEUDOCLASS_ROOTELEMENT, row -&gt; Bindings.createBooleanBinding(</span>
+<span class="nc bnc" id="L252" title="All 6 branches missed.">                        () -&gt; (row != null) &amp;&amp; (groupTree.getRoot() != null) &amp;&amp; (row.getItem() == groupTree.getRoot().getValue()), row.treeItemProperty()))</span>
+<span class="nc" id="L253">                .withPseudoClass(PSEUDOCLASS_SUBELEMENT, row -&gt; Bindings.createBooleanBinding(</span>
+<span class="nc bnc" id="L254" title="All 4 branches missed.">                        () -&gt; (row != null) &amp;&amp; (groupTree.getTreeItemLevel(row.getTreeItem()) &gt; 1), row.treeItemProperty()))</span>
+<span class="nc" id="L255">                .install(groupTree);</span>
+
+<span class="nc" id="L257">        setupDragScrolling();</span>
+
+        // Filter text field
+<span class="nc" id="L260">        setupClearButtonField(searchField);</span>
+<span class="nc" id="L261">    }</span>
+
+    private StackPane getArrowCell(GroupNodeViewModel viewModel) {
+<span class="nc" id="L264">        final StackPane disclosureNode = new StackPane();</span>
+<span class="nc" id="L265">        disclosureNode.visibleProperty().bind(viewModel.hasChildrenProperty());</span>
+<span class="nc" id="L266">        disclosureNode.getStyleClass().setAll(&quot;tree-disclosure-node&quot;);</span>
+
+<span class="nc" id="L268">        final StackPane disclosureNodeArrow = new StackPane();</span>
+<span class="nc" id="L269">        disclosureNodeArrow.getStyleClass().setAll(&quot;arrow&quot;);</span>
+<span class="nc" id="L270">        disclosureNode.getChildren().add(disclosureNodeArrow);</span>
+<span class="nc" id="L271">        return disclosureNode;</span>
+    }
+
+    private StackPane createNumberCell(GroupNodeViewModel group) {
+<span class="nc" id="L275">        final StackPane node = new StackPane();</span>
+<span class="nc" id="L276">        node.getStyleClass().add(&quot;hits&quot;);</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (!group.isRoot()) {</span>
+<span class="nc" id="L278">            BindingsHelper.includePseudoClassWhen(node, PSEUDOCLASS_ANYSELECTED,</span>
+<span class="nc" id="L279">                    group.anySelectedEntriesMatchedProperty());</span>
+<span class="nc" id="L280">            BindingsHelper.includePseudoClassWhen(node, PSEUDOCLASS_ALLSELECTED,</span>
+<span class="nc" id="L281">                    group.allSelectedEntriesMatchedProperty());</span>
+        }
+<span class="nc" id="L283">        Text text = new Text();</span>
+<span class="nc" id="L284">        EasyBind.subscribe(preferencesService.getGroupsPreferences().displayGroupCountProperty(),</span>
+                shouldDisplayGroupCount -&gt; {
+<span class="nc bnc" id="L286" title="All 2 branches missed.">                    if (text.textProperty().isBound()) {</span>
+<span class="nc" id="L287">                        text.textProperty().unbind();</span>
+<span class="nc" id="L288">                        text.setText(&quot;&quot;);</span>
+                    }
+
+<span class="nc bnc" id="L291" title="All 2 branches missed.">                    if (shouldDisplayGroupCount) {</span>
+<span class="nc" id="L292">                        text.textProperty().bind(group.getHits().map(Number::intValue).map(this::getFormattedNumber));</span>
+<span class="nc" id="L293">                        Tooltip tooltip = new Tooltip();</span>
+<span class="nc" id="L294">                        tooltip.textProperty().bind(group.getHits().asString());</span>
+<span class="nc" id="L295">                        Tooltip.install(text, tooltip);</span>
+                    }
+<span class="nc" id="L297">                });</span>
+<span class="nc" id="L298">        text.getStyleClass().setAll(&quot;text&quot;);</span>
+
+<span class="nc" id="L300">        text.styleProperty().bind(Bindings.createStringBinding(() -&gt; {</span>
+            double reducedFontSize;
+<span class="nc" id="L302">            double font_size = preferencesService.getWorkspacePreferences().getMainFontSize();</span>
+            // For each breaking point, the font size is reduced 0.20 em to fix issue 8797
+<span class="nc bnc" id="L304" title="All 2 branches missed.">            if (font_size &gt; 26.0) {</span>
+<span class="nc" id="L305">                reducedFontSize = 0.25;</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            } else if (font_size &gt; 22.0) {</span>
+<span class="nc" id="L307">                reducedFontSize = 0.35;</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            } else if (font_size &gt; 18.0) {</span>
+<span class="nc" id="L309">                reducedFontSize = 0.55;</span>
+            } else {
+<span class="nc" id="L311">                reducedFontSize = 0.75;</span>
+            }
+<span class="nc" id="L313">            return &quot;-fx-font-size: %fem;&quot;.formatted(reducedFontSize);</span>
+<span class="nc" id="L314">        }, preferencesService.getWorkspacePreferences().mainFontSizeProperty()));</span>
+
+<span class="nc" id="L316">        node.getChildren().add(text);</span>
+<span class="nc" id="L317">        node.setMaxWidth(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L318">        return node;</span>
+    }
+
+    private void handleOnDragExited(TreeTableRow&lt;GroupNodeViewModel&gt; row, GroupNodeViewModel fieldViewModel, DragEvent dragEvent) {
+<span class="nc" id="L322">        ControlHelper.removeDroppingPseudoClasses(row);</span>
+<span class="nc" id="L323">    }</span>
+
+    private void handleOnDragDetected(TreeTableRow&lt;GroupNodeViewModel&gt; row, GroupNodeViewModel groupViewModel, MouseEvent event) {
+<span class="nc" id="L326">        List&lt;String&gt; groupsToMove = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        for (TreeItem&lt;GroupNodeViewModel&gt; selectedItem : row.getTreeTableView().getSelectionModel().getSelectedItems()) {</span>
+<span class="nc bnc" id="L328" title="All 4 branches missed.">            if ((selectedItem != null) &amp;&amp; (selectedItem.getValue() != null)) {</span>
+<span class="nc" id="L329">                groupsToMove.add(selectedItem.getValue().getPath());</span>
+            }
+<span class="nc" id="L331">        }</span>
+
+<span class="nc bnc" id="L333" title="All 2 branches missed.">        if (!groupsToMove.isEmpty()) {</span>
+<span class="nc" id="L334">            localDragboard.clearAll();</span>
+        }
+
+        // Put the group nodes as content
+<span class="nc" id="L338">        Dragboard dragboard = row.startDragAndDrop(TransferMode.MOVE);</span>
+        // Display the group when dragging
+<span class="nc" id="L340">        dragboard.setDragView(row.snapshot(null, null));</span>
+<span class="nc" id="L341">        ClipboardContent content = new ClipboardContent();</span>
+<span class="nc" id="L342">        content.put(DragAndDropDataFormats.GROUP, groupsToMove);</span>
+<span class="nc" id="L343">        dragboard.setContent(content);</span>
+<span class="nc" id="L344">        event.consume();</span>
+<span class="nc" id="L345">    }</span>
+
+    private void handleOnDragDropped(TreeTableRow&lt;GroupNodeViewModel&gt; row, GroupNodeViewModel originalItem, DragEvent event) {
+<span class="nc" id="L348">        Dragboard dragboard = event.getDragboard();</span>
+<span class="nc" id="L349">        boolean success = false;</span>
+
+<span class="nc bnc" id="L351" title="All 4 branches missed.">        if (dragboard.hasContent(DragAndDropDataFormats.GROUP) &amp;&amp; row.getItem().canAddGroupsIn()) {</span>
+<span class="nc" id="L352">            List&lt;String&gt; pathToSources = (List&lt;String&gt;) dragboard.getContent(DragAndDropDataFormats.GROUP);</span>
+<span class="nc" id="L353">            List&lt;GroupNodeViewModel&gt; changedGroups = new LinkedList&lt;&gt;();</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">            for (String pathToSource : pathToSources) {</span>
+<span class="nc" id="L355">                Optional&lt;GroupNodeViewModel&gt; source = viewModel</span>
+<span class="nc" id="L356">                        .rootGroupProperty().get()</span>
+<span class="nc" id="L357">                        .getChildByPath(pathToSource);</span>
+<span class="nc bnc" id="L358" title="All 4 branches missed.">                if (source.isPresent() &amp;&amp; source.get().canBeDragged()) {</span>
+<span class="nc" id="L359">                    source.get().draggedOn(row.getItem(), ControlHelper.getDroppingMouseLocation(row, event));</span>
+<span class="nc" id="L360">                    changedGroups.add(source.get());</span>
+<span class="nc" id="L361">                    success = true;</span>
+                }
+<span class="nc" id="L363">            }</span>
+<span class="nc" id="L364">            groupTree.getSelectionModel().clearSelection();</span>
+<span class="nc" id="L365">            changedGroups.forEach(value -&gt; selectNode(value, true));</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">            if (success) {</span>
+<span class="nc" id="L367">                viewModel.writeGroupChangesToMetaData();</span>
+            }
+        }
+
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        if (localDragboard.hasBibEntries()) {</span>
+<span class="nc" id="L372">            List&lt;BibEntry&gt; entries = localDragboard.getBibEntries();</span>
+<span class="nc" id="L373">            row.getItem().addEntriesToGroup(entries);</span>
+<span class="nc" id="L374">            success = true;</span>
+        }
+<span class="nc" id="L376">        event.setDropCompleted(success);</span>
+<span class="nc" id="L377">        event.consume();</span>
+<span class="nc" id="L378">    }</span>
+
+    private void handleOnDragOver(TreeTableRow&lt;GroupNodeViewModel&gt; row, GroupNodeViewModel originalItem, DragEvent event) {
+<span class="nc" id="L381">        Dragboard dragboard = event.getDragboard();</span>
+<span class="nc bnc" id="L382" title="All 6 branches missed.">        if ((event.getGestureSource() != row) &amp;&amp; (row.getItem() != null) &amp;&amp; row.getItem().acceptableDrop(dragboard)) {</span>
+<span class="nc" id="L383">            event.acceptTransferModes(TransferMode.MOVE, TransferMode.LINK);</span>
+
+            // expand node and all children on drag over
+<span class="nc" id="L386">            dragExpansionHandler.expandGroup(row.getTreeItem());</span>
+
+<span class="nc bnc" id="L388" title="All 2 branches missed.">            if (localDragboard.hasBibEntries()) {</span>
+<span class="nc" id="L389">                ControlHelper.setDroppingPseudoClasses(row);</span>
+            } else {
+<span class="nc" id="L391">                ControlHelper.setDroppingPseudoClasses(row, event);</span>
+            }
+        }
+<span class="nc" id="L394">    }</span>
+
+    private void updateSelection(List&lt;TreeItem&lt;GroupNodeViewModel&gt;&gt; newSelectedGroups) {
+<span class="nc bnc" id="L397" title="All 4 branches missed.">        if ((newSelectedGroups == null) || newSelectedGroups.isEmpty()) {</span>
+<span class="nc" id="L398">            viewModel.selectedGroupsProperty().clear();</span>
+        } else {
+<span class="nc bnc" id="L400" title="All 4 branches missed.">            List&lt;GroupNodeViewModel&gt; list = newSelectedGroups.stream().filter(model -&gt; (model != null) &amp;&amp; !(model.getValue().getGroupNode().getGroup() instanceof AllEntriesGroup)).map(TreeItem::getValue).collect(Collectors.toList());</span>
+<span class="nc" id="L401">            viewModel.selectedGroupsProperty().setAll(list);</span>
+        }
+<span class="nc" id="L403">    }</span>
+
+    private void selectNode(GroupNodeViewModel value) {
+<span class="nc" id="L406">        selectNode(value, false);</span>
+<span class="nc" id="L407">    }</span>
+
+    private void selectNode(GroupNodeViewModel value, boolean expandParents) {
+<span class="nc" id="L410">        getTreeItemByValue(value)</span>
+<span class="nc" id="L411">                .ifPresent(treeItem -&gt; {</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">                    if (expandParents) {</span>
+<span class="nc" id="L413">                        TreeItem&lt;GroupNodeViewModel&gt; parent = treeItem.getParent();</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">                        while (parent != null) {</span>
+<span class="nc" id="L415">                            parent.setExpanded(true);</span>
+<span class="nc" id="L416">                            parent = parent.getParent();</span>
+                        }
+                    }
+<span class="nc" id="L419">                    groupTree.getSelectionModel().select(treeItem);</span>
+<span class="nc" id="L420">                });</span>
+<span class="nc" id="L421">    }</span>
+
+    private Optional&lt;TreeItem&lt;GroupNodeViewModel&gt;&gt; getTreeItemByValue(GroupNodeViewModel value) {
+<span class="nc" id="L424">        return getTreeItemByValue(groupTree.getRoot(), value);</span>
+    }
+
+    private Optional&lt;TreeItem&lt;GroupNodeViewModel&gt;&gt; getTreeItemByValue(TreeItem&lt;GroupNodeViewModel&gt; root,
+                                                                      GroupNodeViewModel value) {
+<span class="nc bnc" id="L429" title="All 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L430">            return Optional.empty();</span>
+        }
+
+<span class="nc bnc" id="L433" title="All 2 branches missed.">        if (root.getValue().equals(value)) {</span>
+<span class="nc" id="L434">            return Optional.of(root);</span>
+        }
+
+<span class="nc" id="L437">        Optional&lt;TreeItem&lt;GroupNodeViewModel&gt;&gt; node = Optional.empty();</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        for (TreeItem&lt;GroupNodeViewModel&gt; child : root.getChildren()) {</span>
+<span class="nc" id="L439">            node = getTreeItemByValue(child, value);</span>
+<span class="nc bnc" id="L440" title="All 2 branches missed.">            if (node.isPresent()) {</span>
+<span class="nc" id="L441">                break;</span>
+            }
+<span class="nc" id="L443">        }</span>
+
+<span class="nc" id="L445">        return node;</span>
+    }
+
+    private void setupDragScrolling() {
+        // see http://programmingtipsandtraps.blogspot.com/2015/10/drag-and-drop-in-treetableview-with.html
+
+        // timer used to implement scrolling
+<span class="nc" id="L452">        scrollTimer = FxTimer.createPeriodic(Duration.ofMillis(100), () -&gt;</span>
+<span class="nc" id="L453">                getVerticalScrollbar().ifPresent(scrollBar -&gt; {</span>
+<span class="nc" id="L454">                    double newValue = scrollBar.getValue() + scrollVelocity;</span>
+<span class="nc" id="L455">                    newValue = Math.min(newValue, 1d);</span>
+<span class="nc" id="L456">                    newValue = Math.max(newValue, 0d);</span>
+<span class="nc" id="L457">                    scrollBar.setValue(newValue);</span>
+<span class="nc" id="L458">                }));</span>
+
+        // Start
+<span class="nc" id="L461">        groupTree.setOnDragEntered(event -&gt; {</span>
+<span class="nc" id="L462">            initScrolling();</span>
+<span class="nc" id="L463">            scrollTimer.restart();</span>
+<span class="nc" id="L464">        });</span>
+
+        // During dragging
+<span class="nc" id="L467">        groupTree.setOnDragOver(event -&gt; {</span>
+<span class="nc bnc" id="L468" title="All 2 branches missed.">            boolean scrollingUp = event.getY() &lt; upperBorder;</span>
+<span class="nc bnc" id="L469" title="All 2 branches missed.">            boolean scrollingDown = event.getY() &gt; lowerBorder;</span>
+
+<span class="nc bnc" id="L471" title="All 4 branches missed.">            if (!scrollingUp &amp;&amp; !scrollingDown) {</span>
+<span class="nc" id="L472">                scrollVelocity = 0;</span>
+<span class="nc" id="L473">                return;</span>
+            }
+
+            double distanceFromNonScrollableInsideArea;
+<span class="nc bnc" id="L477" title="All 2 branches missed.">            if (scrollingUp) {</span>
+<span class="nc" id="L478">                distanceFromNonScrollableInsideArea = scrollableAreaHeight - event.getY();</span>
+            } else {
+<span class="nc" id="L480">                distanceFromNonScrollableInsideArea = scrollableAreaHeight - (groupTree.getHeight() - event.getY());</span>
+            }
+
+            // part &quot;(1+x)&quot; of formula &quot;speed = 20px/s (1+x)&quot; (proposed by https://github.com/JabRef/jabref/issues/9754#issuecomment-1766864908)
+            // / 10.0 is because of the 100 milliseconds above. (it is 20px per second, 10.0 * 100.0 ms = 1 second)
+<span class="nc" id="L485">            scrollVelocity = (baseFactor * (1.0 + distanceFromNonScrollableInsideArea)) / 10.0;</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">            if (scrollingUp) {</span>
+<span class="nc" id="L487">                scrollVelocity = -scrollVelocity;</span>
+            }
+<span class="nc" id="L489">        });</span>
+
+        // Stop
+<span class="nc" id="L492">        groupTree.setOnScroll(event -&gt; scrollTimer.stop());</span>
+<span class="nc" id="L493">        groupTree.setOnDragDone(event -&gt; scrollTimer.stop());</span>
+<span class="nc" id="L494">        groupTree.setOnDragDropped(event -&gt; scrollTimer.stop());</span>
+<span class="nc" id="L495">        groupTree.setOnDragExited(event -&gt; scrollTimer.stop());</span>
+<span class="nc" id="L496">    }</span>
+
+    private void initScrolling() {
+<span class="nc" id="L499">        int numberOfShownGroups = groupTree.getExpandedItemCount();</span>
+
+<span class="nc bnc" id="L501" title="All 2 branches missed.">        if (numberOfShownGroups == 0) {</span>
+<span class="nc" id="L502">            scrollVelocity = 0;</span>
+<span class="nc" id="L503">            return;</span>
+        }
+
+<span class="nc" id="L506">        double heightOfOneNode = groupTree.getChildrenUnmodifiable().get(0).getLayoutBounds().getHeight();</span>
+        // heightOfOneNode is the size of text. We need including surroundings.
+        // We found no way to get this. We can only do a heuristics here.
+        // 2.0 is backed by measurement using the screen ruler utility (https://learn.microsoft.com/en-us/windows/powertoys/screen-ruler)
+<span class="nc" id="L510">        heightOfOneNode = heightOfOneNode * 2.0;</span>
+
+        // At most scroll area is three entries large
+<span class="nc" id="L513">        scrollableAreaHeight = Math.min(heightOfOneNode * 3.0, groupTree.getHeight() / 3.0);</span>
+<span class="nc" id="L514">        upperBorder = scrollableAreaHeight;</span>
+<span class="nc" id="L515">        lowerBorder = groupTree.getHeight() - scrollableAreaHeight;</span>
+
+        // 20 is derived from &quot;speed = 20px/s (1+x)&quot; (proposed by https://github.com/JabRef/jabref/issues/9754#issuecomment-1766864908)
+        // (1.0 / groupTree.getHeight()) is the factor to convert from px to fraction of total height
+<span class="nc" id="L519">        double totalHeight = heightOfOneNode * numberOfShownGroups;</span>
+<span class="nc" id="L520">        baseFactor = 20.0 * (1.0 / totalHeight);</span>
+<span class="nc" id="L521">    }</span>
+
+    private Optional&lt;ScrollBar&gt; getVerticalScrollbar() {
+<span class="nc bnc" id="L524" title="All 2 branches missed.">        for (Node node : groupTree.lookupAll(&quot;.scroll-bar&quot;)) {</span>
+<span class="nc bnc" id="L525" title="All 2 branches missed.">            if (node instanceof ScrollBar scrollbar</span>
+<span class="nc bnc" id="L526" title="All 2 branches missed.">                    &amp;&amp; scrollbar.getOrientation().equals(Orientation.VERTICAL)) {</span>
+<span class="nc" id="L527">                return Optional.of(scrollbar);</span>
+            }
+<span class="nc" id="L529">        }</span>
+<span class="nc" id="L530">        return Optional.empty();</span>
+    }
+
+    private ContextMenu createContextMenuForGroup(GroupNodeViewModel group) {
+<span class="nc bnc" id="L534" title="All 2 branches missed.">        if (group == null) {</span>
+<span class="nc" id="L535">            return null;</span>
+        }
+
+<span class="nc" id="L538">        ContextMenu contextMenu = new ContextMenu();</span>
+<span class="nc" id="L539">        ActionFactory factory = new ActionFactory(preferencesService.getKeyBindingRepository());</span>
+
+        MenuItem removeGroup;
+<span class="nc bnc" id="L542" title="All 6 branches missed.">        if (group.hasSubgroups() &amp;&amp; group.canAddGroupsIn() &amp;&amp; !group.isRoot()) {</span>
+<span class="nc" id="L543">            removeGroup = new Menu(Localization.lang(&quot;Remove group&quot;), null,</span>
+<span class="nc" id="L544">                    factory.createMenuItem(StandardActions.GROUP_REMOVE_KEEP_SUBGROUPS,</span>
+                            new GroupTreeView.ContextAction(StandardActions.GROUP_REMOVE_KEEP_SUBGROUPS, group)),
+<span class="nc" id="L546">                    factory.createMenuItem(StandardActions.GROUP_REMOVE_WITH_SUBGROUPS,</span>
+                            new GroupTreeView.ContextAction(StandardActions.GROUP_REMOVE_WITH_SUBGROUPS, group))
+            );
+        } else {
+<span class="nc" id="L550">            removeGroup = factory.createMenuItem(StandardActions.GROUP_REMOVE, new GroupTreeView.ContextAction(StandardActions.GROUP_REMOVE, group));</span>
+        }
+
+<span class="nc" id="L553">        contextMenu.getItems().addAll(</span>
+<span class="nc" id="L554">                factory.createMenuItem(StandardActions.GROUP_EDIT, new ContextAction(StandardActions.GROUP_EDIT, group)),</span>
+                removeGroup,
+                new SeparatorMenuItem(),
+<span class="nc" id="L557">                factory.createMenuItem(StandardActions.GROUP_SUBGROUP_ADD, new ContextAction(StandardActions.GROUP_SUBGROUP_ADD, group)),</span>
+<span class="nc" id="L558">                factory.createMenuItem(StandardActions.GROUP_SUBGROUP_REMOVE, new ContextAction(StandardActions.GROUP_SUBGROUP_REMOVE, group)),</span>
+<span class="nc" id="L559">                factory.createMenuItem(StandardActions.GROUP_SUBGROUP_SORT, new ContextAction(StandardActions.GROUP_SUBGROUP_SORT, group)),</span>
+<span class="nc" id="L560">                factory.createMenuItem(StandardActions.GROUP_SUBGROUP_SORT_REVERSE, new ContextAction(StandardActions.GROUP_SUBGROUP_SORT_REVERSE, group)),</span>
+<span class="nc" id="L561">                factory.createMenuItem(StandardActions.GROUP_SUBGROUP_SORT_ENTRIES, new ContextAction(StandardActions.GROUP_SUBGROUP_SORT_ENTRIES, group)),</span>
+<span class="nc" id="L562">                factory.createMenuItem(StandardActions.GROUP_SUBGROUP_SORT_ENTRIES_REVERSE, new ContextAction(StandardActions.GROUP_SUBGROUP_SORT_ENTRIES_REVERSE, group)),</span>
+                new SeparatorMenuItem(),
+<span class="nc" id="L564">                factory.createMenuItem(StandardActions.GROUP_ENTRIES_ADD, new ContextAction(StandardActions.GROUP_ENTRIES_ADD, group)),</span>
+<span class="nc" id="L565">                factory.createMenuItem(StandardActions.GROUP_ENTRIES_REMOVE, new ContextAction(StandardActions.GROUP_ENTRIES_REMOVE, group))</span>
+        );
+
+<span class="nc" id="L568">        contextMenu.getItems().forEach(item -&gt; item.setGraphic(null));</span>
+<span class="nc" id="L569">        contextMenu.getStyleClass().add(&quot;context-menu&quot;);</span>
+<span class="nc" id="L570">        return contextMenu;</span>
+    }
+
+    private void addNewGroup() {
+<span class="nc" id="L574">        viewModel.addNewGroupToRoot();</span>
+<span class="nc" id="L575">    }</span>
+
+    private String getFormattedNumber(int hits) {
+<span class="nc bnc" id="L578" title="All 2 branches missed.">        if (hits &gt;= 1000000) {</span>
+<span class="nc" id="L579">            double millions = hits / 1000000.0;</span>
+<span class="nc" id="L580">            return new DecimalFormat(&quot;#,##0.#&quot;).format(millions) + &quot;m&quot;;</span>
+<span class="nc bnc" id="L581" title="All 2 branches missed.">        } else if (hits &gt;= 1000) {</span>
+<span class="nc" id="L582">            double thousands = hits / 1000.0;</span>
+<span class="nc" id="L583">            return new DecimalFormat(&quot;#,##0.#&quot;).format(thousands) + &quot;k&quot;;</span>
+        }
+<span class="nc" id="L585">        return Integer.toString(hits);</span>
+    }
+
+    // ToDo: reflective access, should be removed
+    //  Workaround taken from https://github.com/controlsfx/controlsfx/issues/330
+    private void setupClearButtonField(CustomTextField customTextField) {
+        try {
+<span class="nc" id="L592">            Method m = TextFields.class.getDeclaredMethod(&quot;setupClearButtonField&quot;, TextField.class, ObjectProperty.class);</span>
+<span class="nc" id="L593">            m.setAccessible(true);</span>
+<span class="nc" id="L594">            m.invoke(null, customTextField, customTextField.rightProperty());</span>
+<span class="nc" id="L595">        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException ex) {</span>
+<span class="nc" id="L596">            LOGGER.error(&quot;Failed to decorate text field with clear button&quot;, ex);</span>
+<span class="nc" id="L597">        }</span>
+<span class="nc" id="L598">    }</span>
+
+    private static class DragExpansionHandler {
+        private static final long DRAG_TIME_BEFORE_EXPANDING_MS = 1000;
+        private TreeItem&lt;GroupNodeViewModel&gt; draggedItem;
+        private long dragStarted;
+
+        public void expandGroup(TreeItem&lt;GroupNodeViewModel&gt; treeItem) {
+<span class="nc bnc" id="L606" title="All 2 branches missed.">            if (!treeItem.equals(draggedItem)) {</span>
+<span class="nc" id="L607">                this.draggedItem = treeItem;</span>
+<span class="nc" id="L608">                this.dragStarted = System.currentTimeMillis();</span>
+<span class="nc" id="L609">                this.draggedItem.setExpanded(this.draggedItem.isExpanded());</span>
+<span class="nc" id="L610">                return;</span>
+            }
+
+<span class="nc bnc" id="L613" title="All 2 branches missed.">            if ((System.currentTimeMillis() - this.dragStarted) &gt; DRAG_TIME_BEFORE_EXPANDING_MS) {</span>
+                // expand or collapse the tree item and reset the time
+<span class="nc" id="L615">                this.dragStarted = System.currentTimeMillis();</span>
+<span class="nc bnc" id="L616" title="All 2 branches missed.">                this.draggedItem.setExpanded(!this.draggedItem.isExpanded());</span>
+            } else {
+                // leave the expansion state of the tree item as it is
+<span class="nc" id="L619">                this.draggedItem.setExpanded(this.draggedItem.isExpanded());</span>
+            }
+<span class="nc" id="L621">        }</span>
+    }
+
+    private class ContextAction extends SimpleCommand {
+
+        private final StandardActions command;
+        private final GroupNodeViewModel group;
+
+<span class="nc" id="L629">        public ContextAction(StandardActions command, GroupNodeViewModel group) {</span>
+<span class="nc" id="L630">            this.command = command;</span>
+<span class="nc" id="L631">            this.group = group;</span>
+
+<span class="nc" id="L633">            this.executable.bind(BindingsHelper.constantOf(</span>
+<span class="nc bnc" id="L634" title="All 7 branches missed.">                    switch (command) {</span>
+                        case GROUP_EDIT -&gt;
+<span class="nc" id="L636">                                group.isEditable();</span>
+                        case GROUP_REMOVE, GROUP_REMOVE_WITH_SUBGROUPS, GROUP_REMOVE_KEEP_SUBGROUPS -&gt;
+<span class="nc bnc" id="L638" title="All 4 branches missed.">                                group.isEditable() &amp;&amp; group.canRemove();</span>
+                        case GROUP_SUBGROUP_ADD -&gt;
+<span class="nc bnc" id="L640" title="All 4 branches missed.">                                group.isEditable() &amp;&amp; group.canAddGroupsIn()</span>
+<span class="nc bnc" id="L641" title="All 2 branches missed.">                                        || group.isRoot();</span>
+                        case GROUP_SUBGROUP_REMOVE -&gt;
+<span class="nc bnc" id="L643" title="All 6 branches missed.">                                group.isEditable() &amp;&amp; group.hasSubgroups() &amp;&amp; group.canRemove()</span>
+<span class="nc bnc" id="L644" title="All 2 branches missed.">                                        || group.isRoot();</span>
+                        case GROUP_SUBGROUP_SORT -&gt;
+<span class="nc bnc" id="L646" title="All 6 branches missed.">                                group.isEditable() &amp;&amp; group.hasSubgroups() &amp;&amp; group.canAddEntriesIn()</span>
+<span class="nc bnc" id="L647" title="All 2 branches missed.">                                        || group.isRoot();</span>
+                        case GROUP_ENTRIES_ADD, GROUP_ENTRIES_REMOVE -&gt;
+<span class="nc" id="L649">                                group.canAddEntriesIn();</span>
+                        default -&gt;
+<span class="nc" id="L651">                                true;</span>
+                    }));
+<span class="nc" id="L653">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc bnc" id="L657" title="All 13 branches missed.">            switch (command) {</span>
+                case GROUP_REMOVE -&gt;
+<span class="nc" id="L659">                        viewModel.removeGroupNoSubgroups(group);</span>
+                case GROUP_REMOVE_KEEP_SUBGROUPS -&gt;
+<span class="nc" id="L661">                        viewModel.removeGroupKeepSubgroups(group);</span>
+                case GROUP_REMOVE_WITH_SUBGROUPS -&gt;
+<span class="nc" id="L663">                        viewModel.removeGroupAndSubgroups(group);</span>
+                case GROUP_EDIT -&gt; {
+<span class="nc" id="L665">                    viewModel.editGroup(group);</span>
+<span class="nc" id="L666">                    groupTree.refresh();</span>
+<span class="nc" id="L667">                }</span>
+                case GROUP_SUBGROUP_ADD -&gt;
+<span class="nc" id="L669">                        viewModel.addNewSubgroup(group, GroupDialogHeader.SUBGROUP);</span>
+                case GROUP_SUBGROUP_REMOVE -&gt;
+<span class="nc" id="L671">                        viewModel.removeSubgroups(group);</span>
+                case GROUP_SUBGROUP_SORT -&gt;
+<span class="nc" id="L673">                        viewModel.sortAlphabeticallyRecursive(group.getGroupNode());</span>
+                case GROUP_SUBGROUP_SORT_REVERSE -&gt;
+<span class="nc" id="L675">                        viewModel.sortReverseAlphabeticallyRecursive(group.getGroupNode());</span>
+                case GROUP_SUBGROUP_SORT_ENTRIES -&gt;
+<span class="nc" id="L677">                        viewModel.sortEntriesRecursive(group.getGroupNode());</span>
+                case GROUP_SUBGROUP_SORT_ENTRIES_REVERSE -&gt;
+<span class="nc" id="L679">                        viewModel.sortReverseEntriesRecursive(group.getGroupNode());</span>
+                case GROUP_ENTRIES_ADD -&gt;
+<span class="nc" id="L681">                        viewModel.addSelectedEntries(group);</span>
+                case GROUP_ENTRIES_REMOVE -&gt;
+<span class="nc" id="L683">                        viewModel.removeSelectedEntries(group);</span>
+            }
+<span class="nc" id="L685">        }</span>
+    }
+
+    /**
+     * Focus on GroupTree
+     */
+    public void requestFocusGroupTree() {
+<span class="nc" id="L692">        groupTree.requestFocus();</span>
+<span class="nc" id="L693">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

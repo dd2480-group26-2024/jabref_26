@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NameFormatterTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.nameformatter</a> &gt; <span class="el_source">NameFormatterTab.java</span></div><h1>NameFormatterTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.nameformatter;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+
+import org.jabref.gui.Globals;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.help.HelpAction;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.l10n.Localization;
+
+import com.airhacks.afterburner.views.ViewLoader;
+
+public class NameFormatterTab extends AbstractPreferenceTabView&lt;NameFormatterTabViewModel&gt; implements PreferencesTab {
+
+    @FXML private TableView&lt;NameFormatterItemModel&gt; formatterList;
+    @FXML private TableColumn&lt;NameFormatterItemModel, String&gt; formatterNameColumn;
+    @FXML private TableColumn&lt;NameFormatterItemModel, String&gt; formatterStringColumn;
+    @FXML private TableColumn&lt;NameFormatterItemModel, String&gt; actionsColumn;
+    @FXML private TextField addFormatterName;
+    @FXML private TextField addFormatterString;
+    @FXML private Button formatterHelp;
+
+<span class="nc" id="L35">    public NameFormatterTab() {</span>
+<span class="nc" id="L36">        ViewLoader.view(this)</span>
+<span class="nc" id="L37">                  .root(this)</span>
+<span class="nc" id="L38">                  .load();</span>
+<span class="nc" id="L39">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L43">        return Localization.lang(&quot;Name formatter&quot;);</span>
+    }
+
+    public void initialize() {
+<span class="nc" id="L47">        this.viewModel = new NameFormatterTabViewModel(preferencesService.getNameFormatterPreferences());</span>
+
+<span class="nc" id="L49">        formatterNameColumn.setSortable(true);</span>
+<span class="nc" id="L50">        formatterNameColumn.setReorderable(false);</span>
+<span class="nc" id="L51">        formatterNameColumn.setCellValueFactory(cellData -&gt; cellData.getValue().nameProperty());</span>
+<span class="nc" id="L52">        formatterNameColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+<span class="nc" id="L53">        formatterNameColumn.setEditable(true);</span>
+<span class="nc" id="L54">        formatterNameColumn.setOnEditCommit(</span>
+                (TableColumn.CellEditEvent&lt;NameFormatterItemModel, String&gt; event) -&gt;
+<span class="nc" id="L56">                        event.getRowValue().setName(event.getNewValue()));</span>
+
+<span class="nc" id="L58">        formatterStringColumn.setSortable(true);</span>
+<span class="nc" id="L59">        formatterStringColumn.setReorderable(false);</span>
+<span class="nc" id="L60">        formatterStringColumn.setCellValueFactory(cellData -&gt; cellData.getValue().formatProperty());</span>
+<span class="nc" id="L61">        formatterStringColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+<span class="nc" id="L62">        formatterStringColumn.setEditable(true);</span>
+<span class="nc" id="L63">        formatterStringColumn.setOnEditCommit(</span>
+                (TableColumn.CellEditEvent&lt;NameFormatterItemModel, String&gt; event) -&gt;
+<span class="nc" id="L65">                        event.getRowValue().setFormat(event.getNewValue()));</span>
+
+<span class="nc" id="L67">        actionsColumn.setSortable(false);</span>
+<span class="nc" id="L68">        actionsColumn.setReorderable(false);</span>
+<span class="nc" id="L69">        actionsColumn.setCellValueFactory(cellData -&gt; cellData.getValue().nameProperty());</span>
+<span class="nc" id="L70">        new ValueTableCellFactory&lt;NameFormatterItemModel, String&gt;()</span>
+<span class="nc" id="L71">                .withGraphic(name -&gt; IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode())</span>
+<span class="nc" id="L72">                .withTooltip(name -&gt; Localization.lang(&quot;Remove formatter '%0'&quot;, name))</span>
+<span class="nc" id="L73">                .withOnMouseClickedEvent(item -&gt; evt -&gt;</span>
+<span class="nc" id="L74">                        viewModel.removeFormatter(formatterList.getFocusModel().getFocusedItem()))</span>
+<span class="nc" id="L75">                .install(actionsColumn);</span>
+
+<span class="nc" id="L77">        formatterList.addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            if (event.getCode() == KeyCode.DELETE) {</span>
+<span class="nc" id="L79">                viewModel.removeFormatter(formatterList.getSelectionModel().getSelectedItem());</span>
+<span class="nc" id="L80">                event.consume();</span>
+            }
+<span class="nc" id="L82">        });</span>
+
+<span class="nc" id="L84">        formatterList.setEditable(true);</span>
+<span class="nc" id="L85">        formatterList.itemsProperty().bindBidirectional(viewModel.formatterListProperty());</span>
+
+<span class="nc" id="L87">        addFormatterName.textProperty().bindBidirectional(viewModel.addFormatterNameProperty());</span>
+<span class="nc" id="L88">        addFormatterName.addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            if (event.getCode() == KeyCode.ENTER) {</span>
+<span class="nc" id="L90">                addFormatterString.requestFocus();</span>
+<span class="nc" id="L91">                addFormatterString.selectAll();</span>
+<span class="nc" id="L92">                event.consume();</span>
+            }
+<span class="nc" id="L94">        });</span>
+
+<span class="nc" id="L96">        addFormatterString.textProperty().bindBidirectional(viewModel.addFormatterStringProperty());</span>
+<span class="nc" id="L97">        addFormatterString.addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; {</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (event.getCode() == KeyCode.ENTER) {</span>
+<span class="nc" id="L99">                viewModel.addFormatter();</span>
+<span class="nc" id="L100">                addFormatterName.requestFocus();</span>
+<span class="nc" id="L101">                event.consume();</span>
+            }
+<span class="nc" id="L103">        });</span>
+
+<span class="nc" id="L105">        ActionFactory actionFactory = new ActionFactory(Globals.getKeyPrefs());</span>
+<span class="nc" id="L106">        actionFactory.configureIconButton(StandardActions.HELP_NAME_FORMATTER, new HelpAction(HelpFile.CUSTOM_EXPORTS_NAME_FORMATTER, dialogService, preferencesService.getFilePreferences()), formatterHelp);</span>
+<span class="nc" id="L107">    }</span>
+
+    public void addFormatter() {
+<span class="nc" id="L110">        viewModel.addFormatter();</span>
+<span class="nc" id="L111">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ISSN.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.identifier</a> &gt; <span class="el_source">ISSN.java</span></div><h1>ISSN.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.identifier;
+
+import java.net.URI;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+
+public class ISSN implements Identifier {
+
+<span class="fc" id="L14">    private static final Pattern ISSN_PATTERN = Pattern.compile(&quot;^\\d{4}-\\d{3}[\\dxX]$&quot;);</span>
+<span class="fc" id="L15">    private static final Pattern ISSN_PATTERN_NODASH = Pattern.compile(&quot;^(\\d{4})(\\d{3}[\\dxX])$&quot;);</span>
+
+    private final String issnString;
+
+<span class="fc" id="L19">    public ISSN(String issnString) {</span>
+<span class="fc" id="L20">        this.issnString = Objects.requireNonNull(issnString).trim();</span>
+<span class="fc" id="L21">    }</span>
+
+    public boolean isValidFormat() {
+<span class="fc" id="L24">        Matcher issnMatcher = ISSN_PATTERN.matcher(issnString);</span>
+<span class="fc" id="L25">        return issnMatcher.matches();</span>
+    }
+
+    public boolean isCanBeCleaned() {
+<span class="fc" id="L29">        Matcher issnNoDashMatcher = ISSN_PATTERN_NODASH.matcher(issnString);</span>
+<span class="fc" id="L30">        return issnNoDashMatcher.matches();</span>
+    }
+
+    public String getCleanedISSN() {
+<span class="fc" id="L34">        Matcher issnNoDashMatcher = ISSN_PATTERN_NODASH.matcher(issnString);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (issnNoDashMatcher.find()) {</span>
+<span class="fc" id="L36">            return issnNoDashMatcher.replaceFirst(&quot;$1-$2&quot;);</span>
+        }
+<span class="fc" id="L38">        return issnString;</span>
+    }
+
+    public boolean isValidChecksum() {
+        // Check that the control digit is correct, see e.g. https://en.wikipedia.org/wiki/International_Standard_Serial_Number
+<span class="fc" id="L43">        int sum = 0;</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (int pos = 0; pos &lt;= 7; pos++) {</span>
+<span class="fc" id="L45">            char c = issnString.charAt(pos);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (pos != 4) {</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                sum += (c - '0') * ((8 - pos) + (pos &gt; 4 ? 1 : 0));</span>
+            }
+        }
+<span class="fc" id="L50">        char control = issnString.charAt(8);</span>
+<span class="fc bfc" id="L51" title="All 4 branches covered.">        if ((control == 'x') || (control == 'X')) {</span>
+<span class="fc" id="L52">            control = '9' + 1;</span>
+        }
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">        return ((((sum % 11) + control) - '0') == 11) || ((sum % 11) == 0);</span>
+    }
+
+    @Override
+    public String getNormalized() {
+<span class="nc" id="L59">        return issnString;</span>
+    }
+
+    @Override
+    public Field getDefaultField() {
+<span class="nc" id="L64">        return StandardField.ISSN;</span>
+    }
+
+    @Override
+    public Optional&lt;URI&gt; getExternalURI() {
+<span class="nc" id="L69">        return Optional.empty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

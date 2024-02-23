@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComplexSearchQuery.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">ComplexSearchQuery.java</span></div><h1>ComplexSearchQuery.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.StringJoiner;
+
+import org.jabref.model.strings.StringUtil;
+
+import org.apache.lucene.index.Term;
+
+public class ComplexSearchQuery {
+    // Field for non-fielded search
+    private final List&lt;String&gt; defaultField;
+    private final List&lt;String&gt; authors;
+    private final List&lt;String&gt; titlePhrases;
+    private final List&lt;String&gt; abstractPhrases;
+    private final Integer fromYear;
+    private final Integer toYear;
+    private final Integer singleYear;
+    private final String journal;
+    private final String doi;
+
+<span class="fc" id="L26">    private ComplexSearchQuery(List&lt;String&gt; defaultField, List&lt;String&gt; authors, List&lt;String&gt; titlePhrases, List&lt;String&gt; abstractPhrases, Integer fromYear, Integer toYear, Integer singleYear, String journal, String doi) {</span>
+<span class="fc" id="L27">        this.defaultField = defaultField;</span>
+<span class="fc" id="L28">        this.authors = authors;</span>
+<span class="fc" id="L29">        this.titlePhrases = titlePhrases;</span>
+<span class="fc" id="L30">        this.abstractPhrases = abstractPhrases;</span>
+<span class="fc" id="L31">        this.fromYear = fromYear;</span>
+        // Some APIs do not support, or not fully support, year based search. In these cases, the non applicable parameters are ignored.
+<span class="fc" id="L33">        this.toYear = toYear;</span>
+<span class="fc" id="L34">        this.journal = journal;</span>
+<span class="fc" id="L35">        this.singleYear = singleYear;</span>
+<span class="fc" id="L36">        this.doi = doi;</span>
+<span class="fc" id="L37">    }</span>
+
+    public static ComplexSearchQuery fromTerms(List&lt;Term&gt; terms) {
+<span class="fc" id="L40">        ComplexSearchQueryBuilder builder = ComplexSearchQuery.builder();</span>
+<span class="fc" id="L41">        terms.forEach(term -&gt; {</span>
+<span class="fc" id="L42">            String termText = term.text();</span>
+<span class="pc bpc" id="L43" title="4 of 9 branches missed.">            switch (term.field().toLowerCase()) {</span>
+<span class="fc" id="L44">                case &quot;author&quot; -&gt; builder.author(termText);</span>
+<span class="nc" id="L45">                case &quot;title&quot; -&gt; builder.titlePhrase(termText);</span>
+<span class="nc" id="L46">                case &quot;abstract&quot; -&gt; builder.abstractPhrase(termText);</span>
+<span class="fc" id="L47">                case &quot;journal&quot; -&gt; builder.journal(termText);</span>
+<span class="fc" id="L48">                case &quot;year&quot; -&gt; builder.singleYear(Integer.valueOf(termText));</span>
+<span class="fc" id="L49">                case &quot;year-range&quot; -&gt; builder.parseYearRange(termText);</span>
+<span class="nc" id="L50">                case &quot;doi&quot; -&gt; builder.DOI(termText);</span>
+<span class="fc" id="L51">                case &quot;default&quot; -&gt; builder.defaultFieldPhrase(termText);</span>
+                // add unknown field as default field
+<span class="nc" id="L53">                default -&gt; builder.defaultFieldPhrase(termText);</span>
+            }
+<span class="fc" id="L55">        });</span>
+<span class="fc" id="L56">        return builder.build();</span>
+    }
+
+    public List&lt;String&gt; getDefaultFieldPhrases() {
+<span class="fc" id="L60">        return defaultField;</span>
+    }
+
+    public List&lt;String&gt; getAuthors() {
+<span class="fc" id="L64">        return authors;</span>
+    }
+
+    public List&lt;String&gt; getTitlePhrases() {
+<span class="fc" id="L68">        return titlePhrases;</span>
+    }
+
+    public List&lt;String&gt; getAbstractPhrases() {
+<span class="fc" id="L72">        return abstractPhrases;</span>
+    }
+
+    public Optional&lt;Integer&gt; getFromYear() {
+<span class="fc" id="L76">        return Optional.ofNullable(fromYear);</span>
+    }
+
+    public Optional&lt;Integer&gt; getToYear() {
+<span class="fc" id="L80">        return Optional.ofNullable(toYear);</span>
+    }
+
+    public Optional&lt;Integer&gt; getSingleYear() {
+<span class="fc" id="L84">        return Optional.ofNullable(singleYear);</span>
+    }
+
+    public Optional&lt;String&gt; getJournal() {
+<span class="fc" id="L88">        return Optional.ofNullable(journal);</span>
+    }
+
+    public Optional&lt;String&gt; getDOI() {
+<span class="fc" id="L92">        return Optional.ofNullable(doi);</span>
+    }
+
+    public static ComplexSearchQueryBuilder builder() {
+<span class="fc" id="L96">        return new ComplexSearchQueryBuilder();</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L102">            return true;</span>
+        }
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L105">            return false;</span>
+        }
+
+<span class="fc" id="L108">        ComplexSearchQuery that = (ComplexSearchQuery) o;</span>
+
+        // Just check for set equality, order does not matter
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">        if (!(getDefaultFieldPhrases().containsAll(that.getDefaultFieldPhrases()) &amp;&amp; that.getDefaultFieldPhrases().containsAll(getDefaultFieldPhrases()))) {</span>
+<span class="nc" id="L112">            return false;</span>
+        }
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">        if (!(getAuthors().containsAll(that.getAuthors()) &amp;&amp; that.getAuthors().containsAll(getAuthors()))) {</span>
+<span class="nc" id="L115">            return false;</span>
+        }
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">        if (!(getTitlePhrases().containsAll(that.getTitlePhrases()) &amp;&amp; that.getTitlePhrases().containsAll(getTitlePhrases()))) {</span>
+<span class="nc" id="L118">            return false;</span>
+        }
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">        if (!(getAbstractPhrases().containsAll(that.getAbstractPhrases()) &amp;&amp; that.getAbstractPhrases().containsAll(getAbstractPhrases()))) {</span>
+<span class="nc" id="L121">            return false;</span>
+        }
+<span class="pc bpc" id="L123" title="2 of 6 branches missed.">        if (getFromYear().isPresent() ? !getFromYear().equals(that.getFromYear()) : that.getFromYear().isPresent()) {</span>
+<span class="nc" id="L124">            return false;</span>
+        }
+<span class="pc bpc" id="L126" title="2 of 6 branches missed.">        if (getToYear().isPresent() ? !getToYear().equals(that.getToYear()) : that.getToYear().isPresent()) {</span>
+<span class="nc" id="L127">            return false;</span>
+        }
+<span class="pc bpc" id="L129" title="2 of 6 branches missed.">        if (getSingleYear().isPresent() ? !getSingleYear().equals(that.getSingleYear()) : that.getSingleYear().isPresent()) {</span>
+<span class="nc" id="L130">            return false;</span>
+        }
+<span class="pc bpc" id="L132" title="4 of 6 branches missed.">        if (getDOI().isPresent() ? !getDOI().equals(that.getDOI()) : that.getDOI().isPresent()) {</span>
+<span class="nc" id="L133">            return false;</span>
+        }
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        return getJournal().isPresent() ? getJournal().equals(that.getJournal()) : that.getJournal().isEmpty();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L140">        return Objects.hash(defaultField, getAuthors(), getSingleYear(), getAbstractPhrases(), getFromYear(), getToYear(), getTitlePhrases(), getJournal(), getDOI());</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L145">        StringJoiner stringJoiner = new StringJoiner(&quot; &quot;);</span>
+
+<span class="nc" id="L147">        getSingleYear().ifPresent(singleYear -&gt; stringJoiner.add(singleYear.toString()));</span>
+<span class="nc" id="L148">        getFromYear().ifPresent(fromYear -&gt; stringJoiner.add(fromYear.toString()));</span>
+<span class="nc" id="L149">        getToYear().ifPresent(toYear -&gt; stringJoiner.add(toYear.toString()));</span>
+<span class="nc" id="L150">        getJournal().ifPresent(stringJoiner::add);</span>
+<span class="nc" id="L151">        getDOI().ifPresent(newElement -&gt; stringJoiner.add(&quot;doi:&quot; + newElement));</span>
+<span class="nc" id="L152">        stringJoiner.add(String.join(&quot; &quot;, getTitlePhrases()))</span>
+<span class="nc" id="L153">                    .add(String.join(&quot; &quot;, getDefaultFieldPhrases()))</span>
+<span class="nc" id="L154">                    .add(String.join(&quot; &quot;, getAuthors()))</span>
+<span class="nc" id="L155">                    .add(String.join(&quot; &quot;, getAbstractPhrases()));</span>
+
+<span class="nc" id="L157">        return stringJoiner.toString();</span>
+    }
+
+    public static class ComplexSearchQueryBuilder {
+<span class="fc" id="L161">        private final List&lt;String&gt; defaultFieldPhrases = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L162">        private final List&lt;String&gt; authors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L163">        private final List&lt;String&gt; titlePhrases = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L164">        private final List&lt;String&gt; abstractPhrases = new ArrayList&lt;&gt;();</span>
+        private String journal;
+        private String doi;
+        private Integer fromYear;
+        private Integer toYear;
+        private Integer singleYear;
+
+<span class="fc" id="L171">        private ComplexSearchQueryBuilder() {</span>
+<span class="fc" id="L172">        }</span>
+
+        public ComplexSearchQueryBuilder defaultFieldPhrase(String defaultFieldPhrase) {
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (Objects.requireNonNull(defaultFieldPhrase).isBlank()) {</span>
+<span class="nc" id="L176">                throw new IllegalArgumentException(&quot;Parameter must not be blank&quot;);</span>
+            }
+            // Strip all quotes before wrapping
+<span class="fc" id="L179">            this.defaultFieldPhrases.add(&quot;\&quot;%s\&quot;&quot;.formatted(defaultFieldPhrase.replace(&quot;\&quot;&quot;, &quot;&quot;)));</span>
+<span class="fc" id="L180">            return this;</span>
+        }
+
+        /**
+         * Adds author and wraps it in quotes
+         */
+        public ComplexSearchQueryBuilder author(String author) {
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (Objects.requireNonNull(author).isBlank()) {</span>
+<span class="nc" id="L188">                throw new IllegalArgumentException(&quot;Parameter must not be blank&quot;);</span>
+            }
+            // Strip all quotes before wrapping
+<span class="fc" id="L191">            this.authors.add(&quot;\&quot;%s\&quot;&quot;.formatted(author.replace(&quot;\&quot;&quot;, &quot;&quot;)));</span>
+<span class="fc" id="L192">            return this;</span>
+        }
+
+        /**
+         * Adds title phrase and wraps it in quotes
+         */
+        public ComplexSearchQueryBuilder titlePhrase(String titlePhrase) {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            if (Objects.requireNonNull(titlePhrase).isBlank()) {</span>
+<span class="nc" id="L200">                throw new IllegalArgumentException(&quot;Parameter must not be blank&quot;);</span>
+            }
+            // Strip all quotes before wrapping
+<span class="nc" id="L203">            this.titlePhrases.add(&quot;\&quot;%s\&quot;&quot;.formatted(titlePhrase.replace(&quot;\&quot;&quot;, &quot;&quot;)));</span>
+<span class="nc" id="L204">            return this;</span>
+        }
+
+        /**
+         * Adds abstract phrase and wraps it in quotes
+         */
+        public ComplexSearchQueryBuilder abstractPhrase(String abstractPhrase) {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">            if (Objects.requireNonNull(abstractPhrase).isBlank()) {</span>
+<span class="nc" id="L212">                throw new IllegalArgumentException(&quot;Parameter must not be blank&quot;);</span>
+            }
+            // Strip all quotes before wrapping
+<span class="nc" id="L215">            this.titlePhrases.add(&quot;\&quot;%s\&quot;&quot;.formatted(abstractPhrase.replace(&quot;\&quot;&quot;, &quot;&quot;)));</span>
+<span class="nc" id="L216">            return this;</span>
+        }
+
+        public ComplexSearchQueryBuilder fromYearAndToYear(Integer fromYear, Integer toYear) {
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">            if (singleYear != null) {</span>
+<span class="nc" id="L221">                throw new IllegalArgumentException(&quot;You can not use single year and year range search.&quot;);</span>
+            }
+<span class="fc" id="L223">            this.fromYear = Objects.requireNonNull(fromYear);</span>
+<span class="fc" id="L224">            this.toYear = Objects.requireNonNull(toYear);</span>
+<span class="fc" id="L225">            return this;</span>
+        }
+
+        public ComplexSearchQueryBuilder singleYear(Integer singleYear) {
+<span class="pc bpc" id="L229" title="2 of 4 branches missed.">            if (fromYear != null || toYear != null) {</span>
+<span class="nc" id="L230">                throw new IllegalArgumentException(&quot;You can not use single year and year range search.&quot;);</span>
+            }
+<span class="fc" id="L232">            this.singleYear = Objects.requireNonNull(singleYear);</span>
+<span class="fc" id="L233">            return this;</span>
+        }
+
+        public ComplexSearchQueryBuilder journal(String journal) {
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (Objects.requireNonNull(journal).isBlank()) {</span>
+<span class="nc" id="L238">                throw new IllegalArgumentException(&quot;Parameter must not be blank&quot;);</span>
+            }
+<span class="fc" id="L240">            this.journal = &quot;\&quot;%s\&quot;&quot;.formatted(journal.replace(&quot;\&quot;&quot;, &quot;&quot;));</span>
+<span class="fc" id="L241">            return this;</span>
+        }
+
+        public ComplexSearchQueryBuilder DOI(String doi) {
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (Objects.requireNonNull(doi).isBlank()) {</span>
+<span class="nc" id="L246">                throw new IllegalArgumentException(&quot;Parameter must not be blank&quot;);</span>
+            }
+<span class="nc" id="L248">            this.doi = doi.replace(&quot;\&quot;&quot;, &quot;&quot;);</span>
+<span class="nc" id="L249">            return this;</span>
+        }
+
+        public ComplexSearchQueryBuilder terms(Collection&lt;Term&gt; terms) {
+<span class="nc" id="L253">            terms.forEach(term -&gt; {</span>
+<span class="nc" id="L254">                String termText = term.text();</span>
+<span class="nc bnc" id="L255" title="All 9 branches missed.">                switch (term.field().toLowerCase()) {</span>
+<span class="nc" id="L256">                    case &quot;author&quot; -&gt; this.author(termText);</span>
+<span class="nc" id="L257">                    case &quot;title&quot; -&gt; this.titlePhrase(termText);</span>
+<span class="nc" id="L258">                    case &quot;abstract&quot; -&gt; this.abstractPhrase(termText);</span>
+<span class="nc" id="L259">                    case &quot;journal&quot; -&gt; this.journal(termText);</span>
+<span class="nc" id="L260">                    case &quot;doi&quot; -&gt; this.DOI(termText);</span>
+<span class="nc" id="L261">                    case &quot;year&quot; -&gt; this.singleYear(Integer.valueOf(termText));</span>
+<span class="nc" id="L262">                    case &quot;year-range&quot; -&gt; this.parseYearRange(termText);</span>
+<span class="nc" id="L263">                    case &quot;default&quot; -&gt; this.defaultFieldPhrase(termText);</span>
+                }
+<span class="nc" id="L265">            });</span>
+<span class="nc" id="L266">            return this;</span>
+        }
+
+        /**
+         * Instantiates the AdvancesSearchConfig from the provided Builder parameters
+         * If all text fields are empty an empty optional is returned
+         *
+         * @return ComplexSearchQuery instance with the fields set to the values defined in the building instance.
+         * @throws IllegalStateException An IllegalStateException is thrown in case all text search fields are empty.
+         *                               See: https://softwareengineering.stackexchange.com/questions/241309/builder-pattern-when-to-fail/241320#241320
+         */
+        public ComplexSearchQuery build() throws IllegalStateException {
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            if (textSearchFieldsAndYearFieldsAreEmpty()) {</span>
+<span class="nc" id="L279">                throw new IllegalStateException(&quot;At least one text field has to be set&quot;);</span>
+            }
+<span class="fc" id="L281">            return new ComplexSearchQuery(defaultFieldPhrases, authors, titlePhrases, abstractPhrases, fromYear, toYear, singleYear, journal, doi);</span>
+        }
+
+        void parseYearRange(String termText) {
+<span class="fc" id="L285">            String[] split = termText.split(&quot;-&quot;);</span>
+<span class="fc" id="L286">            int fromYear = 0;</span>
+<span class="fc" id="L287">            int toYear = 9999;</span>
+            try {
+<span class="fc" id="L289">                fromYear = Integer.parseInt(split[0]);</span>
+<span class="nc" id="L290">            } catch (NumberFormatException e) {</span>
+                // default value already set
+<span class="fc" id="L292">            }</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            if (split.length &gt; 1) {</span>
+                try {
+<span class="fc" id="L295">                    toYear = Integer.parseInt(split[1]);</span>
+<span class="nc" id="L296">                } catch (NumberFormatException e) {</span>
+                    // default value already set
+<span class="fc" id="L298">                }</span>
+            }
+<span class="fc" id="L300">            this.fromYearAndToYear(fromYear, toYear);</span>
+<span class="fc" id="L301">        }</span>
+
+        private boolean textSearchFieldsAndYearFieldsAreEmpty() {
+<span class="pc bpc" id="L304" title="1 of 4 branches missed.">            return this.stringListIsBlank(defaultFieldPhrases) &amp;&amp; this.stringListIsBlank(titlePhrases) &amp;&amp;</span>
+<span class="pc bpc" id="L305" title="3 of 10 branches missed.">                    this.stringListIsBlank(authors) &amp;&amp; this.stringListIsBlank(abstractPhrases) &amp;&amp; StringUtil.isBlank(journal) &amp;&amp; StringUtil.isBlank(doi) &amp;&amp; yearFieldsAreEmpty();</span>
+        }
+
+        private boolean yearFieldsAreEmpty() {
+<span class="pc bpc" id="L309" title="3 of 6 branches missed.">            return singleYear == null &amp;&amp; fromYear == null &amp;&amp; toYear == null;</span>
+        }
+
+        private boolean stringListIsBlank(List&lt;String&gt; stringList) {
+<span class="pc bpc" id="L313" title="1 of 4 branches missed.">            return stringList == null || stringList.stream().allMatch(String::isBlank);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

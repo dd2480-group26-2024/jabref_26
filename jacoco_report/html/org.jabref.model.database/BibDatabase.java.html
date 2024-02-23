@@ -1,0 +1,659 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibDatabase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.database</a> &gt; <span class="el_source">BibDatabase.java</span></div><h1>BibDatabase.java</h1><pre class="source lang-java linenums">package org.jabref.model.database;
+
+import java.math.BigInteger;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.logic.bibtex.FieldWriter;
+import org.jabref.model.database.event.EntriesAddedEvent;
+import org.jabref.model.database.event.EntriesRemovedEvent;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibtexString;
+import org.jabref.model.entry.Month;
+import org.jabref.model.entry.event.EntriesEventSource;
+import org.jabref.model.entry.event.EntryChangedEvent;
+import org.jabref.model.entry.event.FieldChangedEvent;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.strings.StringUtil;
+
+import com.google.common.eventbus.EventBus;
+import com.google.common.eventbus.Subscribe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A bibliography database. This is the &quot;bib&quot; file (or the library stored in a shared SQL database)
+ */
+public class BibDatabase {
+
+<span class="fc" id="L48">    private static final Logger LOGGER = LoggerFactory.getLogger(BibDatabase.class);</span>
+<span class="fc" id="L49">    private static final Pattern RESOLVE_CONTENT_PATTERN = Pattern.compile(&quot;.*#[^#]+#.*&quot;);</span>
+
+    /**
+     * State attributes
+     */
+<span class="fc" id="L54">    private final ObservableList&lt;BibEntry&gt; entries = FXCollections.synchronizedObservableList(FXCollections.observableArrayList(BibEntry::getObservables));</span>
+<span class="fc" id="L55">    private Map&lt;String, BibtexString&gt; bibtexStrings = new ConcurrentHashMap&lt;&gt;();</span>
+
+    // Not included in equals, because it is not relevant for the content of the database
+<span class="fc" id="L58">    private final EventBus eventBus = new EventBus();</span>
+
+    private String preamble;
+
+    // All file contents below the last entry in the file
+<span class="fc" id="L63">    private String epilog = &quot;&quot;;</span>
+
+    private String sharedDatabaseID;
+
+<span class="fc" id="L67">    private String newLineSeparator = System.lineSeparator();</span>
+
+    public BibDatabase(List&lt;BibEntry&gt; entries, String newLineSeparator) {
+<span class="nc" id="L70">        this(entries);</span>
+<span class="nc" id="L71">        this.newLineSeparator = newLineSeparator;</span>
+<span class="nc" id="L72">    }</span>
+
+    public BibDatabase(List&lt;BibEntry&gt; entries) {
+<span class="fc" id="L75">        this();</span>
+<span class="fc" id="L76">        insertEntries(entries);</span>
+<span class="fc" id="L77">    }</span>
+
+<span class="fc" id="L79">    public BibDatabase() {</span>
+<span class="fc" id="L80">        this.registerListener(new KeyChangeListener(this));</span>
+<span class="fc" id="L81">    }</span>
+
+    /**
+     * Returns a text with references resolved according to an optionally given database.
+     *
+     * @param toResolve maybenull The text to resolve.
+     * @param database  maybenull The database to use for resolving the text.
+     * @return The resolved text or the original text if either the text or the database are null
+     * @deprecated use  {@link BibDatabase#resolveForStrings(String)}
+     */
+    @Deprecated
+    public static String getText(String toResolve, BibDatabase database) {
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        if ((toResolve != null) &amp;&amp; (database != null)) {</span>
+<span class="fc" id="L94">            return database.resolveForStrings(toResolve);</span>
+        }
+<span class="fc" id="L96">        return toResolve;</span>
+    }
+
+    /**
+     * Returns the number of entries.
+     */
+    public int getEntryCount() {
+<span class="fc" id="L103">        return entries.size();</span>
+    }
+
+    /**
+     * Checks if the database contains entries.
+     */
+    public boolean hasEntries() {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        return !entries.isEmpty();</span>
+    }
+
+    /**
+     * Returns the list of entries sorted by the given comparator.
+     */
+    public List&lt;BibEntry&gt; getEntriesSorted(Comparator&lt;BibEntry&gt; comparator) {
+<span class="fc" id="L117">        List&lt;BibEntry&gt; entriesSorted = new ArrayList&lt;&gt;(entries);</span>
+<span class="fc" id="L118">        entriesSorted.sort(comparator);</span>
+<span class="fc" id="L119">        return entriesSorted;</span>
+    }
+
+    /**
+     * Returns whether an entry with the given ID exists (-&gt; entry_type + hashcode).
+     */
+    public boolean containsEntryWithId(String id) {
+<span class="fc" id="L126">        return entries.stream().anyMatch(entry -&gt; entry.getId().equals(id));</span>
+    }
+
+    public ObservableList&lt;BibEntry&gt; getEntries() {
+<span class="fc" id="L130">        return FXCollections.unmodifiableObservableList(entries);</span>
+    }
+
+    /**
+     * Returns a set of Strings, that contains all field names that are visible. This means that the fields
+     * are not internal fields. Internal fields are fields, that are starting with &quot;_&quot;.
+     *
+     * @return set of fieldnames, that are visible
+     */
+    public Set&lt;Field&gt; getAllVisibleFields() {
+<span class="fc" id="L140">        Set&lt;Field&gt; allFields = new TreeSet&lt;&gt;(Comparator.comparing(Field::getName));</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        for (BibEntry e : getEntries()) {</span>
+<span class="nc" id="L142">            allFields.addAll(e.getFields());</span>
+<span class="nc" id="L143">        }</span>
+<span class="pc bnc" id="L144" title="All 2 branches missed.">        return allFields.stream().filter(field -&gt; !FieldFactory.isInternalField(field))</span>
+<span class="fc" id="L145">                        .collect(Collectors.toSet());</span>
+    }
+
+    /**
+     * Returns the entry with the given citation key.
+     */
+    public synchronized Optional&lt;BibEntry&gt; getEntryByCitationKey(String key) {
+<span class="fc" id="L152">        return entries.stream().filter(entry -&gt; Objects.equals(entry.getCitationKey().orElse(null), key)).findFirst();</span>
+    }
+
+    /**
+     * Collects entries having the specified citation key and returns these entries as list.
+     * The order of the entries is the order they appear in the database.
+     *
+     * @return list of entries that contains the given key
+     */
+    public synchronized List&lt;BibEntry&gt; getEntriesByCitationKey(String key) {
+<span class="fc" id="L162">        List&lt;BibEntry&gt; result = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (BibEntry entry : entries) {</span>
+<span class="fc" id="L165">            entry.getCitationKey().ifPresent(entryKey -&gt; {</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                if (key.equals(entryKey)) {</span>
+<span class="fc" id="L167">                    result.add(entry);</span>
+                }
+<span class="fc" id="L169">            });</span>
+<span class="fc" id="L170">        }</span>
+<span class="fc" id="L171">        return result;</span>
+    }
+
+    public synchronized void insertEntry(BibEntry entry) {
+<span class="fc" id="L175">        insertEntry(entry, EntriesEventSource.LOCAL);</span>
+<span class="fc" id="L176">    }</span>
+
+    /**
+     * Inserts the entry.
+     *
+     * @param entry       entry to insert
+     * @param eventSource source the event is sent from
+     */
+    public synchronized void insertEntry(BibEntry entry, EntriesEventSource eventSource) {
+<span class="fc" id="L185">        insertEntries(Collections.singletonList(entry), eventSource);</span>
+<span class="fc" id="L186">    }</span>
+
+    public synchronized void insertEntries(BibEntry... entries) {
+<span class="fc" id="L189">        insertEntries(Arrays.asList(entries), EntriesEventSource.LOCAL);</span>
+<span class="fc" id="L190">    }</span>
+
+    public synchronized void insertEntries(List&lt;BibEntry&gt; entries) {
+<span class="fc" id="L193">        insertEntries(entries, EntriesEventSource.LOCAL);</span>
+<span class="fc" id="L194">    }</span>
+
+    public synchronized void insertEntries(List&lt;BibEntry&gt; newEntries, EntriesEventSource eventSource) {
+<span class="fc" id="L197">        Objects.requireNonNull(newEntries);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (BibEntry entry : newEntries) {</span>
+<span class="fc" id="L199">            entry.registerListener(this);</span>
+<span class="fc" id="L200">        }</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (newEntries.isEmpty()) {</span>
+<span class="fc" id="L202">            eventBus.post(new EntriesAddedEvent(newEntries, eventSource));</span>
+        } else {
+<span class="fc" id="L204">            eventBus.post(new EntriesAddedEvent(newEntries, newEntries.getFirst(), eventSource));</span>
+        }
+<span class="fc" id="L206">        entries.addAll(newEntries);</span>
+<span class="fc" id="L207">    }</span>
+
+    public synchronized void removeEntry(BibEntry bibEntry) {
+<span class="fc" id="L210">        removeEntries(Collections.singletonList(bibEntry));</span>
+<span class="fc" id="L211">    }</span>
+
+    public synchronized void removeEntry(BibEntry bibEntry, EntriesEventSource eventSource) {
+<span class="nc" id="L214">        removeEntries(Collections.singletonList(bibEntry), eventSource);</span>
+<span class="nc" id="L215">    }</span>
+
+    /**
+     * Removes the given entries.
+     * The entries removed based on the id {@link BibEntry#getId()}
+     *
+     * @param toBeDeleted Entries to delete
+     */
+    public synchronized void removeEntries(List&lt;BibEntry&gt; toBeDeleted) {
+<span class="fc" id="L224">        removeEntries(toBeDeleted, EntriesEventSource.LOCAL);</span>
+<span class="fc" id="L225">    }</span>
+
+    /**
+     * Removes the given entries.
+     * The entries are removed based on the id {@link BibEntry#getId()}
+     *
+     * @param toBeDeleted Entry to delete
+     * @param eventSource Source the event is sent from
+     */
+    public synchronized void removeEntries(List&lt;BibEntry&gt; toBeDeleted, EntriesEventSource eventSource) {
+<span class="fc" id="L235">        Objects.requireNonNull(toBeDeleted);</span>
+
+<span class="fc" id="L237">        List&lt;String&gt; ids = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        for (BibEntry entry : toBeDeleted) {</span>
+<span class="fc" id="L239">            ids.add(entry.getId());</span>
+<span class="fc" id="L240">        }</span>
+<span class="fc" id="L241">        boolean anyRemoved = entries.removeIf(entry -&gt; ids.contains(entry.getId()));</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (anyRemoved) {</span>
+<span class="fc" id="L243">            eventBus.post(new EntriesRemovedEvent(toBeDeleted, eventSource));</span>
+        }
+<span class="fc" id="L245">    }</span>
+
+    /**
+     * Returns the database's preamble.
+     * If the preamble text consists only of whitespace, then also an empty optional is returned.
+     */
+    public synchronized Optional&lt;String&gt; getPreamble() {
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (StringUtil.isBlank(preamble)) {</span>
+<span class="fc" id="L253">            return Optional.empty();</span>
+        } else {
+<span class="fc" id="L255">            return Optional.of(preamble);</span>
+        }
+    }
+
+    /**
+     * Sets the database's preamble.
+     */
+    public synchronized void setPreamble(String preamble) {
+<span class="fc" id="L263">        this.preamble = preamble;</span>
+<span class="fc" id="L264">    }</span>
+
+    /**
+     * Inserts a Bibtex String.
+     */
+    public synchronized void addString(BibtexString string) throws KeyCollisionException {
+<span class="fc" id="L270">        String id = string.getId();</span>
+
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (hasStringByName(string.getName())) {</span>
+<span class="fc" id="L273">            throw new KeyCollisionException(&quot;A string with that label already exists&quot;, id);</span>
+        }
+
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (bibtexStrings.containsKey(id)) {</span>
+<span class="fc" id="L277">            throw new KeyCollisionException(&quot;Duplicate BibTeX string id.&quot;, id);</span>
+        }
+
+<span class="fc" id="L280">        bibtexStrings.put(id, string);</span>
+<span class="fc" id="L281">    }</span>
+
+    /**
+     * Replaces the existing lists of BibTexString with the given one
+     * Duplicates throw KeyCollisionException
+     *
+     * @param stringsToAdd The collection of strings to set
+     */
+    public void setStrings(List&lt;BibtexString&gt; stringsToAdd) {
+<span class="fc" id="L290">        bibtexStrings = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L291">        stringsToAdd.forEach(this::addString);</span>
+<span class="fc" id="L292">    }</span>
+
+    /**
+     * Removes the string with the given id.
+     */
+    public void removeString(String id) {
+<span class="fc" id="L298">        bibtexStrings.remove(id);</span>
+<span class="fc" id="L299">    }</span>
+
+    /**
+     * Returns a Set of keys to all BibtexString objects in the database.
+     * These are in no sorted order.
+     */
+    public Set&lt;String&gt; getStringKeySet() {
+<span class="fc" id="L306">        return bibtexStrings.keySet();</span>
+    }
+
+    /**
+     * Returns a Collection of all BibtexString objects in the database.
+     * These are in no particular order.
+     */
+    public Collection&lt;BibtexString&gt; getStringValues() {
+<span class="fc" id="L314">        return bibtexStrings.values();</span>
+    }
+
+    /**
+     * Returns the string with the given id.
+     */
+    public BibtexString getString(String id) {
+<span class="fc" id="L321">        return bibtexStrings.get(id);</span>
+    }
+
+    /**
+     * Returns the string with the given name/label
+     */
+    public Optional&lt;BibtexString&gt; getStringByName(String name) {
+<span class="fc" id="L328">        return getStringValues().stream().filter(string -&gt; string.getName().equals(name)).findFirst();</span>
+    }
+
+    /**
+     * Returns the number of strings.
+     */
+    public int getStringCount() {
+<span class="fc" id="L335">        return bibtexStrings.size();</span>
+    }
+
+    /**
+     * Check if there are strings.
+     */
+    public boolean hasNoStrings() {
+<span class="fc" id="L342">        return bibtexStrings.isEmpty();</span>
+    }
+
+    /**
+     * Copies the preamble of another BibDatabase.
+     *
+     * @param database another BibDatabase
+     */
+    public void copyPreamble(BibDatabase database) {
+<span class="fc" id="L351">        setPreamble(database.getPreamble().orElse(&quot;&quot;));</span>
+<span class="fc" id="L352">    }</span>
+
+    /**
+     * Returns true if a string with the given label already exists.
+     */
+    public synchronized boolean hasStringByName(String label) {
+<span class="fc" id="L358">        return bibtexStrings.values().stream().anyMatch(value -&gt; value.getName().equals(label));</span>
+    }
+
+    /**
+     * Resolves any references to strings contained in this field content,
+     * if possible.
+     */
+    public String resolveForStrings(String content) {
+<span class="fc" id="L366">        Objects.requireNonNull(content, &quot;Content for resolveForStrings must not be null.&quot;);</span>
+<span class="fc" id="L367">        return resolveContent(content, new HashSet&lt;&gt;(), new HashSet&lt;&gt;());</span>
+    }
+
+    /**
+     * Get all strings used in the entries.
+     */
+    public Collection&lt;BibtexString&gt; getUsedStrings(Collection&lt;BibEntry&gt; entries) {
+<span class="fc" id="L374">        List&lt;BibtexString&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L375">        Set&lt;String&gt; allUsedIds = new HashSet&lt;&gt;();</span>
+
+        // All entries
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        for (BibEntry entry : entries) {</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            for (String fieldContent : entry.getFieldValues()) {</span>
+<span class="fc" id="L380">                resolveContent(fieldContent, new HashSet&lt;&gt;(), allUsedIds);</span>
+<span class="fc" id="L381">            }</span>
+<span class="fc" id="L382">        }</span>
+
+        // Preamble
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        if (preamble != null) {</span>
+<span class="fc" id="L386">            resolveContent(preamble, new HashSet&lt;&gt;(), allUsedIds);</span>
+        }
+
+<span class="fc bfc" id="L389" title="All 2 branches covered.">        for (String stringId : allUsedIds) {</span>
+<span class="fc" id="L390">            result.add((BibtexString) bibtexStrings.get(stringId).clone());</span>
+<span class="fc" id="L391">        }</span>
+
+<span class="fc" id="L393">        return result;</span>
+    }
+
+    /**
+     * Take the given collection of BibEntry and resolve any string
+     * references.
+     *
+     * @param entriesToResolve A collection of BibtexEntries in which all strings of the form
+     *                         #xxx# will be resolved against the hash map of string
+     *                         references stored in the database.
+     * @param inPlace          If inPlace is true then the given BibtexEntries will be modified, if false then copies of the BibtexEntries are made before resolving the strings.
+     * @return a list of bibtexentries, with all strings resolved. It is dependent on the value of inPlace whether copies are made or the given BibtexEntries are modified.
+     */
+    public List&lt;BibEntry&gt; resolveForStrings(Collection&lt;BibEntry&gt; entriesToResolve, boolean inPlace) {
+<span class="fc" id="L407">        Objects.requireNonNull(entriesToResolve, &quot;entries must not be null.&quot;);</span>
+
+<span class="fc" id="L409">        List&lt;BibEntry&gt; results = new ArrayList&lt;&gt;(entriesToResolve.size());</span>
+
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        for (BibEntry entry : entriesToResolve) {</span>
+<span class="fc" id="L412">            results.add(this.resolveForStrings(entry, inPlace));</span>
+<span class="fc" id="L413">        }</span>
+<span class="fc" id="L414">        return results;</span>
+    }
+
+    /**
+     * Take the given BibEntry and resolve any string references.
+     *
+     * @param entry   A BibEntry in which all strings of the form #xxx# will be
+     *                resolved against the hash map of string references stored in
+     *                the database.
+     * @param inPlace If inPlace is true then the given BibEntry will be
+     *                modified, if false then a copy is made using close made before
+     *                resolving the strings.
+     * @return a BibEntry with all string references resolved. It is
+     * dependent on the value of inPlace whether a copy is made or the
+     * given BibtexEntries is modified.
+     */
+    public BibEntry resolveForStrings(BibEntry entry, boolean inPlace) {
+        BibEntry resultingEntry;
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">        if (inPlace) {</span>
+<span class="nc" id="L433">            resultingEntry = entry;</span>
+        } else {
+<span class="fc" id="L435">            resultingEntry = (BibEntry) entry.clone();</span>
+        }
+
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        for (Map.Entry&lt;Field, String&gt; field : resultingEntry.getFieldMap().entrySet()) {</span>
+<span class="fc" id="L439">            resultingEntry.setField(field.getKey(), this.resolveForStrings(field.getValue()));</span>
+<span class="fc" id="L440">        }</span>
+<span class="fc" id="L441">        return resultingEntry;</span>
+    }
+
+    /**
+     * If the label represents a string contained in this database, returns
+     * that string's content. Resolves references to other strings, taking
+     * care not to follow a circular reference pattern.
+     * If the string is undefined, returns null.
+     */
+    private String resolveString(String label, Set&lt;String&gt; usedIds, Set&lt;String&gt; allUsedIds) {
+<span class="fc" id="L451">        Objects.requireNonNull(label);</span>
+<span class="fc" id="L452">        Objects.requireNonNull(usedIds);</span>
+<span class="fc" id="L453">        Objects.requireNonNull(allUsedIds);</span>
+
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        for (BibtexString string : bibtexStrings.values()) {</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">            if (string.getName().equalsIgnoreCase(label)) {</span>
+                // First check if this string label has been resolved
+                // earlier in this recursion. If so, we have a
+                // circular reference, and have to stop to avoid
+                // infinite recursion.
+<span class="fc bfc" id="L461" title="All 2 branches covered.">                if (usedIds.contains(string.getId())) {</span>
+<span class="fc" id="L462">                    LOGGER.info(&quot;Stopped due to circular reference in strings: &quot; + label);</span>
+<span class="fc" id="L463">                    return label;</span>
+                }
+                // If not, log this string's ID now.
+<span class="fc" id="L466">                usedIds.add(string.getId());</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">                if (allUsedIds != null) {</span>
+<span class="fc" id="L468">                    allUsedIds.add(string.getId());</span>
+                }
+
+                // Ok, we found the string. Now we must make sure we
+                // resolve any references to other strings in this one.
+<span class="fc" id="L473">                String result = string.getContent();</span>
+<span class="fc" id="L474">                result = resolveContent(result, usedIds, allUsedIds);</span>
+
+                // Finished with recursing this branch, so we remove our
+                // ID again:
+<span class="fc" id="L478">                usedIds.remove(string.getId());</span>
+
+<span class="fc" id="L480">                return result;</span>
+            }
+<span class="fc" id="L482">        }</span>
+
+        // If we get to this point, the string has obviously not been defined locally.
+        // Check if one of the standard BibTeX month strings has been used:
+<span class="fc" id="L486">        Optional&lt;Month&gt; month = Month.getMonthByShortName(label);</span>
+<span class="fc" id="L487">        return month.map(Month::getFullName).orElse(null);</span>
+    }
+
+    private String resolveContent(String result, Set&lt;String&gt; usedIds, Set&lt;String&gt; allUsedIds) {
+<span class="fc" id="L491">        String res = result;</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">        if (RESOLVE_CONTENT_PATTERN.matcher(res).matches()) {</span>
+<span class="fc" id="L493">            StringBuilder newRes = new StringBuilder();</span>
+<span class="fc" id="L494">            int piv = 0;</span>
+            int next;
+<span class="fc bfc" id="L496" title="All 2 branches covered.">            while ((next = res.indexOf(FieldWriter.BIBTEX_STRING_START_END_SYMBOL, piv)) &gt;= 0) {</span>
+                // We found the next string ref. Append the text
+                // up to it.
+<span class="fc bfc" id="L499" title="All 2 branches covered.">                if (next &gt; 0) {</span>
+<span class="fc" id="L500">                    newRes.append(res, piv, next);</span>
+                }
+<span class="fc" id="L502">                int stringEnd = res.indexOf(FieldWriter.BIBTEX_STRING_START_END_SYMBOL, next + 1);</span>
+<span class="fc bfc" id="L503" title="All 2 branches covered.">                if (stringEnd &gt;= 0) {</span>
+                    // We found the boundaries of the string ref,
+                    // now resolve that one.
+<span class="fc" id="L506">                    String refLabel = res.substring(next + 1, stringEnd);</span>
+<span class="fc" id="L507">                    String resolved = resolveString(refLabel, usedIds, allUsedIds);</span>
+
+<span class="fc bfc" id="L509" title="All 2 branches covered.">                    if (resolved == null) {</span>
+                        // Could not resolve string. Display the #
+                        // characters rather than removing them:
+<span class="fc" id="L512">                        newRes.append(res, next, stringEnd + 1);</span>
+                    } else {
+                        // The string was resolved, so we display its meaning only,
+                        // stripping the # characters signifying the string label:
+<span class="fc" id="L516">                        newRes.append(resolved);</span>
+                    }
+<span class="fc" id="L518">                    piv = stringEnd + 1;</span>
+<span class="fc" id="L519">                } else {</span>
+                    // We did not find the boundaries of the string ref. This
+                    // makes it impossible to interpret it as a string label.
+                    // So we should just append the rest of the text and finish.
+<span class="fc" id="L523">                    newRes.append(res.substring(next));</span>
+<span class="fc" id="L524">                    piv = res.length();</span>
+<span class="fc" id="L525">                    break;</span>
+                }
+<span class="fc" id="L527">            }</span>
+<span class="fc bfc" id="L528" title="All 2 branches covered.">            if (piv &lt; (res.length() - 1)) {</span>
+<span class="fc" id="L529">                newRes.append(res.substring(piv));</span>
+            }
+<span class="fc" id="L531">            res = newRes.toString();</span>
+        }
+<span class="fc" id="L533">        return res;</span>
+    }
+
+    public String getEpilog() {
+<span class="fc" id="L537">        return epilog;</span>
+    }
+
+    public void setEpilog(String epilog) {
+<span class="fc" id="L541">        this.epilog = epilog;</span>
+<span class="fc" id="L542">    }</span>
+
+    /**
+     * Registers a listener object (subscriber) to the internal event bus.
+     * The following events are posted:
+     * &lt;p&gt;
+     * - {@link EntriesAddedEvent}
+     * - {@link EntryChangedEvent}
+     * - {@link EntriesRemovedEvent}
+     *
+     * @param listener listener (subscriber) to add
+     */
+    public void registerListener(Object listener) {
+<span class="fc" id="L555">        this.eventBus.register(listener);</span>
+<span class="fc" id="L556">    }</span>
+
+    /**
+     * Unregisters an listener object.
+     *
+     * @param listener listener (subscriber) to remove
+     */
+    public void unregisterListener(Object listener) {
+        try {
+<span class="fc" id="L565">            this.eventBus.unregister(listener);</span>
+<span class="nc" id="L566">        } catch (IllegalArgumentException e) {</span>
+            // occurs if the event source has not been registered, should not prevent shutdown
+<span class="nc" id="L568">            LOGGER.debug(&quot;Problem unregistering&quot;, e);</span>
+<span class="fc" id="L569">        }</span>
+<span class="fc" id="L570">    }</span>
+
+    @Subscribe
+    private void relayEntryChangeEvent(FieldChangedEvent event) {
+<span class="fc" id="L574">        eventBus.post(event);</span>
+<span class="fc" id="L575">    }</span>
+
+    public Optional&lt;BibEntry&gt; getReferencedEntry(BibEntry entry) {
+<span class="fc" id="L578">        return entry.getField(StandardField.CROSSREF).flatMap(this::getEntryByCitationKey);</span>
+    }
+
+    public Optional&lt;String&gt; getSharedDatabaseID() {
+<span class="fc" id="L582">        return Optional.ofNullable(this.sharedDatabaseID);</span>
+    }
+
+    public void setSharedDatabaseID(String sharedDatabaseID) {
+<span class="fc" id="L586">        this.sharedDatabaseID = sharedDatabaseID;</span>
+<span class="fc" id="L587">    }</span>
+
+    public boolean isShared() {
+<span class="nc" id="L590">        return getSharedDatabaseID().isPresent();</span>
+    }
+
+    public void clearSharedDatabaseID() {
+<span class="nc" id="L594">        this.sharedDatabaseID = null;</span>
+<span class="nc" id="L595">    }</span>
+
+    /**
+     * Generates and sets a random ID which is globally unique.
+     *
+     * @return The generated sharedDatabaseID
+     */
+    public String generateSharedDatabaseID() {
+<span class="nc" id="L603">        this.sharedDatabaseID = new BigInteger(128, new SecureRandom()).toString(32);</span>
+<span class="nc" id="L604">        return this.sharedDatabaseID;</span>
+    }
+
+    /**
+     * Returns the number of occurrences of the given citation key in this database.
+     */
+    public long getNumberOfCitationKeyOccurrences(String key) {
+<span class="fc" id="L611">        return entries.stream()</span>
+<span class="fc" id="L612">                      .flatMap(entry -&gt; entry.getCitationKey().stream())</span>
+<span class="fc" id="L613">                      .filter(key::equals)</span>
+<span class="fc" id="L614">                      .count();</span>
+    }
+
+    /**
+     * Checks if there is more than one occurrence of the citation key.
+     */
+    public boolean isDuplicateCitationKeyExisting(String key) {
+<span class="fc bfc" id="L621" title="All 2 branches covered.">        return getNumberOfCitationKeyOccurrences(key) &gt; 1;</span>
+    }
+
+    /**
+     * Set the newline separator.
+     */
+    public void setNewLineSeparator(String newLineSeparator) {
+<span class="fc" id="L628">        this.newLineSeparator = newLineSeparator;</span>
+<span class="fc" id="L629">    }</span>
+
+    /**
+     * Returns the string used to indicate a linebreak
+     */
+    public String getNewLineSeparator() {
+<span class="fc" id="L635">        return newLineSeparator;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L640" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L641">            return true;</span>
+        }
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">        if (!(o instanceof BibDatabase that)) {</span>
+<span class="nc" id="L644">            return false;</span>
+        }
+<span class="pc bpc" id="L646" title="1 of 2 branches missed.">        return Objects.equals(entries, that.entries)</span>
+<span class="pc bpc" id="L647" title="1 of 2 branches missed.">                &amp;&amp; Objects.equals(bibtexStrings, that.bibtexStrings)</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">                &amp;&amp; Objects.equals(preamble, that.preamble)</span>
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">                &amp;&amp; Objects.equals(epilog, that.epilog)</span>
+<span class="pc bpc" id="L650" title="1 of 2 branches missed.">                &amp;&amp; Objects.equals(sharedDatabaseID, that.sharedDatabaseID)</span>
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">                &amp;&amp; Objects.equals(newLineSeparator, that.newLineSeparator);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L656">        return Objects.hash(entries, bibtexStrings, preamble, epilog, sharedDatabaseID, newLineSeparator);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

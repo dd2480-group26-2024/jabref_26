@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RangeSortVisual.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.rangesort</a> &gt; <span class="el_source">RangeSortVisual.java</span></div><h1>RangeSortVisual.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.rangesort;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.jabref.model.openoffice.uno.UnoScreenRefresh;
+
+import com.sun.star.awt.Point;
+import com.sun.star.text.XTextDocument;
+import com.sun.star.text.XTextRange;
+import com.sun.star.text.XTextViewCursor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Sort XTextRange values visually (top-down,left-to-right).
+ * &lt;p&gt;
+ * Requires functional XTextViewCursor.
+ * &lt;p&gt;
+ * Problem: for multicolumn layout and when viewing pages side-by-side in LO, the (top-down,left-to-right) order interpreted as-on-the-screen: an XTextRange at the top of the second column or second page is sorted before an XTextRange at the bottom of the first column of the first page.
+ */
+public class RangeSortVisual {
+
+<span class="nc" id="L24">    private static final Logger LOGGER = LoggerFactory.getLogger(RangeSortVisual.class);</span>
+
+    private RangeSortVisual() {
+    }
+
+    /**
+     * Sort the input {@code inputs} visually.
+     * &lt;p&gt;
+     * Requires a functional {@code XTextViewCursor}.
+     *
+     * @return The input, sorted by the elements XTextRange and getIndexInPosition.
+     */
+    public static &lt;T&gt; List&lt;RangeSortable&lt;T&gt;&gt; visualSort(List&lt;RangeSortable&lt;T&gt;&gt; inputs,
+                                                        XTextDocument doc,
+                                                        FunctionalTextViewCursor fcursor) {
+
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (UnoScreenRefresh.hasControllersLocked(doc)) {</span>
+<span class="nc" id="L41">            final String msg = &quot;visualSort: with ControllersLocked, viewCursor.gotoRange is probably useless&quot;;</span>
+<span class="nc" id="L42">            LOGGER.warn(msg);</span>
+<span class="nc" id="L43">            throw new IllegalStateException(msg);</span>
+        }
+
+<span class="nc" id="L46">        XTextViewCursor viewCursor = fcursor.getViewCursor();</span>
+
+<span class="nc" id="L48">        final int inputSize = inputs.size();</span>
+
+        // find coordinates
+<span class="nc" id="L51">        List&lt;Point&gt; positions = new ArrayList&lt;&gt;(inputSize);</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        for (RangeSortable&lt;T&gt; v : inputs) {</span>
+<span class="nc" id="L53">            positions.add(findPositionOfTextRange(v.getRange(), viewCursor));</span>
+<span class="nc" id="L54">        }</span>
+<span class="nc" id="L55">        fcursor.restore(doc);</span>
+
+        // order by position
+<span class="nc" id="L58">        ArrayList&lt;ComparableMark&lt;RangeSortable&lt;T&gt;&gt;&gt; comparableMarks = new ArrayList&lt;&gt;(inputSize);</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        for (int i = 0; i &lt; inputSize; i++) {</span>
+<span class="nc" id="L60">            RangeSortable&lt;T&gt; input = inputs.get(i);</span>
+<span class="nc" id="L61">            comparableMarks.add(new ComparableMark&lt;&gt;(positions.get(i),</span>
+<span class="nc" id="L62">                    input.getIndexInPosition(),</span>
+                    input));
+        }
+<span class="nc" id="L65">        comparableMarks.sort(RangeSortVisual::compareTopToBottomLeftToRight);</span>
+
+        // collect ordered result
+<span class="nc" id="L68">        List&lt;RangeSortable&lt;T&gt;&gt; result = new ArrayList&lt;&gt;(comparableMarks.size());</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        for (ComparableMark&lt;RangeSortable&lt;T&gt;&gt; mark : comparableMarks) {</span>
+<span class="nc" id="L70">            result.add(mark.getContent());</span>
+<span class="nc" id="L71">        }</span>
+
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (result.size() != inputSize) {</span>
+<span class="nc" id="L74">            throw new IllegalStateException(&quot;visualSort: result.size() != inputSize&quot;);</span>
+        }
+
+<span class="nc" id="L77">        return result;</span>
+    }
+
+    /**
+     * Given a location, return its position: coordinates relative to the top left position of the first page of the document.
+     * &lt;p&gt;
+     * Note: for text layouts with two or more columns, this gives the wrong order: top-down/left-to-right does not match reading order.
+     * &lt;p&gt;
+     * Note: The &quot;relative to the top left position of the first page&quot; is meant &quot;as it appears on the screen&quot;.
+     * &lt;p&gt;
+     * In particular: when viewing pages side-by-side, the top half of the right page is higher than the lower half of the left page. Again, top-down/left-to-right does not match reading order.
+     *
+     * @param range  Location.
+     * @param cursor To get the position, we need az XTextViewCursor. It will be moved to the range.
+     */
+    private static Point findPositionOfTextRange(XTextRange range, XTextViewCursor cursor) {
+<span class="nc" id="L93">        cursor.gotoRange(range, false);</span>
+<span class="nc" id="L94">        return cursor.getPosition();</span>
+    }
+
+    private static &lt;T&gt; int compareTopToBottomLeftToRight(ComparableMark&lt;T&gt; a, ComparableMark&lt;T&gt; b) {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (a.position.Y != b.position.Y) {</span>
+<span class="nc" id="L99">            return a.position.Y - b.position.Y;</span>
+        }
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (a.position.X != b.position.X) {</span>
+<span class="nc" id="L102">            return a.position.X - b.position.X;</span>
+        }
+<span class="nc" id="L104">        return a.indexInPosition - b.indexInPosition;</span>
+    }
+
+    /**
+     * A reference mark name paired with its visual position.
+     * &lt;p&gt;
+     * Comparison is based on (Y,X,indexInPosition): vertical compared first, horizontal second, indexInPosition third.
+     * &lt;p&gt;
+     * Used for sorting reference marks by their visual positions.
+     */
+    private static class ComparableMark&lt;T&gt; {
+
+        private final Point position;
+        private final int indexInPosition;
+        private final T content;
+
+<span class="nc" id="L120">        public ComparableMark(Point position, int indexInPosition, T content) {</span>
+<span class="nc" id="L121">            this.position = position;</span>
+<span class="nc" id="L122">            this.indexInPosition = indexInPosition;</span>
+<span class="nc" id="L123">            this.content = content;</span>
+<span class="nc" id="L124">        }</span>
+
+        public T getContent() {
+<span class="nc" id="L127">            return content;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PushToLyx.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.push</a> &gt; <span class="el_source">PushToLyx.java</span></div><h1>PushToLyx.java</h1><pre class="source lang-java linenums">package org.jabref.gui.push;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.JabRefExecutorService;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.PreferencesService;
+import org.jabref.preferences.PushToApplicationPreferences;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class PushToLyx extends AbstractPushToApplication {
+
+    public static final String NAME = PushToApplications.LYX;
+
+<span class="nc" id="L27">    private static final Logger LOGGER = LoggerFactory.getLogger(PushToLyx.class);</span>
+
+    public PushToLyx(DialogService dialogService, PreferencesService preferencesService) {
+<span class="nc" id="L30">        super(dialogService, preferencesService);</span>
+<span class="nc" id="L31">    }</span>
+
+    @Override
+    public String getDisplayName() {
+<span class="nc" id="L35">        return NAME;</span>
+    }
+
+    @Override
+    public JabRefIcon getApplicationIcon() {
+<span class="nc" id="L40">        return IconTheme.JabRefIcons.APPLICATION_LYX;</span>
+    }
+
+    @Override
+    public void onOperationCompleted() {
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (couldNotPush) {</span>
+<span class="nc" id="L46">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Error pushing entries&quot;),</span>
+<span class="nc" id="L47">                    Localization.lang(&quot;Verify that LyX is running and that the lyxpipe is valid.&quot;)</span>
+                            + &quot;[&quot; + commandPath + &quot;]&quot;);
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        } else if (couldNotCall) {</span>
+<span class="nc" id="L50">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Unable to write to %0.&quot;, commandPath + &quot;.in&quot;));</span>
+        } else {
+<span class="nc" id="L52">            super.onOperationCompleted();</span>
+        }
+<span class="nc" id="L54">    }</span>
+
+    @Override
+    public PushToApplicationSettings getSettings(PushToApplication application, PushToApplicationPreferences preferences) {
+<span class="nc" id="L58">        return new PushToLyxSettings(application, dialogService, preferencesService.getFilePreferences(), preferences);</span>
+    }
+
+    @Override
+    public void pushEntries(BibDatabaseContext database, final List&lt;BibEntry&gt; entries, final String keyString) {
+<span class="nc" id="L63">        couldNotPush = false;</span>
+<span class="nc" id="L64">        couldNotCall = false;</span>
+<span class="nc" id="L65">        notDefined = false;</span>
+
+<span class="nc" id="L67">        commandPath = preferencesService.getPushToApplicationPreferences().getCommandPaths().get(this.getDisplayName());</span>
+
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        if ((commandPath == null) || commandPath.trim().isEmpty()) {</span>
+<span class="nc" id="L70">            notDefined = true;</span>
+<span class="nc" id="L71">            return;</span>
+        }
+
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (!commandPath.endsWith(&quot;.in&quot;)) {</span>
+<span class="nc" id="L75">            commandPath = commandPath + &quot;.in&quot;;</span>
+        }
+<span class="nc" id="L77">        File lp = new File(commandPath); // this needs to fixed because it gives &quot;asdf&quot; when going prefs.get(&quot;lyxpipe&quot;)</span>
+<span class="nc bnc" id="L78" title="All 4 branches missed.">        if (!lp.exists() || !lp.canWrite()) {</span>
+            // See if it helps to append &quot;.in&quot;:
+<span class="nc" id="L80">            lp = new File(commandPath + &quot;.in&quot;);</span>
+<span class="nc bnc" id="L81" title="All 4 branches missed.">            if (!lp.exists() || !lp.canWrite()) {</span>
+<span class="nc" id="L82">                couldNotPush = true;</span>
+<span class="nc" id="L83">                return;</span>
+            }
+        }
+
+<span class="nc" id="L87">        final File lyxpipe = lp;</span>
+
+<span class="nc" id="L89">        JabRefExecutorService.INSTANCE.executeAndWait(() -&gt; {</span>
+<span class="nc" id="L90">            try (FileWriter fw = new FileWriter(lyxpipe, StandardCharsets.UTF_8); BufferedWriter lyxOut = new BufferedWriter(fw)) {</span>
+<span class="nc" id="L91">                String citeStr = &quot;LYXCMD:sampleclient:citation-insert:&quot; + keyString;</span>
+<span class="nc" id="L92">                lyxOut.write(citeStr + &quot;\n&quot;);</span>
+<span class="nc" id="L93">            } catch (IOException excep) {</span>
+<span class="nc" id="L94">                couldNotCall = true;</span>
+<span class="nc" id="L95">                LOGGER.warn(&quot;Problem pushing to LyX/Kile.&quot;, excep);</span>
+<span class="nc" id="L96">            }</span>
+<span class="nc" id="L97">        });</span>
+<span class="nc" id="L98">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

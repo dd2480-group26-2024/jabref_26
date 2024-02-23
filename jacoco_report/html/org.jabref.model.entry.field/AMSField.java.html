@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AMSField.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.field</a> &gt; <span class="el_source">AMSField.java</span></div><h1>AMSField.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.field;
+
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Optional;
+import java.util.Set;
+
+<span class="fc" id="L8">public enum AMSField implements Field {</span>
+
+<span class="fc" id="L10">    FJOURNAL(&quot;fjournal&quot;);</span>
+
+    private final String name;
+    private final String displayName;
+    private final Set&lt;FieldProperty&gt; properties;
+
+<span class="fc" id="L16">    AMSField(String name) {</span>
+<span class="fc" id="L17">        this.name = name;</span>
+<span class="fc" id="L18">        this.displayName = null;</span>
+<span class="fc" id="L19">        this.properties = EnumSet.noneOf(FieldProperty.class);</span>
+<span class="fc" id="L20">    }</span>
+
+<span class="nc" id="L22">    AMSField(String name, String displayName) {</span>
+<span class="nc" id="L23">        this.name = name;</span>
+<span class="nc" id="L24">        this.displayName = displayName;</span>
+<span class="nc" id="L25">        this.properties = EnumSet.noneOf(FieldProperty.class);</span>
+<span class="nc" id="L26">    }</span>
+
+<span class="nc" id="L28">    AMSField(String name, String displayName, FieldProperty first, FieldProperty... rest) {</span>
+<span class="nc" id="L29">        this.name = name;</span>
+<span class="nc" id="L30">        this.displayName = displayName;</span>
+<span class="nc" id="L31">        this.properties = EnumSet.of(first, rest);</span>
+<span class="nc" id="L32">    }</span>
+
+<span class="nc" id="L34">    AMSField(String name, FieldProperty first, FieldProperty... rest) {</span>
+<span class="nc" id="L35">        this.name = name;</span>
+<span class="nc" id="L36">        this.displayName = null;</span>
+<span class="nc" id="L37">        this.properties = EnumSet.of(first, rest);</span>
+<span class="nc" id="L38">    }</span>
+
+    public static &lt;T&gt; Optional&lt;AMSField&gt; fromName(T type, String name) {
+<span class="fc" id="L41">        return Arrays.stream(AMSField.values())</span>
+<span class="fc" id="L42">                     .filter(field -&gt; field.getName().equalsIgnoreCase(name))</span>
+<span class="fc" id="L43">                     .findAny();</span>
+    }
+
+    @Override
+    public Set&lt;FieldProperty&gt; getProperties() {
+<span class="nc" id="L48">        return properties;</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L53">        return name;</span>
+    }
+
+    @Override
+    public boolean isStandardField() {
+<span class="nc" id="L58">        return false;</span>
+    }
+
+    @Override
+    public String getDisplayName() {
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (displayName == null) {</span>
+<span class="nc" id="L64">            return Field.super.getDisplayName();</span>
+        } else {
+<span class="nc" id="L66">            return displayName;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

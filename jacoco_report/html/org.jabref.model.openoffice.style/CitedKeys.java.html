@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitedKeys.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.style</a> &gt; <span class="el_source">CitedKeys.java</span></div><h1>CitedKeys.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.style;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+
+public class CitedKeys {
+
+    /**
+     * Order-preserving map from citation keys to associated data.
+     */
+    private LinkedHashMap&lt;String, CitedKey&gt; data;
+
+<span class="nc" id="L19">    CitedKeys(LinkedHashMap&lt;String, CitedKey&gt; data) {</span>
+<span class="nc" id="L20">        this.data = data;</span>
+<span class="nc" id="L21">    }</span>
+
+    /**
+     *  The cited keys in their current order.
+     */
+    public List&lt;CitedKey&gt; values() {
+<span class="nc" id="L27">        return new ArrayList&lt;&gt;(data.values());</span>
+    }
+
+    public CitedKey get(String citationKey) {
+<span class="nc" id="L31">        return data.get(citationKey);</span>
+    }
+
+    /**
+     * Sort entries for the bibliography.
+     */
+    void sortByComparator(Comparator&lt;BibEntry&gt; entryComparator) {
+<span class="nc" id="L38">        List&lt;CitedKey&gt; cks = new ArrayList&lt;&gt;(data.values());</span>
+<span class="nc" id="L39">        cks.sort(new CompareCitedKey(entryComparator, true));</span>
+<span class="nc" id="L40">        LinkedHashMap&lt;String, CitedKey&gt; newData = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        for (CitedKey ck : cks) {</span>
+<span class="nc" id="L42">            newData.put(ck.citationKey, ck);</span>
+<span class="nc" id="L43">        }</span>
+<span class="nc" id="L44">        data = newData;</span>
+<span class="nc" id="L45">    }</span>
+
+    void numberCitedKeysInCurrentOrder() {
+<span class="nc" id="L48">        int index = 1;</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        for (CitedKey ck : data.values()) {</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">            if (ck.getLookupResult().isPresent()) {</span>
+<span class="nc" id="L51">                ck.setNumber(Optional.of(index));</span>
+<span class="nc" id="L52">                index++;</span>
+            } else {
+                // Unresolved citations do not get a number.
+<span class="nc" id="L55">                ck.setNumber(Optional.empty());</span>
+            }
+<span class="nc" id="L57">        }</span>
+<span class="nc" id="L58">    }</span>
+
+    public void lookupInDatabases(List&lt;BibDatabase&gt; databases) {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        for (CitedKey ck : this.data.values()) {</span>
+<span class="nc" id="L62">            ck.lookupInDatabases(databases);</span>
+<span class="nc" id="L63">        }</span>
+<span class="nc" id="L64">    }</span>
+
+    void distributeLookupResults(CitationGroups citationGroups) {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        for (CitedKey ck : this.data.values()) {</span>
+<span class="nc" id="L68">            ck.distributeLookupResult(citationGroups);</span>
+<span class="nc" id="L69">        }</span>
+<span class="nc" id="L70">    }</span>
+
+    void distributeNumbers(CitationGroups citationGroups) {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        for (CitedKey ck : this.data.values()) {</span>
+<span class="nc" id="L74">            ck.distributeNumber(citationGroups);</span>
+<span class="nc" id="L75">        }</span>
+<span class="nc" id="L76">    }</span>
+
+    public void distributeUniqueLetters(CitationGroups citationGroups) {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        for (CitedKey ck : this.data.values()) {</span>
+<span class="nc" id="L80">            ck.distributeUniqueLetter(citationGroups);</span>
+<span class="nc" id="L81">        }</span>
+<span class="nc" id="L82">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

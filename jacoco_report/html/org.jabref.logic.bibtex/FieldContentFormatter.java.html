@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldContentFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.bibtex</a> &gt; <span class="el_source">FieldContentFormatter.java</span></div><h1>FieldContentFormatter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.bibtex;
+
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+
+/**
+ * This class provides the reformatting needed when reading BibTeX fields formatted
+ * in JabRef style. The reformatting must undo all formatting done by JabRef when
+ * writing the same fields.
+ */
+public class FieldContentFormatter {
+
+    // 's' matches a space, tab, new line, carriage return.
+<span class="fc" id="L19">    private static final Pattern WHITESPACE = Pattern.compile(&quot;\\s+&quot;);</span>
+
+    private final Set&lt;Field&gt; multiLineFields;
+
+<span class="fc" id="L23">    public FieldContentFormatter(FieldPreferences preferences) {</span>
+<span class="fc" id="L24">        Objects.requireNonNull(preferences);</span>
+
+<span class="fc" id="L26">        multiLineFields = new HashSet&lt;&gt;();</span>
+        // the following two are also coded in org.jabref.logic.bibtex.LatexFieldFormatter.format(String, String)
+<span class="fc" id="L28">        multiLineFields.add(StandardField.ABSTRACT);</span>
+<span class="fc" id="L29">        multiLineFields.add(StandardField.COMMENT);</span>
+<span class="fc" id="L30">        multiLineFields.add(StandardField.REVIEW);</span>
+        // the file field should not be formatted, therefore we treat it as a multi line field
+<span class="fc" id="L32">        multiLineFields.addAll(preferences.getNonWrappableFields());</span>
+<span class="fc" id="L33">    }</span>
+
+    /**
+     * Performs the reformatting
+     *
+     * @param fieldContent the content to format
+     * @param field        the name of the bibtex field
+     * @return the formatted field content.
+     */
+    public String format(String fieldContent, Field field) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (multiLineFields.contains(field)) {</span>
+            // Keep the field as is.
+            // Newlines are normalized at org.jabref.logic.exporter.BibWriter
+            // Alternative: StringUtil.unifyLineBreaks(fieldContent, OS.NEWLINE)
+<span class="fc" id="L47">            return fieldContent;</span>
+        }
+
+<span class="fc" id="L50">        return WHITESPACE.matcher(fieldContent).replaceAll(&quot; &quot;);</span>
+    }
+
+    public String format(StringBuilder fieldContent, Field field) {
+<span class="fc" id="L54">        return format(fieldContent.toString(), field);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

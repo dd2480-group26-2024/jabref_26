@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnoTextRange.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.uno</a> &gt; <span class="el_source">UnoTextRange.java</span></div><h1>UnoTextRange.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.uno;
+
+import java.util.Optional;
+
+import com.sun.star.text.XFootnote;
+import com.sun.star.text.XTextContent;
+import com.sun.star.text.XTextRange;
+import com.sun.star.text.XTextRangeCompare;
+
+public class UnoTextRange {
+
+    private UnoTextRange() {
+    }
+
+    /**
+     * If original is in a footnote, return a range containing the corresponding footnote marker.
+     * &lt;p&gt;
+     * Returns Optional.empty if not in a footnote.
+     */
+    public static Optional&lt;XTextRange&gt; getFootnoteMarkRange(XTextRange original) {
+<span class="nc" id="L21">        Optional&lt;XFootnote&gt; footer = UnoCast.cast(XFootnote.class, original.getText());</span>
+        // If we are inside a footnote,
+        // find the linking footnote marker:
+        // The footnote's anchor gives the correct position in the text:
+<span class="nc" id="L25">        return footer.map(XTextContent::getAnchor);</span>
+    }
+
+    /**
+     * Test if two XTextRange values are comparable (i.e. they share the same getText()).
+     */
+    public static boolean comparables(XTextRange a, XTextRange b) {
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        return a.getText() == b.getText();</span>
+    }
+
+    /**
+     * @return follows java conventions
+     * 1 if  (a &amp;gt; b); (-1) if (a &amp;lt; b)
+     */
+    public static int compareStartsUnsafe(XTextRangeCompare compare, XTextRange a, XTextRange b) {
+<span class="nc" id="L40">        return -1 * compare.compareRegionStarts(a, b);</span>
+    }
+
+    public static int compareStarts(XTextRange a, XTextRange b) {
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (!comparables(a, b)) {</span>
+<span class="nc" id="L45">            throw new java.lang.IllegalArgumentException(&quot;compareStarts: got incomparable regions&quot;);</span>
+        }
+<span class="nc" id="L47">        final XTextRangeCompare compare = UnoCast.cast(XTextRangeCompare.class, a.getText()).get();</span>
+<span class="nc" id="L48">        return compareStartsUnsafe(compare, a, b);</span>
+    }
+
+    /**
+     * @return follows java conventions
+     * 1 if  (a &amp;gt; b); (-1) if (a &amp;lt; b)
+     */
+    public static int compareEnds(XTextRange a, XTextRange b) {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (!comparables(a, b)) {</span>
+<span class="nc" id="L57">            throw new java.lang.IllegalArgumentException(&quot;compareEnds: got incomparable regions&quot;);</span>
+        }
+<span class="nc" id="L59">        final XTextRangeCompare compare = UnoCast.cast(XTextRangeCompare.class, a.getText()).get();</span>
+<span class="nc" id="L60">        return -1 * compare.compareRegionEnds(a, b);</span>
+    }
+
+    /*
+     * Assumes a and b belong to the same XText as compare.
+     */
+    public static int compareStartsThenEndsUnsafe(XTextRangeCompare compare, XTextRange a, XTextRange b) {
+<span class="nc" id="L67">        int res = compare.compareRegionStarts(a, b);</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (res != 0) {</span>
+<span class="nc" id="L69">            return -1 * res;</span>
+        }
+<span class="nc" id="L71">        return -1 * compare.compareRegionEnds(a, b);</span>
+    }
+
+    public static int compareStartsThenEnds(XTextRange a, XTextRange b) {
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (!comparables(a, b)) {</span>
+<span class="nc" id="L76">            throw new java.lang.IllegalArgumentException(&quot;compareStartsThenEnds: got incomparable regions&quot;);</span>
+        }
+<span class="nc" id="L78">        final XTextRangeCompare compare = UnoCast.cast(XTextRangeCompare.class, a.getText()).get();</span>
+<span class="nc" id="L79">        return compareStartsThenEndsUnsafe(compare, a, b);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

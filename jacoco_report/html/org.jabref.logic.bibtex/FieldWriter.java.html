@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.bibtex</a> &gt; <span class="el_source">FieldWriter.java</span></div><h1>FieldWriter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.bibtex;
+
+import org.jabref.model.entry.field.Field;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Converts JabRef's internal BibTeX representation of a BibTeX field to BibTeX text representation
+ */
+public class FieldWriter {
+
+    // See also ADR-0024
+    public static final char BIBTEX_STRING_START_END_SYMBOL = '#';
+
+<span class="fc" id="L16">    private static final Logger LOGGER = LoggerFactory.getLogger(FieldWriter.class);</span>
+
+    private static final char FIELD_START = '{';
+    private static final char FIELD_END = '}';
+
+    private final boolean neverFailOnHashes;
+    private final FieldPreferences preferences;
+    private final FieldContentFormatter formatter;
+
+    public FieldWriter(FieldPreferences preferences) {
+<span class="fc" id="L26">        this(true, preferences);</span>
+<span class="fc" id="L27">    }</span>
+
+<span class="fc" id="L29">    private FieldWriter(boolean neverFailOnHashes, FieldPreferences preferences) {</span>
+<span class="fc" id="L30">        this.neverFailOnHashes = neverFailOnHashes;</span>
+<span class="fc" id="L31">        this.preferences = preferences;</span>
+
+<span class="fc" id="L33">        formatter = new FieldContentFormatter(preferences);</span>
+<span class="fc" id="L34">    }</span>
+
+    public static FieldWriter buildIgnoreHashes(FieldPreferences prefs) {
+<span class="fc" id="L37">        return new FieldWriter(true, prefs);</span>
+    }
+
+    private static void checkBraces(String text) throws InvalidFieldValueException {
+<span class="fc" id="L41">        int left = 0;</span>
+<span class="fc" id="L42">        int right = 0;</span>
+
+        // First we collect all occurrences:
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L46">            char item = text.charAt(i);</span>
+
+<span class="fc" id="L48">            boolean charBeforeIsEscape = false;</span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">            if ((i &gt; 0) &amp;&amp; (text.charAt(i - 1) == '\\')) {</span>
+<span class="fc" id="L50">                charBeforeIsEscape = true;</span>
+            }
+
+<span class="fc bfc" id="L53" title="All 4 branches covered.">            if (!charBeforeIsEscape &amp;&amp; (item == '{')) {</span>
+<span class="fc" id="L54">                left++;</span>
+<span class="fc bfc" id="L55" title="All 4 branches covered.">            } else if (!charBeforeIsEscape &amp;&amp; (item == '}')) {</span>
+<span class="fc" id="L56">                right++;</span>
+            }
+        }
+
+        // Then we throw an exception if the error criteria are met.
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">        if (right != 0 &amp;&amp; (left == 0)) {</span>
+<span class="nc" id="L62">            LOGGER.error(&quot;Unescaped '}' character without opening bracket ends string prematurely. Field value: {}&quot;, text);</span>
+<span class="nc" id="L63">            throw new InvalidFieldValueException(&quot;Unescaped '}' character without opening bracket ends string prematurely. Field value: &quot; + text);</span>
+        }
+<span class="fc bfc" id="L65" title="All 4 branches covered.">        if (right != 0 &amp;&amp; (right &lt; left)) {</span>
+<span class="fc" id="L66">            LOGGER.error(&quot;Unescaped '}' character without opening bracket ends string prematurely. Field value: {}&quot;, text);</span>
+<span class="fc" id="L67">            throw new InvalidFieldValueException(&quot;Unescaped '}' character without opening bracket ends string prematurely. Field value: &quot; + text);</span>
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (left != right) {</span>
+<span class="fc" id="L70">            LOGGER.error(&quot;Braces don't match. Field value: {}&quot;, text);</span>
+<span class="fc" id="L71">            throw new InvalidFieldValueException(&quot;Braces don't match. Field value: &quot; + text);</span>
+        }
+<span class="fc" id="L73">    }</span>
+
+    /**
+     * Formats the content of a field.
+     *
+     * @param field   the name of the field - used to trigger different serializations, e.g., turning off resolution for some strings
+     * @param content the content of the field
+     * @return a formatted string suitable for output
+     * @throws InvalidFieldValueException if s is not a correct bibtex string, e.g., because of improperly balanced braces or using # not paired
+     */
+    public String write(Field field, String content) throws InvalidFieldValueException {
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (content == null) {</span>
+<span class="nc" id="L85">            return FIELD_START + String.valueOf(FIELD_END);</span>
+        }
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (!shouldResolveStrings(field)) {</span>
+<span class="fc" id="L89">            return formatWithoutResolvingStrings(content, field);</span>
+        }
+
+<span class="fc" id="L92">        return formatAndResolveStrings(content, field);</span>
+    }
+
+    /**
+     * This method handles # in the field content to get valid bibtex strings
+     * &lt;p&gt;
+     * For instance, &lt;code&gt;#jan# - #feb#&lt;/code&gt; gets  &lt;code&gt;jan #{ - } # feb&lt;/code&gt; (see @link{org.jabref.logic.bibtex.LatexFieldFormatterTests#makeHashEnclosedWordsRealStringsInMonthField()})
+     */
+    private String formatAndResolveStrings(String content, Field field) throws InvalidFieldValueException {
+<span class="fc" id="L101">        checkBraces(content);</span>
+
+<span class="fc" id="L103">        StringBuilder stringBuilder = new StringBuilder();</span>
+
+        // Here we assume that the user encloses any bibtex strings in #, e.g.:
+        // #jan# - #feb#
+        // ...which will be written to the file like this:
+        // jan # { - } # feb
+<span class="fc" id="L109">        int pivot = 0;</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        while (pivot &lt; content.length()) {</span>
+<span class="fc" id="L111">            int goFrom = pivot;</span>
+<span class="fc" id="L112">            int pos1 = pivot;</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            while (goFrom == pos1) {</span>
+<span class="fc" id="L114">                pos1 = content.indexOf(BIBTEX_STRING_START_END_SYMBOL, goFrom);</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">                if ((pos1 &gt; 0) &amp;&amp; (content.charAt(pos1 - 1) == '\\')) {</span>
+<span class="nc" id="L116">                    goFrom = pos1 + 1;</span>
+<span class="nc" id="L117">                    pos1++;</span>
+                } else {
+<span class="fc" id="L119">                    goFrom = pos1 - 1; // Ends the loop.</span>
+                }
+            }
+
+            int pos2;
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (pos1 == -1) {</span>
+<span class="fc" id="L125">                pos1 = content.length(); // No more occurrences found.</span>
+<span class="fc" id="L126">                pos2 = -1;</span>
+            } else {
+<span class="fc" id="L128">                pos2 = content.indexOf(BIBTEX_STRING_START_END_SYMBOL, pos1 + 1);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                if (pos2 == -1) {</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                    if (neverFailOnHashes) {</span>
+<span class="nc" id="L131">                        pos1 = content.length(); // just write out the rest of the text, and throw no exception</span>
+                    } else {
+<span class="nc" id="L133">                        LOGGER.error(&quot;The character {} is not allowed in BibTeX strings unless escaped as in '\\{}'. &quot;</span>
+                                + &quot;In JabRef, use pairs of # characters to indicate a string. &quot;
+                                + &quot;Note that the entry causing the problem has been selected. Field value: {}&quot;,
+<span class="nc" id="L136">                                BIBTEX_STRING_START_END_SYMBOL,</span>
+<span class="nc" id="L137">                                BIBTEX_STRING_START_END_SYMBOL,</span>
+                                content);
+<span class="nc" id="L139">                        throw new InvalidFieldValueException(</span>
+                                &quot;The character &quot; + BIBTEX_STRING_START_END_SYMBOL + &quot; is not allowed in BibTeX strings unless escaped as in '\\&quot; + BIBTEX_STRING_START_END_SYMBOL + &quot;'.\n&quot;
+                                        + &quot;In JabRef, use pairs of # characters to indicate a string.\n&quot;
+                                        + &quot;Note that the entry causing the problem has been selected. Field value: &quot; + content);
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (pos1 &gt; pivot) {</span>
+<span class="fc" id="L148">                writeText(stringBuilder, content, pivot, pos1);</span>
+            }
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">            if ((pos1 &lt; content.length()) &amp;&amp; ((pos2 - 1) &gt; pos1)) {</span>
+                // We check that the string label is not empty. That means
+                // an occurrence of ## will simply be ignored. Should it instead
+                // cause an error message?
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                writeStringLabel(stringBuilder, content, pos1 + 1, pos2, pos1 == pivot,</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                        (pos2 + 1) == content.length());</span>
+            }
+
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (pos2 &gt; -1) {</span>
+<span class="fc" id="L159">                pivot = pos2 + 1;</span>
+            } else {
+<span class="fc" id="L161">                pivot = pos1 + 1;</span>
+            }
+<span class="fc" id="L163">        }</span>
+
+<span class="fc" id="L165">        return formatter.format(stringBuilder, field);</span>
+    }
+
+    private boolean shouldResolveStrings(Field field) {
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (preferences.shouldResolveStrings()) {</span>
+            // Resolve strings for the list of fields only
+<span class="fc" id="L171">            return preferences.getResolvableFields().contains(field);</span>
+        }
+<span class="fc" id="L173">        return false;</span>
+    }
+
+    private String formatWithoutResolvingStrings(String content, Field field) throws InvalidFieldValueException {
+<span class="fc" id="L177">        checkBraces(content);</span>
+
+<span class="fc" id="L179">        StringBuilder stringBuilder = new StringBuilder(String.valueOf(FIELD_START));</span>
+<span class="fc" id="L180">        stringBuilder.append(formatter.format(content, field));</span>
+<span class="fc" id="L181">        stringBuilder.append(FIELD_END);</span>
+<span class="fc" id="L182">        return stringBuilder.toString();</span>
+    }
+
+    /**
+     * @param stringBuilder the StringBuilder to append the text to
+     * @param text          the text to append
+     */
+    private void writeText(StringBuilder stringBuilder, String text, int startPos, int endPos) {
+<span class="fc" id="L190">        stringBuilder.append(FIELD_START);</span>
+<span class="fc" id="L191">        stringBuilder.append(text, startPos, endPos);</span>
+<span class="fc" id="L192">        stringBuilder.append(FIELD_END);</span>
+<span class="fc" id="L193">    }</span>
+
+    /**
+     * @param stringBuilder the StringBuilder to append the text to
+     * @param text          the text use as basis to get the text to append
+     * @param startPos      the position in text where the text to add starts
+     * @param endPos        the position in text where the text to add ends
+     * @param isFirst       true if the label to write is the first one to write
+     * @param isLast        true if the label to write is the last one to write
+     */
+    private void writeStringLabel(StringBuilder stringBuilder, String text, int startPos, int endPos, boolean isFirst, boolean isLast) {
+<span class="fc bfc" id="L204" title="All 4 branches covered.">        String line = (isFirst ? &quot;&quot; : &quot; # &quot;) + text.substring(startPos, endPos) + (isLast ? &quot;&quot; : &quot; # &quot;);</span>
+<span class="fc" id="L205">        stringBuilder.append(line);</span>
+<span class="fc" id="L206">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

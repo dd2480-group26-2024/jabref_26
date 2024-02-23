@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalFileType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.externalfiletype</a> &gt; <span class="el_source">ExternalFileType.java</span></div><h1>ExternalFileType.java</h1><pre class="source lang-java linenums">package org.jabref.gui.externalfiletype;
+
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+
+public interface ExternalFileType {
+    String getName();
+
+    String getExtension();
+
+    String getMimeType();
+
+    String getOpenWithApplication();
+
+    JabRefIcon getIcon();
+
+    /**
+     * Get the bibtex field name used for this file type. Currently we assume that field name equals filename extension.
+     *
+     * @return The field name.
+     */
+    default Field getField() {
+<span class="nc" id="L24">        return FieldFactory.parseField(getExtension());</span>
+    }
+
+    /**
+     * Return a String array representing this file type. This is used for storage into
+     * Preferences, and the same array can be used to construct the file type later,
+     * using the String[] constructor.
+     *
+     * @return A String[] containing all information about this file type.
+     */
+    default String[] toStringArray() {
+<span class="fc" id="L35">        return new String[]{getName(), getExtension(), getMimeType(), getOpenWithApplication(), getIcon().name()};</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

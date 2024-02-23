@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OOProcessNumericMarkers.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice.style</a> &gt; <span class="el_source">OOProcessNumericMarkers.java</span></div><h1>OOProcessNumericMarkers.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice.style;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.model.openoffice.ootext.OOText;
+import org.jabref.model.openoffice.style.CitationGroup;
+import org.jabref.model.openoffice.style.CitationGroups;
+import org.jabref.model.openoffice.style.CitationMarkerNumericEntry;
+import org.jabref.model.openoffice.util.OOListUtil;
+
+<span class="nc" id="L12">class OOProcessNumericMarkers {</span>
+
+    private OOProcessNumericMarkers() {
+    }
+
+    /**
+     * Produce citation markers for the case of numbered citations
+     * with bibliography sorted by first appearance in the text.
+     *
+     * Numbered citation markers for each CitationGroup.
+     * Numbering is according to first appearance.
+     * Assumes global order and local order are already applied.
+     */
+    static void produceCitationMarkers(CitationGroups citationGroups, OOBibStyle style) {
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        assert style.isNumberEntries();</span>
+
+<span class="nc bnc" id="L28" title="All 2 branches missed.">        if (style.isSortByPosition()) {</span>
+<span class="nc" id="L29">            citationGroups.createNumberedBibliographySortedInOrderOfAppearance();</span>
+        } else {
+<span class="nc" id="L31">            citationGroups.createNumberedBibliographySortedByComparator(OOProcess.AUTHOR_YEAR_TITLE_COMPARATOR);</span>
+        }
+
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        for (CitationGroup group : citationGroups.getCitationGroupsInGlobalOrder()) {</span>
+<span class="nc" id="L35">            List&lt;CitationMarkerNumericEntry&gt; cits = OOListUtil.map(group.getCitationsInLocalOrder(), e -&gt; e);</span>
+<span class="nc" id="L36">            OOText citMarker = style.getNumCitationMarker2(cits);</span>
+<span class="nc" id="L37">            group.setCitationMarker(Optional.of(citMarker));</span>
+<span class="nc" id="L38">        }</span>
+<span class="nc" id="L39">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MSBibConverter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.msbib</a> &gt; <span class="el_source">MSBibConverter.java</span></div><h1>MSBibConverter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.msbib;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.Month;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.entry.types.IEEETranEntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+
+public class MSBibConverter {
+
+    private static final String MSBIB_PREFIX = &quot;msbib-&quot;;
+    private static final String BIBTEX_PREFIX = &quot;BIBTEX_&quot;;
+
+    private MSBibConverter() {
+    }
+
+    public static MSBibEntry convert(BibEntry entry) {
+<span class="fc" id="L25">        MSBibEntry result = new MSBibEntry();</span>
+
+        // memorize original type
+<span class="fc" id="L28">        result.fields.put(BIBTEX_PREFIX + &quot;Entry&quot;, entry.getType().getName());</span>
+        // define new type
+<span class="fc" id="L30">        String msBibType = MSBibMapping.getMSBibEntryType(entry.getType()).name();</span>
+<span class="fc" id="L31">        result.fields.put(&quot;SourceType&quot;, msBibType);</span>
+
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        for (Field field : entry.getFields()) {</span>
+<span class="fc" id="L34">            String msBibField = MSBibMapping.getMSBibField(field);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            if (msBibField != null) {</span>
+<span class="fc" id="L36">                String value = entry.getFieldLatexFree(field).orElse(&quot;&quot;);</span>
+<span class="fc" id="L37">                result.fields.put(msBibField, value);</span>
+            }
+<span class="fc" id="L39">        }</span>
+
+        // Duplicate: also added as BookTitle
+<span class="fc" id="L42">        entry.getFieldLatexFree(StandardField.BOOKTITLE).ifPresent(booktitle -&gt; result.conferenceName = booktitle);</span>
+<span class="fc" id="L43">        entry.getFieldLatexFree(StandardField.PAGES).ifPresent(pages -&gt; result.pages = new PageNumbers(pages));</span>
+<span class="fc" id="L44">        entry.getFieldLatexFree(new UnknownField(MSBIB_PREFIX + &quot;accessed&quot;)).ifPresent(accesed -&gt; result.dateAccessed = accesed);</span>
+
+<span class="fc" id="L46">        entry.getFieldLatexFree(StandardField.URLDATE).ifPresent(acessed -&gt; result.dateAccessed = acessed);</span>
+
+        // TODO: currently this can never happen
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (&quot;SoundRecording&quot;.equals(msBibType)) {</span>
+<span class="nc" id="L50">            result.albumTitle = entry.getFieldLatexFree(StandardField.TITLE).orElse(null);</span>
+        }
+
+        // TODO: currently this can never happen
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (&quot;Interview&quot;.equals(msBibType)) {</span>
+<span class="nc" id="L55">            result.broadcastTitle = entry.getFieldLatexFree(StandardField.TITLE).orElse(null);</span>
+        }
+
+<span class="fc" id="L58">        result.number = entry.getFieldLatexFree(StandardField.NUMBER).orElse(null);</span>
+
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (entry.getType().equals(IEEETranEntryType.Patent)) {</span>
+<span class="fc" id="L61">            result.patentNumber = entry.getFieldLatexFree(StandardField.NUMBER).orElse(null);</span>
+<span class="fc" id="L62">            result.number = null;</span>
+        }
+
+<span class="fc" id="L65">        result.day = entry.getFieldOrAliasLatexFree(StandardField.DAY).orElse(null);</span>
+<span class="fc" id="L66">        result.month = entry.getMonth().map(Month::getFullName).orElse(null);</span>
+
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (!entry.getFieldLatexFree(StandardField.YEAR).isPresent()) {</span>
+<span class="fc" id="L69">            result.year = entry.getFieldOrAliasLatexFree(StandardField.YEAR).orElse(null);</span>
+        }
+<span class="fc" id="L71">        result.journalName = entry.getFieldOrAliasLatexFree(StandardField.JOURNAL).orElse(null);</span>
+
+        // Value must be converted
+<span class="fc" id="L74">        entry.getFieldLatexFree(StandardField.LANGUAGE)</span>
+<span class="fc" id="L75">             .ifPresent(lang -&gt; result.fields.put(&quot;LCID&quot;, String.valueOf(MSBibMapping.getLCID(lang))));</span>
+<span class="fc" id="L76">        StringBuilder sbNumber = new StringBuilder();</span>
+<span class="fc" id="L77">        entry.getFieldLatexFree(StandardField.ISBN).ifPresent(isbn -&gt; sbNumber.append(&quot; ISBN: &quot;).append(isbn));</span>
+<span class="fc" id="L78">        entry.getFieldLatexFree(StandardField.ISSN).ifPresent(issn -&gt; sbNumber.append(&quot; ISSN: &quot;).append(issn));</span>
+<span class="fc" id="L79">        entry.getFieldLatexFree(new UnknownField(&quot;lccn&quot;)).ifPresent(lccn -&gt; sbNumber.append(&quot;LCCN: &quot;).append(lccn));</span>
+<span class="fc" id="L80">        entry.getFieldLatexFree(StandardField.MR_NUMBER).ifPresent(mrnumber -&gt; sbNumber.append(&quot; MRN: &quot;).append(mrnumber));</span>
+
+<span class="fc" id="L82">        result.standardNumber = sbNumber.toString();</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (result.standardNumber.isEmpty()) {</span>
+<span class="fc" id="L84">            result.standardNumber = null;</span>
+        }
+
+<span class="fc" id="L87">        result.address = entry.getFieldOrAliasLatexFree(StandardField.ADDRESS).orElse(null);</span>
+
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (entry.getFieldLatexFree(StandardField.TYPE).isPresent()) {</span>
+<span class="fc" id="L90">            result.thesisType = entry.getFieldLatexFree(StandardField.TYPE).get();</span>
+        } else {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (entry.getType().equals(StandardEntryType.TechReport)) {</span>
+<span class="fc" id="L93">                result.thesisType = &quot;Tech. rep.&quot;;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            } else if (entry.getType().equals(StandardEntryType.MastersThesis)) {</span>
+<span class="fc" id="L95">                result.thesisType = &quot;Master's thesis&quot;;</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            } else if (entry.getType().equals(StandardEntryType.PhdThesis)) {</span>
+<span class="nc" id="L97">                result.thesisType = &quot;Ph.D. dissertation&quot;;</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            } else if (entry.getType().equals(StandardEntryType.Unpublished)) {</span>
+<span class="fc" id="L99">                result.thesisType = &quot;unpublished&quot;;</span>
+            }
+        }
+
+        // TODO: currently this can never happen
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (&quot;InternetSite&quot;.equals(msBibType) || &quot;DocumentFromInternetSite&quot;.equals(msBibType)) {</span>
+<span class="nc" id="L105">            result.internetSiteTitle = entry.getFieldLatexFree(StandardField.TITLE).orElse(null);</span>
+        }
+
+        // TODO: currently only Misc can happen
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">        if (&quot;Art&quot;.equals(msBibType) || &quot;Misc&quot;.equals(msBibType)) {</span>
+<span class="fc" id="L110">            result.publicationTitle = entry.getFieldLatexFree(StandardField.TITLE).orElse(null);</span>
+        }
+
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (entry.getType().equals(IEEETranEntryType.Patent)) {</span>
+<span class="fc" id="L114">            entry.getField(StandardField.AUTHOR).ifPresent(authors -&gt; result.inventors = getAuthors(entry, authors, StandardField.AUTHOR));</span>
+        } else {
+<span class="fc" id="L116">            entry.getField(StandardField.AUTHOR).ifPresent(authors -&gt; result.authors = getAuthors(entry, authors, StandardField.AUTHOR));</span>
+        }
+<span class="fc" id="L118">        entry.getField(StandardField.EDITOR).ifPresent(editors -&gt; result.editors = getAuthors(entry, editors, StandardField.EDITOR));</span>
+<span class="pc" id="L119">        entry.getField(StandardField.TRANSLATOR).ifPresent(translator -&gt; result.translators = getAuthors(entry, translator, StandardField.EDITOR));</span>
+
+<span class="fc" id="L121">        return result;</span>
+    }
+
+    private static List&lt;MsBibAuthor&gt; getAuthors(BibEntry entry, String authors, Field field) {
+<span class="fc" id="L125">        List&lt;MsBibAuthor&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L126">        boolean corporate = false;</span>
+        // Only one corporate author is supported
+        // We have the possible rare case that are multiple authors which start and end with latex , this is currently not considered
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">        if (authors.startsWith(&quot;{&quot;) &amp;&amp; authors.endsWith(&quot;}&quot;)) {</span>
+<span class="fc" id="L130">            corporate = true;</span>
+        }
+        // FIXME: #4152 This is an ugly hack because the latex2unicode formatter kills of all curly braces, so no more corporate author parsing possible
+<span class="fc" id="L133">        String authorLatexFree = entry.getFieldLatexFree(field).orElse(&quot;&quot;);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (corporate) {</span>
+<span class="fc" id="L135">            authorLatexFree = &quot;{&quot; + authorLatexFree + &quot;}&quot;;</span>
+        }
+
+<span class="fc" id="L138">        AuthorList authorList = AuthorList.parse(authorLatexFree);</span>
+
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (Author author : authorList.getAuthors()) {</span>
+<span class="fc" id="L141">            result.add(new MsBibAuthor(author, corporate));</span>
+<span class="fc" id="L142">        }</span>
+
+<span class="fc" id="L144">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OOFormatBibliography.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice.style</a> &gt; <span class="el_source">OOFormatBibliography.java</span></div><h1>OOFormatBibliography.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice.style;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.layout.Layout;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.openoffice.ootext.OOFormat;
+import org.jabref.model.openoffice.ootext.OOText;
+import org.jabref.model.openoffice.style.CitationGroup;
+import org.jabref.model.openoffice.style.CitationGroupId;
+import org.jabref.model.openoffice.style.CitationGroups;
+import org.jabref.model.openoffice.style.CitationPath;
+import org.jabref.model.openoffice.style.CitedKey;
+import org.jabref.model.openoffice.style.CitedKeys;
+
+public class OOFormatBibliography {
+<span class="nc" id="L23">    private static final OOPreFormatter POSTFORMATTER = new OOPreFormatter();</span>
+<span class="nc" id="L24">    private static final Field UNIQUEFIER_FIELD = new UnknownField(&quot;uniq&quot;);</span>
+
+    private OOFormatBibliography() {
+    }
+
+    /**
+     * @return The formatted bibliography, including its title.
+     */
+    public static OOText formatBibliography(CitationGroups citationGroups,
+                                            CitedKeys bibliography,
+                                            OOBibStyle style,
+                                            boolean alwaysAddCitedOnPages) {
+
+<span class="nc" id="L37">        OOText title = style.getFormattedBibliographyTitle();</span>
+<span class="nc" id="L38">        OOText body = formatBibliographyBody(citationGroups, bibliography, style, alwaysAddCitedOnPages);</span>
+<span class="nc" id="L39">        return OOText.fromString(title.toString() + body.toString());</span>
+    }
+
+    /**
+     * @return Formatted body of the bibliography. Excludes the title.
+     */
+    public static OOText formatBibliographyBody(CitationGroups citationGroups,
+                                                CitedKeys bibliography,
+                                                OOBibStyle style,
+                                                boolean alwaysAddCitedOnPages) {
+
+<span class="nc" id="L50">        StringBuilder stringBuilder = new StringBuilder();</span>
+
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        for (CitedKey citedKey : bibliography.values()) {</span>
+<span class="nc" id="L53">            OOText entryText = formatBibliographyEntry(citationGroups, citedKey, style, alwaysAddCitedOnPages);</span>
+<span class="nc" id="L54">            stringBuilder.append(entryText.toString());</span>
+<span class="nc" id="L55">        }</span>
+
+<span class="nc" id="L57">        return OOText.fromString(stringBuilder.toString());</span>
+    }
+
+    /**
+     * @return A paragraph. Includes label and &quot;Cited on pages&quot;.
+     */
+    public static OOText formatBibliographyEntry(CitationGroups citationGroups,
+                                                 CitedKey citedKey,
+                                                 OOBibStyle style,
+                                                 boolean alwaysAddCitedOnPages) {
+<span class="nc" id="L67">        StringBuilder stringBuilder = new StringBuilder();</span>
+
+        // insert marker &quot;[1]&quot;
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (style.isNumberEntries()) {</span>
+<span class="nc" id="L71">            stringBuilder.append(style.getNumCitationMarkerForBibliography(citedKey).toString());</span>
+        } else {
+            // !style.isNumberEntries() : emit no prefix
+            // Note: We might want [citationKey] prefix for style.isCitationKeyCiteMarkers();
+        }
+
+        // Add entry body
+<span class="nc" id="L78">        stringBuilder.append(formatBibliographyEntryBody(citedKey, style).toString());</span>
+
+        // Add &quot;Cited on pages&quot;
+<span class="nc bnc" id="L81" title="All 4 branches missed.">        if (citedKey.getLookupResult().isEmpty() || alwaysAddCitedOnPages) {</span>
+<span class="nc" id="L82">            stringBuilder.append(formatCitedOnPages(citationGroups, citedKey).toString());</span>
+        }
+
+        // Add paragraph
+<span class="nc" id="L86">        OOText entryText = OOText.fromString(stringBuilder.toString());</span>
+<span class="nc" id="L87">        String parStyle = style.getReferenceParagraphFormat();</span>
+<span class="nc" id="L88">        return OOFormat.paragraph(entryText, parStyle);</span>
+    }
+
+    /**
+     * @return just the body of a bibliography entry. No label, &quot;Cited on pages&quot; or paragraph.
+     */
+    public static OOText formatBibliographyEntryBody(CitedKey citedKey, OOBibStyle style) {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (citedKey.getLookupResult().isEmpty()) {</span>
+            // Unresolved entry
+<span class="nc" id="L97">            return OOText.fromString(&quot;Unresolved(%s)&quot;.formatted(citedKey.citationKey));</span>
+        } else {
+            // Resolved entry, use the layout engine
+<span class="nc" id="L100">            BibEntry bibentry = citedKey.getLookupResult().get().entry;</span>
+<span class="nc" id="L101">            Layout layout = style.getReferenceFormat(bibentry.getType());</span>
+<span class="nc" id="L102">            layout.setPostFormatter(POSTFORMATTER);</span>
+
+<span class="nc" id="L104">            return formatFullReferenceOfBibEntry(layout,</span>
+                                                 bibentry,
+<span class="nc" id="L106">                                                 citedKey.getLookupResult().get().database,</span>
+<span class="nc" id="L107">                                                 citedKey.getUniqueLetter().orElse(null));</span>
+        }
+    }
+
+    /**
+     * Format the reference part of a bibliography entry using a Layout.
+     *
+     * @param layout     The Layout to format the reference with.
+     * @param entry      The entry to insert.
+     * @param database   The database the entry belongs to.
+     * @param uniquefier Uniqiefier letter, if any, to append to the entry's year.
+     *
+     * @return OOText The reference part of a bibliography entry formatted as OOText
+     */
+    private static OOText formatFullReferenceOfBibEntry(Layout layout,
+                                                        BibEntry entry,
+                                                        BibDatabase database,
+                                                        String uniquefier) {
+
+        // Backup the value of the uniq field, just in case the entry already has it:
+<span class="nc" id="L127">        Optional&lt;String&gt; oldUniqVal = entry.getField(UNIQUEFIER_FIELD);</span>
+
+        // Set the uniq field with the supplied uniquefier:
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (uniquefier == null) {</span>
+<span class="nc" id="L131">            entry.clearField(UNIQUEFIER_FIELD);</span>
+        } else {
+<span class="nc" id="L133">            entry.setField(UNIQUEFIER_FIELD, uniquefier);</span>
+        }
+
+        // Do the layout for this entry:
+<span class="nc" id="L137">        OOText formattedText = OOText.fromString(layout.doLayout(entry, database));</span>
+
+        // Afterwards, reset the old value:
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (oldUniqVal.isPresent()) {</span>
+<span class="nc" id="L141">            entry.setField(UNIQUEFIER_FIELD, oldUniqVal.get());</span>
+        } else {
+<span class="nc" id="L143">            entry.clearField(UNIQUEFIER_FIELD);</span>
+        }
+
+<span class="nc" id="L146">        return formattedText;</span>
+    }
+
+    /**
+     * Format links to citations of the source (citedKey).
+     *
+     * Requires reference marks for the citation groups.
+     *
+     * - The links are created as references that show page numbers of the reference marks.
+     *   - We do not control the text shown, that is provided by OpenOffice.
+     */
+    private static OOText formatCitedOnPages(CitationGroups citationGroups, CitedKey citedKey) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (!citationGroups.citationGroupsProvideReferenceMarkNameForLinking()) {</span>
+<span class="nc" id="L159">            return OOText.fromString(&quot;&quot;);</span>
+        }
+
+<span class="nc" id="L162">        StringBuilder stringBuilder = new StringBuilder();</span>
+
+<span class="nc" id="L164">        final String prefix = &quot; (%s: &quot;.formatted(Localization.lang(&quot;Cited on pages&quot;));</span>
+<span class="nc" id="L165">        final String suffix = &quot;)&quot;;</span>
+<span class="nc" id="L166">        stringBuilder.append(prefix);</span>
+
+<span class="nc" id="L168">        List&lt;CitationGroup&gt; filteredList = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        for (CitationPath path : citedKey.getCitationPaths()) {</span>
+<span class="nc" id="L170">            CitationGroupId groupId = path.group;</span>
+<span class="nc" id="L171">            Optional&lt;CitationGroup&gt; group = citationGroups.getCitationGroup(groupId);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            if (group.isEmpty()) {</span>
+<span class="nc" id="L173">                throw new IllegalStateException();</span>
+            }
+<span class="nc" id="L175">            filteredList.add(group.get());</span>
+<span class="nc" id="L176">        }</span>
+
+        // sort the citationGroups according to their indexInGlobalOrder
+<span class="nc" id="L179">        filteredList.sort((a, b) -&gt; {</span>
+<span class="nc" id="L180">                Integer aa = a.getIndexInGlobalOrder().orElseThrow(IllegalStateException::new);</span>
+<span class="nc" id="L181">                Integer bb = b.getIndexInGlobalOrder().orElseThrow(IllegalStateException::new);</span>
+<span class="nc" id="L182">                return aa.compareTo(bb);</span>
+            });
+
+<span class="nc" id="L185">        int index = 0;</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        for (CitationGroup group : filteredList) {</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">            if (index &gt; 0) {</span>
+<span class="nc" id="L188">                stringBuilder.append(&quot;, &quot;);</span>
+            }
+<span class="nc" id="L190">            String markName = group.getReferenceMarkNameForLinking().orElseThrow(IllegalStateException::new);</span>
+<span class="nc" id="L191">            OOText xref = OOFormat.formatReferenceToPageNumberOfReferenceMark(markName);</span>
+<span class="nc" id="L192">            stringBuilder.append(xref.toString());</span>
+<span class="nc" id="L193">            index++;</span>
+<span class="nc" id="L194">        }</span>
+<span class="nc" id="L195">        stringBuilder.append(suffix);</span>
+<span class="nc" id="L196">        return OOText.fromString(stringBuilder.toString());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

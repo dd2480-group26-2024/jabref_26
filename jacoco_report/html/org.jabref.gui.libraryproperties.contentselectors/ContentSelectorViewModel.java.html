@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContentSelectorViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.libraryproperties.contentselectors</a> &gt; <span class="el_source">ContentSelectorViewModel.java</span></div><h1>ContentSelectorViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.libraryproperties.contentselectors;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.libraryproperties.PropertiesTabViewModel;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.metadata.ContentSelector;
+import org.jabref.model.metadata.MetaData;
+
+public class ContentSelectorViewModel implements PropertiesTabViewModel {
+
+<span class="fc" id="L36">    private static final List&lt;Field&gt; DEFAULT_FIELD_NAMES = Arrays.asList(StandardField.AUTHOR, StandardField.JOURNAL, StandardField.KEYWORDS, StandardField.PUBLISHER);</span>
+
+    private final MetaData metaData;
+    private final DialogService dialogService;
+<span class="fc" id="L40">    private final Map&lt;Field, List&lt;String&gt;&gt; fieldKeywordsMap = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L42">    private final ListProperty&lt;Field&gt; fields = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="fc" id="L43">    private final ListProperty&lt;String&gt; keywords = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="fc" id="L44">    private final ObjectProperty&lt;Field&gt; selectedField = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="fc" id="L45">    private final StringProperty selectedKeyword = new SimpleStringProperty();</span>
+
+<span class="fc" id="L47">    ContentSelectorViewModel(BibDatabaseContext databaseContext, DialogService dialogService) {</span>
+<span class="fc" id="L48">        this.metaData = databaseContext.getMetaData();</span>
+<span class="fc" id="L49">        this.dialogService = dialogService;</span>
+<span class="fc" id="L50">    }</span>
+
+    @Override
+    public void setValues() {
+        // Populate field names keyword map
+<span class="fc" id="L55">        metaData.getContentSelectors().getContentSelectors().forEach(</span>
+<span class="nc" id="L56">                existingContentSelector -&gt; fieldKeywordsMap.put(existingContentSelector.getField(), new ArrayList&lt;&gt;(existingContentSelector.getValues()))</span>
+        );
+
+        // Populate Field names list
+<span class="fc" id="L60">        List&lt;Field&gt; existingFields = new ArrayList&lt;&gt;(fieldKeywordsMap.keySet());</span>
+<span class="fc" id="L61">        fields.addAll(existingFields);</span>
+
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (fields.isEmpty()) {</span>
+<span class="fc" id="L64">            DEFAULT_FIELD_NAMES.forEach(this::addFieldIfUnique);</span>
+        }
+<span class="fc" id="L66">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="fc" id="L70">        List&lt;Field&gt; metaDataFields = metaData.getContentSelectors().getFieldsWithSelectors();</span>
+
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (isDefaultMap(fieldKeywordsMap)) {</span>
+<span class="nc" id="L73">            Iterator&lt;ContentSelector&gt; iterator = metaData.getContentSelectors().getContentSelectors().iterator();</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            while (iterator.hasNext()) {</span>
+<span class="nc" id="L75">                metaData.clearContentSelectors(iterator.next().getField());</span>
+            }
+        }
+
+<span class="fc" id="L79">        fieldKeywordsMap.forEach((field, keywords) -&gt; updateMetaDataContentSelector(metaDataFields, field, keywords));</span>
+
+<span class="fc" id="L81">        List&lt;Field&gt; fieldNamesToRemove = filterFieldsToRemove();</span>
+<span class="fc" id="L82">        fieldNamesToRemove.forEach(metaData::clearContentSelectors);</span>
+<span class="fc" id="L83">    }</span>
+
+    private boolean isDefaultMap(Map&lt;Field, List&lt;String&gt;&gt; fieldKeywordsMap) {
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (fieldKeywordsMap.size() != DEFAULT_FIELD_NAMES.size()) {</span>
+<span class="fc" id="L87">            return false;</span>
+        }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        for (Field field : DEFAULT_FIELD_NAMES) {</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (!fieldKeywordsMap.containsKey(field)) {</span>
+<span class="nc" id="L91">                return false;</span>
+            }
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (!fieldKeywordsMap.get(field).isEmpty()) {</span>
+<span class="nc" id="L94">                return false;</span>
+            }
+<span class="nc" id="L96">        }</span>
+<span class="nc" id="L97">        return true;</span>
+    }
+
+    public ListProperty&lt;Field&gt; getFieldNamesBackingList() {
+<span class="fc" id="L101">        return fields;</span>
+    }
+
+    public ObjectProperty&lt;Field&gt; selectedFieldProperty() {
+<span class="nc" id="L105">        return selectedField;</span>
+    }
+
+    public BooleanBinding isFieldNameListEmpty() {
+<span class="nc" id="L109">        return Bindings.isEmpty(fields);</span>
+    }
+
+    public BooleanBinding isNoFieldNameSelected() {
+<span class="nc" id="L113">        return Bindings.isEmpty(selectedField.asString());</span>
+    }
+
+    public ListProperty&lt;String&gt; getKeywordsBackingList() {
+<span class="fc" id="L117">        return keywords;</span>
+    }
+
+    StringProperty selectedKeywordProperty() {
+<span class="nc" id="L121">        return selectedKeyword;</span>
+    }
+
+    BooleanBinding isNoKeywordSelected() {
+<span class="nc" id="L125">        return Bindings.isEmpty(selectedKeyword);</span>
+    }
+
+    void showInputFieldNameDialog() {
+<span class="fc" id="L129">        dialogService.showInputDialogAndWait(Localization.lang(&quot;Add new field name&quot;), Localization.lang(&quot;Field name&quot;))</span>
+<span class="fc" id="L130">                     .map(FieldFactory::parseField)</span>
+<span class="fc" id="L131">                     .ifPresent(this::addFieldIfUnique);</span>
+<span class="fc" id="L132">    }</span>
+
+    private void addFieldIfUnique(Field fieldToAdd) {
+<span class="fc" id="L135">        boolean exists = fieldKeywordsMap.containsKey(fieldToAdd);</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (exists) {</span>
+<span class="nc" id="L137">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Field name \&quot;%0\&quot; already exists&quot;, fieldToAdd.getDisplayName()));</span>
+<span class="nc" id="L138">            return;</span>
+        }
+
+<span class="fc" id="L141">        fieldKeywordsMap.put(fieldToAdd, new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L142">        fields.add(fieldToAdd);</span>
+<span class="fc" id="L143">    }</span>
+
+    void showRemoveFieldNameConfirmationDialog(Field fieldToRemove) {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (fieldToRemove == null) {</span>
+<span class="nc" id="L147">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;No field name selected!&quot;));</span>
+<span class="nc" id="L148">            return;</span>
+        }
+
+<span class="fc" id="L151">        boolean deleteConfirmed = dialogService.showConfirmationDialogAndWait(</span>
+<span class="fc" id="L152">                Localization.lang(&quot;Remove field name&quot;),</span>
+<span class="fc" id="L153">                Localization.lang(&quot;Are you sure you want to remove field name: \&quot;%0\&quot;?&quot;, fieldToRemove.getDisplayName())</span>
+        );
+
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (deleteConfirmed) {</span>
+<span class="fc" id="L157">            removeFieldName(fieldToRemove);</span>
+        }
+<span class="fc" id="L159">    }</span>
+
+    private void removeFieldName(Field fieldToRemove) {
+<span class="fc" id="L162">        fieldKeywordsMap.remove(fieldToRemove);</span>
+<span class="fc" id="L163">        fields.remove(fieldToRemove);</span>
+<span class="fc" id="L164">    }</span>
+
+    void populateKeywords(Field selectedField) {
+<span class="fc" id="L167">        keywords.clear();</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (selectedField != null) {</span>
+<span class="fc" id="L169">            keywords.addAll(fieldKeywordsMap.get(selectedField));</span>
+        }
+<span class="fc" id="L171">    }</span>
+
+    void showInputKeywordDialog(Field selectedField) {
+<span class="fc" id="L174">        dialogService.showInputDialogAndWait(Localization.lang(&quot;Add new keyword&quot;), Localization.lang(&quot;Keyword:&quot;))</span>
+<span class="fc" id="L175">                     .ifPresent(newKeyword -&gt; addKeywordIfUnique(selectedField, newKeyword));</span>
+<span class="fc" id="L176">    }</span>
+
+    private void addKeywordIfUnique(Field field, String keywordToAdd) {
+<span class="fc" id="L179">        boolean exists = fieldKeywordsMap.get(field).contains(keywordToAdd);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (exists) {</span>
+<span class="fc" id="L181">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Keyword \&quot;%0\&quot; already exists&quot;, keywordToAdd));</span>
+<span class="fc" id="L182">            return;</span>
+        }
+
+<span class="fc" id="L185">        List&lt;String&gt; existingKeywords = fieldKeywordsMap.getOrDefault(field, new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L186">        existingKeywords.add(keywordToAdd);</span>
+<span class="fc" id="L187">        existingKeywords.sort(Comparator.naturalOrder());</span>
+<span class="fc" id="L188">        fieldKeywordsMap.put(field, existingKeywords);</span>
+<span class="fc" id="L189">        populateKeywords(field);</span>
+<span class="fc" id="L190">    }</span>
+
+    void showRemoveKeywordConfirmationDialog(Field field, String keywordToRemove) {
+<span class="fc" id="L193">        boolean deleteConfirmed = dialogService.showConfirmationDialogAndWait(Localization.lang(&quot;Remove keyword&quot;), Localization.lang(&quot;Are you sure you want to remove keyword: \&quot;%0\&quot;?&quot;, keywordToRemove));</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (deleteConfirmed) {</span>
+<span class="fc" id="L195">            removeKeyword(field, keywordToRemove);</span>
+        }
+<span class="fc" id="L197">    }</span>
+
+    private void removeKeyword(Field field, String keywordToRemove) {
+<span class="fc" id="L200">        fieldKeywordsMap.get(field).remove(keywordToRemove);</span>
+<span class="fc" id="L201">        keywords.remove(keywordToRemove);</span>
+<span class="fc" id="L202">    }</span>
+
+    private List&lt;Field&gt; filterFieldsToRemove() {
+<span class="fc" id="L205">        Set&lt;Field&gt; newlyAddedKeywords = fieldKeywordsMap.keySet();</span>
+<span class="fc" id="L206">        return metaData.getContentSelectors().getFieldsWithSelectors().stream()</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                       .filter(field -&gt; !newlyAddedKeywords.contains(field))</span>
+<span class="fc" id="L208">                       .collect(Collectors.toList());</span>
+    }
+
+    private void updateMetaDataContentSelector(List&lt;Field&gt; existingFields, Field field, List&lt;String&gt; keywords) {
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        boolean fieldNameDoNotExists = !existingFields.contains(field);</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (fieldNameDoNotExists) {</span>
+<span class="fc" id="L214">            metaData.addContentSelector(new ContentSelector(field, keywords));</span>
+        }
+
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (keywordsHaveChanged(field, keywords)) {</span>
+<span class="nc" id="L218">            metaData.clearContentSelectors(field);</span>
+<span class="nc" id="L219">            metaData.addContentSelector(new ContentSelector(field, keywords));</span>
+        }
+<span class="fc" id="L221">    }</span>
+
+    private boolean keywordsHaveChanged(Field field, List&lt;String&gt; keywords) {
+<span class="fc" id="L224">        HashSet&lt;String&gt; keywordsSet = asHashSet(keywords);</span>
+<span class="fc" id="L225">        List&lt;String&gt; existingKeywords = metaData.getContentSelectorValuesForField(field);</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (!keywordsSet.equals(asHashSet(existingKeywords))) {</span>
+<span class="nc" id="L227">            return true;</span>
+        }
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">        return !keywordsSet.isEmpty() &amp;&amp; existingKeywords.isEmpty();</span>
+    }
+
+    private HashSet&lt;String&gt; asHashSet(List&lt;String&gt; listToConvert) {
+<span class="fc" id="L233">        return new HashSet&lt;&gt;(listToConvert);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

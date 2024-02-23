@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MSBibMapping.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.msbib</a> &gt; <span class="el_source">MSBibMapping.java</span></div><h1>MSBibMapping.java</h1><pre class="source lang-java linenums">package org.jabref.logic.msbib;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.InternalField;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.IEEETranEntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+
+/**
+ * Mapping between Msbib and biblatex All Fields: &lt;a href = &quot;https://msdn.microsoft.com/de-de/library/office/documentformat.openxml.bibliography&quot;&gt;List
+ * of all MSBib fields&lt;/a&gt;
+ */
+public class MSBibMapping {
+
+    private static final String BIBTEX_PREFIX = &quot;BIBTEX_&quot;;
+    private static final String MSBIB_PREFIX = &quot;msbib-&quot;;
+
+<span class="fc" id="L26">    private static final BiMap&lt;Field, String&gt; BIBLATEX_TO_MS_BIB = HashBiMap.create();</span>
+
+    // see https://learn.microsoft.com/en-us/openspecs/office_standards/ms-oe376/6c085406-a698-4e12-9d4d-c3b0ee3dbc4a
+<span class="fc" id="L29">    private static final BiMap&lt;String, Integer&gt; LANG_TO_LCID = HashBiMap.create();</span>
+
+    static {
+<span class="fc" id="L32">        LANG_TO_LCID.put(&quot;basque&quot;, 1609);</span>
+<span class="fc" id="L33">        LANG_TO_LCID.put(&quot;bulgarian&quot;, 1026);</span>
+<span class="fc" id="L34">        LANG_TO_LCID.put(&quot;catalan&quot;, 1027);</span>
+<span class="fc" id="L35">        LANG_TO_LCID.put(&quot;croatian&quot;, 1050);</span>
+<span class="fc" id="L36">        LANG_TO_LCID.put(&quot;czech&quot;, 1029);</span>
+<span class="fc" id="L37">        LANG_TO_LCID.put(&quot;danish&quot;, 1030);</span>
+<span class="fc" id="L38">        LANG_TO_LCID.put(&quot;dutch&quot;, 1043);</span>
+<span class="fc" id="L39">        LANG_TO_LCID.put(&quot;english&quot;, 1033); // american english</span>
+<span class="fc" id="L40">        LANG_TO_LCID.put(&quot;finnish&quot;, 1035);</span>
+<span class="fc" id="L41">        LANG_TO_LCID.put(&quot;french&quot;, 1036);</span>
+<span class="fc" id="L42">        LANG_TO_LCID.put(&quot;german&quot;, 1031);</span>
+<span class="fc" id="L43">        LANG_TO_LCID.put(&quot;austrian&quot;, 3079);</span>
+<span class="fc" id="L44">        LANG_TO_LCID.put(&quot;swissgerman&quot;, 2055);</span>
+<span class="fc" id="L45">        LANG_TO_LCID.put(&quot;greek&quot;, 1032);</span>
+<span class="fc" id="L46">        LANG_TO_LCID.put(&quot;hungarian&quot;, 1038);</span>
+<span class="fc" id="L47">        LANG_TO_LCID.put(&quot;icelandic&quot;, 1039);</span>
+<span class="fc" id="L48">        LANG_TO_LCID.put(&quot;italian&quot;, 1040);</span>
+<span class="fc" id="L49">        LANG_TO_LCID.put(&quot;latvian&quot;, 1062);</span>
+<span class="fc" id="L50">        LANG_TO_LCID.put(&quot;lithuanian&quot;, 1063);</span>
+<span class="fc" id="L51">        LANG_TO_LCID.put(&quot;marathi&quot;, 1102);</span>
+<span class="fc" id="L52">        LANG_TO_LCID.put(&quot;nynorsk&quot;, 2068);</span>
+<span class="fc" id="L53">        LANG_TO_LCID.put(&quot;polish&quot;, 1045);</span>
+<span class="fc" id="L54">        LANG_TO_LCID.put(&quot;brazil&quot;, 1046);</span>
+<span class="fc" id="L55">        LANG_TO_LCID.put(&quot;portuguese&quot;, 2070);</span>
+<span class="fc" id="L56">        LANG_TO_LCID.put(&quot;romanian&quot;, 1048);</span>
+<span class="fc" id="L57">        LANG_TO_LCID.put(&quot;russian&quot;, 1049);</span>
+<span class="fc" id="L58">        LANG_TO_LCID.put(&quot;serbian&quot;, 2074);</span>
+<span class="fc" id="L59">        LANG_TO_LCID.put(&quot;serbianc&quot;, 3098);</span>
+<span class="fc" id="L60">        LANG_TO_LCID.put(&quot;slovak&quot;, 1051);</span>
+<span class="fc" id="L61">        LANG_TO_LCID.put(&quot;slovene&quot;, 1060);</span>
+<span class="fc" id="L62">        LANG_TO_LCID.put(&quot;spanish&quot;, 3082);</span>
+<span class="fc" id="L63">        LANG_TO_LCID.put(&quot;swedish&quot;, 1053);</span>
+<span class="fc" id="L64">        LANG_TO_LCID.put(&quot;turkish&quot;, 1055);</span>
+<span class="fc" id="L65">        LANG_TO_LCID.put(&quot;ukrainian&quot;, 1058);</span>
+    }
+
+    static {
+<span class="fc" id="L69">        BIBLATEX_TO_MS_BIB.put(InternalField.KEY_FIELD, &quot;Tag&quot;);</span>
+<span class="fc" id="L70">        BIBLATEX_TO_MS_BIB.put(StandardField.TITLE, &quot;Title&quot;);</span>
+<span class="fc" id="L71">        BIBLATEX_TO_MS_BIB.put(StandardField.YEAR, &quot;Year&quot;);</span>
+<span class="fc" id="L72">        BIBLATEX_TO_MS_BIB.put(StandardField.VOLUME, &quot;Volume&quot;);</span>
+<span class="fc" id="L73">        BIBLATEX_TO_MS_BIB.put(StandardField.LANGUAGE, &quot;LCID&quot;);</span>
+<span class="fc" id="L74">        BIBLATEX_TO_MS_BIB.put(StandardField.EDITION, &quot;Edition&quot;);</span>
+<span class="fc" id="L75">        BIBLATEX_TO_MS_BIB.put(StandardField.PUBLISHER, &quot;Publisher&quot;);</span>
+<span class="fc" id="L76">        BIBLATEX_TO_MS_BIB.put(StandardField.BOOKTITLE, &quot;BookTitle&quot;);</span>
+<span class="fc" id="L77">        BIBLATEX_TO_MS_BIB.put(StandardField.SHORTTITLE, &quot;ShortTitle&quot;);</span>
+<span class="fc" id="L78">        BIBLATEX_TO_MS_BIB.put(StandardField.NOTE, &quot;Comments&quot;);</span>
+<span class="fc" id="L79">        BIBLATEX_TO_MS_BIB.put(StandardField.VOLUMES, &quot;NumberVolumes&quot;);</span>
+
+<span class="fc" id="L81">        BIBLATEX_TO_MS_BIB.put(StandardField.CHAPTER, &quot;ChapterNumber&quot;);</span>
+
+<span class="fc" id="L83">        BIBLATEX_TO_MS_BIB.put(StandardField.ISSUE, &quot;Issue&quot;);</span>
+<span class="fc" id="L84">        BIBLATEX_TO_MS_BIB.put(StandardField.SCHOOL, &quot;Department&quot;);</span>
+<span class="fc" id="L85">        BIBLATEX_TO_MS_BIB.put(StandardField.INSTITUTION, &quot;Institution&quot;);</span>
+<span class="fc" id="L86">        BIBLATEX_TO_MS_BIB.put(StandardField.DOI, &quot;DOI&quot;);</span>
+<span class="fc" id="L87">        BIBLATEX_TO_MS_BIB.put(StandardField.URL, &quot;URL&quot;);</span>
+        // BibTeX/Biblatex only fields
+
+<span class="fc" id="L90">        BIBLATEX_TO_MS_BIB.put(StandardField.SERIES, BIBTEX_PREFIX + &quot;Series&quot;);</span>
+<span class="fc" id="L91">        BIBLATEX_TO_MS_BIB.put(StandardField.ABSTRACT, BIBTEX_PREFIX + &quot;Abstract&quot;);</span>
+<span class="fc" id="L92">        BIBLATEX_TO_MS_BIB.put(StandardField.KEYWORDS, BIBTEX_PREFIX + &quot;KeyWords&quot;);</span>
+<span class="fc" id="L93">        BIBLATEX_TO_MS_BIB.put(StandardField.CROSSREF, BIBTEX_PREFIX + &quot;CrossRef&quot;);</span>
+<span class="fc" id="L94">        BIBLATEX_TO_MS_BIB.put(StandardField.HOWPUBLISHED, BIBTEX_PREFIX + &quot;HowPublished&quot;);</span>
+<span class="fc" id="L95">        BIBLATEX_TO_MS_BIB.put(StandardField.PUBSTATE, BIBTEX_PREFIX + &quot;Pubstate&quot;);</span>
+<span class="fc" id="L96">        BIBLATEX_TO_MS_BIB.put(new UnknownField(&quot;affiliation&quot;), BIBTEX_PREFIX + &quot;Affiliation&quot;);</span>
+<span class="fc" id="L97">        BIBLATEX_TO_MS_BIB.put(new UnknownField(&quot;contents&quot;), BIBTEX_PREFIX + &quot;Contents&quot;);</span>
+<span class="fc" id="L98">        BIBLATEX_TO_MS_BIB.put(new UnknownField(&quot;copyright&quot;), BIBTEX_PREFIX + &quot;Copyright&quot;);</span>
+<span class="fc" id="L99">        BIBLATEX_TO_MS_BIB.put(new UnknownField(&quot;price&quot;), BIBTEX_PREFIX + &quot;Price&quot;);</span>
+<span class="fc" id="L100">        BIBLATEX_TO_MS_BIB.put(new UnknownField(&quot;size&quot;), BIBTEX_PREFIX + &quot;Size&quot;);</span>
+<span class="fc" id="L101">        BIBLATEX_TO_MS_BIB.put(new UnknownField(&quot;intype&quot;), BIBTEX_PREFIX + &quot;InType&quot;);</span>
+<span class="fc" id="L102">        BIBLATEX_TO_MS_BIB.put(new UnknownField(&quot;paper&quot;), BIBTEX_PREFIX + &quot;Paper&quot;);</span>
+<span class="fc" id="L103">        BIBLATEX_TO_MS_BIB.put(StandardField.KEY, BIBTEX_PREFIX + &quot;Key&quot;);</span>
+
+        // MSBib only fields
+<span class="fc" id="L106">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;periodical&quot;), &quot;PeriodicalTitle&quot;);</span>
+<span class="fc" id="L107">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + StandardField.DAY), &quot;Day&quot;);</span>
+<span class="fc" id="L108">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;accessed&quot;), &quot;Accessed&quot;);</span>
+<span class="fc" id="L109">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;medium&quot;), &quot;Medium&quot;);</span>
+<span class="fc" id="L110">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;recordingnumber&quot;), &quot;RecordingNumber&quot;);</span>
+<span class="fc" id="L111">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;theater&quot;), &quot;Theater&quot;);</span>
+<span class="fc" id="L112">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;distributor&quot;), &quot;Distributor&quot;);</span>
+<span class="fc" id="L113">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;broadcaster&quot;), &quot;Broadcaster&quot;);</span>
+<span class="fc" id="L114">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;station&quot;), &quot;Station&quot;);</span>
+<span class="fc" id="L115">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + StandardField.TYPE), &quot;Type&quot;);</span>
+<span class="fc" id="L116">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;court&quot;), &quot;Court&quot;);</span>
+<span class="fc" id="L117">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;reporter&quot;), &quot;Reporter&quot;);</span>
+<span class="fc" id="L118">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;casenumber&quot;), &quot;CaseNumber&quot;);</span>
+<span class="fc" id="L119">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;abbreviatedcasenumber&quot;), &quot;AbbreviatedCaseNumber&quot;);</span>
+<span class="fc" id="L120">        BIBLATEX_TO_MS_BIB.put(new UnknownField(MSBIB_PREFIX + &quot;productioncompany&quot;), &quot;ProductionCompany&quot;);</span>
+<span class="fc" id="L121">    }</span>
+
+    private MSBibMapping() {
+    }
+
+    public static EntryType getBiblatexEntryType(String msbibType) {
+<span class="fc" id="L127">        Map&lt;String, EntryType&gt; entryTypeMapping = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L129">        entryTypeMapping.put(&quot;Book&quot;, StandardEntryType.Book);</span>
+<span class="fc" id="L130">        entryTypeMapping.put(&quot;BookSection&quot;, StandardEntryType.Book);</span>
+<span class="fc" id="L131">        entryTypeMapping.put(&quot;JournalArticle&quot;, StandardEntryType.Article);</span>
+<span class="fc" id="L132">        entryTypeMapping.put(&quot;ArticleInAPeriodical&quot;, IEEETranEntryType.Periodical);</span>
+<span class="fc" id="L133">        entryTypeMapping.put(&quot;ConferenceProceedings&quot;, StandardEntryType.InProceedings);</span>
+<span class="fc" id="L134">        entryTypeMapping.put(&quot;Report&quot;, StandardEntryType.TechReport);</span>
+<span class="fc" id="L135">        entryTypeMapping.put(&quot;Patent&quot;, IEEETranEntryType.Patent);</span>
+<span class="fc" id="L136">        entryTypeMapping.put(&quot;InternetSite&quot;, StandardEntryType.Online);</span>
+
+<span class="fc" id="L138">        return entryTypeMapping.getOrDefault(msbibType, StandardEntryType.Misc);</span>
+    }
+
+    public static MSBibEntryType getMSBibEntryType(EntryType bibtexType) {
+<span class="fc" id="L142">        Map&lt;EntryType, MSBibEntryType&gt; entryTypeMapping = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L144">        entryTypeMapping.put(StandardEntryType.Book, MSBibEntryType.Book);</span>
+<span class="fc" id="L145">        entryTypeMapping.put(StandardEntryType.InBook, MSBibEntryType.BookSection);</span>
+<span class="fc" id="L146">        entryTypeMapping.put(StandardEntryType.Booklet, MSBibEntryType.BookSection);</span>
+<span class="fc" id="L147">        entryTypeMapping.put(StandardEntryType.InCollection, MSBibEntryType.BookSection);</span>
+<span class="fc" id="L148">        entryTypeMapping.put(StandardEntryType.Article, MSBibEntryType.JournalArticle);</span>
+<span class="fc" id="L149">        entryTypeMapping.put(StandardEntryType.InProceedings, MSBibEntryType.ConferenceProceedings);</span>
+<span class="fc" id="L150">        entryTypeMapping.put(StandardEntryType.Conference, MSBibEntryType.ConferenceProceedings);</span>
+<span class="fc" id="L151">        entryTypeMapping.put(StandardEntryType.Proceedings, MSBibEntryType.ConferenceProceedings);</span>
+<span class="fc" id="L152">        entryTypeMapping.put(StandardEntryType.Collection, MSBibEntryType.ConferenceProceedings);</span>
+<span class="fc" id="L153">        entryTypeMapping.put(StandardEntryType.TechReport, MSBibEntryType.Report);</span>
+<span class="fc" id="L154">        entryTypeMapping.put(StandardEntryType.Manual, MSBibEntryType.Report);</span>
+<span class="fc" id="L155">        entryTypeMapping.put(StandardEntryType.MastersThesis, MSBibEntryType.Report);</span>
+<span class="fc" id="L156">        entryTypeMapping.put(StandardEntryType.PhdThesis, MSBibEntryType.Report);</span>
+<span class="fc" id="L157">        entryTypeMapping.put(StandardEntryType.Unpublished, MSBibEntryType.Report);</span>
+<span class="fc" id="L158">        entryTypeMapping.put(IEEETranEntryType.Patent, MSBibEntryType.Patent);</span>
+<span class="fc" id="L159">        entryTypeMapping.put(StandardEntryType.Misc, MSBibEntryType.Misc);</span>
+<span class="fc" id="L160">        entryTypeMapping.put(IEEETranEntryType.Electronic, MSBibEntryType.ElectronicSource);</span>
+<span class="fc" id="L161">        entryTypeMapping.put(StandardEntryType.Online, MSBibEntryType.InternetSite);</span>
+
+<span class="fc" id="L163">        return entryTypeMapping.getOrDefault(bibtexType, MSBibEntryType.Misc);</span>
+    }
+
+    /**
+     * &lt;a href=&quot;http://www.microsoft.com/globaldev/reference/lcid-all.mspx&quot;&gt;All LCID codes&lt;/a&gt;
+     *
+     * @param language The language to transform
+     * @return 1033 (american english) as default. LCID otherwise.
+     */
+    public static int getLCID(String language) {
+<span class="fc" id="L173">        return LANG_TO_LCID.getOrDefault(language, 1033);</span>
+    }
+
+    /**
+     * &lt;a href=&quot;http://www.microsoft.com/globaldev/reference/lcid-all.mspx&quot;&gt;All LCID codes&lt;/a&gt;
+     *
+     * @param  LCID The LCID to transform
+     * @return &quot;english&quot; as default. Corresponding language from BiMap otherwise.
+     */
+    public static String getLanguage(int LCID) {
+<span class="fc" id="L183">        return LANG_TO_LCID.inverse().getOrDefault(LCID, &quot;english&quot;);</span>
+    }
+
+    public static String getMSBibField(Field field) {
+<span class="fc" id="L187">        return BIBLATEX_TO_MS_BIB.get(field);</span>
+    }
+
+    public static Field getBibTeXField(String msbibFieldName) {
+<span class="fc" id="L191">        return BIBLATEX_TO_MS_BIB.inverse().get(msbibFieldName);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

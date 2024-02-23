@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MainTableColumnModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.maintable</a> &gt; <span class="el_source">MainTableColumnModel.java</span></div><h1>MainTableColumnModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.maintable;
+
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
+
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.scene.control.TableColumn;
+
+import org.jabref.gui.util.FieldsUtil;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.metadata.SaveOrder;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Represents the full internal name of a column in the main table. Consists of two parts: The type of the column and a qualifier, like the
+ * field name to be displayed in the column.
+ */
+public class MainTableColumnModel {
+
+<span class="fc" id="L30">    public static final Character COLUMNS_QUALIFIER_DELIMITER = ':';</span>
+
+<span class="fc" id="L32">    private static final Logger LOGGER = LoggerFactory.getLogger(MainTableColumnModel.class);</span>
+
+<span class="fc" id="L34">    public enum Type {</span>
+<span class="fc" id="L35">        INDEX(&quot;index&quot;, Localization.lang(&quot;Index&quot;)),</span>
+<span class="fc" id="L36">        EXTRAFILE(&quot;extrafile&quot;, Localization.lang(&quot;File type&quot;)),</span>
+<span class="fc" id="L37">        FILES(&quot;files&quot;, Localization.lang(&quot;Linked files&quot;)),</span>
+
+<span class="fc" id="L39">        GROUPS(&quot;groups&quot;, Localization.lang(&quot;Groups&quot;)),</span>
+<span class="fc" id="L40">        GROUP_ICONS(&quot;group_icons&quot;, Localization.lang(&quot;Group icons&quot;)),</span>
+<span class="fc" id="L41">        LINKED_IDENTIFIER(&quot;linked_id&quot;, Localization.lang(&quot;Linked identifiers&quot;)),</span>
+<span class="fc" id="L42">        NORMALFIELD(&quot;field&quot;),</span>
+<span class="fc" id="L43">        SPECIALFIELD(&quot;special&quot;, Localization.lang(&quot;Special&quot;)),</span>
+<span class="fc" id="L44">        LIBRARY_NAME(&quot;library&quot;, Localization.lang(&quot;Library&quot;));</span>
+
+<span class="fc" id="L46">        public static final EnumSet&lt;Type&gt; ICON_COLUMNS = EnumSet.of(EXTRAFILE, FILES, GROUPS, GROUP_ICONS, LINKED_IDENTIFIER);</span>
+
+        private final String name;
+        private final String displayName;
+
+<span class="fc" id="L51">        Type(String name) {</span>
+<span class="fc" id="L52">            this.name = name;</span>
+<span class="fc" id="L53">            this.displayName = name;</span>
+<span class="fc" id="L54">        }</span>
+
+<span class="fc" id="L56">        Type(String name, String displayName) {</span>
+<span class="fc" id="L57">            this.name = name;</span>
+<span class="fc" id="L58">            this.displayName = displayName;</span>
+<span class="fc" id="L59">        }</span>
+
+        public String getName() {
+<span class="fc" id="L62">            return name;</span>
+        }
+
+        public String getDisplayName() {
+<span class="nc" id="L66">            return displayName;</span>
+        }
+
+        public static Type fromString(String text) {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            for (Type type : Type.values()) {</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                if (type.getName().equals(text)) {</span>
+<span class="fc" id="L72">                    return type;</span>
+                }
+            }
+<span class="fc" id="L75">            LOGGER.warn(&quot;Column type '{}' is unknown.&quot;, text);</span>
+<span class="fc" id="L76">            return NORMALFIELD;</span>
+        }
+    }
+
+<span class="fc" id="L80">    private final ObjectProperty&lt;Type&gt; typeProperty = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="fc" id="L81">    private final StringProperty qualifierProperty = new SimpleStringProperty();</span>
+<span class="fc" id="L82">    private final DoubleProperty widthProperty = new SimpleDoubleProperty();</span>
+<span class="fc" id="L83">    private final ObjectProperty&lt;TableColumn.SortType&gt; sortTypeProperty = new SimpleObjectProperty&lt;&gt;();</span>
+
+    /**
+     * This is used by the preferences dialog, to initialize available columns the user can add to the table.
+     *
+     * @param type      the {@code MainTableColumnModel.Type} of the column, e.g. &quot;NORMALFIELD&quot; or &quot;EXTRAFILE&quot;
+     * @param qualifier the stored qualifier of the column, e.g. &quot;author/editor&quot;
+     */
+<span class="fc" id="L91">    public MainTableColumnModel(Type type, String qualifier) {</span>
+<span class="fc" id="L92">        Objects.requireNonNull(type);</span>
+<span class="fc" id="L93">        Objects.requireNonNull(qualifier);</span>
+
+<span class="fc" id="L95">        this.typeProperty.setValue(type);</span>
+<span class="fc" id="L96">        this.qualifierProperty.setValue(qualifier);</span>
+<span class="fc" id="L97">        this.sortTypeProperty.setValue(TableColumn.SortType.ASCENDING);</span>
+
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (Type.ICON_COLUMNS.contains(type)) {</span>
+<span class="fc" id="L100">            this.widthProperty.setValue(ColumnPreferences.ICON_COLUMN_WIDTH);</span>
+        } else {
+<span class="fc" id="L102">            this.widthProperty.setValue(ColumnPreferences.DEFAULT_COLUMN_WIDTH);</span>
+        }
+<span class="fc" id="L104">    }</span>
+
+    /**
+     * This is used by the preferences dialog, to initialize available basic icon columns, the user can add to the table.
+     *
+     * @param type the {@code MainTableColumnModel.Type} of the column, e.g. &quot;GROUPS&quot; or &quot;LINKED_IDENTIFIER&quot;
+     */
+    public MainTableColumnModel(Type type) {
+<span class="fc" id="L112">        this(type, &quot;&quot;);</span>
+<span class="fc" id="L113">    }</span>
+
+    /**
+     * This is used by the preference migrations.
+     *
+     * @param type      the {@code MainTableColumnModel.Type} of the column, e.g. &quot;NORMALFIELD&quot; or &quot;GROUPS&quot;
+     * @param qualifier the stored qualifier of the column, e.g. &quot;author/editor&quot;
+     * @param width     the stored width of the column
+     */
+    public MainTableColumnModel(Type type, String qualifier, double width) {
+<span class="fc" id="L123">        this(type, qualifier);</span>
+
+<span class="fc" id="L125">        this.widthProperty.setValue(width);</span>
+<span class="fc" id="L126">    }</span>
+
+    public Type getType() {
+<span class="fc" id="L129">        return typeProperty.getValue();</span>
+    }
+
+    public String getQualifier() {
+<span class="fc" id="L133">        return qualifierProperty.getValue();</span>
+    }
+
+    public String getName() {
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (qualifierProperty.getValue().isBlank()) {</span>
+<span class="fc" id="L138">            return typeProperty.getValue().getName();</span>
+        } else {
+<span class="fc" id="L140">            return typeProperty.getValue().getName() + COLUMNS_QUALIFIER_DELIMITER + qualifierProperty.getValue();</span>
+        }
+    }
+
+    public String getDisplayName() {
+<span class="nc bnc" id="L145" title="All 4 branches missed.">        if ((Type.ICON_COLUMNS.contains(typeProperty.getValue()) &amp;&amp; qualifierProperty.getValue().isBlank())</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                || (typeProperty.getValue() == Type.INDEX)) {</span>
+<span class="nc" id="L147">            return typeProperty.getValue().getDisplayName();</span>
+        } else {
+            // In case an OrField is used, `FieldFactory.parseField` returns UnknownField, which leads to
+            // &quot;author/editor(Custom)&quot; instead of &quot;author/editor&quot; in the output
+<span class="nc" id="L151">            return FieldsUtil.getNameWithType(FieldFactory.parseField(qualifierProperty.getValue()));</span>
+        }
+    }
+
+    public StringProperty nameProperty() {
+<span class="nc" id="L156">        return new ReadOnlyStringWrapper(getDisplayName());</span>
+    }
+
+    public double getWidth() {
+<span class="fc" id="L160">        return widthProperty.getValue();</span>
+    }
+
+    public DoubleProperty widthProperty() {
+<span class="nc" id="L164">        return widthProperty;</span>
+    }
+
+    public TableColumn.SortType getSortType() {
+<span class="fc" id="L168">        return sortTypeProperty.getValue();</span>
+    }
+
+    public ObjectProperty&lt;TableColumn.SortType&gt; sortTypeProperty() {
+<span class="nc" id="L172">        return sortTypeProperty;</span>
+    }
+
+    /**
+     * Returns a list of sort cirteria based on the fields the current column displays.
+     * In case it is single field, a single SortCriterion is returned.
+     * In case of multiple fields, for each field, there is a SortCriterion contained in the list.
+     *
+     * Implementation reason: We want to have SortCriterion handle a single field, because the UI allows for handling
+     * &quot;plain&quot; fields only.
+     */
+    public List&lt;SaveOrder.SortCriterion&gt; getSortCriteria() {
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        boolean descending = getSortType() == TableColumn.SortType.DESCENDING;</span>
+<span class="nc" id="L185">        return FieldFactory.parseOrFields(getQualifier()).getFields().stream()</span>
+<span class="nc" id="L186">                .map(field -&gt; new SaveOrder.SortCriterion(field, descending))</span>
+<span class="nc" id="L187">                .toList();</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L193">            return true;</span>
+        }
+
+<span class="nc bnc" id="L196" title="All 4 branches missed.">        if ((o == null) || (getClass() != o.getClass())) {</span>
+<span class="nc" id="L197">            return false;</span>
+        }
+
+<span class="nc" id="L200">        MainTableColumnModel that = (MainTableColumnModel) o;</span>
+
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (typeProperty.getValue() != that.typeProperty.getValue()) {</span>
+<span class="nc" id="L203">            return false;</span>
+        }
+<span class="nc" id="L205">        return Objects.equals(qualifierProperty.getValue(), that.qualifierProperty.getValue());</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L210">        return Objects.hash(typeProperty.getValue(), qualifierProperty.getValue());</span>
+    }
+
+    /**
+     * This creates a new {@code MainTableColumnModel} out of a given string
+     *
+     * @param rawColumnName the name of the column, e.g. &quot;field:author&quot;, or &quot;author&quot;
+     * @return A new {@code MainTableColumnModel}
+     */
+    public static MainTableColumnModel parse(String rawColumnName) {
+<span class="fc" id="L220">        Objects.requireNonNull(rawColumnName);</span>
+<span class="fc" id="L221">        String[] splittedName = rawColumnName.split(COLUMNS_QUALIFIER_DELIMITER.toString());</span>
+
+<span class="fc" id="L223">        Type type = Type.fromString(splittedName[0]);</span>
+<span class="fc" id="L224">        String qualifier = &quot;&quot;;</span>
+
+<span class="pc bpc" id="L226" title="2 of 6 branches missed.">        if ((type == Type.NORMALFIELD)</span>
+                || (type == Type.SPECIALFIELD)
+                || (type == Type.EXTRAFILE)) {
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (splittedName.length == 1) {</span>
+<span class="fc" id="L230">                qualifier = splittedName[0]; // By default the rawColumnName is parsed as NORMALFIELD</span>
+            } else {
+<span class="fc" id="L232">                qualifier = splittedName[1];</span>
+            }
+        }
+
+<span class="fc" id="L236">        return new MainTableColumnModel(type, qualifier);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

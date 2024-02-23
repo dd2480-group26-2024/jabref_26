@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomImporterTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.customimporter</a> &gt; <span class="el_source">CustomImporterTabViewModel.java</span></div><h1>CustomImporterTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.customimporter;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.collections.FXCollections;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.importer.ImporterViewModel;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.logic.importer.ImportException;
+import org.jabref.logic.importer.fileformat.CustomImporter;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class CustomImporterTabViewModel implements PreferenceTabViewModel {
+
+<span class="nc" id="L30">    private static final Logger LOGGER = LoggerFactory.getLogger(CustomImporterTabViewModel.class);</span>
+
+<span class="nc" id="L32">    private final ListProperty&lt;ImporterViewModel&gt; importers = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L33">    private final ListProperty&lt;ImporterViewModel&gt; selectedImporters = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+
+    private final PreferencesService preferences;
+    private final DialogService dialogService;
+
+<span class="nc" id="L38">    public CustomImporterTabViewModel(PreferencesService preferences, DialogService dialogService) {</span>
+<span class="nc" id="L39">        this.preferences = preferences;</span>
+<span class="nc" id="L40">        this.dialogService = dialogService;</span>
+<span class="nc" id="L41">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L45">        Set&lt;CustomImporter&gt; importersLogic = preferences.getImporterPreferences().getCustomImporters();</span>
+<span class="nc" id="L46">        importers.clear();</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        for (CustomImporter importer : importersLogic) {</span>
+<span class="nc" id="L48">            importers.add(new ImporterViewModel(importer));</span>
+<span class="nc" id="L49">        }</span>
+<span class="nc" id="L50">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L54">        preferences.getImporterPreferences().setCustomImporters(importers.stream()</span>
+<span class="nc" id="L55">                                                                         .map(ImporterViewModel::getLogic)</span>
+<span class="nc" id="L56">                                                                         .collect(Collectors.toSet()));</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Converts a path relative to a base-path into a class name.
+     *
+     * @param basePath base path
+     * @param path     path that includes base-path as a prefix
+     * @return class name
+     */
+    private static String pathToClass(String basePath, Path path) {
+<span class="nc" id="L67">        String className = FileUtil.relativize(path, Collections.singletonList(Path.of(basePath))).toString();</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (className != null) {</span>
+<span class="nc" id="L69">            int lastDot = className.lastIndexOf('.');</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (lastDot &lt; 0) {</span>
+<span class="nc" id="L71">                return className;</span>
+            }
+<span class="nc" id="L73">            className = className.substring(0, lastDot);</span>
+        }
+<span class="nc" id="L75">        return className;</span>
+    }
+
+    public void addImporter() {
+<span class="nc" id="L79">        FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()</span>
+<span class="nc" id="L80">                .addExtensionFilter(StandardFileType.CLASS, StandardFileType.JAR, StandardFileType.ZIP)</span>
+<span class="nc" id="L81">                .withDefaultExtension(StandardFileType.CLASS)</span>
+<span class="nc" id="L82">                .withInitialDirectory(preferences.getFilePreferences().getWorkingDirectory())</span>
+<span class="nc" id="L83">                .build();</span>
+
+<span class="nc" id="L85">        Optional&lt;Path&gt; selectedFile = dialogService.showFileOpenDialog(fileDialogConfiguration);</span>
+
+<span class="nc bnc" id="L87" title="All 4 branches missed.">        if (selectedFile.isPresent() &amp;&amp; (selectedFile.get().getParent() != null)) {</span>
+<span class="nc" id="L88">            boolean isArchive = FileUtil.getFileExtension(selectedFile.get())</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">                                        .filter(extension -&gt; &quot;jar&quot;.equalsIgnoreCase(extension) || &quot;zip&quot;.equalsIgnoreCase(extension))</span>
+<span class="nc" id="L90">                                        .isPresent();</span>
+
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            if (isArchive) {</span>
+                try {
+<span class="nc" id="L94">                    Optional&lt;Path&gt; selectedFileInArchive = dialogService.showFileOpenFromArchiveDialog(selectedFile.get());</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                    if (selectedFileInArchive.isPresent()) {</span>
+<span class="nc" id="L96">                        String className = selectedFileInArchive.get().toString().substring(0, selectedFileInArchive.get().toString().lastIndexOf('.')).replace(</span>
+                                &quot;/&quot;, &quot;.&quot;);
+<span class="nc" id="L98">                        CustomImporter importer = new CustomImporter(selectedFile.get().toAbsolutePath().toString(), className);</span>
+<span class="nc" id="L99">                        importers.add(new ImporterViewModel(importer));</span>
+                    }
+<span class="nc" id="L101">                } catch (IOException exc) {</span>
+<span class="nc" id="L102">                    LOGGER.error(&quot;Could not open ZIP-archive.&quot;, exc);</span>
+<span class="nc" id="L103">                    dialogService.showErrorDialogAndWait(</span>
+<span class="nc" id="L104">                            Localization.lang(&quot;Could not open %0&quot;, selectedFile.get().toString()) + &quot;\n&quot;</span>
+<span class="nc" id="L105">                                    + Localization.lang(&quot;Have you chosen the correct package path?&quot;),</span>
+                            exc);
+<span class="nc" id="L107">                } catch (ImportException exc) {</span>
+<span class="nc" id="L108">                    LOGGER.error(&quot;Could not instantiate importer&quot;, exc);</span>
+<span class="nc" id="L109">                    dialogService.showErrorDialogAndWait(</span>
+<span class="nc" id="L110">                            Localization.lang(&quot;Could not instantiate %0 %1&quot;, &quot;importer&quot;),</span>
+                            exc);
+<span class="nc" id="L112">                }</span>
+            } else {
+                try {
+<span class="nc" id="L115">                    String basePath = selectedFile.get().getParent().toString();</span>
+<span class="nc" id="L116">                    String className = pathToClass(basePath, selectedFile.get());</span>
+<span class="nc" id="L117">                    CustomImporter importer = new CustomImporter(basePath, className);</span>
+
+<span class="nc" id="L119">                    importers.add(new ImporterViewModel(importer));</span>
+<span class="nc" id="L120">                } catch (Exception exc) {</span>
+<span class="nc" id="L121">                    LOGGER.error(&quot;Could not instantiate importer&quot;, exc);</span>
+<span class="nc" id="L122">                    dialogService.showErrorDialogAndWait(Localization.lang(&quot;Could not instantiate %0&quot;, selectedFile.get().toString()), exc);</span>
+<span class="nc" id="L123">                } catch (NoClassDefFoundError exc) {</span>
+<span class="nc" id="L124">                    LOGGER.error(&quot;Could not find class while instantiating importer&quot;, exc);</span>
+<span class="nc" id="L125">                    dialogService.showErrorDialogAndWait(</span>
+<span class="nc" id="L126">                            Localization.lang(&quot;Could not instantiate %0. Have you chosen the correct package path?&quot;, selectedFile.get().toString()),</span>
+                            exc);
+<span class="nc" id="L128">                }</span>
+            }
+        }
+<span class="nc" id="L131">    }</span>
+
+    public void removeSelectedImporter() {
+<span class="nc" id="L134">        importers.removeAll(selectedImporters);</span>
+<span class="nc" id="L135">    }</span>
+
+    public ListProperty&lt;ImporterViewModel&gt; selectedImportersProperty() {
+<span class="nc" id="L138">        return selectedImporters;</span>
+    }
+
+    public ListProperty&lt;ImporterViewModel&gt; importersProperty() {
+<span class="nc" id="L142">        return importers;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

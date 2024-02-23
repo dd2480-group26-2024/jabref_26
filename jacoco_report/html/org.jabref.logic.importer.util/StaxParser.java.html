@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StaxParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.util</a> &gt; <span class="el_source">StaxParser.java</span></div><h1>StaxParser.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.util;
+
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+
+<span class="nc" id="L7">public class StaxParser {</span>
+
+    /**
+     * Extracts the XML content inside the first
+     * encountered parent tag, including tag elements,
+     * attributes, namespace, prefix and contained text
+     *
+     * @param reader the stream reader
+     * @return Returns the inner XML content
+     */
+    public static String getXMLContent(XMLStreamReader reader) throws XMLStreamException {
+        // skip over START DOCUMENT event
+<span class="pc bpc" id="L19" title="1 of 4 branches missed.">        while (reader.getEventType() == XMLStreamConstants.START_DOCUMENT &amp;&amp; reader.hasNext()) {</span>
+<span class="fc" id="L20">            reader.next();</span>
+        }
+
+<span class="fc" id="L23">        StringBuilder content = new StringBuilder();</span>
+
+<span class="fc" id="L25">        String parentTag = reader.getLocalName();</span>
+<span class="fc" id="L26">        int depth = 1;</span>
+<span class="fc" id="L27">        content.append(getXMLStartTag(reader, true));</span>
+
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L30">            int event = reader.next();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            if (event == XMLStreamConstants.START_ELEMENT) {</span>
+<span class="fc" id="L32">                String tagName = reader.getLocalName();</span>
+
+<span class="fc bfc" id="L34" title="All 2 branches covered.">                if (tagName.equals(parentTag)) {</span>
+                    // nested tag of same type
+<span class="fc" id="L36">                    depth++;</span>
+                }
+
+                // append the start tag
+<span class="fc" id="L40">                content.append(getXMLStartTag(reader, false));</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            } else if (event == XMLStreamConstants.END_ELEMENT) {</span>
+<span class="fc" id="L42">                String tagName = reader.getLocalName();</span>
+
+                // append the end tag
+<span class="fc" id="L45">                content.append(getXMLEndTag(reader));</span>
+
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                if (tagName.equals(parentTag)) {</span>
+<span class="fc" id="L48">                    depth--;</span>
+
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                    if (depth == 0) {</span>
+                        // reached the closing tag of the first parent tag
+<span class="fc" id="L52">                        break;</span>
+                    }
+                }
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            } else if (event == XMLStreamConstants.CHARACTERS) {</span>
+<span class="fc" id="L56">                content.append(getXMLText(reader));</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            } else if (event == XMLStreamConstants.CDATA) {</span>
+<span class="nc" id="L58">                content.append(getXMLCData(reader));</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">            } else if (event == XMLStreamConstants.COMMENT) {</span>
+<span class="nc" id="L60">                content.append(getXMLComment(reader));</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            } else if (event == XMLStreamConstants.PROCESSING_INSTRUCTION) {</span>
+<span class="nc" id="L62">                content.append(getXMLProcessingInstruction(reader));</span>
+<span class="nc bnc" id="L63" title="All 4 branches missed.">            } else if (event == XMLStreamConstants.SPACE || event == XMLStreamConstants.ENTITY_REFERENCE) {</span>
+<span class="nc" id="L64">                content.append(getXMLText(reader));</span>
+            }
+<span class="fc" id="L66">        }</span>
+
+<span class="fc" id="L68">        return content.toString().trim();</span>
+    }
+
+    private static String getXMLStartTag(XMLStreamReader reader, boolean addNamespaceURI) {
+<span class="fc" id="L72">        StringBuilder startTag = new StringBuilder();</span>
+
+<span class="fc" id="L74">        String prefix = reader.getPrefix();</span>
+
+<span class="fc" id="L76">        startTag.append(&quot;&lt;&quot;)</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">                .append(prefix != null &amp;&amp; !prefix.isBlank() ? prefix + &quot;:&quot; : &quot;&quot;)</span>
+<span class="fc" id="L78">                .append(reader.getName().getLocalPart());</span>
+
+<span class="fc" id="L80">        String namespaceURI = reader.getNamespaceURI();</span>
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (addNamespaceURI &amp;&amp; namespaceURI != null) {</span>
+<span class="fc" id="L82">            startTag.append(&quot; xmlns&quot;)</span>
+<span class="pc bpc" id="L83" title="1 of 4 branches missed.">                    .append(prefix != null &amp;&amp; !prefix.isBlank() ? &quot;:&quot; + prefix : &quot;&quot;)</span>
+<span class="fc" id="L84">                    .append(&quot;=\&quot;&quot;)</span>
+<span class="fc" id="L85">                    .append(namespaceURI)</span>
+<span class="fc" id="L86">                    .append(&quot;\&quot;&quot;);</span>
+        }
+
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (int i = 0; i &lt; reader.getAttributeCount(); i++) {</span>
+<span class="fc" id="L90">            startTag.append(&quot; &quot;).append(reader.getAttributeLocalName(i)).append(&quot;=\&quot;&quot;).append(reader.getAttributeValue(i)).append(&quot;\&quot;&quot;);</span>
+        }
+
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (reader.isEndElement()) {</span>
+<span class="nc" id="L94">            startTag.append(&quot;/&quot;);</span>
+        }
+
+<span class="fc" id="L97">        startTag.append(&quot;&gt;&quot;);</span>
+<span class="fc" id="L98">        return startTag.toString();</span>
+    }
+
+    private static String getXMLEndTag(XMLStreamReader reader) {
+<span class="fc" id="L102">        StringBuilder endTag = new StringBuilder();</span>
+<span class="fc" id="L103">        String prefix = reader.getPrefix();</span>
+
+<span class="fc" id="L105">        endTag.append(&quot;&lt;/&quot;)</span>
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">              .append(prefix != null &amp;&amp; !prefix.isBlank() ? prefix + &quot;:&quot; : &quot;&quot;)</span>
+<span class="fc" id="L107">              .append(reader.getName().getLocalPart())</span>
+<span class="fc" id="L108">              .append(&quot;&gt;&quot;);</span>
+
+<span class="fc" id="L110">        return endTag.toString();</span>
+    }
+
+    private static String getXMLCData(XMLStreamReader reader) {
+<span class="nc" id="L114">        return &quot;&lt;![CDATA[&quot; + reader.getText() + &quot;]]&gt;&quot;;</span>
+    }
+
+    private static String getXMLComment(XMLStreamReader reader) {
+<span class="nc" id="L118">        return &quot;&lt;!--&quot; + reader.getText() + &quot;--&gt;&quot;;</span>
+    }
+
+    private static String getXMLProcessingInstruction(XMLStreamReader reader) {
+<span class="nc" id="L122">        return &quot;&lt;?&quot; + reader.getPITarget() + &quot; &quot; + reader.getPIData() + &quot;?&gt;&quot;;</span>
+    }
+
+    private static String getXMLText(XMLStreamReader reader) {
+<span class="fc" id="L126">        return reader.getText().trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

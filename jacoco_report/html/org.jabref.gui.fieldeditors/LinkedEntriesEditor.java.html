@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LinkedEntriesEditor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors</a> &gt; <span class="el_source">LinkedEntriesEditor.java</span></div><h1>LinkedEntriesEditor.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors;
+
+import java.util.Comparator;
+import java.util.stream.Collectors;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.beans.binding.Bindings;
+import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.HBox;
+
+import org.jabref.gui.ClipBoardManager;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.JabRefDialogService;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.autocompleter.SuggestionProvider;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.integrity.FieldCheckers;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.ParsedEntryLink;
+import org.jabref.model.entry.field.Field;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.dlsc.gemsfx.TagsField;
+import jakarta.inject.Inject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class LinkedEntriesEditor extends HBox implements FieldEditorFX {
+
+<span class="nc" id="L43">    private static final Logger LOGGER = LoggerFactory.getLogger(LinkedEntriesEditor.class);</span>
+
+    @FXML public TagsField&lt;ParsedEntryLink&gt; entryLinkField;
+
+    @Inject private DialogService dialogService;
+    @Inject private ClipBoardManager clipBoardManager;
+    @Inject private KeyBindingRepository keyBindingRepository;
+    @Inject private UndoManager undoManager;
+
+    private final LinkedEntriesEditorViewModel viewModel;
+
+<span class="nc" id="L54">    public LinkedEntriesEditor(Field field, BibDatabaseContext databaseContext, SuggestionProvider&lt;BibEntry&gt; suggestionProvider, FieldCheckers fieldCheckers) {</span>
+<span class="nc" id="L55">        ViewLoader.view(this)</span>
+<span class="nc" id="L56">                  .root(this)</span>
+<span class="nc" id="L57">                  .load();</span>
+
+<span class="nc" id="L59">        this.viewModel = new LinkedEntriesEditorViewModel(field, suggestionProvider, databaseContext, fieldCheckers, undoManager);</span>
+
+<span class="nc" id="L61">        entryLinkField.setCellFactory(new ViewModelListCellFactory&lt;ParsedEntryLink&gt;().withText(ParsedEntryLink::getKey));</span>
+        // Mind the .collect(Collectors.toList()) as the list needs to be mutable
+<span class="nc" id="L63">        entryLinkField.setSuggestionProvider(request -&gt;</span>
+<span class="nc" id="L64">                suggestionProvider.getPossibleSuggestions().stream()</span>
+<span class="nc" id="L65">                                  .filter(suggestion -&gt; suggestion.getCitationKey().orElse(&quot;&quot;).toLowerCase()</span>
+<span class="nc" id="L66">                                                                  .contains(request.getUserText().toLowerCase()))</span>
+<span class="nc" id="L67">                                  .map(ParsedEntryLink::new)</span>
+<span class="nc" id="L68">                                  .collect(Collectors.toList()));</span>
+<span class="nc" id="L69">        entryLinkField.setTagViewFactory(this::createTag);</span>
+<span class="nc" id="L70">        entryLinkField.setConverter(viewModel.getStringConverter());</span>
+<span class="nc" id="L71">        entryLinkField.setNewItemProducer(searchText -&gt; viewModel.getStringConverter().fromString(searchText));</span>
+<span class="nc" id="L72">        entryLinkField.setMatcher((entryLink, searchText) -&gt; entryLink.getKey().toLowerCase().startsWith(searchText.toLowerCase()));</span>
+<span class="nc" id="L73">        entryLinkField.setComparator(Comparator.comparing(ParsedEntryLink::getKey));</span>
+<span class="nc" id="L74">        entryLinkField.setShowSearchIcon(false);</span>
+<span class="nc" id="L75">        entryLinkField.getEditor().getStyleClass().clear();</span>
+<span class="nc" id="L76">        entryLinkField.getEditor().getStyleClass().add(&quot;tags-field-editor&quot;);</span>
+
+<span class="nc" id="L78">        Bindings.bindContentBidirectional(entryLinkField.getTags(), viewModel.linkedEntriesProperty());</span>
+<span class="nc" id="L79">    }</span>
+
+    private Node createTag(ParsedEntryLink entryLink) {
+<span class="nc" id="L82">        Label tagLabel = new Label();</span>
+<span class="nc" id="L83">        tagLabel.setText(entryLinkField.getConverter().toString(entryLink));</span>
+<span class="nc" id="L84">        tagLabel.setGraphic(IconTheme.JabRefIcons.REMOVE_TAGS.getGraphicNode());</span>
+<span class="nc" id="L85">        tagLabel.getGraphic().setOnMouseClicked(event -&gt; entryLinkField.removeTags(entryLink));</span>
+<span class="nc" id="L86">        tagLabel.setContentDisplay(ContentDisplay.RIGHT);</span>
+<span class="nc" id="L87">        tagLabel.setOnMouseClicked(event -&gt; {</span>
+<span class="nc bnc" id="L88" title="All 4 branches missed.">            if (event.getClickCount() == 2 &amp;&amp; event.getButton().equals(MouseButton.PRIMARY)) {</span>
+<span class="nc" id="L89">                viewModel.jumpToEntry(entryLink);</span>
+            }
+<span class="nc" id="L91">        });</span>
+
+<span class="nc" id="L93">        ContextMenu contextMenu = new ContextMenu();</span>
+<span class="nc" id="L94">        ActionFactory factory = new ActionFactory(keyBindingRepository);</span>
+<span class="nc" id="L95">        contextMenu.getItems().addAll(</span>
+<span class="nc" id="L96">                factory.createMenuItem(StandardActions.COPY, new TagContextAction(StandardActions.COPY, entryLink)),</span>
+<span class="nc" id="L97">                factory.createMenuItem(StandardActions.CUT, new TagContextAction(StandardActions.CUT, entryLink)),</span>
+<span class="nc" id="L98">                factory.createMenuItem(StandardActions.DELETE, new TagContextAction(StandardActions.DELETE, entryLink))</span>
+        );
+<span class="nc" id="L100">        tagLabel.setContextMenu(contextMenu);</span>
+<span class="nc" id="L101">        return tagLabel;</span>
+    }
+
+    public LinkedEntriesEditorViewModel getViewModel() {
+<span class="nc" id="L105">        return viewModel;</span>
+    }
+
+    @Override
+    public void bindToEntry(BibEntry entry) {
+<span class="nc" id="L110">        viewModel.bindToEntry(entry);</span>
+<span class="nc" id="L111">    }</span>
+
+    @Override
+    public Parent getNode() {
+<span class="nc" id="L115">        return this;</span>
+    }
+
+    private class TagContextAction extends SimpleCommand {
+        private final StandardActions command;
+        private final ParsedEntryLink entryLink;
+
+<span class="nc" id="L122">        public TagContextAction(StandardActions command, ParsedEntryLink entryLink) {</span>
+<span class="nc" id="L123">            this.command = command;</span>
+<span class="nc" id="L124">            this.entryLink = entryLink;</span>
+<span class="nc" id="L125">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc bnc" id="L129" title="All 4 branches missed.">            switch (command) {</span>
+                case COPY -&gt; {
+<span class="nc" id="L131">                    clipBoardManager.setContent(entryLink.getKey());</span>
+<span class="nc" id="L132">                    dialogService.notify(Localization.lang(&quot;Copied '%0' to clipboard.&quot;,</span>
+<span class="nc" id="L133">                            JabRefDialogService.shortenDialogMessage(entryLink.getKey())));</span>
+<span class="nc" id="L134">                }</span>
+                case CUT -&gt; {
+<span class="nc" id="L136">                    clipBoardManager.setContent(entryLink.getKey());</span>
+<span class="nc" id="L137">                    dialogService.notify(Localization.lang(&quot;Copied '%0' to clipboard.&quot;,</span>
+<span class="nc" id="L138">                            JabRefDialogService.shortenDialogMessage(entryLink.getKey())));</span>
+<span class="nc" id="L139">                    entryLinkField.removeTags(entryLink);</span>
+<span class="nc" id="L140">                }</span>
+                case DELETE -&gt;
+<span class="nc" id="L142">                        entryLinkField.removeTags(entryLink);</span>
+                default -&gt;
+<span class="nc" id="L144">                        LOGGER.info(&quot;Action {} not defined&quot;, command.getText());</span>
+            }
+<span class="nc" id="L146">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

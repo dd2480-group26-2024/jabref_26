@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeDesktop.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.desktop.os</a> &gt; <span class="el_source">NativeDesktop.java</span></div><h1>NativeDesktop.java</h1><pre class="source lang-java linenums">package org.jabref.gui.desktop.os;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import org.jabref.Launcher;
+import org.jabref.gui.DialogService;
+import org.jabref.logic.util.BuildInfo;
+import org.jabref.logic.util.OS;
+import org.jabref.model.pdf.search.SearchFieldConstants;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.preferences.FilePreferences;
+
+import net.harawata.appdirs.AppDirsFactory;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class contains bundles OS specific implementations for file directories and file/application open handling methods.
+ * In case the default does not work, subclasses provide the correct behavior.
+ *
+ * &lt;p&gt;
+ * We cannot use a static logger instance here in this class as the Logger first needs to be configured in the {@link Launcher#addLogToDisk}
+ * The configuration of tinylog will become immutable as soon as the first log entry is issued.
+ * https://tinylog.org/v2/configuration/
+ * &lt;/p&gt;
+ */
+<span class="fc" id="L31">public abstract class NativeDesktop {</span>
+
+    public abstract void openFile(String filePath, String fileType, FilePreferences filePreferences) throws IOException;
+
+    /**
+     * Opens a file on an Operating System, using the given application.
+     *
+     * @param filePath    The filename.
+     * @param application Link to the app that opens the file.
+     */
+    public abstract void openFileWithApplication(String filePath, String application) throws IOException;
+
+    public abstract void openFolderAndSelectFile(Path file) throws IOException;
+
+    public abstract void openConsole(String absolutePath, DialogService dialogService) throws IOException;
+
+    public abstract String detectProgramPath(String programName, String directoryName);
+
+    /**
+     * Returns the path to the system's applications folder.
+     *
+     * @return the path to the applications folder.
+     */
+    public abstract Path getApplicationDirectory();
+
+    /**
+     * Get the user's default file chooser directory
+     *
+     * @return The path to the directory
+     */
+    public Path getDefaultFileChooserDirectory() {
+<span class="nc" id="L62">         Path userDirectory = getUserDirectory();</span>
+<span class="nc" id="L63">         Path documents = userDirectory.resolve(&quot;Documents&quot;);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">         if (!Files.exists(documents)) {</span>
+<span class="nc" id="L65">             return userDirectory;</span>
+         }
+<span class="nc" id="L67">         return documents;</span>
+     }
+
+    /**
+     * Returns the path to the system's user directory.
+     *
+     * @return the path to the user directory.
+     */
+    public Path getUserDirectory() {
+<span class="nc" id="L76">        return Path.of(System.getProperty(&quot;user.home&quot;));</span>
+    }
+
+    public Path getLogDirectory() {
+<span class="nc" id="L80">        return Path.of(AppDirsFactory.getInstance()</span>
+<span class="nc" id="L81">                                     .getUserDataDir(</span>
+                                             OS.APP_DIR_APP_NAME,
+                                             &quot;logs&quot;,
+                                             OS.APP_DIR_APP_AUTHOR))
+<span class="nc" id="L85">                   .resolve(new BuildInfo().version.toString());</span>
+    }
+
+    public Path getBackupDirectory() {
+<span class="fc" id="L89">        return Path.of(AppDirsFactory.getInstance()</span>
+<span class="fc" id="L90">                                     .getUserDataDir(</span>
+                                             OS.APP_DIR_APP_NAME,
+                                             &quot;backups&quot;,
+                                             OS.APP_DIR_APP_AUTHOR));
+    }
+
+    public Path getFulltextIndexBaseDirectory() {
+<span class="fc" id="L97">        return Path.of(AppDirsFactory.getInstance()</span>
+<span class="fc" id="L98">                                     .getUserDataDir(OS.APP_DIR_APP_NAME,</span>
+                                             &quot;lucene&quot; + File.separator + SearchFieldConstants.VERSION,
+                                             OS.APP_DIR_APP_AUTHOR));
+    }
+
+    public Path getSslDirectory() {
+<span class="nc" id="L104">        return Path.of(AppDirsFactory.getInstance()</span>
+<span class="nc" id="L105">                                     .getUserDataDir(OS.APP_DIR_APP_NAME,</span>
+                                             &quot;ssl&quot;,
+                                             OS.APP_DIR_APP_AUTHOR));
+    }
+
+    public String getHostName() {
+        String hostName;
+        // Following code inspired by https://commons.apache.org/proper/commons-lang/apidocs/org/apache/commons/lang3/SystemUtils.html#getHostName--
+        // See also https://stackoverflow.com/a/20793241/873282
+<span class="nc" id="L114">        hostName = System.getenv(&quot;HOSTNAME&quot;);</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (StringUtil.isBlank(hostName)) {</span>
+<span class="nc" id="L116">            hostName = System.getenv(&quot;COMPUTERNAME&quot;);</span>
+        }
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (StringUtil.isBlank(hostName)) {</span>
+            try {
+<span class="nc" id="L120">                hostName = InetAddress.getLocalHost().getHostName();</span>
+<span class="nc" id="L121">            } catch (UnknownHostException e) {</span>
+<span class="nc" id="L122">                LoggerFactory.getLogger(OS.class).info(&quot;Hostname not found. Using \&quot;localhost\&quot; as fallback.&quot;, e);</span>
+<span class="nc" id="L123">                hostName = &quot;localhost&quot;;</span>
+<span class="nc" id="L124">            }</span>
+        }
+<span class="nc" id="L126">        return hostName;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

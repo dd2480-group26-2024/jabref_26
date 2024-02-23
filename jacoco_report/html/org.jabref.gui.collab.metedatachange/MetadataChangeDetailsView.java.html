@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MetadataChangeDetailsView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.collab.metedatachange</a> &gt; <span class="el_source">MetadataChangeDetailsView.java</span></div><h1>MetadataChangeDetailsView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.collab.metedatachange;
+
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.VBox;
+
+import org.jabref.gui.collab.DatabaseChangeDetailsView;
+import org.jabref.logic.bibtex.comparator.MetaDataDiff;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.preferences.PreferencesService;
+
+public final class MetadataChangeDetailsView extends DatabaseChangeDetailsView {
+
+<span class="nc" id="L14">    public MetadataChangeDetailsView(MetadataChange metadataChange, PreferencesService preferencesService) {</span>
+<span class="nc" id="L15">        VBox container = new VBox(15);</span>
+
+<span class="nc" id="L17">        Label header = new Label(Localization.lang(&quot;The following metadata changed:&quot;));</span>
+<span class="nc" id="L18">        header.getStyleClass().add(&quot;sectionHeader&quot;);</span>
+<span class="nc" id="L19">        container.getChildren().add(header);</span>
+
+<span class="nc bnc" id="L21" title="All 2 branches missed.">        for (MetaDataDiff.Difference diff : metadataChange.getMetaDataDiff().getDifferences(preferencesService)) {</span>
+<span class="nc" id="L22">            container.getChildren().add(new Label(getDifferenceString(diff.differenceType())));</span>
+<span class="nc" id="L23">            container.getChildren().add(new Label(diff.originalObject().toString()));</span>
+<span class="nc" id="L24">            container.getChildren().add(new Label(diff.newObject().toString()));</span>
+<span class="nc" id="L25">        }</span>
+
+<span class="nc" id="L27">        ScrollPane scrollPane = new ScrollPane(container);</span>
+<span class="nc" id="L28">        scrollPane.setFitToWidth(true);</span>
+<span class="nc" id="L29">        getChildren().setAll(scrollPane);</span>
+
+<span class="nc" id="L31">        setLeftAnchor(scrollPane, 8d);</span>
+<span class="nc" id="L32">        setTopAnchor(scrollPane, 8d);</span>
+<span class="nc" id="L33">        setRightAnchor(scrollPane, 8d);</span>
+<span class="nc" id="L34">        setBottomAnchor(scrollPane, 8d);</span>
+<span class="nc" id="L35">    }</span>
+
+    private String getDifferenceString(MetaDataDiff.DifferenceType changeType) {
+<span class="nc bnc" id="L38" title="All 13 branches missed.">        return switch (changeType) {</span>
+            case PROTECTED -&gt;
+<span class="nc" id="L40">                    Localization.lang(&quot;Library protection&quot;);</span>
+            case GROUPS_ALTERED -&gt;
+<span class="nc" id="L42">                    Localization.lang(&quot;Modified groups tree&quot;);</span>
+            case ENCODING -&gt;
+<span class="nc" id="L44">                    Localization.lang(&quot;Library encoding&quot;);</span>
+            case SAVE_SORT_ORDER -&gt;
+<span class="nc" id="L46">                    Localization.lang(&quot;Save sort order&quot;);</span>
+            case KEY_PATTERNS -&gt;
+<span class="nc" id="L48">                    Localization.lang(&quot;Key patterns&quot;);</span>
+            case USER_FILE_DIRECTORY -&gt;
+<span class="nc" id="L50">                    Localization.lang(&quot;User-specific file directory&quot;);</span>
+            case LATEX_FILE_DIRECTORY -&gt;
+<span class="nc" id="L52">                    Localization.lang(&quot;LaTeX file directory&quot;);</span>
+            case DEFAULT_KEY_PATTERN -&gt;
+<span class="nc" id="L54">                    Localization.lang(&quot;Default pattern&quot;);</span>
+            case SAVE_ACTIONS -&gt;
+<span class="nc" id="L56">                    Localization.lang(&quot;Save actions&quot;);</span>
+            case MODE -&gt;
+<span class="nc" id="L58">                    Localization.lang(&quot;Library mode&quot;);</span>
+            case GENERAL_FILE_DIRECTORY -&gt;
+<span class="nc" id="L60">                    Localization.lang(&quot;General file directory&quot;);</span>
+            case CONTENT_SELECTOR -&gt;
+<span class="nc" id="L62">                    Localization.lang(&quot;Content selectors&quot;);</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

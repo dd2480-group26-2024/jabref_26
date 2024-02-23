@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibEntryDTO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.http.dto</a> &gt; <span class="el_source">BibEntryDTO.java</span></div><h1>BibEntryDTO.java</h1><pre class="source lang-java linenums">package org.jabref.http.dto;
+
+import java.io.IOException;
+import java.io.StringWriter;
+
+import org.jabref.logic.bibtex.BibEntryWriter;
+import org.jabref.logic.bibtex.FieldPreferences;
+import org.jabref.logic.bibtex.FieldWriter;
+import org.jabref.logic.exporter.BibWriter;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.SharedBibEntryData;
+
+import com.google.common.base.MoreObjects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * The data transfer object (DTO) for an BibEntry
+ *
+ * @param sharingMetadata the data used for sharing
+ * @param userComments the comments before the BibTeX entry
+ * @param citationKey the citation key (duplicated from BibEntry to ease processing by the client)
+ * @param bibtex the BibEntry as BibTeX string (see ADR-0027 for more information, why we don't use a HashMap / JSON)
+ */
+<span class="nc" id="L27">public record BibEntryDTO(SharedBibEntryData sharingMetadata, String userComments, String citationKey, String bibtex) implements Comparable&lt;BibEntryDTO&gt; {</span>
+
+<span class="nc" id="L29">    public static final Logger LOGGER = LoggerFactory.getLogger(BibEntryDTO.class);</span>
+
+    public BibEntryDTO(BibEntry bibEntry, BibDatabaseMode bibDatabaseMode, FieldPreferences fieldWriterPreferences, BibEntryTypesManager bibEntryTypesManager) {
+<span class="nc" id="L32">        this(bibEntry.getSharedBibEntryData(),</span>
+<span class="nc" id="L33">                bibEntry.getUserComments(),</span>
+<span class="nc" id="L34">                bibEntry.getCitationKey().orElse(&quot;&quot;),</span>
+<span class="nc" id="L35">                convertToString(bibEntry, bibDatabaseMode, fieldWriterPreferences, bibEntryTypesManager)</span>
+        );
+<span class="nc" id="L37">    }</span>
+
+    private static String convertToString(BibEntry entry, BibDatabaseMode bibDatabaseMode, FieldPreferences fieldWriterPreferences, BibEntryTypesManager bibEntryTypesManager) {
+<span class="nc" id="L40">        StringWriter rawEntry = new StringWriter();</span>
+<span class="nc" id="L41">        BibWriter bibWriter = new BibWriter(rawEntry, &quot;\n&quot;);</span>
+<span class="nc" id="L42">        BibEntryWriter bibtexEntryWriter = new BibEntryWriter(new FieldWriter(fieldWriterPreferences), bibEntryTypesManager);</span>
+        try {
+<span class="nc" id="L44">            bibtexEntryWriter.write(entry, bibWriter, bibDatabaseMode);</span>
+<span class="nc" id="L45">        } catch (IOException e) {</span>
+<span class="nc" id="L46">            LOGGER.warn(&quot;Problem creating BibTeX entry.&quot;, e);</span>
+<span class="nc" id="L47">            return &quot;error&quot;;</span>
+<span class="nc" id="L48">        }</span>
+<span class="nc" id="L49">        return rawEntry.toString();</span>
+    }
+
+    @Override
+    public int compareTo(BibEntryDTO o) {
+<span class="nc" id="L54">        int sharingComparison = sharingMetadata.compareTo(o.sharingMetadata);</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (sharingComparison != 0) {</span>
+<span class="nc" id="L56">            return sharingComparison;</span>
+        }
+<span class="nc" id="L58">        LOGGER.error(&quot;Comparing equal DTOs&quot;);</span>
+<span class="nc" id="L59">        return 0;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L64">        return MoreObjects.toStringHelper(this)</span>
+<span class="nc" id="L65">                          .add(&quot;sharingMetadata&quot;, sharingMetadata)</span>
+<span class="nc" id="L66">                          .add(&quot;userComments&quot;, userComments)</span>
+<span class="nc" id="L67">                          .add(&quot;citationkey&quot;, citationKey)</span>
+<span class="nc" id="L68">                          .add(&quot;bibtex&quot;, bibtex)</span>
+<span class="nc" id="L69">                          .toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

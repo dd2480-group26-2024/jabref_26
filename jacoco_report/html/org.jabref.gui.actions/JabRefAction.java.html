@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JabRefAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.actions</a> &gt; <span class="el_source">JabRefAction.java</span></div><h1>JabRefAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.actions;
+
+import java.util.Map;
+
+import javafx.beans.binding.Bindings;
+
+import org.jabref.gui.Telemetry;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+
+import de.saxsys.mvvmfx.utils.commands.Command;
+
+/**
+ * Wrapper around one of our actions from {@link Action} to convert them to controlsfx {@link org.controlsfx.control.action.Action}.
+ */
+class JabRefAction extends org.controlsfx.control.action.Action {
+
+    public JabRefAction(Action action, KeyBindingRepository keyBindingRepository) {
+<span class="nc" id="L18">        super(action.getText());</span>
+<span class="nc" id="L19">        action.getIcon()</span>
+<span class="nc" id="L20">              .ifPresent(icon -&gt; setGraphic(icon.getGraphicNode()));</span>
+<span class="nc" id="L21">        action.getKeyBinding()</span>
+<span class="nc" id="L22">              .ifPresent(keyBinding -&gt; keyBindingRepository.getKeyCombination(keyBinding).ifPresent(combination -&gt; setAccelerator(combination)));</span>
+
+<span class="nc" id="L24">        setLongText(action.getDescription());</span>
+<span class="nc" id="L25">    }</span>
+
+    public JabRefAction(Action action, Command command, KeyBindingRepository keyBindingRepository) {
+<span class="nc" id="L28">        this(action, command, keyBindingRepository, null);</span>
+<span class="nc" id="L29">    }</span>
+
+    /**
+     * especially for the track execute when the action run the same function but from different source.
+     *
+     * @param source is a string contains the source, for example &quot;button&quot;
+     */
+    public JabRefAction(Action action, Command command, KeyBindingRepository keyBindingRepository, Sources source) {
+<span class="nc" id="L37">        this(action, keyBindingRepository);</span>
+
+<span class="nc" id="L39">        setEventHandler(event -&gt; {</span>
+<span class="nc" id="L40">            command.execute();</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">            if (source == null) {</span>
+<span class="nc" id="L42">                trackExecute(getActionName(action, command));</span>
+            } else {
+<span class="nc" id="L44">                trackUserActionSource(getActionName(action, command), source);</span>
+            }
+<span class="nc" id="L46">        });</span>
+
+<span class="nc" id="L48">        disabledProperty().bind(command.executableProperty().not());</span>
+
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (command instanceof SimpleCommand ourCommand) {</span>
+<span class="nc" id="L51">            longTextProperty().bind(Bindings.concat(action.getDescription(), ourCommand.statusMessageProperty()));</span>
+        }
+<span class="nc" id="L53">    }</span>
+
+    private String getActionName(Action action, Command command) {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (command.getClass().isAnonymousClass()) {</span>
+<span class="nc" id="L57">            return action.getText();</span>
+        } else {
+<span class="nc" id="L59">            String commandName = command.getClass().getSimpleName();</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            if (commandName.contains(&quot;EditAction&quot;)</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                    || commandName.contains(&quot;CopyMoreAction&quot;)</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                    || commandName.contains(&quot;CopyCitationAction&quot;)</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">                    || commandName.contains(&quot;PreviewSwitchAction&quot;)</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                    || commandName.contains(&quot;SaveAction&quot;)) {</span>
+<span class="nc" id="L65">                return command.toString();</span>
+            } else {
+<span class="nc" id="L67">                return commandName;</span>
+            }
+        }
+    }
+
+    private void trackExecute(String actionName) {
+<span class="nc" id="L73">        Telemetry.getTelemetryClient()</span>
+<span class="nc" id="L74">                 .ifPresent(telemetryClient -&gt; telemetryClient.trackEvent(actionName));</span>
+<span class="nc" id="L75">    }</span>
+
+    private void trackUserActionSource(String actionName, Sources source) {
+<span class="nc" id="L78">        Telemetry.getTelemetryClient().ifPresent(telemetryClient -&gt; telemetryClient.trackEvent(</span>
+                actionName,
+<span class="nc" id="L80">                Map.of(&quot;Source&quot;, source.toString()),</span>
+<span class="nc" id="L81">                Map.of()));</span>
+<span class="nc" id="L82">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LinkedFilesTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.linkedfiles</a> &gt; <span class="el_source">LinkedFilesTabViewModel.java</span></div><h1>LinkedFilesTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.linkedfiles;
+
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.gui.util.DirectoryDialogConfiguration;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.io.AutoLinkPreferences;
+import org.jabref.preferences.FilePreferences;
+import org.jabref.preferences.PreferencesService;
+
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+
+public class LinkedFilesTabViewModel implements PreferenceTabViewModel {
+
+<span class="nc" id="L30">    private final StringProperty mainFileDirectoryProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L31">    private final BooleanProperty useMainFileDirectoryProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L32">    private final BooleanProperty useBibLocationAsPrimaryProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L33">    private final BooleanProperty autolinkFileStartsBibtexProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L34">    private final BooleanProperty autolinkFileExactBibtexProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L35">    private final BooleanProperty autolinkUseRegexProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L36">    private final StringProperty autolinkRegexKeyProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L37">    private final ListProperty&lt;String&gt; defaultFileNamePatternsProperty =</span>
+<span class="nc" id="L38">            new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList(FilePreferences.DEFAULT_FILENAME_PATTERNS));</span>
+<span class="nc" id="L39">    private final BooleanProperty fulltextIndex = new SimpleBooleanProperty();</span>
+<span class="nc" id="L40">    private final StringProperty fileNamePatternProperty = new SimpleStringProperty();</span>
+<span class="nc" id="L41">    private final StringProperty fileDirectoryPatternProperty = new SimpleStringProperty();</span>
+
+    private final Validator mainFileDirValidator;
+
+    private final DialogService dialogService;
+    private final FilePreferences filePreferences;
+    private final AutoLinkPreferences autoLinkPreferences;
+
+<span class="nc" id="L49">    public LinkedFilesTabViewModel(DialogService dialogService, PreferencesService preferences) {</span>
+<span class="nc" id="L50">        this.dialogService = dialogService;</span>
+<span class="nc" id="L51">        this.filePreferences = preferences.getFilePreferences();</span>
+<span class="nc" id="L52">        this.autoLinkPreferences = preferences.getAutoLinkPreferences();</span>
+
+<span class="nc" id="L54">        mainFileDirValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                mainFileDirectoryProperty,
+                mainDirectoryPath -&gt; {
+<span class="nc" id="L57">                    ValidationMessage error = ValidationMessage.error(</span>
+<span class="nc" id="L58">                            Localization.lang(&quot;Main file directory '%0' not found.\nCheck the tab \&quot;Linked files\&quot;.&quot;, mainDirectoryPath)</span>
+                    );
+                    try {
+<span class="nc" id="L61">                        Path path = Path.of(mainDirectoryPath);</span>
+<span class="nc bnc" id="L62" title="All 4 branches missed.">                        if (!(Files.exists(path) &amp;&amp; Files.isDirectory(path))) {</span>
+<span class="nc" id="L63">                            return error;</span>
+                        }
+<span class="nc" id="L65">                    } catch (InvalidPathException ex) {</span>
+<span class="nc" id="L66">                        return error;</span>
+<span class="nc" id="L67">                    }</span>
+                    // main directory is valid
+<span class="nc" id="L69">                    return null;</span>
+                }
+        );
+<span class="nc" id="L72">    }</span>
+
+    @Override
+    public void setValues() {
+        // External files preferences / Attached files preferences / File preferences
+<span class="nc" id="L77">        mainFileDirectoryProperty.setValue(filePreferences.getMainFileDirectory().orElse(Path.of(&quot;&quot;)).toString());</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        useMainFileDirectoryProperty.setValue(!filePreferences.shouldStoreFilesRelativeToBibFile());</span>
+<span class="nc" id="L79">        useBibLocationAsPrimaryProperty.setValue(filePreferences.shouldStoreFilesRelativeToBibFile());</span>
+<span class="nc" id="L80">        fulltextIndex.setValue(filePreferences.shouldFulltextIndexLinkedFiles());</span>
+<span class="nc" id="L81">        fileNamePatternProperty.setValue(filePreferences.getFileNamePattern());</span>
+<span class="nc" id="L82">        fileDirectoryPatternProperty.setValue(filePreferences.getFileDirectoryPattern());</span>
+
+        // Autolink preferences
+<span class="nc bnc" id="L85" title="All 4 branches missed.">        switch (autoLinkPreferences.getCitationKeyDependency()) {</span>
+<span class="nc" id="L86">            case START -&gt; autolinkFileStartsBibtexProperty.setValue(true);</span>
+<span class="nc" id="L87">            case EXACT -&gt; autolinkFileExactBibtexProperty.setValue(true);</span>
+<span class="nc" id="L88">            case REGEX -&gt; autolinkUseRegexProperty.setValue(true);</span>
+        }
+
+<span class="nc" id="L91">        autolinkRegexKeyProperty.setValue(autoLinkPreferences.getRegularExpression());</span>
+<span class="nc" id="L92">    }</span>
+
+    @Override
+    public void storeSettings() {
+        // External files preferences / Attached files preferences / File preferences
+<span class="nc" id="L97">        filePreferences.setMainFileDirectory(mainFileDirectoryProperty.getValue());</span>
+<span class="nc" id="L98">        filePreferences.setStoreFilesRelativeToBibFile(useBibLocationAsPrimaryProperty.getValue());</span>
+<span class="nc" id="L99">        filePreferences.setFileNamePattern(fileNamePatternProperty.getValue());</span>
+<span class="nc" id="L100">        filePreferences.setFileDirectoryPattern(fileDirectoryPatternProperty.getValue());</span>
+<span class="nc" id="L101">        filePreferences.setFulltextIndexLinkedFiles(fulltextIndex.getValue());</span>
+
+        // Autolink preferences
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (autolinkFileStartsBibtexProperty.getValue()) {</span>
+<span class="nc" id="L105">            autoLinkPreferences.setCitationKeyDependency(AutoLinkPreferences.CitationKeyDependency.START);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        } else if (autolinkFileExactBibtexProperty.getValue()) {</span>
+<span class="nc" id="L107">            autoLinkPreferences.setCitationKeyDependency(AutoLinkPreferences.CitationKeyDependency.EXACT);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        } else if (autolinkUseRegexProperty.getValue()) {</span>
+<span class="nc" id="L109">            autoLinkPreferences.setCitationKeyDependency(AutoLinkPreferences.CitationKeyDependency.REGEX);</span>
+        }
+
+<span class="nc" id="L112">        autoLinkPreferences.setRegularExpression(autolinkRegexKeyProperty.getValue());</span>
+<span class="nc" id="L113">    }</span>
+
+    ValidationStatus mainFileDirValidationStatus() {
+<span class="nc" id="L116">        return mainFileDirValidator.getValidationStatus();</span>
+    }
+
+    @Override
+    public boolean validateSettings() {
+<span class="nc" id="L121">        ValidationStatus validationStatus = mainFileDirValidationStatus();</span>
+<span class="nc bnc" id="L122" title="All 4 branches missed.">        if (!validationStatus.isValid() &amp;&amp; useMainFileDirectoryProperty().get()) {</span>
+<span class="nc" id="L123">            validationStatus.getHighestMessage().ifPresent(message -&gt;</span>
+<span class="nc" id="L124">                    dialogService.showErrorDialogAndWait(message.getMessage()));</span>
+<span class="nc" id="L125">            return false;</span>
+        }
+<span class="nc" id="L127">        return true;</span>
+    }
+
+    public void mainFileDirBrowse() {
+<span class="nc" id="L131">        DirectoryDialogConfiguration dirDialogConfiguration =</span>
+<span class="nc" id="L132">                new DirectoryDialogConfiguration.Builder().withInitialDirectory(Path.of(mainFileDirectoryProperty.getValue())).build();</span>
+<span class="nc" id="L133">        dialogService.showDirectorySelectionDialog(dirDialogConfiguration)</span>
+<span class="nc" id="L134">                     .ifPresent(f -&gt; mainFileDirectoryProperty.setValue(f.toString()));</span>
+<span class="nc" id="L135">    }</span>
+
+    // External file links
+    public StringProperty mainFileDirectoryProperty() {
+<span class="nc" id="L139">        return mainFileDirectoryProperty;</span>
+    }
+
+    public BooleanProperty useBibLocationAsPrimaryProperty() {
+<span class="nc" id="L143">        return useBibLocationAsPrimaryProperty;</span>
+    }
+
+    public BooleanProperty autolinkFileStartsBibtexProperty() {
+<span class="nc" id="L147">        return autolinkFileStartsBibtexProperty;</span>
+    }
+
+    public BooleanProperty autolinkFileExactBibtexProperty() {
+<span class="nc" id="L151">        return autolinkFileExactBibtexProperty;</span>
+    }
+
+    public BooleanProperty autolinkUseRegexProperty() {
+<span class="nc" id="L155">        return autolinkUseRegexProperty;</span>
+    }
+
+    public StringProperty autolinkRegexKeyProperty() {
+<span class="nc" id="L159">        return autolinkRegexKeyProperty;</span>
+    }
+
+    public BooleanProperty fulltextIndexProperty() {
+<span class="nc" id="L163">        return fulltextIndex;</span>
+    }
+
+    public ListProperty&lt;String&gt; defaultFileNamePatternsProperty() {
+<span class="nc" id="L167">        return defaultFileNamePatternsProperty;</span>
+    }
+
+    public StringProperty fileNamePatternProperty() {
+<span class="nc" id="L171">        return fileNamePatternProperty;</span>
+    }
+
+    public StringProperty fileDirectoryPatternProperty() {
+<span class="nc" id="L175">        return fileDirectoryPatternProperty;</span>
+    }
+
+    public BooleanProperty useMainFileDirectoryProperty() {
+<span class="nc" id="L179">        return useMainFileDirectoryProperty;</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

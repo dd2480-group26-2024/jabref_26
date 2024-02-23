@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreviewWithSourceTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.collab.entrychange</a> &gt; <span class="el_source">PreviewWithSourceTab.java</span></div><h1>PreviewWithSourceTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.collab.entrychange;
+
+import java.io.IOException;
+import java.io.StringWriter;
+
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+
+import org.jabref.gui.preview.PreviewViewer;
+import org.jabref.logic.bibtex.BibEntryWriter;
+import org.jabref.logic.bibtex.FieldPreferences;
+import org.jabref.logic.bibtex.FieldWriter;
+import org.jabref.logic.exporter.BibWriter;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.OS;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.preferences.PreferencesService;
+
+import org.fxmisc.richtext.CodeArea;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+<span class="nc" id="L27">public class PreviewWithSourceTab {</span>
+
+<span class="nc" id="L29">    private static final Logger LOGGER = LoggerFactory.getLogger(PreviewWithSourceTab.class);</span>
+
+    public TabPane getPreviewWithSourceTab(BibEntry entry, BibDatabaseContext bibDatabaseContext, PreferencesService preferencesService, BibEntryTypesManager entryTypesManager, PreviewViewer previewViewer) {
+<span class="nc" id="L32">        return getPreviewWithSourceTab(entry, bibDatabaseContext, preferencesService, entryTypesManager, previewViewer, &quot;&quot;);</span>
+    }
+
+    public TabPane getPreviewWithSourceTab(BibEntry entry, BibDatabaseContext bibDatabaseContext, PreferencesService preferencesService, BibEntryTypesManager entryTypesManager, PreviewViewer previewViewer, String label) {
+<span class="nc" id="L36">        previewViewer.setLayout(preferencesService.getPreviewPreferences().getSelectedPreviewLayout());</span>
+<span class="nc" id="L37">        previewViewer.setEntry(entry);</span>
+
+<span class="nc" id="L39">        CodeArea codeArea = new CodeArea();</span>
+<span class="nc" id="L40">        codeArea.setId(&quot;bibtexcodearea&quot;);</span>
+<span class="nc" id="L41">        codeArea.setWrapText(true);</span>
+<span class="nc" id="L42">        codeArea.setDisable(true);</span>
+
+<span class="nc" id="L44">        TabPane tabPanePreviewCode = new TabPane();</span>
+<span class="nc" id="L45">        Tab previewTab = new Tab();</span>
+<span class="nc" id="L46">        previewTab.setContent(previewViewer);</span>
+
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (StringUtil.isNullOrEmpty(label)) {</span>
+<span class="nc" id="L49">            previewTab.setText(Localization.lang(&quot;Entry preview&quot;));</span>
+        } else {
+<span class="nc" id="L51">            previewTab.setText(label);</span>
+        }
+
+        try {
+<span class="nc" id="L55">            codeArea.appendText(getSourceString(entry, bibDatabaseContext.getMode(), preferencesService.getFieldPreferences(), entryTypesManager));</span>
+<span class="nc" id="L56">        } catch (IOException e) {</span>
+<span class="nc" id="L57">            LOGGER.error(&quot;Error getting Bibtex: {}&quot;, entry);</span>
+<span class="nc" id="L58">        }</span>
+<span class="nc" id="L59">        codeArea.setEditable(false);</span>
+<span class="nc" id="L60">        Tab codeTab = new Tab(Localization.lang(&quot;%0 source&quot;, bibDatabaseContext.getMode().getFormattedName()), codeArea);</span>
+
+<span class="nc" id="L62">        tabPanePreviewCode.getTabs().addAll(previewTab, codeTab);</span>
+<span class="nc" id="L63">        return tabPanePreviewCode;</span>
+    }
+
+    private String getSourceString(BibEntry entry, BibDatabaseMode type, FieldPreferences fieldPreferences, BibEntryTypesManager entryTypesManager) throws IOException {
+<span class="nc" id="L67">        StringWriter writer = new StringWriter();</span>
+<span class="nc" id="L68">        BibWriter bibWriter = new BibWriter(writer, OS.NEWLINE);</span>
+<span class="nc" id="L69">        FieldWriter fieldWriter = FieldWriter.buildIgnoreHashes(fieldPreferences);</span>
+<span class="nc" id="L70">        new BibEntryWriter(fieldWriter, entryTypesManager).write(entry, bibWriter, type);</span>
+<span class="nc" id="L71">        return writer.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

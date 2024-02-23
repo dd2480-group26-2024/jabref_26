@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebSearchTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.websearch</a> &gt; <span class="el_source">WebSearchTab.java</span></div><h1>WebSearchTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.websearch;
+
+import javafx.beans.InvalidationListener;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.cell.CheckBoxTableCell;
+import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.input.MouseButton;
+
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.gui.slr.StudyCatalogItem;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.gui.util.ViewModelTableRowFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.preferences.FetcherApiKey;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+
+public class WebSearchTab extends AbstractPreferenceTabView&lt;WebSearchTabViewModel&gt; implements PreferencesTab {
+
+    @FXML private CheckBox enableWebSearch;
+    @FXML private CheckBox generateNewKeyOnImport;
+    @FXML private CheckBox warnAboutDuplicatesOnImport;
+    @FXML private CheckBox downloadLinkedOnlineFiles;
+
+    @FXML private CheckBox useCustomDOI;
+    @FXML private TextField useCustomDOIName;
+
+    @FXML private CheckBox grobidEnabled;
+    @FXML private TextField grobidURL;
+
+    @FXML private ComboBox&lt;FetcherApiKey&gt; apiKeySelector;
+    @FXML private TextField customApiKey;
+    @FXML private CheckBox useCustomApiKey;
+    @FXML private Button testCustomApiKey;
+
+    @FXML private CheckBox persistApiKeys;
+    @FXML private SplitPane persistentTooltipWrapper; // The disabled persistApiKeys control does not show tooltips
+    @FXML private TableView&lt;StudyCatalogItem&gt; catalogTable;
+    @FXML private TableColumn&lt;StudyCatalogItem, Boolean&gt; catalogEnabledColumn;
+    @FXML private TableColumn&lt;StudyCatalogItem, String&gt; catalogColumn;
+
+<span class="nc" id="L52">    public WebSearchTab() {</span>
+<span class="nc" id="L53">        ViewLoader.view(this)</span>
+<span class="nc" id="L54">                  .root(this)</span>
+<span class="nc" id="L55">                  .load();</span>
+<span class="nc" id="L56">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L60">        return Localization.lang(&quot;Web search&quot;);</span>
+    }
+
+    public void initialize() {
+<span class="nc" id="L64">        this.viewModel = new WebSearchTabViewModel(preferencesService, dialogService);</span>
+
+<span class="nc" id="L66">        enableWebSearch.selectedProperty().bindBidirectional(viewModel.enableWebSearchProperty());</span>
+<span class="nc" id="L67">        generateNewKeyOnImport.selectedProperty().bindBidirectional(viewModel.generateKeyOnImportProperty());</span>
+<span class="nc" id="L68">        warnAboutDuplicatesOnImport.selectedProperty().bindBidirectional(viewModel.warnAboutDuplicatesOnImportProperty());</span>
+<span class="nc" id="L69">        downloadLinkedOnlineFiles.selectedProperty().bindBidirectional(viewModel.shouldDownloadLinkedOnlineFiles());</span>
+
+<span class="nc" id="L71">        grobidEnabled.selectedProperty().bindBidirectional(viewModel.grobidEnabledProperty());</span>
+<span class="nc" id="L72">        grobidURL.textProperty().bindBidirectional(viewModel.grobidURLProperty());</span>
+<span class="nc" id="L73">        grobidURL.disableProperty().bind(grobidEnabled.selectedProperty().not());</span>
+
+<span class="nc" id="L75">        useCustomDOI.selectedProperty().bindBidirectional(viewModel.useCustomDOIProperty());</span>
+<span class="nc" id="L76">        useCustomDOIName.textProperty().bindBidirectional(viewModel.useCustomDOINameProperty());</span>
+<span class="nc" id="L77">        useCustomDOIName.disableProperty().bind(useCustomDOI.selectedProperty().not());</span>
+
+<span class="nc" id="L79">        new ViewModelTableRowFactory&lt;StudyCatalogItem&gt;()</span>
+<span class="nc" id="L80">                .withOnMouseClickedEvent((entry, event) -&gt; {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                    if (event.getButton() == MouseButton.PRIMARY) {</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                        entry.setEnabled(!entry.isEnabled());</span>
+                    }
+<span class="nc" id="L84">                })</span>
+<span class="nc" id="L85">                .install(catalogTable);</span>
+
+<span class="nc" id="L87">        catalogColumn.setReorderable(false);</span>
+<span class="nc" id="L88">        catalogColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+
+<span class="nc" id="L90">        catalogEnabledColumn.setResizable(false);</span>
+<span class="nc" id="L91">        catalogEnabledColumn.setReorderable(false);</span>
+<span class="nc" id="L92">        catalogEnabledColumn.setCellFactory(CheckBoxTableCell.forTableColumn(catalogEnabledColumn));</span>
+<span class="nc" id="L93">        catalogEnabledColumn.setCellValueFactory(param -&gt; param.getValue().enabledProperty());</span>
+
+<span class="nc" id="L95">        catalogColumn.setEditable(false);</span>
+<span class="nc" id="L96">        catalogColumn.setCellValueFactory(param -&gt; param.getValue().nameProperty());</span>
+<span class="nc" id="L97">        catalogTable.setItems(viewModel.getCatalogs());</span>
+
+<span class="nc" id="L99">        new ViewModelListCellFactory&lt;FetcherApiKey&gt;()</span>
+<span class="nc" id="L100">                .withText(FetcherApiKey::getName)</span>
+<span class="nc" id="L101">                .install(apiKeySelector);</span>
+<span class="nc" id="L102">        apiKeySelector.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -&gt; {</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (oldValue != null) {</span>
+<span class="nc" id="L104">                updateFetcherApiKey(oldValue);</span>
+            }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (newValue != null) {</span>
+<span class="nc" id="L107">                useCustomApiKey.setSelected(newValue.shouldUse());</span>
+<span class="nc" id="L108">                customApiKey.setText(newValue.getKey());</span>
+            }
+<span class="nc" id="L110">        });</span>
+<span class="nc" id="L111">        customApiKey.textProperty().addListener(listener -&gt; updateFetcherApiKey(apiKeySelector.valueProperty().get()));</span>
+
+<span class="nc" id="L113">        customApiKey.disableProperty().bind(useCustomApiKey.selectedProperty().not());</span>
+<span class="nc" id="L114">        testCustomApiKey.disableProperty().bind(useCustomApiKey.selectedProperty().not());</span>
+
+<span class="nc" id="L116">        persistApiKeys.selectedProperty().bindBidirectional(viewModel.getApikeyPersistProperty());</span>
+<span class="nc" id="L117">        persistApiKeys.disableProperty().bind(viewModel.apiKeyPersistAvailable().not());</span>
+<span class="nc" id="L118">        EasyBind.subscribe(viewModel.apiKeyPersistAvailable(), available -&gt; {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">            if (!available) {</span>
+<span class="nc" id="L120">                persistentTooltipWrapper.setTooltip(new Tooltip(Localization.lang(&quot;Credential store not available.&quot;)));</span>
+            } else {
+<span class="nc" id="L122">                persistentTooltipWrapper.setTooltip(null);</span>
+            }
+<span class="nc" id="L124">        });</span>
+
+<span class="nc" id="L126">        apiKeySelector.setItems(viewModel.fetcherApiKeys());</span>
+<span class="nc" id="L127">        viewModel.selectedApiKeyProperty().bind(apiKeySelector.valueProperty());</span>
+
+        // Content is set later
+<span class="nc" id="L130">        viewModel.fetcherApiKeys().addListener((InvalidationListener) change -&gt; apiKeySelector.getSelectionModel().selectFirst());</span>
+<span class="nc" id="L131">    }</span>
+
+    private void updateFetcherApiKey(FetcherApiKey apiKey) {
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (apiKey != null) {</span>
+<span class="nc" id="L135">            apiKey.setUse(useCustomApiKey.isSelected());</span>
+<span class="nc" id="L136">            apiKey.setKey(customApiKey.getText().trim());</span>
+        }
+<span class="nc" id="L138">    }</span>
+
+    @FXML
+    void checkCustomApiKey() {
+<span class="nc" id="L142">        viewModel.checkCustomApiKey();</span>
+<span class="nc" id="L143">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

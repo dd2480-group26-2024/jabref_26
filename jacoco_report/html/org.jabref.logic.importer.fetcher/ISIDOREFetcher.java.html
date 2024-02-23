@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ISIDOREFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">ISIDOREFetcher.java</span></div><h1>ISIDOREFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.io.PushbackInputStream;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.StringJoiner;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.PagedSearchBasedParserFetcher;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.fetcher.transformers.ISIDOREQueryTransformer;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+
+import jakarta.ws.rs.core.MediaType;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.jooq.lambda.Unchecked;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+
+/**
+ * Fetcher for &lt;a href=&quot;https://isidore.science&quot;&gt;ISIDORE&lt;/a&gt;```
+ * Will take in the link to the website or the last six digits that identify the reference
+ * Uses &lt;a href=&quot;https://isidore.science/api&quot;&gt;ISIDORE's API&lt;/a&gt;.
+ */
+public class ISIDOREFetcher implements PagedSearchBasedParserFetcher {
+
+<span class="fc" id="L49">    private static final Logger LOGGER = LoggerFactory.getLogger(ISIDOREFetcher.class);</span>
+
+    private static final String SOURCE_WEB_SEARCH = &quot;https://api.isidore.science/resource/search&quot;;
+
+    private final DocumentBuilderFactory factory;
+
+<span class="fc" id="L55">    public ISIDOREFetcher() {</span>
+<span class="fc" id="L56">        this.factory = DocumentBuilderFactory.newInstance();</span>
+<span class="fc" id="L57">    }</span>
+
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L61">        return xmlData -&gt; {</span>
+            try {
+<span class="fc" id="L63">                PushbackInputStream pushbackInputStream = new PushbackInputStream(xmlData);</span>
+<span class="fc" id="L64">                int data = pushbackInputStream.read();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                if (data == -1) {</span>
+<span class="fc" id="L66">                    return List.of();</span>
+                }
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                if (pushbackInputStream.available() &lt; 5) {</span>
+                    // We guess, it's an error if less than 5
+<span class="nc" id="L70">                    pushbackInputStream.unread(data);</span>
+<span class="nc" id="L71">                    String error = new String(pushbackInputStream.readAllBytes(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L72">                    throw new FetcherException(error);</span>
+                }
+
+<span class="fc" id="L75">                pushbackInputStream.unread(data);</span>
+<span class="fc" id="L76">                DocumentBuilder builder = this.factory.newDocumentBuilder();</span>
+<span class="fc" id="L77">                Document document = builder.parse(pushbackInputStream);</span>
+
+                // Assuming the root element represents an entry
+<span class="fc" id="L80">                Element entryElement = document.getDocumentElement();</span>
+
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                if (entryElement == null) {</span>
+<span class="nc" id="L83">                    return Collections.emptyList();</span>
+                }
+
+<span class="fc" id="L86">                return parseXMl(entryElement);</span>
+<span class="nc" id="L87">            } catch (FetcherException e) {</span>
+<span class="nc" id="L88">                Unchecked.throwChecked(e);</span>
+<span class="nc" id="L89">            } catch (ParserConfigurationException |</span>
+                     IOException |
+                     SAXException e) {
+<span class="nc" id="L92">                Unchecked.throwChecked(new FetcherException(&quot;Issue with parsing link&quot;, e));</span>
+<span class="nc" id="L93">            }</span>
+<span class="nc" id="L94">            return null;</span>
+        };
+    }
+
+    @Override
+    public URLDownload getUrlDownload(URL url) {
+<span class="fc" id="L100">        URLDownload download = new URLDownload(url);</span>
+<span class="fc" id="L101">        download.addHeader(&quot;Accept&quot;, MediaType.APPLICATION_XML);</span>
+<span class="fc" id="L102">        return download;</span>
+    }
+
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery, int pageNumber) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L107">        ISIDOREQueryTransformer queryTransformer = new ISIDOREQueryTransformer();</span>
+<span class="fc" id="L108">        String transformedQuery = queryTransformer.transformLuceneQuery(luceneQuery).orElse(&quot;&quot;);</span>
+<span class="fc" id="L109">        URIBuilder uriBuilder = new URIBuilder(SOURCE_WEB_SEARCH);</span>
+<span class="fc" id="L110">        uriBuilder.addParameter(&quot;q&quot;, transformedQuery);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (pageNumber &gt; 1) {</span>
+<span class="nc" id="L112">            uriBuilder.addParameter(&quot;page&quot;, String.valueOf(pageNumber));</span>
+        }
+<span class="fc" id="L114">        uriBuilder.addParameter(&quot;replies&quot;, String.valueOf(getPageSize()));</span>
+<span class="fc" id="L115">        uriBuilder.addParameter(&quot;lang&quot;, &quot;en&quot;);</span>
+<span class="fc" id="L116">        uriBuilder.addParameter(&quot;output&quot;, &quot;xml&quot;);</span>
+<span class="fc" id="L117">        queryTransformer.getParameterMap().forEach((k, v) -&gt; {</span>
+<span class="fc" id="L118">            uriBuilder.addParameter(k, v);</span>
+<span class="fc" id="L119">        });</span>
+
+<span class="fc" id="L121">        URL url = uriBuilder.build().toURL();</span>
+<span class="fc" id="L122">        LOGGER.debug(&quot;URl for query {}&quot;, url);</span>
+<span class="fc" id="L123">        return url;</span>
+    }
+
+    private List&lt;BibEntry&gt; parseXMl(Element element) {
+<span class="fc" id="L127">        var list = element.getElementsByTagName(&quot;isidore&quot;);</span>
+<span class="fc" id="L128">        List&lt;BibEntry&gt; bibEntryList = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (int i = 0; i &lt; list.getLength(); i++) {</span>
+<span class="fc" id="L131">            Element elem = (Element) list.item(i);</span>
+<span class="fc" id="L132">            var bibEntry = xmlItemToBibEntry(elem);</span>
+<span class="fc" id="L133">            bibEntryList.add(bibEntry);</span>
+        }
+<span class="fc" id="L135">        return bibEntryList;</span>
+    }
+
+    private BibEntry xmlItemToBibEntry(Element itemElement) {
+<span class="fc" id="L139">        return new BibEntry(getType(itemElement.getElementsByTagName(&quot;types&quot;).item(0).getChildNodes()))</span>
+<span class="fc" id="L140">                .withField(StandardField.TITLE, itemElement.getElementsByTagName(&quot;title&quot;).item(0).getTextContent().replace(&quot;\&quot;&quot;, &quot;&quot;))</span>
+<span class="fc" id="L141">                .withField(StandardField.AUTHOR, getAuthor(itemElement.getElementsByTagName(&quot;enrichedCreators&quot;).item(0)))</span>
+<span class="fc" id="L142">                .withField(StandardField.YEAR, itemElement.getElementsByTagName(&quot;date&quot;).item(0).getChildNodes().item(1).getTextContent().substring(0, 4))</span>
+<span class="fc" id="L143">                .withField(StandardField.JOURNAL, getJournal(itemElement.getElementsByTagName(&quot;dc:source&quot;)))</span>
+<span class="fc" id="L144">                .withField(StandardField.PUBLISHER, getPublishers(itemElement.getElementsByTagName(&quot;publishers&quot;).item(0)))</span>
+<span class="fc" id="L145">                .withField(StandardField.DOI, getDOI(itemElement.getElementsByTagName(&quot;ore&quot;).item(0).getChildNodes()));</span>
+    }
+
+    private String getDOI(NodeList list) {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (int i = 0; i &lt; list.getLength(); i++) {</span>
+<span class="fc" id="L150">            String content = list.item(i).getTextContent();</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            if (content.contains(&quot;DOI:&quot;)) {</span>
+<span class="nc" id="L152">                return content.replace(&quot;DOI: &quot;, &quot;&quot;);</span>
+            }
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            if (list.item(i).getTextContent().contains(&quot;doi:&quot;)) {</span>
+<span class="fc" id="L155">                return content.replace(&quot;info:doi:&quot;, &quot;&quot;);</span>
+            }
+        }
+<span class="fc" id="L158">        return &quot;&quot;;</span>
+    }
+
+    /**
+     * Get the type of the document, ISIDORE only seems to have select types, also their types are different to
+     * those used by JabRef.
+     */
+    private EntryType getType(NodeList list) {
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        for (int i = 0; i &lt; list.getLength(); i++) {</span>
+<span class="fc" id="L167">            String type = list.item(i).getTextContent();</span>
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">            if (type.contains(&quot;article&quot;) || type.contains(&quot;Article&quot;)) {</span>
+<span class="fc" id="L169">                return StandardEntryType.Article;</span>
+            }
+<span class="pc bpc" id="L171" title="1 of 4 branches missed.">            if (type.contains(&quot;thesis&quot;) || type.contains(&quot;Thesis&quot;)) {</span>
+<span class="fc" id="L172">                return StandardEntryType.Thesis;</span>
+            }
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">            if (type.contains(&quot;book&quot;) || type.contains(&quot;Book&quot;)) {</span>
+<span class="nc" id="L175">                return StandardEntryType.Book;</span>
+            }
+        }
+<span class="nc" id="L178">        return StandardEntryType.Misc;</span>
+    }
+
+    private String getAuthor(Node itemElement) {
+        // Gets all the authors, separated with the word &quot;and&quot;
+        // For some reason the author field sometimes has extra numbers and letters.
+<span class="fc" id="L184">        StringJoiner stringJoiner = new StringJoiner(&quot; and &quot;);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (int i = 1; i &lt; itemElement.getChildNodes().getLength(); i += 2) {</span>
+<span class="fc" id="L186">            String next = removeNumbers(itemElement.getChildNodes().item(i).getTextContent()).replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L187">            next = next.replace(&quot;\n&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            if (next.isBlank()) {</span>
+<span class="nc" id="L189">                continue;</span>
+            }
+<span class="fc" id="L191">            stringJoiner.add(next);</span>
+        }
+<span class="fc" id="L193">        return (stringJoiner.toString().substring(0, stringJoiner.length())).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    /**
+     * Remove numbers from a string and everything after the number, (helps with the author field).
+     */
+    private String removeNumbers(String string) {
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        for (int i = 0; i &lt; string.length(); i++) {</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            if (Character.isDigit(string.charAt(i))) {</span>
+<span class="nc" id="L202">                return string.substring(0, i);</span>
+            }
+        }
+<span class="fc" id="L205">        return string;</span>
+    }
+
+    private String getPublishers(Node itemElement) {
+        // In the XML file the publishers node often lists multiple publisher e.g.
+        // &lt;publisher origin=&quot;HAL CCSD&quot;&gt;HAL CCSD&lt;/publisher&gt;
+        // &lt;publisher origin=&quot;Elsevier&quot;&gt;Elsevier&lt;/publisher&gt;
+        // Therefore this function simply gets all of them.
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (itemElement == null) {</span>
+<span class="fc" id="L214">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L216">        StringJoiner stringJoiner = new StringJoiner(&quot;, &quot;);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        for (int i = 0; i &lt; itemElement.getChildNodes().getLength(); i++) {</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">            if (itemElement.getChildNodes().item(i).getTextContent().isBlank()) {</span>
+<span class="nc" id="L219">                continue;</span>
+            }
+<span class="nc" id="L221">            stringJoiner.add(itemElement.getChildNodes().item(i).getTextContent().trim());</span>
+        }
+<span class="nc" id="L223">        return stringJoiner.toString();</span>
+    }
+
+    private String getJournal(NodeList list) {
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (list.getLength() == 0) {</span>
+<span class="fc" id="L228">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L230">        String reference = list.item(list.getLength() - 1).getTextContent();</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        for (int i = 0; i &lt; reference.length(); i++) {</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            if (reference.charAt(i) == ',') {</span>
+<span class="nc" id="L233">                return reference.substring(0, i);</span>
+            }
+        }
+<span class="nc" id="L236">        return &quot;&quot;;</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L241">        return &quot;ISIDORE&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;HelpFile&gt; getHelpPage() {
+<span class="nc" id="L246">        return Optional.of(HelpFile.FETCHER_ISIDORE);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

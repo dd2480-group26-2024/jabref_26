@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldFormatterCleanupsPanel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.commonfxcontrols</a> &gt; <span class="el_source">FieldFormatterCleanupsPanel.java</span></div><h1>FieldFormatterCleanupsPanel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.commonfxcontrols;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.value.ObservableValue;
+import javafx.fxml.FXML;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.SelectionMode;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.VBox;
+
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.util.BindingsHelper;
+import org.jabref.gui.util.FieldsUtil;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.cleanup.FieldFormatterCleanup;
+import org.jabref.logic.cleanup.Formatter;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.field.Field;
+
+import com.airhacks.afterburner.views.ViewLoader;
+
+public class FieldFormatterCleanupsPanel extends VBox {
+
+    @FXML private CheckBox cleanupsEnabled;
+    @FXML private TableView&lt;FieldFormatterCleanup&gt; cleanupsList;
+    @FXML private TableColumn&lt;FieldFormatterCleanup, Field&gt; fieldColumn;
+    @FXML private TableColumn&lt;FieldFormatterCleanup, Formatter&gt; formatterColumn;
+    @FXML private TableColumn&lt;FieldFormatterCleanup, Field&gt; actionsColumn;
+    @FXML private ComboBox&lt;Field&gt; addableFields;
+    @FXML private ComboBox&lt;Formatter&gt; addableFormatters;
+
+    private FieldFormatterCleanupsPanelViewModel viewModel;
+
+<span class="fc" id="L40">    public FieldFormatterCleanupsPanel() {</span>
+<span class="fc" id="L41">        ViewLoader.view(this)</span>
+<span class="fc" id="L42">                  .root(this)</span>
+<span class="fc" id="L43">                  .load();</span>
+<span class="fc" id="L44">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L48">        this.viewModel = new FieldFormatterCleanupsPanelViewModel();</span>
+
+<span class="nc" id="L50">        setupTable();</span>
+<span class="nc" id="L51">        setupCombos();</span>
+<span class="nc" id="L52">        setupBindings();</span>
+<span class="nc" id="L53">    }</span>
+
+    private void setupTable() {
+<span class="nc" id="L56">        cleanupsList.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);</span>
+
+        // ToDo: To be editable the list needs a view model wrapper for FieldFormatterCleanup
+
+<span class="nc" id="L60">        fieldColumn.setCellValueFactory(cellData -&gt; new ReadOnlyObjectWrapper&lt;&gt;(cellData.getValue().getField()));</span>
+<span class="nc" id="L61">        new ValueTableCellFactory&lt;FieldFormatterCleanup, Field&gt;()</span>
+<span class="nc" id="L62">                .withText(Field::getDisplayName)</span>
+<span class="nc" id="L63">                .install(fieldColumn);</span>
+
+<span class="nc" id="L65">        formatterColumn.setCellValueFactory(cellData -&gt; new ReadOnlyObjectWrapper&lt;&gt;(cellData.getValue().getFormatter()));</span>
+<span class="nc" id="L66">        new ValueTableCellFactory&lt;FieldFormatterCleanup, Formatter&gt;()</span>
+<span class="nc" id="L67">                .withText(Formatter::getName)</span>
+<span class="nc" id="L68">                .install(formatterColumn);</span>
+
+<span class="nc" id="L70">        actionsColumn.setCellValueFactory(cellData -&gt; new ReadOnlyObjectWrapper&lt;&gt;(cellData.getValue().getField()));</span>
+<span class="nc" id="L71">        new ValueTableCellFactory&lt;FieldFormatterCleanup, Field&gt;()</span>
+<span class="nc" id="L72">                .withGraphic(field -&gt; IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode())</span>
+<span class="nc" id="L73">                .withTooltip(field -&gt; Localization.lang(&quot;Remove formatter for %0&quot;, field.getDisplayName()))</span>
+<span class="nc" id="L74">                .withOnMouseClickedEvent(item -&gt; event -&gt; viewModel.removeCleanup(cleanupsList.getSelectionModel().getSelectedItem()))</span>
+<span class="nc" id="L75">                .install(actionsColumn);</span>
+
+<span class="nc" id="L77">        viewModel.selectedCleanupProperty().setValue(cleanupsList.getSelectionModel());</span>
+
+<span class="nc" id="L79">        cleanupsList.setOnKeyPressed(event -&gt; {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (event.getCode() == KeyCode.DELETE) {</span>
+<span class="nc" id="L81">                viewModel.removeCleanup(cleanupsList.getSelectionModel().getSelectedItem());</span>
+            }
+<span class="nc" id="L83">        });</span>
+<span class="nc" id="L84">    }</span>
+
+    private void setupCombos() {
+<span class="nc" id="L87">        new ViewModelListCellFactory&lt;Field&gt;()</span>
+<span class="nc" id="L88">                .withText(Field::getDisplayName)</span>
+<span class="nc" id="L89">                .install(addableFields);</span>
+<span class="nc" id="L90">        addableFields.setConverter(FieldsUtil.FIELD_STRING_CONVERTER);</span>
+<span class="nc" id="L91">        addableFields.setOnKeyPressed(event -&gt; {</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">            if (event.getCode() == KeyCode.TAB || event.getCode() == KeyCode.ENTER) {</span>
+<span class="nc" id="L93">                addableFormatters.requestFocus();</span>
+<span class="nc" id="L94">                event.consume();</span>
+            }
+<span class="nc" id="L96">        });</span>
+
+<span class="nc" id="L98">        new ViewModelListCellFactory&lt;Formatter&gt;()</span>
+<span class="nc" id="L99">                .withText(Formatter::getName)</span>
+<span class="nc" id="L100">                .withStringTooltip(Formatter::getDescription)</span>
+<span class="nc" id="L101">                .install(addableFormatters);</span>
+<span class="nc" id="L102">        addableFormatters.setOnKeyPressed(event -&gt; {</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (event.getCode() == KeyCode.ENTER) {</span>
+<span class="nc" id="L104">                viewModel.addCleanup();</span>
+<span class="nc" id="L105">                event.consume();</span>
+            }
+<span class="nc" id="L107">        });</span>
+<span class="nc" id="L108">    }</span>
+
+    private void setupBindings() {
+<span class="nc" id="L111">        BindingsHelper.bindBidirectional((ObservableValue&lt;Boolean&gt;) cleanupsEnabled.selectedProperty(),</span>
+<span class="nc" id="L112">                viewModel.cleanupsDisableProperty(),</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                disabled -&gt; cleanupsEnabled.selectedProperty().setValue(!disabled),</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                selected -&gt; viewModel.cleanupsDisableProperty().setValue(!selected));</span>
+
+<span class="nc" id="L116">        cleanupsList.itemsProperty().bind(viewModel.cleanupsListProperty());</span>
+<span class="nc" id="L117">        addableFields.itemsProperty().bind(viewModel.availableFieldsProperty());</span>
+<span class="nc" id="L118">        addableFields.valueProperty().bindBidirectional(viewModel.selectedFieldProperty());</span>
+<span class="nc" id="L119">        addableFormatters.itemsProperty().bind(viewModel.availableFormattersProperty());</span>
+<span class="nc" id="L120">        addableFormatters.valueProperty().bindBidirectional(viewModel.selectedFormatterProperty());</span>
+<span class="nc" id="L121">    }</span>
+
+    @FXML
+    private void resetToRecommended() {
+<span class="nc" id="L125">        viewModel.resetToRecommended();</span>
+<span class="nc" id="L126">    }</span>
+
+    @FXML
+    private void clearAll() {
+<span class="nc" id="L130">        viewModel.clearAll();</span>
+<span class="nc" id="L131">    }</span>
+
+    @FXML
+    private void addCleanup() {
+<span class="nc" id="L135">        viewModel.addCleanup();</span>
+<span class="nc" id="L136">    }</span>
+
+    public BooleanProperty cleanupsDisableProperty() {
+<span class="nc" id="L139">        return viewModel.cleanupsDisableProperty();</span>
+    }
+
+    public ListProperty&lt;FieldFormatterCleanup&gt; cleanupsProperty() {
+<span class="nc" id="L143">        return viewModel.cleanupsListProperty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

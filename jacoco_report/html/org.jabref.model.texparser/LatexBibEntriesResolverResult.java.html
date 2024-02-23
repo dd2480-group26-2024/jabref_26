@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LatexBibEntriesResolverResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.texparser</a> &gt; <span class="el_source">LatexBibEntriesResolverResult.java</span></div><h1>LatexBibEntriesResolverResult.java</h1><pre class="source lang-java linenums">package org.jabref.model.texparser;
+
+import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+
+import org.jabref.model.entry.BibEntry;
+
+import com.google.common.collect.Multimap;
+
+public class LatexBibEntriesResolverResult {
+
+    private final LatexParserResult latexParserResult;
+    private final Set&lt;BibEntry&gt; newEntries;
+
+<span class="fc" id="L17">    public LatexBibEntriesResolverResult(LatexParserResult latexParserResult) {</span>
+<span class="fc" id="L18">        this.latexParserResult = latexParserResult;</span>
+<span class="fc" id="L19">        this.newEntries = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L20">    }</span>
+
+    public LatexParserResult getLatexParserResult() {
+<span class="nc" id="L23">        return latexParserResult;</span>
+    }
+
+    public Set&lt;BibEntry&gt; getNewEntries() {
+<span class="fc" id="L27">        return newEntries;</span>
+    }
+
+    public void addEntry(BibEntry entry) {
+<span class="fc" id="L31">        newEntries.add(entry);</span>
+<span class="fc" id="L32">    }</span>
+
+    /**
+     * @return the BIB files multimap from the LatexParserResult object.
+     */
+    public Multimap&lt;Path, Path&gt; getBibFiles() {
+<span class="fc" id="L38">        return latexParserResult.getBibFiles();</span>
+    }
+
+    /**
+     * @return the citations multimap from the LatexParserResult object.
+     */
+    public Multimap&lt;String, Citation&gt; getCitations() {
+<span class="nc" id="L45">        return latexParserResult.getCitations();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L50">        return &quot;TexBibEntriesResolverResult{texParserResult=%s, newEntries=%s}&quot;.formatted(</span>
+                this.latexParserResult,
+                this.newEntries);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L58">            return true;</span>
+        }
+
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        if (obj == null || getClass() != obj.getClass()) {</span>
+<span class="nc" id="L62">            return false;</span>
+        }
+
+<span class="fc" id="L65">        LatexBibEntriesResolverResult that = (LatexBibEntriesResolverResult) obj;</span>
+
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        return Objects.equals(latexParserResult, that.latexParserResult)</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                &amp;&amp; Objects.equals(newEntries, that.newEntries);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L73">        return Objects.hash(latexParserResult, newEntries);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

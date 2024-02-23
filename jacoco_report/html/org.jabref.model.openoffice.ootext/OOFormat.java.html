@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OOFormat.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.ootext</a> &gt; <span class="el_source">OOFormat.java</span></div><h1>OOFormat.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.ootext;
+
+import org.jabref.model.strings.StringUtil;
+
+/**
+ * Helper functions to produce some of the markup as understood by OOTextIntoOO.write
+ * &lt;p&gt;
+ * These do not cover all tags, only those needed to embed markup from Layout and citation marker formatters into citation markers and bibliography.
+ */
+public class OOFormat {
+
+    private OOFormat() {
+    }
+
+    /**
+     * Mark {@code ootext} as using a character locale known to OO.
+     *
+     * @param locale language[-country[-territory]]
+     *               &lt;p&gt;
+     *               https://www.openoffice.org/api/docs/common/ref/com/sun/star/lang/Locale.html
+     *               &lt;p&gt;
+     *               The country part is optional.
+     *               &lt;p&gt;
+     *               The territory part is not only optional, the allowed &quot;codes are vendor and browser-specific&quot;, so probably best to avoid them if possible.
+     */
+    public static OOText setLocale(OOText ootext, String locale) {
+<span class="nc" id="L27">        return OOText.fromString(&quot;&lt;span lang=\&quot;%s\&quot;&gt;&quot;.formatted(locale) + ootext.toString() + &quot;&lt;/span&gt;&quot;);</span>
+    }
+
+    /**
+     * Mark {@code ootext} as using the character locale &quot;zxx&quot;, which means &quot;no language&quot;, &quot;no linguistic content&quot;.
+     * &lt;p&gt;
+     * Used around citation marks, probably to turn off spellchecking.
+     */
+    public static OOText setLocaleNone(OOText ootext) {
+<span class="nc" id="L36">        return OOFormat.setLocale(ootext, &quot;zxx&quot;);</span>
+    }
+
+    /**
+     * Mark {@code ootext} using a character style {@code charStyle}
+     *
+     * @param charStyle Name of a character style known to OO. May be empty for &quot;Standard&quot;, which in turn means do not override any properties.
+     */
+    public static OOText setCharStyle(OOText ootext, String charStyle) {
+<span class="nc" id="L45">        return OOText.fromString(&quot;&lt;span oo:CharStyleName=\&quot;%s\&quot;&gt;&quot;.formatted(charStyle)</span>
+<span class="nc" id="L46">                + ootext.toString()</span>
+                + &quot;&lt;/span&gt;&quot;);
+    }
+
+    /**
+     * Mark {@code ootext} as part of a paragraph with style {@code paraStyle}
+     */
+    public static OOText paragraph(OOText ootext, String paraStyle) {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (StringUtil.isNullOrEmpty(paraStyle)) {</span>
+<span class="nc" id="L55">            return paragraph(ootext);</span>
+        }
+<span class="nc" id="L57">        String startTag = &quot;&lt;p oo:ParaStyleName=\&quot;%s\&quot;&gt;&quot;.formatted(paraStyle);</span>
+<span class="nc" id="L58">        return OOText.fromString(startTag + ootext.toString() + &quot;&lt;/p&gt;&quot;);</span>
+    }
+
+    /**
+     * Mark {@code ootext} as part of a paragraph.
+     */
+    public static OOText paragraph(OOText ootext) {
+<span class="nc" id="L65">        return OOText.fromString(&quot;&lt;p&gt;&quot; + ootext.toString() + &quot;&lt;/p&gt;&quot;);</span>
+    }
+
+    /**
+     * Format an OO cross-reference showing the target's page number as label to a reference mark.
+     */
+    public static OOText formatReferenceToPageNumberOfReferenceMark(String referenceMarkName) {
+<span class="nc" id="L72">        String string = &quot;&lt;oo:referenceToPageNumberOfReferenceMark target=\&quot;%s\&quot;&gt;&quot;.formatted(referenceMarkName);</span>
+<span class="nc" id="L73">        return OOText.fromString(string);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

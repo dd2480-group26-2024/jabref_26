@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DoiResolution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">DoiResolution.java</span></div><h1>DoiResolution.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.importer.FulltextFetcher;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ImporterPreferences;
+import org.jabref.logic.importer.WebFetchers;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.logic.preferences.DOIPreferences;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.identifier.DOI;
+
+import org.jsoup.Connection;
+import org.jsoup.Jsoup;
+import org.jsoup.UnsupportedMimeTypeException;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * FulltextFetcher implementation that follows the DOI resolution redirects and scans for a full-text PDF URL.
+ *
+ * Note that we also have custom fetchers in place.
+ * See {@link WebFetchers#getFullTextFetchers(ImportFormatPreferences, ImporterPreferences)}.
+ */
+public class DoiResolution implements FulltextFetcher {
+
+<span class="fc" id="L42">    private static final Logger LOGGER = LoggerFactory.getLogger(DoiResolution.class);</span>
+    private final DOIPreferences doiPreferences;
+
+    public DoiResolution(DOIPreferences doiPreferences) {
+<span class="fc" id="L46">        super();</span>
+<span class="fc" id="L47">        this.doiPreferences = doiPreferences;</span>
+<span class="fc" id="L48">    }</span>
+
+    @Override
+    public Optional&lt;URL&gt; findFullText(BibEntry entry) throws IOException {
+<span class="fc" id="L52">        Objects.requireNonNull(entry);</span>
+
+<span class="fc" id="L54">        Optional&lt;DOI&gt; doi = entry.getField(StandardField.DOI).flatMap(DOI::parse);</span>
+
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (doi.isEmpty()) {</span>
+<span class="fc" id="L57">            return Optional.empty();</span>
+        }
+
+        URL base;
+
+        String doiLink;
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (doiPreferences.isUseCustom()) {</span>
+<span class="nc" id="L64">            base = new URL(doiPreferences.getDefaultBaseURI());</span>
+<span class="nc" id="L65">            doiLink = doi.get()</span>
+<span class="nc" id="L66">                         .getExternalURIWithCustomBase(base.toString())</span>
+<span class="nc" id="L67">                         .map(URI::toASCIIString)</span>
+<span class="nc" id="L68">                         .orElse(&quot;&quot;);</span>
+        } else {
+<span class="fc" id="L70">            base = DOI.RESOLVER.toURL();</span>
+<span class="fc" id="L71">            doiLink = doi.get().getURIAsASCIIString();</span>
+        }
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (doiLink.isEmpty()) {</span>
+<span class="nc" id="L74">            return Optional.empty();</span>
+        }
+
+        // follow all redirects and scan for a single pdf link
+        try {
+<span class="fc" id="L79">            Connection connection = Jsoup.connect(doiLink);</span>
+            // pretend to be a browser (agent &amp; referrer)
+<span class="fc" id="L81">            connection.userAgent(URLDownload.USER_AGENT);</span>
+<span class="fc" id="L82">            connection.referrer(&quot;https://www.google.com&quot;);</span>
+<span class="fc" id="L83">            connection.followRedirects(true);</span>
+<span class="fc" id="L84">            connection.ignoreHttpErrors(true);</span>
+            // some publishers are quite slow (default is 3s)
+<span class="fc" id="L86">            connection.timeout(30_000);</span>
+
+<span class="fc" id="L88">            Connection.Response response = connection.execute();</span>
+
+<span class="fc" id="L90">            Document html = response.parse();</span>
+            // citation pdf meta tag
+<span class="fc" id="L92">            Optional&lt;URL&gt; citationMetaTag = citationMetaTag(html);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (citationMetaTag.isPresent()) {</span>
+<span class="fc" id="L94">                return citationMetaTag;</span>
+            }
+<span class="fc" id="L96">            Optional&lt;URL&gt; embeddedLink = findEmbeddedLink(html, base);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">            if (embeddedLink.isPresent()) {</span>
+<span class="nc" id="L98">                return embeddedLink;</span>
+            }
+
+            // scan for PDF
+<span class="fc" id="L102">            Elements hrefElements = html.body().select(&quot;a[href]&quot;);</span>
+
+<span class="fc" id="L104">            List&lt;URL&gt; links = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (Element element : hrefElements) {</span>
+<span class="fc" id="L106">                String href = element.attr(&quot;abs:href&quot;).toLowerCase(Locale.ENGLISH);</span>
+<span class="fc" id="L107">                String hrefText = element.text().toLowerCase(Locale.ENGLISH);</span>
+                // Only check if pdf is included in the link or inside the text
+                // ACM uses tokens without PDF inside the link
+                // See https://github.com/lehner/LocalCopy for more scrape ideas
+                // link with &quot;PDF&quot; in title tag
+<span class="pc bpc" id="L112" title="3 of 4 branches missed.">                if (element.attr(&quot;title&quot;).toLowerCase(Locale.ENGLISH).contains(&quot;pdf&quot;) &amp;&amp; new URLDownload(href).isPdf()) {</span>
+<span class="nc" id="L113">                    return Optional.of(new URL(href));</span>
+                }
+
+<span class="pc bpc" id="L116" title="4 of 6 branches missed.">                if (href.contains(&quot;pdf&quot;) || hrefText.contains(&quot;pdf&quot;) &amp;&amp; new URLDownload(href).isPdf()) {</span>
+<span class="nc" id="L117">                    links.add(new URL(href));</span>
+                }
+<span class="fc" id="L119">            }</span>
+
+            // return if only one link was found (high accuracy)
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (links.size() == 1) {</span>
+<span class="nc" id="L123">                LOGGER.info(&quot;Fulltext PDF found @ {}&quot;, doiLink);</span>
+<span class="nc" id="L124">                return Optional.of(links.getFirst());</span>
+            }
+            // return if links are equal
+<span class="fc" id="L127">            return findDistinctLinks(links);</span>
+<span class="nc" id="L128">        } catch (UnsupportedMimeTypeException type) {</span>
+            // this might be the PDF already as we follow redirects
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            if (type.getMimeType().startsWith(&quot;application/pdf&quot;)) {</span>
+<span class="nc" id="L131">                return Optional.of(new URL(type.getUrl()));</span>
+            }
+<span class="nc" id="L133">            LOGGER.warn(&quot;DoiResolution fetcher failed: &quot;, type);</span>
+<span class="nc" id="L134">        } catch (IOException e) {</span>
+<span class="nc" id="L135">            LOGGER.warn(&quot;DoiResolution fetcher failed: &quot;, e);</span>
+<span class="nc" id="L136">        }</span>
+
+<span class="nc" id="L138">        return Optional.empty();</span>
+    }
+
+    /**
+     * Scan for &lt;meta name=&quot;citation_pdf_url&quot;&gt;
+     * See https://scholar.google.com/intl/de/scholar/inclusion.html#indexing
+     */
+    private Optional&lt;URL&gt; citationMetaTag(Document html) {
+<span class="fc" id="L146">        Elements citationPdfUrlElement = html.head().select(&quot;meta[name='citation_pdf_url']&quot;);</span>
+<span class="fc" id="L147">        Optional&lt;String&gt; citationPdfUrl = citationPdfUrlElement.stream().map(e -&gt; e.attr(&quot;content&quot;)).findFirst();</span>
+
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (citationPdfUrl.isPresent()) {</span>
+            try {
+<span class="fc" id="L151">                return Optional.of(new URL(citationPdfUrl.get()));</span>
+<span class="nc" id="L152">            } catch (MalformedURLException e) {</span>
+<span class="nc" id="L153">                return Optional.empty();</span>
+            }
+        }
+<span class="fc" id="L156">        return Optional.empty();</span>
+    }
+
+    private Optional&lt;URL&gt; findEmbeddedLink(Document html, URL base) {
+<span class="fc" id="L160">        Elements embedElement = html.body().select(&quot;embed[id='pdf']&quot;);</span>
+<span class="fc" id="L161">        Optional&lt;String&gt; pdfUrl = embedElement</span>
+<span class="fc" id="L162">                .stream()</span>
+<span class="pc" id="L163">                .map(e -&gt; e.attr(&quot;src&quot;)).findFirst();</span>
+
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (pdfUrl.isPresent()) {</span>
+            try {
+<span class="nc" id="L167">                URL url = base.toURI().resolve(pdfUrl.get()).toURL();</span>
+<span class="nc" id="L168">                return Optional.of(url);</span>
+<span class="nc" id="L169">            } catch (MalformedURLException | URISyntaxException e) {</span>
+<span class="nc" id="L170">                return Optional.empty();</span>
+            }
+        }
+<span class="fc" id="L173">        return Optional.empty();</span>
+    }
+
+    private Optional&lt;URL&gt; findDistinctLinks(List&lt;URL&gt; urls) {
+<span class="fc" id="L177">        List&lt;URL&gt; distinctLinks = urls.stream().distinct().collect(Collectors.toList());</span>
+
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (distinctLinks.isEmpty()) {</span>
+<span class="fc" id="L180">            return Optional.empty();</span>
+        }
+        // equal
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (distinctLinks.size() == 1) {</span>
+<span class="nc" id="L184">            return Optional.of(distinctLinks.getFirst());</span>
+        }
+
+<span class="nc" id="L187">        return Optional.empty();</span>
+    }
+
+    @Override
+    public TrustLevel getTrustLevel() {
+<span class="fc" id="L192">        return TrustLevel.SOURCE;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfXmpImporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fileformat</a> &gt; <span class="el_source">PdfXmpImporter.java</span></div><h1>PdfXmpImporter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fileformat;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Objects;
+
+import org.jabref.logic.importer.Importer;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.logic.xmp.XmpPreferences;
+import org.jabref.logic.xmp.XmpUtilReader;
+import org.jabref.logic.xmp.XmpUtilShared;
+
+/**
+ * Wraps the XMPUtility function to be used as an Importer.
+ */
+public class PdfXmpImporter extends Importer {
+
+    private final XmpPreferences xmpPreferences;
+
+<span class="fc" id="L23">    public PdfXmpImporter(XmpPreferences xmpPreferences) {</span>
+<span class="fc" id="L24">        this.xmpPreferences = xmpPreferences;</span>
+<span class="fc" id="L25">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L29">        return Localization.lang(&quot;XMP-annotated PDF&quot;);</span>
+    }
+
+    @Override
+    public StandardFileType getFileType() {
+<span class="fc" id="L34">        return StandardFileType.PDF;</span>
+    }
+
+    @Override
+    public ParserResult importDatabase(BufferedReader reader) throws IOException {
+<span class="nc" id="L39">        Objects.requireNonNull(reader);</span>
+<span class="nc" id="L40">        throw new UnsupportedOperationException(</span>
+                &quot;PdfXmpImporter does not support importDatabase(BufferedReader reader).&quot;
+                        + &quot;Instead use importDatabase(Path filePath, Charset defaultEncoding).&quot;);
+    }
+
+    @Override
+    public ParserResult importDatabase(String data) throws IOException {
+<span class="nc" id="L47">        Objects.requireNonNull(data);</span>
+<span class="nc" id="L48">        throw new UnsupportedOperationException(</span>
+                &quot;PdfXmpImporter does not support importDatabase(String data).&quot;
+                        + &quot;Instead use importDatabase(Path filePath, Charset defaultEncoding).&quot;);
+    }
+
+    @Override
+    public ParserResult importDatabase(Path filePath) {
+<span class="fc" id="L55">        Objects.requireNonNull(filePath);</span>
+        try {
+<span class="fc" id="L57">            return new ParserResult(new XmpUtilReader().readXmp(filePath, xmpPreferences));</span>
+<span class="fc" id="L58">        } catch (IOException exception) {</span>
+<span class="fc" id="L59">            return ParserResult.fromError(exception);</span>
+        }
+    }
+
+    @Override
+    public boolean isRecognizedFormat(BufferedReader reader) throws IOException {
+<span class="fc" id="L65">        Objects.requireNonNull(reader);</span>
+<span class="fc" id="L66">        return false;</span>
+    }
+
+    /**
+     * Returns whether the given stream contains data that is a.) a pdf and b.)
+     * contains at least one BibEntry.
+     */
+    @Override
+    public boolean isRecognizedFormat(Path filePath) throws IOException {
+<span class="fc" id="L75">        Objects.requireNonNull(filePath);</span>
+<span class="fc" id="L76">        return XmpUtilShared.hasMetadata(filePath, xmpPreferences);</span>
+    }
+
+    @Override
+    public String getId() {
+<span class="fc" id="L81">        return &quot;xmp&quot;;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="fc" id="L86">        return &quot;Wraps the XMPUtility function to be used as an Importer.&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreviewPreferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.preferences</a> &gt; <span class="el_source">PreviewPreferences.java</span></div><h1>PreviewPreferences.java</h1><pre class="source lang-java linenums">package org.jabref.preferences;
+
+import java.util.List;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.logic.layout.TextBasedPreviewLayout;
+import org.jabref.logic.preview.PreviewLayout;
+
+public class PreviewPreferences {
+
+    private final ObservableList&lt;PreviewLayout&gt; layoutCycle;
+    private final IntegerProperty layoutCyclePosition;
+    private final ObjectProperty&lt;TextBasedPreviewLayout&gt; customPreviewLayout;
+    private final StringProperty defaultCustomPreviewLayout;
+    private final BooleanProperty showPreviewAsExtraTab;
+
+    public PreviewPreferences(List&lt;PreviewLayout&gt; layoutCycle,
+                              int layoutCyclePosition,
+                              TextBasedPreviewLayout customPreviewLayout,
+                              String defaultCustomPreviewLayout,
+<span class="nc" id="L31">                              boolean showPreviewAsExtraTab) {</span>
+<span class="nc" id="L32">        this.layoutCycle = FXCollections.observableArrayList(layoutCycle);</span>
+<span class="nc" id="L33">        this.layoutCyclePosition = new SimpleIntegerProperty(layoutCyclePosition);</span>
+<span class="nc" id="L34">        this.customPreviewLayout = new SimpleObjectProperty&lt;&gt;(customPreviewLayout);</span>
+<span class="nc" id="L35">        this.defaultCustomPreviewLayout = new SimpleStringProperty(defaultCustomPreviewLayout);</span>
+<span class="nc" id="L36">        this.showPreviewAsExtraTab = new SimpleBooleanProperty(showPreviewAsExtraTab);</span>
+<span class="nc" id="L37">    }</span>
+
+    public ObservableList&lt;PreviewLayout&gt; getLayoutCycle() {
+<span class="nc" id="L40">        return layoutCycle;</span>
+    }
+
+    public int getLayoutCyclePosition() {
+<span class="nc" id="L44">        return layoutCyclePosition.getValue();</span>
+    }
+
+    public IntegerProperty layoutCyclePositionProperty() {
+<span class="nc" id="L48">        return layoutCyclePosition;</span>
+    }
+
+    public void setLayoutCyclePosition(int position) {
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (layoutCycle.isEmpty()) {</span>
+<span class="nc" id="L53">            this.layoutCyclePosition.setValue(0);</span>
+        } else {
+<span class="nc" id="L55">            int previewCyclePosition = position;</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">            while (previewCyclePosition &lt; 0) {</span>
+<span class="nc" id="L57">                previewCyclePosition += layoutCycle.size();</span>
+            }
+<span class="nc" id="L59">            this.layoutCyclePosition.setValue(previewCyclePosition % layoutCycle.size());</span>
+        }
+<span class="nc" id="L61">    }</span>
+
+    public PreviewLayout getSelectedPreviewLayout() {
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (layoutCycle.size() &lt;= 0</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">                || layoutCyclePosition.getValue() &lt; 0</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                || layoutCyclePosition.getValue() &gt;= layoutCycle.size()) {</span>
+<span class="nc" id="L67">            return getCustomPreviewLayout();</span>
+        } else {
+<span class="nc" id="L69">            return layoutCycle.get(layoutCyclePosition.getValue());</span>
+        }
+    }
+
+    public TextBasedPreviewLayout getCustomPreviewLayout() {
+<span class="nc" id="L74">        return customPreviewLayout.getValue();</span>
+    }
+
+    public ObjectProperty&lt;TextBasedPreviewLayout&gt; customPreviewLayoutProperty() {
+<span class="nc" id="L78">        return customPreviewLayout;</span>
+    }
+
+    public void setCustomPreviewLayout(TextBasedPreviewLayout layout) {
+<span class="nc" id="L82">        this.customPreviewLayout.set(layout);</span>
+<span class="nc" id="L83">    }</span>
+
+    public String getDefaultCustomPreviewLayout() {
+<span class="nc" id="L86">        return defaultCustomPreviewLayout.getValue();</span>
+    }
+
+    public boolean shouldShowPreviewAsExtraTab() {
+<span class="nc" id="L90">        return showPreviewAsExtraTab.getValue();</span>
+    }
+
+    public BooleanProperty showPreviewAsExtraTabProperty() {
+<span class="nc" id="L94">        return showPreviewAsExtraTab;</span>
+    }
+
+    public void setShowPreviewAsExtraTab(boolean showPreviewAsExtraTab) {
+<span class="nc" id="L98">        this.showPreviewAsExtraTab.set(showPreviewAsExtraTab);</span>
+<span class="nc" id="L99">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

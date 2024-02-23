@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtectedTermsTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.protectedterms</a> &gt; <span class="el_source">ProtectedTermsTab.java</span></div><h1>ProtectedTermsTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.protectedterms;
+
+import javafx.beans.property.ReadOnlyBooleanWrapper;
+import javafx.fxml.FXML;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.cell.CheckBoxTableCell;
+
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.gui.util.BindingsHelper;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.gui.util.ViewModelTableRowFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.protectedterms.ProtectedTermsList;
+import org.jabref.logic.protectedterms.ProtectedTermsLoader;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import jakarta.inject.Inject;
+
+/**
+ * Dialog for managing term list files.
+ */
+public class ProtectedTermsTab extends AbstractPreferenceTabView&lt;ProtectedTermsTabViewModel&gt; implements PreferencesTab {
+    @FXML private TableView&lt;ProtectedTermsListItemModel&gt; filesTable;
+    @FXML private TableColumn&lt;ProtectedTermsListItemModel, Boolean&gt; filesTableEnabledColumn;
+    @FXML private TableColumn&lt;ProtectedTermsListItemModel, String&gt; filesTableDescriptionColumn;
+    @FXML private TableColumn&lt;ProtectedTermsListItemModel, String&gt; filesTableFileColumn;
+    @FXML private TableColumn&lt;ProtectedTermsListItemModel, Boolean&gt; filesTableEditColumn;
+    @FXML private TableColumn&lt;ProtectedTermsListItemModel, Boolean&gt; filesTableDeleteColumn;
+
+    @Inject private ProtectedTermsLoader termsLoader;
+    @Inject private KeyBindingRepository keyBindingRepository;
+
+<span class="nc" id="L41">    public ProtectedTermsTab() {</span>
+<span class="nc" id="L42">        ViewLoader.view(this)</span>
+<span class="nc" id="L43">                  .root(this)</span>
+<span class="nc" id="L44">                  .load();</span>
+<span class="nc" id="L45">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L49">        return Localization.lang(&quot;Protected terms files&quot;);</span>
+    }
+
+    @FXML
+    public void initialize() {
+<span class="nc" id="L54">        viewModel = new ProtectedTermsTabViewModel(termsLoader, dialogService, preferencesService);</span>
+
+<span class="nc" id="L56">        new ViewModelTableRowFactory&lt;ProtectedTermsListItemModel&gt;()</span>
+<span class="nc" id="L57">                .withContextMenu(this::createContextMenu)</span>
+<span class="nc" id="L58">                .install(filesTable);</span>
+<span class="nc" id="L59">        filesTableEnabledColumn.setCellFactory(CheckBoxTableCell.forTableColumn(filesTableEnabledColumn));</span>
+<span class="nc" id="L60">        filesTableEnabledColumn.setCellValueFactory(data -&gt; data.getValue().enabledProperty());</span>
+<span class="nc" id="L61">        filesTableDescriptionColumn.setCellValueFactory(data -&gt; BindingsHelper.constantOf(data.getValue().getTermsList().getDescription()));</span>
+
+<span class="nc" id="L63">        filesTableFileColumn.setCellValueFactory(data -&gt; {</span>
+<span class="nc" id="L64">            ProtectedTermsList list = data.getValue().getTermsList();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (list.isInternalList()) {</span>
+<span class="nc" id="L66">                return BindingsHelper.constantOf(Localization.lang(&quot;Internal list&quot;));</span>
+            } else {
+<span class="nc" id="L68">                return BindingsHelper.constantOf(list.getLocation());</span>
+            }
+        });
+
+<span class="nc" id="L72">        filesTableEditColumn.setCellValueFactory(data -&gt; data.getValue().internalProperty().not());</span>
+<span class="nc" id="L73">        new ValueTableCellFactory&lt;ProtectedTermsListItemModel, Boolean&gt;()</span>
+<span class="nc" id="L74">                .withGraphic(none -&gt; IconTheme.JabRefIcons.EDIT.getGraphicNode())</span>
+<span class="nc" id="L75">                .withVisibleExpression(ReadOnlyBooleanWrapper::new)</span>
+<span class="nc" id="L76">                .withOnMouseClickedEvent((item, none) -&gt; event -&gt; viewModel.edit(item))</span>
+<span class="nc" id="L77">                .install(filesTableEditColumn);</span>
+
+<span class="nc" id="L79">        filesTableDeleteColumn.setCellValueFactory(data -&gt; data.getValue().internalProperty().not());</span>
+<span class="nc" id="L80">        new ValueTableCellFactory&lt;ProtectedTermsListItemModel, Boolean&gt;()</span>
+<span class="nc" id="L81">                .withGraphic(none -&gt; IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode())</span>
+<span class="nc" id="L82">                .withVisibleExpression(ReadOnlyBooleanWrapper::new)</span>
+<span class="nc" id="L83">                .withTooltip(none -&gt; Localization.lang(&quot;Remove protected terms file&quot;))</span>
+<span class="nc" id="L84">                .withOnMouseClickedEvent((item, none) -&gt; event -&gt; viewModel.removeList(item))</span>
+<span class="nc" id="L85">                .install(filesTableDeleteColumn);</span>
+
+<span class="nc" id="L87">        filesTable.itemsProperty().set(viewModel.termsFilesProperty());</span>
+<span class="nc" id="L88">    }</span>
+
+    private ContextMenu createContextMenu(ProtectedTermsListItemModel file) {
+<span class="nc" id="L91">        ActionFactory factory = new ActionFactory(keyBindingRepository);</span>
+<span class="nc" id="L92">        ContextMenu contextMenu = new ContextMenu();</span>
+<span class="nc" id="L93">        contextMenu.getItems().addAll(</span>
+<span class="nc" id="L94">                factory.createMenuItem(StandardActions.EDIT_LIST, new ProtectedTermsTab.ContextAction(StandardActions.EDIT_LIST, file)),</span>
+<span class="nc" id="L95">                factory.createMenuItem(StandardActions.VIEW_LIST, new ProtectedTermsTab.ContextAction(StandardActions.VIEW_LIST, file)),</span>
+<span class="nc" id="L96">                factory.createMenuItem(StandardActions.REMOVE_LIST, new ProtectedTermsTab.ContextAction(StandardActions.REMOVE_LIST, file)),</span>
+<span class="nc" id="L97">                factory.createMenuItem(StandardActions.RELOAD_LIST, new ProtectedTermsTab.ContextAction(StandardActions.RELOAD_LIST, file))</span>
+        );
+<span class="nc" id="L99">        contextMenu.getItems().forEach(item -&gt; item.setGraphic(null));</span>
+<span class="nc" id="L100">        contextMenu.getStyleClass().add(&quot;context-menu&quot;);</span>
+
+<span class="nc" id="L102">        return contextMenu;</span>
+    }
+
+    @FXML
+    private void addFile() {
+<span class="nc" id="L107">        viewModel.addFile();</span>
+<span class="nc" id="L108">    }</span>
+
+    @FXML
+    private void createNewFile() {
+<span class="nc" id="L112">        viewModel.createNewFile();</span>
+<span class="nc" id="L113">    }</span>
+
+    private class ContextAction extends SimpleCommand {
+
+        private final StandardActions command;
+        private final ProtectedTermsListItemModel itemModel;
+
+<span class="nc" id="L120">        public ContextAction(StandardActions command, ProtectedTermsListItemModel itemModel) {</span>
+<span class="nc" id="L121">            this.command = command;</span>
+<span class="nc" id="L122">            this.itemModel = itemModel;</span>
+
+<span class="nc" id="L124">            this.executable.bind(BindingsHelper.constantOf(</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                    switch (command) {</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                        case EDIT_LIST, REMOVE_LIST, RELOAD_LIST -&gt; !itemModel.getTermsList().isInternalList();</span>
+<span class="nc" id="L127">                        default -&gt; true;</span>
+                    }));
+<span class="nc" id="L129">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc bnc" id="L133" title="All 5 branches missed.">            switch (command) {</span>
+<span class="nc" id="L134">                case EDIT_LIST -&gt; viewModel.edit(itemModel);</span>
+<span class="nc" id="L135">                case VIEW_LIST -&gt; viewModel.displayContent(itemModel);</span>
+<span class="nc" id="L136">                case REMOVE_LIST -&gt; viewModel.removeList(itemModel);</span>
+<span class="nc" id="L137">                case RELOAD_LIST -&gt; viewModel.reloadList(itemModel);</span>
+            }
+<span class="nc" id="L139">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalFileTypeItemViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.externalfiletypes</a> &gt; <span class="el_source">ExternalFileTypeItemViewModel.java</span></div><h1>ExternalFileTypeItemViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.externalfiletypes;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+import org.jabref.gui.externalfiletype.CustomExternalFileType;
+import org.jabref.gui.externalfiletype.ExternalFileType;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.icon.JabRefIcon;
+
+public class ExternalFileTypeItemViewModel {
+<span class="fc" id="L14">    private final ObjectProperty&lt;JabRefIcon&gt; icon = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="fc" id="L15">    private final StringProperty name = new SimpleStringProperty();</span>
+<span class="fc" id="L16">    private final StringProperty extension = new SimpleStringProperty();</span>
+<span class="fc" id="L17">    private final StringProperty mimetype = new SimpleStringProperty();</span>
+<span class="fc" id="L18">    private final StringProperty application = new SimpleStringProperty();</span>
+
+<span class="fc" id="L20">    public ExternalFileTypeItemViewModel(ExternalFileType fileType) {</span>
+<span class="fc" id="L21">        this.icon.setValue(fileType.getIcon());</span>
+<span class="fc" id="L22">        this.name.setValue(fileType.getName());</span>
+<span class="fc" id="L23">        this.extension.setValue(fileType.getExtension());</span>
+<span class="fc" id="L24">        this.mimetype.setValue(fileType.getMimeType());</span>
+<span class="fc" id="L25">        this.application.setValue(fileType.getOpenWithApplication());</span>
+<span class="fc" id="L26">    }</span>
+
+    public ExternalFileTypeItemViewModel() {
+<span class="fc" id="L29">        this(new CustomExternalFileType(&quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;new&quot;, IconTheme.JabRefIcons.FILE));</span>
+<span class="fc" id="L30">    }</span>
+
+    public ObjectProperty&lt;JabRefIcon&gt; iconProperty() {
+<span class="nc" id="L33">        return icon;</span>
+    }
+
+    /**
+     * Used for sorting in the table
+     */
+    public String getName() {
+<span class="fc" id="L40">        return name.get();</span>
+    }
+
+    public StringProperty nameProperty() {
+<span class="fc" id="L44">        return name;</span>
+    }
+
+    public StringProperty extensionProperty() {
+<span class="fc" id="L48">        return extension;</span>
+    }
+
+    public StringProperty mimetypeProperty() {
+<span class="fc" id="L52">        return mimetype;</span>
+    }
+
+    public StringProperty applicationProperty() {
+<span class="fc" id="L56">        return application;</span>
+    }
+
+    public ExternalFileType toExternalFileType() {
+<span class="nc" id="L60">        return new CustomExternalFileType(</span>
+<span class="nc" id="L61">                this.name.get(),</span>
+<span class="nc" id="L62">                this.extension.get(),</span>
+<span class="nc" id="L63">                this.mimetype.get(),</span>
+<span class="nc" id="L64">                this.application.get(),</span>
+<span class="nc" id="L65">                this.icon.get().name(),</span>
+<span class="nc" id="L66">                this.icon.get());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

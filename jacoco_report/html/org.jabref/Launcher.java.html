@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Launcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref</a> &gt; <span class="el_source">Launcher.java</span></div><h1>Launcher.java</h1><pre class="source lang-java linenums">package org.jabref;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.Authenticator;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+
+import org.jabref.architecture.AllowedToUseStandardStreams;
+import org.jabref.cli.ArgumentProcessor;
+import org.jabref.cli.JabRefCLI;
+import org.jabref.gui.Globals;
+import org.jabref.gui.JabRefGUI;
+import org.jabref.logic.UiCommand;
+import org.jabref.logic.journals.JournalAbbreviationLoader;
+import org.jabref.logic.journals.predatory.PredatoryJournalListLoader;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.net.ProxyAuthenticator;
+import org.jabref.logic.net.ProxyPreferences;
+import org.jabref.logic.net.ProxyRegisterer;
+import org.jabref.logic.net.ssl.SSLPreferences;
+import org.jabref.logic.net.ssl.TrustStoreManager;
+import org.jabref.logic.protectedterms.ProtectedTermsLoader;
+import org.jabref.logic.remote.RemotePreferences;
+import org.jabref.logic.remote.client.RemoteClient;
+import org.jabref.logic.util.OS;
+import org.jabref.migrations.PreferencesMigrations;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.JabRefPreferences;
+import org.jabref.preferences.PreferencesService;
+
+import org.apache.commons.cli.ParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.bridge.SLF4JBridgeHandler;
+import org.tinylog.configuration.Configuration;
+
+/**
+ * The main entry point for the JabRef application.
+ * &lt;p&gt;
+ * It has two main functions:
+ * - Handle the command line arguments
+ * - Start the JavaFX application (if not in cli mode)
+ */
+@AllowedToUseStandardStreams(&quot;Direct output to the user&quot;)
+<span class="nc" id="L52">public class Launcher {</span>
+    private static Logger LOGGER;
+    private static boolean isDebugEnabled;
+
+    public static void main(String[] args) {
+<span class="nc" id="L57">        routeLoggingToSlf4J();</span>
+
+        // We must configure logging as soon as possible, which is why we cannot wait for the usual
+        // argument parsing workflow to parse logging options .e.g. --debug
+        JabRefCLI jabRefCLI;
+        try {
+<span class="nc" id="L63">            jabRefCLI = new JabRefCLI(args);</span>
+<span class="nc" id="L64">            isDebugEnabled = jabRefCLI.isDebugLogging();</span>
+<span class="nc" id="L65">        } catch (ParseException e) {</span>
+<span class="nc" id="L66">            isDebugEnabled = false;</span>
+<span class="nc" id="L67">        }</span>
+
+<span class="nc" id="L69">        addLogToDisk();</span>
+        try {
+<span class="nc" id="L71">            BibEntryTypesManager entryTypesManager = new BibEntryTypesManager();</span>
+<span class="nc" id="L72">            Globals.entryTypesManager = entryTypesManager;</span>
+
+            // Initialize preferences
+<span class="nc" id="L75">            final JabRefPreferences preferences = JabRefPreferences.getInstance();</span>
+
+            // Early exit in case another instance is already running
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            if (!handleMultipleAppInstances(args, preferences.getRemotePreferences())) {</span>
+<span class="nc" id="L79">                return;</span>
+            }
+
+<span class="nc" id="L82">            Globals.prefs = preferences;</span>
+<span class="nc" id="L83">            PreferencesMigrations.runMigrations(preferences, entryTypesManager);</span>
+
+            // Initialize rest of preferences
+<span class="nc" id="L86">            configureProxy(preferences.getProxyPreferences());</span>
+<span class="nc" id="L87">            configureSSL(preferences.getSSLPreferences());</span>
+<span class="nc" id="L88">            initGlobals(preferences);</span>
+<span class="nc" id="L89">            clearOldSearchIndices();</span>
+
+            try {
+<span class="nc" id="L92">                FileUpdateMonitor fileUpdateMonitor = Globals.getFileUpdateMonitor();</span>
+
+                // Process arguments
+<span class="nc" id="L95">                ArgumentProcessor argumentProcessor = new ArgumentProcessor(</span>
+                        args,
+                        ArgumentProcessor.Mode.INITIAL_START,
+                        preferences,
+                        fileUpdateMonitor,
+                        entryTypesManager);
+<span class="nc" id="L101">                argumentProcessor.processArguments();</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                if (argumentProcessor.shouldShutDown()) {</span>
+<span class="nc" id="L103">                    LOGGER.debug(&quot;JabRef shut down after processing command line arguments&quot;);</span>
+                    // A clean shutdown takes 60s time
+                    // We don't need the clean shutdown here
+<span class="nc" id="L106">                    System.exit(0);</span>
+                }
+
+<span class="nc" id="L109">                List&lt;UiCommand&gt; uiCommands = new ArrayList&lt;&gt;(argumentProcessor.getUiCommands());</span>
+<span class="nc" id="L110">                JabRefGUI.setup(uiCommands, preferences, fileUpdateMonitor);</span>
+<span class="nc" id="L111">                JabRefGUI.launch(JabRefGUI.class, args);</span>
+<span class="nc" id="L112">            } catch (ParseException e) {</span>
+<span class="nc" id="L113">                LOGGER.error(&quot;Problem parsing arguments&quot;, e);</span>
+<span class="nc" id="L114">                JabRefCLI.printUsage(preferences);</span>
+<span class="nc" id="L115">            }</span>
+<span class="nc" id="L116">        } catch (Exception ex) {</span>
+<span class="nc" id="L117">            LOGGER.error(&quot;Unexpected exception&quot;, ex);</span>
+<span class="nc" id="L118">        }</span>
+<span class="nc" id="L119">    }</span>
+
+    private static void routeLoggingToSlf4J() {
+<span class="nc" id="L122">        SLF4JBridgeHandler.removeHandlersForRootLogger();</span>
+<span class="nc" id="L123">        SLF4JBridgeHandler.install();</span>
+<span class="nc" id="L124">    }</span>
+
+    /**
+     * This needs to be called as early as possible. After the first log write, it
+     * is not possible to alter
+     * the log configuration programmatically anymore.
+     */
+    private static void addLogToDisk() {
+<span class="nc" id="L132">        Path directory = OS.getNativeDesktop().getLogDirectory();</span>
+        try {
+<span class="nc" id="L134">            Files.createDirectories(directory);</span>
+<span class="nc" id="L135">        } catch (IOException e) {</span>
+<span class="nc" id="L136">            initializeLogger();</span>
+<span class="nc" id="L137">            LOGGER.error(&quot;Could not create log directory {}&quot;, directory, e);</span>
+<span class="nc" id="L138">            return;</span>
+<span class="nc" id="L139">        }</span>
+        // The &quot;Shared File Writer&quot; is explained at
+        // https://tinylog.org/v2/configuration/#shared-file-writer
+<span class="nc" id="L142">        Map&lt;String, String&gt; configuration = Map.of(</span>
+                &quot;writerFile&quot;, &quot;shared file&quot;,
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                &quot;writerFile.level&quot;, isDebugEnabled ? &quot;debug&quot; : &quot;info&quot;,</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                &quot;level&quot;, isDebugEnabled ? &quot;debug&quot; : &quot;info&quot;,</span>
+<span class="nc" id="L146">                &quot;writerFile.file&quot;, directory.resolve(&quot;log.txt&quot;).toString(),</span>
+                &quot;writerFile.charset&quot;, &quot;UTF-8&quot;);
+
+<span class="nc" id="L149">        configuration.forEach(Configuration::set);</span>
+<span class="nc" id="L150">        initializeLogger();</span>
+<span class="nc" id="L151">    }</span>
+
+    private static void initializeLogger() {
+<span class="nc" id="L154">        LOGGER = LoggerFactory.getLogger(Launcher.class);</span>
+<span class="nc" id="L155">    }</span>
+
+    /**
+     * @return true if JabRef should continue starting up, false if it should quit.
+     */
+    private static boolean handleMultipleAppInstances(String[] args, RemotePreferences remotePreferences) {
+<span class="nc" id="L161">        LOGGER.trace(&quot;Checking for remote handling...&quot;);</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (remotePreferences.useRemoteServer()) {</span>
+            // Try to contact already running JabRef
+<span class="nc" id="L164">            RemoteClient remoteClient = new RemoteClient(remotePreferences.getPort());</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (remoteClient.ping()) {</span>
+<span class="nc" id="L166">                LOGGER.debug(&quot;Pinging other instance succeeded.&quot;);</span>
+                // We are not alone, there is already a server out there, send command line
+                // arguments to other instance
+<span class="nc" id="L169">                LOGGER.debug(&quot;Passing arguments passed on to running JabRef...&quot;);</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                if (remoteClient.sendCommandLineArguments(args)) {</span>
+                    // So we assume it's all taken care of, and quit.
+<span class="nc" id="L172">                    LOGGER.debug(&quot;Arguments passed on to running JabRef instance.&quot;);</span>
+                    // Used for script-use output etc. to the user
+<span class="nc" id="L174">                    System.out.println(Localization.lang(&quot;Arguments passed on to running JabRef instance. Shutting down.&quot;));</span>
+<span class="nc" id="L175">                    return false;</span>
+                } else {
+<span class="nc" id="L177">                    LOGGER.warn(&quot;Could not communicate with other running JabRef instance.&quot;);</span>
+                    // We do not launch a new instance in presence of an error
+<span class="nc" id="L179">                    return false;</span>
+                }
+            } else {
+<span class="nc" id="L182">                LOGGER.debug(&quot;Could not ping JabRef instance.&quot;);</span>
+            }
+        }
+<span class="nc" id="L185">        return true;</span>
+    }
+
+    private static void initGlobals(PreferencesService preferences) {
+        // Read list(s) of journal names and abbreviations
+<span class="nc" id="L190">        Globals.journalAbbreviationRepository = JournalAbbreviationLoader</span>
+<span class="nc" id="L191">                .loadRepository(preferences.getJournalAbbreviationPreferences());</span>
+        Globals.predatoryJournalRepository = PredatoryJournalListLoader
+<span class="nc" id="L193">                .loadRepository();</span>
+
+<span class="nc" id="L195">        Globals.entryTypesManager = preferences.getCustomEntryTypesRepository();</span>
+<span class="nc" id="L196">        Globals.protectedTermsLoader = new ProtectedTermsLoader(preferences.getProtectedTermsPreferences());</span>
+<span class="nc" id="L197">    }</span>
+
+    private static void configureProxy(ProxyPreferences proxyPreferences) {
+<span class="nc" id="L200">        ProxyRegisterer.register(proxyPreferences);</span>
+<span class="nc bnc" id="L201" title="All 4 branches missed.">        if (proxyPreferences.shouldUseProxy() &amp;&amp; proxyPreferences.shouldUseAuthentication()) {</span>
+<span class="nc" id="L202">            Authenticator.setDefault(new ProxyAuthenticator());</span>
+        }
+<span class="nc" id="L204">    }</span>
+
+    private static void configureSSL(SSLPreferences sslPreferences) {
+<span class="nc" id="L207">        TrustStoreManager.createTruststoreFileIfNotExist(Path.of(sslPreferences.getTruststorePath()));</span>
+<span class="nc" id="L208">    }</span>
+
+    private static void clearOldSearchIndices() {
+<span class="nc" id="L211">        Path currentIndexPath = OS.getNativeDesktop().getFulltextIndexBaseDirectory();</span>
+<span class="nc" id="L212">        Path appData = currentIndexPath.getParent();</span>
+
+        try {
+<span class="nc" id="L215">            Files.createDirectories(currentIndexPath);</span>
+<span class="nc" id="L216">        } catch (IOException e) {</span>
+<span class="nc" id="L217">            LOGGER.error(&quot;Could not create index directory {}&quot;, appData, e);</span>
+<span class="nc" id="L218">        }</span>
+
+<span class="nc" id="L220">        try (DirectoryStream&lt;Path&gt; stream = Files.newDirectoryStream(appData)) {</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            for (Path path : stream) {</span>
+<span class="nc bnc" id="L222" title="All 6 branches missed.">                if (Files.isDirectory(path) &amp;&amp; !path.toString().endsWith(&quot;ssl&quot;) &amp;&amp; path.toString().contains(&quot;lucene&quot;)</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                        &amp;&amp; !path.equals(currentIndexPath)) {</span>
+<span class="nc" id="L224">                    LOGGER.info(&quot;Deleting out-of-date fulltext search index at {}.&quot;, path);</span>
+<span class="nc" id="L225">                    Files.walk(path)</span>
+<span class="nc" id="L226">                            .sorted(Comparator.reverseOrder())</span>
+<span class="nc" id="L227">                            .map(Path::toFile)</span>
+<span class="nc" id="L228">                            .forEach(File::delete);</span>
+                }
+<span class="nc" id="L230">            }</span>
+<span class="nc" id="L231">        } catch (IOException e) {</span>
+<span class="nc" id="L232">            LOGGER.error(&quot;Could not access app-directory at {}&quot;, appData, e);</span>
+<span class="nc" id="L233">        }</span>
+<span class="nc" id="L234">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SemanticScholar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">SemanticScholar.java</span></div><h1>SemanticScholar.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import org.jabref.logic.importer.EntryBasedFetcher;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.FulltextFetcher;
+import org.jabref.logic.importer.ImporterPreferences;
+import org.jabref.logic.importer.PagedSearchBasedParserFetcher;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.fetcher.transformers.DefaultQueryTransformer;
+import org.jabref.logic.importer.util.JsonReader;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.identifier.ArXivIdentifier;
+import org.jabref.model.entry.identifier.DOI;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONException;
+import kong.unirest.json.JSONObject;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class SemanticScholar implements FulltextFetcher, PagedSearchBasedParserFetcher, EntryBasedFetcher, CustomizableKeyFetcher {
+
+<span class="fc" id="L44">    private static final Logger LOGGER = LoggerFactory.getLogger(SemanticScholar.class);</span>
+
+    private static final String SOURCE_ID_SEARCH = &quot;https://api.semanticscholar.org/v1/paper/&quot;;
+    private static final String SOURCE_WEB_SEARCH = &quot;https://api.semanticscholar.org/graph/v1/paper/search?&quot;;
+    private final ImporterPreferences importerPreferences;
+
+<span class="fc" id="L50">    public SemanticScholar(ImporterPreferences importerPreferences) {</span>
+<span class="fc" id="L51">        this.importerPreferences = importerPreferences;</span>
+<span class="fc" id="L52">    }</span>
+
+    /**
+     * Tries to find a fulltext URL for a given BibTex entry.
+     * &lt;p&gt;
+     * Uses the DOI if present, otherwise the arXiv identifier.
+     *
+     * @param entry The Bibtex entry
+     * @return The fulltext PDF URL Optional, if found, or an empty Optional if not found.
+     * @throws IOException      if a page could not be fetched correctly
+     * @throws FetcherException if the received page differs from what was expected
+     */
+    @Override
+    public Optional&lt;URL&gt; findFullText(BibEntry entry) throws IOException, FetcherException {
+<span class="fc" id="L66">        Objects.requireNonNull(entry);</span>
+
+<span class="fc" id="L68">        Optional&lt;DOI&gt; doi = entry.getField(StandardField.DOI).flatMap(DOI::parse);</span>
+<span class="fc" id="L69">        Optional&lt;ArXivIdentifier&gt; arXiv = entry.getField(StandardField.EPRINT).flatMap(ArXivIdentifier::parse);</span>
+
+<span class="fc" id="L71">        Document html = null;</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (doi.isPresent()) {</span>
+            try {
+                // Retrieve PDF link
+<span class="fc" id="L75">                String source = SOURCE_ID_SEARCH + doi.get().getDOI();</span>
+<span class="fc" id="L76">                var jsoupRequest = Jsoup.connect(getURLBySource(source))</span>
+<span class="fc" id="L77">                                        .userAgent(URLDownload.USER_AGENT)</span>
+<span class="fc" id="L78">                                        .header(&quot;Accept&quot;, &quot;text/html; charset=utf-8&quot;)</span>
+<span class="fc" id="L79">                                        .referrer(&quot;https://www.google.com&quot;)</span>
+<span class="fc" id="L80">                                        .ignoreHttpErrors(true);</span>
+<span class="fc" id="L81">                importerPreferences.getApiKey(getName()).ifPresent(</span>
+<span class="nc" id="L82">                        key -&gt; jsoupRequest.header(&quot;x-api-key&quot;, key));</span>
+<span class="fc" id="L83">                html = jsoupRequest.get();</span>
+<span class="fc" id="L84">            } catch (IOException e) {</span>
+<span class="fc" id="L85">                LOGGER.info(&quot;Error for pdf lookup with DOI&quot;);</span>
+<span class="fc" id="L86">            }</span>
+        }
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">        if (arXiv.isPresent() &amp;&amp; entry.getField(StandardField.EPRINT).isPresent()) {</span>
+            // Check if entry is a match
+<span class="fc" id="L90">            String arXivString = entry.getField(StandardField.EPRINT).get();</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (!arXivString.startsWith(&quot;arXiv:&quot;)) {</span>
+<span class="fc" id="L92">                arXivString = &quot;arXiv:&quot; + arXivString;</span>
+            }
+<span class="fc" id="L94">            String source = SOURCE_ID_SEARCH + arXivString;</span>
+<span class="fc" id="L95">            var jsoupRequest = Jsoup.connect(getURLBySource(source))</span>
+<span class="fc" id="L96">                                    .userAgent(URLDownload.USER_AGENT)</span>
+<span class="fc" id="L97">                                    .referrer(&quot;https://www.google.com&quot;)</span>
+<span class="fc" id="L98">                                    .header(&quot;Accept&quot;, &quot;text/html; charset=utf-8&quot;)</span>
+<span class="fc" id="L99">                                    .ignoreHttpErrors(true);</span>
+<span class="fc" id="L100">            importerPreferences.getApiKey(getName()).ifPresent(</span>
+<span class="nc" id="L101">                    key -&gt; jsoupRequest.header(&quot;x-api-key&quot;, key));</span>
+<span class="fc" id="L102">            html = jsoupRequest.get();</span>
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (html == null) {</span>
+<span class="fc" id="L105">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L108">        var metaTag = html.selectFirst(&quot;meta[name=citation_pdf_url]&quot;);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (metaTag == null) {</span>
+<span class="nc" id="L110">            return Optional.empty();</span>
+        }
+<span class="fc" id="L112">        String link = metaTag.attr(&quot;content&quot;);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (StringUtil.isNullOrEmpty(link)) {</span>
+<span class="nc" id="L114">            return Optional.empty();</span>
+        }
+<span class="fc" id="L116">        LOGGER.info(&quot;Fulltext PDF found @ SemanticScholar. Link: {}&quot;, link);</span>
+<span class="fc" id="L117">        return Optional.of(new URL(link));</span>
+    }
+
+    @Override
+    public TrustLevel getTrustLevel() {
+<span class="fc" id="L122">        return TrustLevel.META_SEARCH;</span>
+    }
+
+    String getURLBySource(String source) throws IOException, FetcherException {
+<span class="fc" id="L126">        URLDownload download = new URLDownload(source);</span>
+<span class="fc" id="L127">        JSONObject json = new JSONObject(download.asString());</span>
+<span class="fc" id="L128">        LOGGER.debug(&quot;URL for source: {}&quot;, json.get(&quot;url&quot;).toString());</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (!json.has(&quot;url&quot;)) {</span>
+<span class="nc" id="L130">            throw new FetcherException(&quot;Page does not contain field \&quot;url\&quot;&quot;);</span>
+        }
+<span class="fc" id="L132">        return json.get(&quot;url&quot;).toString();</span>
+    }
+
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery, int pageNumber) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L137">        URIBuilder uriBuilder = new URIBuilder(SOURCE_WEB_SEARCH);</span>
+<span class="fc" id="L138">        uriBuilder.addParameter(&quot;query&quot;, new DefaultQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;));</span>
+<span class="fc" id="L139">        uriBuilder.addParameter(&quot;offset&quot;, String.valueOf(pageNumber * getPageSize()));</span>
+<span class="fc" id="L140">        uriBuilder.addParameter(&quot;limit&quot;, String.valueOf(Math.min(getPageSize(), 10000 - pageNumber * getPageSize())));</span>
+        // All fields need to be specified
+<span class="fc" id="L142">        uriBuilder.addParameter(&quot;fields&quot;, &quot;paperId,externalIds,url,title,abstract,venue,year,authors&quot;);</span>
+<span class="fc" id="L143">        LOGGER.debug(&quot;URL for query: {}&quot;, uriBuilder.build().toURL());</span>
+<span class="fc" id="L144">        return uriBuilder.build().toURL();</span>
+    }
+
+    /**
+     * Returns the parser used to convert the response to a list of {@link BibEntry}.
+     */
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L152">        return inputStream -&gt; {</span>
+
+<span class="fc" id="L154">            JSONObject response = JsonReader.toJsonObject(inputStream);</span>
+<span class="fc" id="L155">            LOGGER.debug(&quot;Response for Parser: {}&quot;, response);</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            if (response.isEmpty()) {</span>
+<span class="nc" id="L157">                return Collections.emptyList();</span>
+            }
+
+<span class="fc" id="L160">            int total = response.getInt(&quot;total&quot;);</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (total == 0) {</span>
+<span class="nc" id="L162">                return Collections.emptyList();</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            } else if (response.has(&quot;next&quot;)) {</span>
+<span class="fc" id="L164">                total = Math.min(total, response.getInt(&quot;next&quot;) - response.getInt(&quot;offset&quot;));</span>
+            }
+
+            // Response contains a list
+<span class="fc" id="L168">            JSONArray items = response.getJSONArray(&quot;data&quot;);</span>
+<span class="fc" id="L169">            List&lt;BibEntry&gt; entries = new ArrayList&lt;&gt;(items.length());</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            for (int i = 0; i &lt; total; i++) {</span>
+<span class="fc" id="L171">                JSONObject item = items.getJSONObject(i);</span>
+<span class="fc" id="L172">                BibEntry entry = jsonItemToBibEntry(item);</span>
+<span class="fc" id="L173">                entries.add(entry);</span>
+            }
+
+<span class="fc" id="L176">            return entries;</span>
+        };
+    }
+
+    /**
+     * This is copy-paste from CrossRef, need to be checked.
+     *
+     * @param item an entry received, needs to be parsed into a BibEntry
+     * @return The BibEntry that corresponds to the received object
+     * @throws ParseException if the JSONObject could not be parsed
+     */
+    private BibEntry jsonItemToBibEntry(JSONObject item) throws ParseException {
+        try {
+<span class="fc" id="L189">            BibEntry entry = new BibEntry(StandardEntryType.Article);</span>
+<span class="fc" id="L190">            entry.setField(StandardField.URL, item.optString(&quot;url&quot;));</span>
+<span class="fc" id="L191">            entry.setField(StandardField.TITLE, item.optString(&quot;title&quot;));</span>
+<span class="fc" id="L192">            entry.setField(StandardField.ABSTRACT, item.optString(&quot;abstract&quot;));</span>
+<span class="fc" id="L193">            entry.setField(StandardField.VENUE, item.optString(&quot;venue&quot;));</span>
+<span class="fc" id="L194">            entry.setField(StandardField.YEAR, item.optString(&quot;year&quot;));</span>
+
+<span class="fc" id="L196">            entry.setField(StandardField.AUTHOR,</span>
+<span class="fc" id="L197">                    IntStream.range(0, item.optJSONArray(&quot;authors&quot;).length())</span>
+<span class="fc" id="L198">                             .mapToObj(item.optJSONArray(&quot;authors&quot;)::getJSONObject)</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                             .map(author -&gt; author.has(&quot;name&quot;) ? author.getString(&quot;name&quot;) : &quot;&quot;)</span>
+<span class="fc" id="L200">                             .collect(Collectors.joining(&quot; and &quot;)));</span>
+
+<span class="fc" id="L202">            JSONObject externalIds = item.optJSONObject(&quot;externalIds&quot;);</span>
+<span class="fc" id="L203">            entry.setField(StandardField.DOI, externalIds.optString(&quot;DOI&quot;));</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (externalIds.has(&quot;ArXiv&quot;)) {</span>
+<span class="fc" id="L205">                entry.setField(StandardField.EPRINT, externalIds.getString(&quot;ArXiv&quot;));</span>
+<span class="fc" id="L206">                entry.setField(StandardField.EPRINTTYPE, &quot;arXiv&quot;);</span>
+            }
+<span class="fc" id="L208">            entry.setField(StandardField.PMID, externalIds.optString(&quot;PubMed&quot;));</span>
+<span class="fc" id="L209">            return entry;</span>
+<span class="nc" id="L210">        } catch (JSONException exception) {</span>
+<span class="nc" id="L211">            throw new ParseException(&quot;SemanticScholar API JSON format has changed&quot;, exception);</span>
+        }
+    }
+
+    /**
+     * Returns the localized name of this fetcher. The title can be used to display the fetcher in the menu and in the side pane.
+     *
+     * @return the localized name
+     */
+    @Override
+    public String getName() {
+<span class="fc" id="L222">        return &quot;SemanticScholar&quot;;</span>
+    }
+
+    /**
+     * Looks for hits which are matched by the given {@link BibEntry}.
+     *
+     * @param entry entry to search bibliographic information for
+     * @return a list of {@link BibEntry}, which are matched by the query (may be empty)
+     * @throws FetcherException if an error linked to the Fetcher applies
+     */
+    @Override
+    public List&lt;BibEntry&gt; performSearch(BibEntry entry) throws FetcherException {
+<span class="fc" id="L234">        Optional&lt;String&gt; title = entry.getTitle();</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (title.isEmpty()) {</span>
+<span class="nc" id="L236">            return new ArrayList&lt;&gt;();</span>
+        }
+<span class="fc" id="L238">        return performSearch(title.get());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DOAJFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">DOAJFetcher.java</span></div><h1>DOAJFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.SearchBasedParserFetcher;
+import org.jabref.logic.importer.fetcher.transformers.DefaultLuceneQueryTransformer;
+import org.jabref.logic.util.OS;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONObject;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Fetches data from the Directory of Open Access Journals (DOAJ)
+ *
+ * @see &lt;a href=&quot;https://doaj.org/api/v1/docs&quot;&gt;API documentation&lt;/a&gt;
+ */
+public class DOAJFetcher implements SearchBasedParserFetcher {
+
+<span class="fc" id="L41">    private static final Logger LOGGER = LoggerFactory.getLogger(DOAJFetcher.class);</span>
+
+    private static final String SEARCH_URL = &quot;https://doaj.org/api/v1/search/articles/&quot;;
+    private final ImportFormatPreferences preferences;
+
+<span class="fc" id="L46">    public DOAJFetcher(ImportFormatPreferences preferences) {</span>
+<span class="fc" id="L47">        this.preferences = Objects.requireNonNull(preferences);</span>
+<span class="fc" id="L48">    }</span>
+
+    /**
+     * Convert a JSONObject containing a bibJSON entry to a BibEntry
+     *
+     * @param bibJsonEntry The JSONObject to convert
+     * @return the converted BibEntry
+     */
+    public static BibEntry parseBibJSONtoBibtex(JSONObject bibJsonEntry, Character keywordSeparator) {
+        // Fields that are directly accessible at the top level BibJson object
+<span class="fc" id="L58">        List&lt;Field&gt; singleFields = List.of(StandardField.YEAR, StandardField.TITLE, StandardField.ABSTRACT, StandardField.MONTH);</span>
+
+        // Fields that are accessible in the journal part of the BibJson object
+<span class="fc" id="L61">        List&lt;Field&gt; journalSingleFields = List.of(StandardField.PUBLISHER, StandardField.NUMBER, StandardField.VOLUME);</span>
+
+<span class="fc" id="L63">        BibEntry entry = new BibEntry(StandardEntryType.Article);</span>
+
+        // Authors
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (bibJsonEntry.has(&quot;author&quot;)) {</span>
+<span class="fc" id="L67">            JSONArray authors = bibJsonEntry.getJSONArray(&quot;author&quot;);</span>
+<span class="fc" id="L68">            List&lt;String&gt; authorList = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            for (int i = 0; i &lt; authors.length(); i++) {</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                if (authors.getJSONObject(i).has(&quot;name&quot;)) {</span>
+<span class="fc" id="L71">                    authorList.add(authors.getJSONObject(i).getString(&quot;name&quot;));</span>
+                } else {
+<span class="nc" id="L73">                    LOGGER.info(&quot;Empty author name.&quot;);</span>
+                }
+            }
+<span class="fc" id="L76">            entry.setField(StandardField.AUTHOR, String.join(&quot; and &quot;, authorList));</span>
+<span class="fc" id="L77">        } else {</span>
+<span class="nc" id="L78">            LOGGER.info(&quot;No author found.&quot;);</span>
+        }
+
+        // Direct accessible fields
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (Field field : singleFields) {</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (bibJsonEntry.has(field.getName())) {</span>
+<span class="fc" id="L84">                entry.setField(field, bibJsonEntry.getString(field.getName()));</span>
+            }
+<span class="fc" id="L86">        }</span>
+
+        // Page numbers
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (bibJsonEntry.has(&quot;start_page&quot;)) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (bibJsonEntry.has(&quot;end_page&quot;)) {</span>
+<span class="fc" id="L91">                entry.setField(StandardField.PAGES,</span>
+<span class="fc" id="L92">                        bibJsonEntry.getString(&quot;start_page&quot;) + &quot;--&quot; + bibJsonEntry.getString(&quot;end_page&quot;));</span>
+            } else {
+<span class="fc" id="L94">                entry.setField(StandardField.PAGES, bibJsonEntry.getString(&quot;start_page&quot;));</span>
+            }
+        }
+
+        // Journal
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (bibJsonEntry.has(&quot;journal&quot;)) {</span>
+<span class="fc" id="L100">            JSONObject journal = bibJsonEntry.getJSONObject(&quot;journal&quot;);</span>
+            // Journal title
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (journal.has(&quot;title&quot;)) {</span>
+<span class="fc" id="L103">                entry.setField(StandardField.JOURNAL, journal.getString(&quot;title&quot;).trim());</span>
+            } else {
+<span class="nc" id="L105">                LOGGER.info(&quot;No journal title found.&quot;);</span>
+            }
+            // Other journal related fields
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (Field field : journalSingleFields) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                if (journal.has(field.getName())) {</span>
+<span class="fc" id="L110">                    entry.setField(field, journal.getString(field.getName()));</span>
+                }
+<span class="fc" id="L112">            }</span>
+<span class="fc" id="L113">        } else {</span>
+<span class="nc" id="L114">            LOGGER.info(&quot;No journal information found.&quot;);</span>
+        }
+
+        // Keywords
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (bibJsonEntry.has(&quot;keywords&quot;)) {</span>
+<span class="fc" id="L119">            JSONArray keywords = bibJsonEntry.getJSONArray(&quot;keywords&quot;);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            for (int i = 0; i &lt; keywords.length(); i++) {</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                if (!keywords.isNull(i)) {</span>
+<span class="fc" id="L122">                    entry.addKeyword(keywords.getString(i).trim(), keywordSeparator);</span>
+                }
+            }
+        }
+
+        // Identifiers
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (bibJsonEntry.has(&quot;identifier&quot;)) {</span>
+<span class="fc" id="L129">            JSONArray identifiers = bibJsonEntry.getJSONArray(&quot;identifier&quot;);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            for (int i = 0; i &lt; identifiers.length(); i++) {</span>
+<span class="fc" id="L131">                String type = identifiers.getJSONObject(i).getString(&quot;type&quot;);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                if (&quot;doi&quot;.equals(type)) {</span>
+<span class="fc" id="L133">                    entry.setField(StandardField.DOI, identifiers.getJSONObject(i).getString(&quot;id&quot;));</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                } else if (&quot;pissn&quot;.equals(type)) {</span>
+<span class="fc" id="L135">                    entry.setField(StandardField.ISSN, identifiers.getJSONObject(i).getString(&quot;id&quot;));</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                } else if (&quot;eissn&quot;.equals(type)) {</span>
+<span class="fc" id="L137">                    entry.setField(StandardField.ISSN, identifiers.getJSONObject(i).getString(&quot;id&quot;));</span>
+                }
+            }
+        }
+
+        // Links
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (bibJsonEntry.has(&quot;link&quot;)) {</span>
+<span class="fc" id="L144">            JSONArray links = bibJsonEntry.getJSONArray(&quot;link&quot;);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            for (int i = 0; i &lt; links.length(); i++) {</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                if (links.getJSONObject(i).has(&quot;type&quot;)) {</span>
+<span class="fc" id="L147">                    String type = links.getJSONObject(i).getString(&quot;type&quot;);</span>
+<span class="pc bpc" id="L148" title="2 of 4 branches missed.">                    if (&quot;fulltext&quot;.equals(type) &amp;&amp; links.getJSONObject(i).has(&quot;url&quot;)) {</span>
+<span class="fc" id="L149">                        entry.setField(StandardField.URL, links.getJSONObject(i).getString(&quot;url&quot;));</span>
+                    }
+                }
+            }
+        }
+
+<span class="fc" id="L155">        return entry;</span>
+    }
+
+    public static void addPath(URIBuilder base, String subPath) {
+        // slightly altered version based on https://gist.github.com/enginer/230e2dc2f1d213a825d5
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">        if (!StringUtil.isBlank(subPath) &amp;&amp; !&quot;/&quot;.equals(subPath)) {</span>
+<span class="fc" id="L161">            base.setPath(appendSegmentToPath(base.getPath(), subPath));</span>
+        }
+<span class="fc" id="L163">    }</span>
+
+    private static String appendSegmentToPath(String path, String segment) {
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (StringUtil.isBlank(path)) {</span>
+<span class="nc" id="L167">            path = &quot;/&quot;;</span>
+        }
+
+<span class="fc bfc" id="L170" title="All 4 branches covered.">        if (path.charAt(path.length() - 1) == '/' || segment.startsWith(&quot;/&quot;)) {</span>
+<span class="fc" id="L171">            return path + segment;</span>
+        }
+
+<span class="fc" id="L174">        return path + &quot;/&quot; + segment;</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L179">        return &quot;DOAJ&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;HelpFile&gt; getHelpPage() {
+<span class="nc" id="L184">        return Optional.of(HelpFile.FETCHER_DOAJ);</span>
+    }
+
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L189">        URIBuilder uriBuilder = new URIBuilder(SEARCH_URL);</span>
+<span class="fc" id="L190">        DOAJFetcher.addPath(uriBuilder, new DefaultLuceneQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;));</span>
+        // Number of results
+<span class="fc" id="L192">        uriBuilder.addParameter(&quot;pageSize&quot;, &quot;30&quot;);</span>
+        // Page (not needed so far)
+        // uriBuilder.addParameter(&quot;page&quot;, &quot;1&quot;);
+<span class="fc" id="L195">        return uriBuilder.build().toURL();</span>
+    }
+
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L200">        return inputStream -&gt; {</span>
+<span class="fc" id="L201">            String response = new BufferedReader(new InputStreamReader(inputStream)).lines().collect(Collectors.joining(OS.NEWLINE));</span>
+<span class="fc" id="L202">            JSONObject jsonObject = new JSONObject(response);</span>
+
+<span class="fc" id="L204">            List&lt;BibEntry&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (jsonObject.has(&quot;results&quot;)) {</span>
+<span class="fc" id="L206">                JSONArray results = jsonObject.getJSONArray(&quot;results&quot;);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                for (int i = 0; i &lt; results.length(); i++) {</span>
+<span class="fc" id="L208">                    JSONObject bibJsonEntry = results.getJSONObject(i).getJSONObject(&quot;bibjson&quot;);</span>
+<span class="fc" id="L209">                    BibEntry entry = parseBibJSONtoBibtex(bibJsonEntry, preferences.bibEntryPreferences().getKeywordSeparator());</span>
+<span class="fc" id="L210">                    entries.add(entry);</span>
+                }
+            }
+<span class="fc" id="L213">            return entries;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldsUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">FieldsUtil.java</span></div><h1>FieldsUtil.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import javafx.util.StringConverter;
+
+import org.jabref.gui.Globals;
+import org.jabref.gui.specialfields.SpecialFieldViewModel;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.IEEEField;
+import org.jabref.model.entry.field.InternalField;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.model.entry.field.UnknownField;
+
+<span class="nc" id="L15">public class FieldsUtil {</span>
+
+<span class="nc" id="L17">    public static final StringConverter&lt;Field&gt; FIELD_STRING_CONVERTER = new StringConverter&lt;&gt;() {</span>
+        @Override
+        public String toString(Field object) {
+<span class="nc bnc" id="L20" title="All 2 branches missed.">            if (object != null) {</span>
+<span class="nc" id="L21">                return object.getDisplayName();</span>
+            } else {
+<span class="nc" id="L23">                return &quot;&quot;;</span>
+            }
+        }
+
+        @Override
+        public Field fromString(String string) {
+<span class="nc" id="L29">            return FieldFactory.parseField(string);</span>
+        }
+    };
+
+    public static String getNameWithType(Field field) {
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        if (field instanceof SpecialField specialField) {</span>
+<span class="nc" id="L35">            return new SpecialFieldViewModel(specialField, Globals.prefs, Globals.undoManager).getLocalization()</span>
+<span class="nc" id="L36">                    + &quot; (&quot; + Localization.lang(&quot;Special&quot;) + &quot;)&quot;;</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        } else if (field instanceof IEEEField) {</span>
+<span class="nc" id="L38">            return field.getDisplayName() + &quot; (&quot; + Localization.lang(&quot;IEEE&quot;) + &quot;)&quot;;</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        } else if (field instanceof InternalField) {</span>
+<span class="nc" id="L40">            return field.getDisplayName() + &quot; (&quot; + Localization.lang(&quot;Internal&quot;) + &quot;)&quot;;</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        } else if (field instanceof UnknownField) {</span>
+<span class="nc" id="L42">            return field.getDisplayName() + &quot; (&quot; + Localization.lang(&quot;Custom&quot;) + &quot;)&quot;;</span>
+        } else {
+<span class="nc" id="L44">            return field.getDisplayName();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,384 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DuplicateCheck.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.database</a> &gt; <span class="el_source">DuplicateCheck.java</span></div><h1>DuplicateCheck.java</h1><pre class="source lang-java linenums">package org.jabref.logic.database;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.util.OS;
+import org.jabref.logic.util.strings.StringSimilarity;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryType;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.field.BibField;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.FieldProperty;
+import org.jabref.model.entry.field.OrFields;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.identifier.DOI;
+import org.jabref.model.entry.identifier.ISBN;
+import org.jabref.model.strings.StringUtil;
+
+import com.google.common.collect.Sets;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class contains utility method for duplicate checking of entries.
+ */
+public class DuplicateCheck {
+    private static final double DUPLICATE_THRESHOLD = 0.75; // The overall threshold to signal a duplicate pair
+
+<span class="fc" id="L41">    private static final Logger LOGGER = LoggerFactory.getLogger(DuplicateCheck.class);</span>
+    /*
+     * Integer values for indicating result of duplicate check (for entries):
+     */
+    private static final int NOT_EQUAL = 0;
+    private static final int EQUAL = 1;
+    private static final int EMPTY_IN_ONE = 2;
+    private static final int EMPTY_IN_TWO = 3;
+
+    private static final int EMPTY_IN_BOTH = 4;
+    // Non-required fields are investigated only if the required fields give a value within
+    // the doubt range of the threshold:
+    private static final double DOUBT_RANGE = 0.05;
+
+    private static final double REQUIRED_WEIGHT = 3; // Weighting of all required fields
+
+    // Extra weighting of those fields that are most likely to provide correct duplicate detection:
+<span class="fc" id="L58">    private static final Map&lt;Field, Double&gt; FIELD_WEIGHTS = new HashMap&lt;&gt;();</span>
+
+    static {
+<span class="fc" id="L61">        DuplicateCheck.FIELD_WEIGHTS.put(StandardField.AUTHOR, 2.5);</span>
+<span class="fc" id="L62">        DuplicateCheck.FIELD_WEIGHTS.put(StandardField.EDITOR, 2.5);</span>
+<span class="fc" id="L63">        DuplicateCheck.FIELD_WEIGHTS.put(StandardField.TITLE, 3.);</span>
+<span class="fc" id="L64">        DuplicateCheck.FIELD_WEIGHTS.put(StandardField.JOURNAL, 2.);</span>
+<span class="fc" id="L65">        DuplicateCheck.FIELD_WEIGHTS.put(StandardField.NOTE, 0.1);</span>
+<span class="fc" id="L66">        DuplicateCheck.FIELD_WEIGHTS.put(StandardField.COMMENT, 0.1);</span>
+<span class="fc" id="L67">        DuplicateCheck.FIELD_WEIGHTS.put(StandardField.DOI, 3.);</span>
+<span class="fc" id="L68">    }</span>
+
+    private final BibEntryTypesManager entryTypesManager;
+
+<span class="fc" id="L72">    public DuplicateCheck(BibEntryTypesManager entryTypesManager) {</span>
+<span class="fc" id="L73">        this.entryTypesManager = entryTypesManager;</span>
+<span class="fc" id="L74">    }</span>
+
+    private static boolean haveSameIdentifier(final BibEntry one, final BibEntry two) {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (final Field name : FieldFactory.getIdentifierFieldNames()) {</span>
+<span class="fc bfc" id="L78" title="All 4 branches covered.">            if (one.getField(name).isPresent() &amp;&amp; one.getField(name).equals(two.getField(name))) {</span>
+<span class="fc" id="L79">                return true;</span>
+            }
+<span class="fc" id="L81">        }</span>
+<span class="fc" id="L82">        return false;</span>
+    }
+
+    private static boolean haveDifferentEntryType(final BibEntry one, final BibEntry two) {
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        return !one.getType().equals(two.getType());</span>
+    }
+
+    private static boolean haveDifferentEditions(final BibEntry one, final BibEntry two) {
+<span class="fc" id="L90">        final Optional&lt;String&gt; editionOne = one.getField(StandardField.EDITION);</span>
+<span class="fc" id="L91">        final Optional&lt;String&gt; editionTwo = two.getField(StandardField.EDITION);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        return editionOne.isPresent() &amp;&amp;</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                editionTwo.isPresent() &amp;&amp;</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                !editionOne.get().equals(editionTwo.get());</span>
+    }
+
+    private static boolean haveDifferentChaptersOrPagesOfTheSameBook(final BibEntry one, final BibEntry two) {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        return (compareSingleField(StandardField.AUTHOR, one, two) == EQUAL) &amp;&amp;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                (compareSingleField(StandardField.TITLE, one, two) == EQUAL) &amp;&amp;</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                ((compareSingleField(StandardField.CHAPTER, one, two) == NOT_EQUAL) ||</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                        (compareSingleField(StandardField.PAGES, one, two) == NOT_EQUAL));</span>
+    }
+
+    private static double[] compareRequiredFields(final BibEntryType type, final BibEntry one, final BibEntry two) {
+<span class="fc" id="L105">        final Set&lt;OrFields&gt; requiredFields = type.getRequiredFields();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        return requiredFields.isEmpty()</span>
+<span class="fc" id="L107">                ? new double[] {0., 0.}</span>
+<span class="fc" id="L108">                : DuplicateCheck.compareFieldSet(requiredFields.stream().map(OrFields::getPrimary).collect(Collectors.toSet()), one, two);</span>
+    }
+
+    private static boolean isFarFromThreshold(double value) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (value &lt; 0.0) {</span>
+<span class="nc" id="L113">            LOGGER.debug(&quot;Value {} is below zero. Should not happen&quot;, value);</span>
+        }
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        return value - DuplicateCheck.DUPLICATE_THRESHOLD &gt; DuplicateCheck.DOUBT_RANGE;</span>
+    }
+
+    private static boolean compareOptionalFields(final BibEntryType type,
+                                                 final BibEntry one,
+                                                 final BibEntry two,
+                                                 final double[] req) {
+<span class="fc" id="L122">        final Set&lt;BibField&gt; optionalFields = type.getOptionalFields();</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (optionalFields.isEmpty()) {</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">            return req[0] &gt;= DuplicateCheck.DUPLICATE_THRESHOLD;</span>
+        }
+<span class="fc" id="L126">        final double[] opt = DuplicateCheck.compareFieldSet(optionalFields.stream().map(BibField::field).collect(Collectors.toSet()), one, two);</span>
+<span class="fc" id="L127">        final double numerator = (DuplicateCheck.REQUIRED_WEIGHT * req[0] * req[1]) + (opt[0] * opt[1]);</span>
+<span class="fc" id="L128">        final double denominator = (req[1] * DuplicateCheck.REQUIRED_WEIGHT) + opt[1];</span>
+<span class="fc" id="L129">        final double totValue = numerator / denominator;</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        return totValue &gt;= DuplicateCheck.DUPLICATE_THRESHOLD;</span>
+    }
+
+    private static double[] compareFieldSet(final Collection&lt;Field&gt; fields, final BibEntry one, final BibEntry two) {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (fields.isEmpty()) {</span>
+<span class="nc" id="L135">            return new double[] {0.0, 0.0};</span>
+        }
+<span class="fc" id="L137">        double equalWeights = 0;</span>
+<span class="fc" id="L138">        double totalWeights = 0.;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (final Field field : fields) {</span>
+<span class="fc" id="L140">            final double currentWeight = DuplicateCheck.FIELD_WEIGHTS.getOrDefault(field, 1.0);</span>
+<span class="fc" id="L141">            totalWeights += currentWeight;</span>
+<span class="fc" id="L142">            int result = DuplicateCheck.compareSingleField(field, one, two);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (result == EQUAL) {</span>
+<span class="fc" id="L144">                equalWeights += currentWeight;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            } else if (result == EMPTY_IN_BOTH) {</span>
+<span class="fc" id="L146">                totalWeights -= currentWeight;</span>
+            }
+<span class="fc" id="L148">        }</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (totalWeights &gt; 0) {</span>
+<span class="fc" id="L150">            return new double[] {equalWeights / totalWeights, totalWeights};</span>
+        }
+        // all fields are empty in both --&gt; have no difference at all
+<span class="fc" id="L153">        return new double[] {0.0, 0.0};</span>
+    }
+
+    private static int compareSingleField(final Field field, final BibEntry one, final BibEntry two) {
+<span class="fc" id="L157">        final Optional&lt;String&gt; optionalStringOne = one.getFieldLatexFree(field);</span>
+<span class="fc" id="L158">        final Optional&lt;String&gt; optionalStringTwo = two.getFieldLatexFree(field);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (optionalStringOne.isEmpty()) {</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            if (optionalStringTwo.isEmpty()) {</span>
+<span class="fc" id="L161">                return EMPTY_IN_BOTH;</span>
+            }
+<span class="nc" id="L163">            return EMPTY_IN_ONE;</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        } else if (optionalStringTwo.isEmpty()) {</span>
+<span class="fc" id="L165">            return EMPTY_IN_TWO;</span>
+        }
+
+        // Both strings present
+<span class="fc" id="L169">        final String stringOne = optionalStringOne.get();</span>
+<span class="fc" id="L170">        final String stringTwo = optionalStringTwo.get();</span>
+
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (field.getProperties().contains(FieldProperty.PERSON_NAMES)) {</span>
+<span class="fc" id="L173">            return compareAuthorField(stringOne, stringTwo);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        } else if (StandardField.PAGES == field) {</span>
+<span class="fc" id="L175">            return comparePagesField(stringOne, stringTwo);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        } else if (StandardField.JOURNAL == field) {</span>
+<span class="fc" id="L177">            return compareJournalField(stringOne, stringTwo);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        } else if (StandardField.CHAPTER == field) {</span>
+<span class="nc" id="L179">            return compareChapterField(stringOne, stringTwo);</span>
+        }
+
+<span class="fc" id="L182">        return compareField(stringOne, stringTwo);</span>
+    }
+
+    private static int compareAuthorField(final String stringOne, final String stringTwo) {
+        // Specific for name fields.
+        // Harmonise case:
+<span class="fc" id="L188">        final String authorOne = AuthorList.fixAuthorLastNameOnlyCommas(stringOne, false).replace(&quot; and &quot;, &quot; &quot;).toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L189">        final String authorTwo = AuthorList.fixAuthorLastNameOnlyCommas(stringTwo, false).replace(&quot; and &quot;, &quot; &quot;).toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L190">        final double similarity = DuplicateCheck.correlateByWords(authorOne, authorTwo);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (similarity &gt; 0.8) {</span>
+<span class="fc" id="L192">            return EQUAL;</span>
+        }
+<span class="fc" id="L194">        return NOT_EQUAL;</span>
+    }
+
+    /**
+     * Pages can be given with a variety of delimiters, &quot;-&quot;, &quot;--&quot;, &quot; - &quot;, &quot; -- &quot;.
+     * We do a replace to harmonize these to a simple &quot;-&quot;
+     * After this, a simple test for equality should be enough
+     */
+    private static int comparePagesField(final String stringOne, final String stringTwo) {
+<span class="fc" id="L203">        final String processedStringOne = stringOne.replaceAll(&quot;[- ]+&quot;, &quot;-&quot;);</span>
+<span class="fc" id="L204">        final String processedStringTwo = stringTwo.replaceAll(&quot;[- ]+&quot;, &quot;-&quot;);</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (processedStringOne.equals(processedStringTwo)) {</span>
+<span class="fc" id="L206">            return EQUAL;</span>
+        }
+<span class="nc" id="L208">        return NOT_EQUAL;</span>
+    }
+
+    /**
+     * We do not attempt to harmonize abbreviation state of the journal names,
+     * but we remove periods from the names in case they are abbreviated with and without dots:
+     */
+    private static int compareJournalField(final String stringOne, final String stringTwo) {
+<span class="fc" id="L216">        final String processedStringOne = stringOne.replace(&quot;.&quot;, &quot;&quot;).toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L217">        final String processedStringTwo = stringTwo.replace(&quot;.&quot;, &quot;&quot;).toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L218">        final double similarity = DuplicateCheck.correlateByWords(processedStringOne, processedStringTwo);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (similarity &gt; 0.8) {</span>
+<span class="fc" id="L220">            return EQUAL;</span>
+        }
+<span class="fc" id="L222">        return NOT_EQUAL;</span>
+    }
+
+    private static int compareChapterField(final String stringOne, final String stringTwo) {
+<span class="nc" id="L226">        final String processedStringOne = stringOne.replaceAll(&quot;(?i)chapter&quot;, &quot;&quot;).trim();</span>
+<span class="nc" id="L227">        final String processedStringTwo = stringTwo.replaceAll(&quot;(?i)chapter&quot;, &quot;&quot;).trim();</span>
+<span class="nc" id="L228">        return compareField(processedStringOne, processedStringTwo);</span>
+    }
+
+    private static int compareField(final String stringOne, final String stringTwo) {
+<span class="fc" id="L232">        final String processedStringOne = StringUtil.unifyLineBreaks(stringOne.toLowerCase(Locale.ROOT).trim(), OS.NEWLINE);</span>
+<span class="fc" id="L233">        final String processedStringTwo = StringUtil.unifyLineBreaks(stringTwo.toLowerCase(Locale.ROOT).trim(), OS.NEWLINE);</span>
+<span class="fc" id="L234">        final double similarity = DuplicateCheck.correlateByWords(processedStringOne, processedStringTwo);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (similarity &gt; 0.8) {</span>
+<span class="fc" id="L236">            return EQUAL;</span>
+        }
+<span class="fc" id="L238">        return NOT_EQUAL;</span>
+    }
+
+    public static double compareEntriesStrictly(BibEntry one, BibEntry two) {
+<span class="fc" id="L242">        final Set&lt;Field&gt; allFields = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L243">        allFields.addAll(one.getFields());</span>
+<span class="fc" id="L244">        allFields.addAll(two.getFields());</span>
+
+<span class="fc" id="L246">        int score = 0;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        for (final Field field : allFields) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (isSingleFieldEqual(one, two, field)) {</span>
+<span class="fc" id="L249">                score++;</span>
+            }
+<span class="fc" id="L251">        }</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (score == allFields.size()) {</span>
+<span class="fc" id="L253">            return 1.01; // Just to make sure we can use score &gt; 1 without trouble.</span>
+        }
+<span class="fc" id="L255">        return (double) score / allFields.size();</span>
+    }
+
+    private static boolean isSingleFieldEqual(BibEntry one, BibEntry two, Field field) {
+<span class="fc" id="L259">        final Optional&lt;String&gt; stringOne = one.getField(field);</span>
+<span class="fc" id="L260">        final Optional&lt;String&gt; stringTwo = two.getField(field);</span>
+<span class="pc bpc" id="L261" title="3 of 4 branches missed.">        if (stringOne.isEmpty() &amp;&amp; stringTwo.isEmpty()) {</span>
+<span class="nc" id="L262">            return true;</span>
+        }
+<span class="pc bpc" id="L264" title="2 of 4 branches missed.">        if (stringOne.isEmpty() || stringTwo.isEmpty()) {</span>
+<span class="nc" id="L265">            return false;</span>
+        }
+<span class="fc" id="L267">        return StringUtil.unifyLineBreaks(stringOne.get(), OS.NEWLINE).equals(</span>
+<span class="fc" id="L268">                StringUtil.unifyLineBreaks(stringTwo.get(), OS.NEWLINE));</span>
+    }
+
+    /**
+     * Compare two strings on the basis of word-by-word correlation analysis.
+     *
+     * @param s1 The first string
+     * @param s2 The second string
+     * @return a value in the interval [0, 1] indicating the degree of match.
+     */
+    public static double correlateByWords(final String s1, final String s2) {
+<span class="fc" id="L279">        final String[] w1 = s1.split(&quot;\\s&quot;);</span>
+<span class="fc" id="L280">        final String[] w2 = s2.split(&quot;\\s&quot;);</span>
+<span class="fc" id="L281">        final int n = Math.min(w1.length, w2.length);</span>
+<span class="fc" id="L282">        int misses = 0;</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L284">            double corr = similarity(w1[i], w2[i]);</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            if (corr &lt; 0.75) {</span>
+<span class="fc" id="L286">                misses++;</span>
+            }
+        }
+<span class="fc" id="L289">        final double missRate = (double) misses / (double) n;</span>
+<span class="fc" id="L290">        return 1 - missRate;</span>
+    }
+
+    /**
+     * Calculates the similarity (a number within 0 and 1) between two strings.
+     * http://stackoverflow.com/questions/955110/similarity-string-comparison-in-java
+     */
+    private static double similarity(final String first, final String second) {
+        final String longer;
+        final String shorter;
+
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        if (first.length() &lt; second.length()) {</span>
+<span class="fc" id="L302">            longer = second;</span>
+<span class="fc" id="L303">            shorter = first;</span>
+        } else {
+<span class="fc" id="L305">            longer = first;</span>
+<span class="fc" id="L306">            shorter = second;</span>
+        }
+
+<span class="fc" id="L309">        final int longerLength = longer.length();</span>
+        // both strings are zero length
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (longerLength == 0) {</span>
+<span class="fc" id="L312">            return 1.0;</span>
+        }
+<span class="fc" id="L314">        final double distanceIgnoredCase = new StringSimilarity().editDistanceIgnoreCase(longer, shorter);</span>
+<span class="fc" id="L315">        final double similarity = (longerLength - distanceIgnoredCase) / longerLength;</span>
+<span class="fc" id="L316">        LOGGER.debug(&quot;Longer string: {} Shorter string: {} Similarity: {}&quot;, longer, shorter, similarity);</span>
+<span class="fc" id="L317">        return similarity;</span>
+    }
+
+    /**
+     * Checks if the two entries represent the same publication.
+     */
+    public boolean isDuplicate(final BibEntry one, final BibEntry two, final BibDatabaseMode bibDatabaseMode) {
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (haveSameIdentifier(one, two)) {</span>
+<span class="fc" id="L325">            return true;</span>
+        }
+
+        // check DOI
+<span class="fc" id="L329">        Optional&lt;DOI&gt; oneDOI = one.getDOI();</span>
+<span class="fc" id="L330">        Optional&lt;DOI&gt; twoDOI = two.getDOI();</span>
+<span class="pc bpc" id="L331" title="1 of 4 branches missed.">        if (oneDOI.isPresent() &amp;&amp; twoDOI.isPresent()) {</span>
+<span class="fc" id="L332">            return Objects.equals(oneDOI, twoDOI);</span>
+        }
+        // check ISBN
+<span class="fc" id="L335">        Optional&lt;ISBN&gt; oneISBN = one.getISBN();</span>
+<span class="fc" id="L336">        Optional&lt;ISBN&gt; twoISBN = two.getISBN();</span>
+<span class="pc bpc" id="L337" title="1 of 4 branches missed.">        if (oneISBN.isPresent() &amp;&amp; twoISBN.isPresent()) {</span>
+<span class="fc" id="L338">            return Objects.equals(oneISBN, twoISBN);</span>
+        }
+
+<span class="fc bfc" id="L341" title="All 2 branches covered.">        if (haveDifferentEntryType(one, two) ||</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">                haveDifferentEditions(one, two) ||</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">                haveDifferentChaptersOrPagesOfTheSameBook(one, two)) {</span>
+<span class="fc" id="L344">            return false;</span>
+        }
+
+<span class="fc" id="L347">        final Optional&lt;BibEntryType&gt; type = entryTypesManager.enrich(one.getType(), bibDatabaseMode);</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">        if (type.isPresent()) {</span>
+<span class="fc" id="L349">            BibEntryType entryType = type.get();</span>
+<span class="fc" id="L350">            final double[] reqCmpResult = compareRequiredFields(entryType, one, two);</span>
+
+<span class="fc bfc" id="L352" title="All 2 branches covered.">            if (isFarFromThreshold(reqCmpResult[0])) {</span>
+                // Far from the threshold value, so we base our decision on the required fields only
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">                return reqCmpResult[0] &gt;= DuplicateCheck.DUPLICATE_THRESHOLD;</span>
+            }
+
+            // Close to the threshold value, so we take a look at the optional fields, if any:
+<span class="fc bfc" id="L358" title="All 2 branches covered.">            if (compareOptionalFields(type.get(), one, two, reqCmpResult)) {</span>
+<span class="fc" id="L359">                return true;</span>
+            }
+        }
+        // if type is not present, so simply compare fields without any distinction between optional/required
+        // In case both required and optional fields are equal, we also use this fallback
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        return compareFieldSet(Sets.union(one.getFields(), two.getFields()), one, two)[0] &gt;= DuplicateCheck.DUPLICATE_THRESHOLD;</span>
+    }
+
+    /**
+     * Goes through all entries in the given database, and if at least one of
+     * them is a duplicate of the given entry, as per
+     * Util.isDuplicate(BibEntry, BibEntry), the duplicate is returned.
+     * The search is terminated when the first duplicate is found.
+     *
+     * @param database The database to search.
+     * @param entry    The entry of which we are looking for duplicates.
+     * @return The first duplicate entry found. Empty Optional if no duplicates are found.
+     */
+    public Optional&lt;BibEntry&gt; containsDuplicate(final BibDatabase database,
+                                                final BibEntry entry,
+                                                final BibDatabaseMode bibDatabaseMode) {
+
+<span class="fc" id="L381">        return database.getEntries().stream().filter(other -&gt; isDuplicate(entry, other, bibDatabaseMode)).findFirst();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FromAuxDialogViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.auximport</a> &gt; <span class="el_source">FromAuxDialogViewModel.java</span></div><h1>FromAuxDialogViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.auximport;
+
+import java.nio.file.Path;
+import java.util.Optional;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyListProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.logic.auxparser.AuxParser;
+import org.jabref.logic.auxparser.AuxParserResult;
+import org.jabref.logic.auxparser.DefaultAuxParser;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.shared.DatabaseLocation;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+
+public class FromAuxDialogViewModel {
+
+<span class="nc" id="L36">    private final BooleanProperty parseFailedProperty = new SimpleBooleanProperty(false);</span>
+<span class="nc" id="L37">    private final StringProperty auxFileProperty = new SimpleStringProperty();</span>
+<span class="nc" id="L38">    private final StringProperty statusTextProperty = new SimpleStringProperty();</span>
+<span class="nc" id="L39">    private final ListProperty&lt;String&gt; notFoundList = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L40">    private final ListProperty&lt;BibDatabaseContext&gt; librariesProperty = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L41">    private final ObjectProperty&lt;BibDatabaseContext&gt; selectedLibraryProperty = new SimpleObjectProperty&lt;&gt;();</span>
+
+    private final LibraryTabContainer tabContainer;
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+    private final StateManager stateManager;
+
+    private AuxParserResult auxParserResult;
+
+    public FromAuxDialogViewModel(LibraryTabContainer tabContainer,
+                                  DialogService dialogService,
+                                  PreferencesService preferencesService,
+<span class="nc" id="L53">                                  StateManager stateManager) {</span>
+<span class="nc" id="L54">        this.tabContainer = tabContainer;</span>
+<span class="nc" id="L55">        this.dialogService = dialogService;</span>
+<span class="nc" id="L56">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L57">        this.stateManager = stateManager;</span>
+
+<span class="nc" id="L59">        librariesProperty.setAll(stateManager.getOpenDatabases());</span>
+<span class="nc" id="L60">        selectedLibraryProperty.set(tabContainer.getCurrentLibraryTab().getBibDatabaseContext());</span>
+<span class="nc" id="L61">        EasyBind.listen(selectedLibraryProperty, (obs, oldValue, newValue) -&gt; {</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">            if (auxParserResult != null) {</span>
+<span class="nc" id="L63">                parse();</span>
+            }
+<span class="nc" id="L65">        });</span>
+<span class="nc" id="L66">    }</span>
+
+    public String getDatabaseName(BibDatabaseContext databaseContext) {
+<span class="nc" id="L69">        Optional&lt;String&gt; dbOpt = Optional.empty();</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (databaseContext.getDatabasePath().isPresent()) {</span>
+<span class="nc" id="L71">            dbOpt = FileUtil.getUniquePathFragment(stateManager.collectAllDatabasePaths(), databaseContext.getDatabasePath().get());</span>
+        }
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (databaseContext.getLocation() == DatabaseLocation.SHARED) {</span>
+<span class="nc" id="L74">            return databaseContext.getDBMSSynchronizer().getDBName() + &quot; [&quot; + Localization.lang(&quot;shared&quot;) + &quot;]&quot;;</span>
+        }
+
+<span class="nc" id="L77">        return dbOpt.orElse(Localization.lang(&quot;untitled&quot;));</span>
+    }
+
+    public void browse() {
+<span class="nc" id="L81">        FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()</span>
+<span class="nc" id="L82">                .addExtensionFilter(StandardFileType.AUX)</span>
+<span class="nc" id="L83">                .withDefaultExtension(StandardFileType.AUX)</span>
+<span class="nc" id="L84">                .withInitialDirectory(preferencesService.getFilePreferences().getWorkingDirectory()).build();</span>
+<span class="nc" id="L85">        dialogService.showFileOpenDialog(fileDialogConfiguration).ifPresent(file -&gt; auxFileProperty.setValue(file.toAbsolutePath().toString()));</span>
+<span class="nc" id="L86">    }</span>
+
+    public void parse() {
+<span class="nc" id="L89">        parseFailedProperty.set(false);</span>
+<span class="nc" id="L90">        notFoundList.clear();</span>
+<span class="nc" id="L91">        statusTextProperty.setValue(&quot;&quot;);</span>
+<span class="nc" id="L92">        BibDatabase referenceDatabase = selectedLibraryProperty.get().getDatabase();</span>
+<span class="nc" id="L93">        String auxName = auxFileProperty.get();</span>
+
+<span class="nc bnc" id="L95" title="All 6 branches missed.">        if ((auxName != null) &amp;&amp; (referenceDatabase != null) &amp;&amp; !auxName.isEmpty()) {</span>
+<span class="nc" id="L96">            AuxParser auxParser = new DefaultAuxParser(referenceDatabase);</span>
+<span class="nc" id="L97">            auxParserResult = auxParser.parse(Path.of(auxName));</span>
+<span class="nc" id="L98">            notFoundList.setAll(auxParserResult.getUnresolvedKeys());</span>
+<span class="nc" id="L99">            statusTextProperty.set(new AuxParserResultViewModel(auxParserResult).getInformation(false));</span>
+
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (!auxParserResult.getGeneratedBibDatabase().hasEntries()) {</span>
+                // The generated database contains no entries -&gt; no active generate-button
+<span class="nc" id="L103">                statusTextProperty.set(statusTextProperty.get() + &quot;\n&quot; + Localization.lang(&quot;empty library&quot;));</span>
+<span class="nc" id="L104">                parseFailedProperty.set(true);</span>
+            }
+<span class="nc" id="L106">        } else {</span>
+<span class="nc" id="L107">            parseFailedProperty.set(true);</span>
+        }
+<span class="nc" id="L109">    }</span>
+
+    public void addResultToTabContainer() {
+<span class="nc" id="L112">        BibDatabaseContext context = new BibDatabaseContext(auxParserResult.getGeneratedBibDatabase());</span>
+<span class="nc" id="L113">        tabContainer.addTab(context, true);</span>
+<span class="nc" id="L114">    }</span>
+
+    public BooleanProperty parseFailedProperty() {
+<span class="nc" id="L117">        return parseFailedProperty;</span>
+    }
+
+    public StringProperty auxFileProperty() {
+<span class="nc" id="L121">        return auxFileProperty;</span>
+    }
+
+    public StringProperty statusTextProperty() {
+<span class="nc" id="L125">        return statusTextProperty;</span>
+    }
+
+    public ReadOnlyListProperty&lt;String&gt; notFoundList() {
+<span class="nc" id="L129">        return notFoundList;</span>
+    }
+
+    public ReadOnlyListProperty&lt;BibDatabaseContext&gt; librariesProperty() {
+<span class="nc" id="L133">        return librariesProperty;</span>
+    }
+
+    public ObjectProperty&lt;BibDatabaseContext&gt; selectedLibraryProperty() {
+<span class="nc" id="L137">        return selectedLibraryProperty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

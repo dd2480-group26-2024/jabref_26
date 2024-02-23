@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TexGroup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.groups</a> &gt; <span class="el_source">TexGroup.java</span></div><h1>TexGroup.java</h1><pre class="source lang-java linenums">package org.jabref.model.groups;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+import org.jabref.architecture.AllowedToUseLogic;
+import org.jabref.logic.auxparser.AuxParser;
+import org.jabref.logic.auxparser.AuxParserResult;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.metadata.MetaData;
+import org.jabref.model.util.DummyFileUpdateMonitor;
+import org.jabref.model.util.FileUpdateListener;
+import org.jabref.model.util.FileUpdateMonitor;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@AllowedToUseLogic(&quot;because it needs access to aux parser&quot;)
+public class TexGroup extends AbstractGroup implements FileUpdateListener {
+
+<span class="fc" id="L27">    private static final Logger LOGGER = LoggerFactory.getLogger(TexGroup.class);</span>
+
+    private final Path filePath;
+    private Set&lt;String&gt; keysUsedInAux;
+    private final FileUpdateMonitor fileMonitor;
+    private final AuxParser auxParser;
+    private final MetaData metaData;
+    private final String user;
+
+    TexGroup(String name, GroupHierarchyType context, Path filePath, AuxParser auxParser, FileUpdateMonitor fileMonitor, MetaData metaData, String user) {
+<span class="fc" id="L37">        super(name, context);</span>
+<span class="fc" id="L38">        this.metaData = metaData;</span>
+<span class="fc" id="L39">        this.user = user;</span>
+<span class="fc" id="L40">        this.filePath = expandPath(Objects.requireNonNull(filePath));</span>
+<span class="fc" id="L41">        this.auxParser = auxParser;</span>
+<span class="fc" id="L42">        this.fileMonitor = fileMonitor;</span>
+<span class="fc" id="L43">    }</span>
+
+    TexGroup(String name, GroupHierarchyType context, Path filePath, AuxParser auxParser, FileUpdateMonitor fileMonitor, MetaData metaData) throws IOException {
+<span class="fc" id="L46">        this(name, context, filePath, auxParser, fileMonitor, metaData, System.getProperty(&quot;user.name&quot;) + '-' + InetAddress.getLocalHost().getHostName());</span>
+<span class="fc" id="L47">    }</span>
+
+    public static TexGroup create(String name, GroupHierarchyType context, Path filePath, AuxParser auxParser, FileUpdateMonitor fileMonitor, MetaData metaData) throws IOException {
+<span class="fc" id="L50">        TexGroup group = new TexGroup(name, context, filePath, auxParser, fileMonitor, metaData);</span>
+<span class="fc" id="L51">        fileMonitor.addListenerForFile(group.getFilePathResolved(), group);</span>
+<span class="fc" id="L52">        return group;</span>
+    }
+
+    // without FileUpdateMonitor
+    public static TexGroup create(String name, GroupHierarchyType context, Path filePath, AuxParser auxParser, MetaData metaData) throws IOException {
+<span class="fc" id="L57">        return new TexGroup(name, context, filePath, auxParser, new DummyFileUpdateMonitor(), metaData);</span>
+    }
+
+    public Path getFilePathResolved() {
+<span class="fc" id="L61">        return this.filePath;</span>
+    }
+
+    @Override
+    public boolean contains(BibEntry entry) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (keysUsedInAux == null) {</span>
+<span class="fc" id="L67">            AuxParserResult auxResult = auxParser.parse(filePath);</span>
+<span class="fc" id="L68">            keysUsedInAux = auxResult.getUniqueKeys();</span>
+        }
+
+<span class="fc" id="L71">        return entry.getCitationKey().map(keysUsedInAux::contains).orElse(false);</span>
+    }
+
+    @Override
+    public boolean isDynamic() {
+<span class="nc" id="L76">        return false;</span>
+    }
+
+    @Override
+    public AbstractGroup deepCopy() {
+        try {
+<span class="nc" id="L82">            return new TexGroup(name.getValue(), context, filePath, auxParser, fileMonitor, metaData);</span>
+<span class="nc" id="L83">        } catch (IOException ex) {</span>
+            // This should never happen because we were able to monitor the file just fine until now
+<span class="nc" id="L85">            LOGGER.error(&quot;Problem creating copy of group&quot;, ex);</span>
+<span class="nc" id="L86">            return null;</span>
+        }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L93">            return true;</span>
+        }
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">        if ((o == null) || (getClass() != o.getClass())) {</span>
+<span class="nc" id="L96">            return false;</span>
+        }
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (!super.equals(o)) {</span>
+<span class="nc" id="L99">            return false;</span>
+        }
+<span class="fc" id="L101">        TexGroup group = (TexGroup) o;</span>
+<span class="fc" id="L102">        return Objects.equals(filePath, group.filePath);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L107">        return &quot;TexGroup{&quot; +</span>
+                &quot;filePath=&quot; + filePath +
+                &quot;, keysUsedInAux=&quot; + keysUsedInAux +
+                &quot;, auxParser=&quot; + auxParser +
+                &quot;, fileMonitor=&quot; + fileMonitor +
+<span class="nc" id="L112">                &quot;} &quot; + super.toString();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L117">        return Objects.hash(super.hashCode(), filePath);</span>
+    }
+
+    public Path getFilePath() {
+<span class="fc" id="L121">        return relativize(filePath);</span>
+    }
+
+    @Override
+    public void fileUpdated() {
+        // Reset previous parse result
+<span class="nc" id="L127">        keysUsedInAux = null;</span>
+<span class="nc" id="L128">        metaData.groupsBinding().invalidate();</span>
+<span class="nc" id="L129">    }</span>
+
+    private Path relativize(Path path) {
+<span class="fc" id="L132">        List&lt;Path&gt; fileDirectories = getFileDirectoriesAsPaths();</span>
+<span class="fc" id="L133">        return FileUtil.relativize(path, fileDirectories);</span>
+    }
+
+    private Path expandPath(Path path) {
+<span class="fc" id="L137">        List&lt;Path&gt; fileDirectories = getFileDirectoriesAsPaths();</span>
+<span class="fc" id="L138">        return FileUtil.find(path.toString(), fileDirectories).orElse(path);</span>
+    }
+
+    private List&lt;Path&gt; getFileDirectoriesAsPaths() {
+<span class="fc" id="L142">        return metaData.getLatexFileDirectory(user)</span>
+<span class="fc" id="L143">                       .map(List::of)</span>
+<span class="fc" id="L144">                       .orElse(Collections.emptyList());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

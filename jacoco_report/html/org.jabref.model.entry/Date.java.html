@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Date.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry</a> &gt; <span class="el_source">Date.java</span></div><h1>Date.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry;
+
+import java.time.LocalDate;
+import java.time.Year;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
+import java.time.temporal.TemporalAccessor;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class Date {
+
+    public static final String DATE_REGEX;
+<span class="fc" id="L23">    private static final DateTimeFormatter NORMALIZED_DATE_FORMATTER = DateTimeFormatter.ofPattern(&quot;uuuu[-MM][-dd]&quot;);</span>
+    private static final DateTimeFormatter SIMPLE_DATE_FORMATS;
+<span class="fc" id="L25">    private static final Logger LOGGER = LoggerFactory.getLogger(Date.class);</span>
+
+    static {
+<span class="fc" id="L28">        List&lt;String&gt; formatStrings = Arrays.asList(</span>
+                &quot;uuuu-MM-dd'T'HH:mm[:ss][xxx][xx][X]&quot;,  // covers 2018-10-03T07:24:14+03:00
+                &quot;uuuu-MM-dd'T'HH:m[:ss][xxx][xx][X]&quot;,   // covers 2018-10-03T17:2
+                &quot;uuuu-MM-dd'T'H:mm[:ss][xxx][xx][X]&quot;,   // covers 2018-10-03T7:24
+                &quot;uuuu-MM-dd'T'H:m[:ss][xxx][xx][X]&quot;,    // covers 2018-10-03T7:7
+                &quot;uuuu-MM-dd'T'HH[:ss][xxx][xx][X]&quot;,     // covers 2018-10-03T07
+                &quot;uuuu-MM-dd'T'H[:ss][xxx][xx][X]&quot;,      // covers 2018-10-03T7
+                &quot;uuuu-M-d&quot;,                             // covers 2009-1-15
+                &quot;uuuu-M&quot;,                               // covers 2009-11
+                &quot;uuuu/M&quot;,                               // covers 2020/10
+                &quot;d-M-uuuu&quot;,                             // covers 15-1-2012
+                &quot;M-uuuu&quot;,                               // covers 1-2012
+                &quot;M/uuuu&quot;,                               // covers 9/2015 and 09/2015
+                &quot;M/uu&quot;,                                 // covers 9/15
+                &quot;MMMM d, uuuu&quot;,                         // covers September 1, 2015
+                &quot;MMMM, uuuu&quot;,                           // covers September, 2015
+                &quot;d.M.uuuu&quot;,                             // covers 15.1.2015
+                &quot;uuuu.M.d&quot;,                             // covers 2015.1.15
+                &quot;uuuu&quot;,                                 // covers 2015
+                &quot;MMM, uuuu&quot;,                            // covers Jan, 2020
+                &quot;uuuu.MM.d&quot;,                            // covers 2015.10.15
+                &quot;d MMMM u/d MMMM u&quot;,                    // covers 20 January 2015/20 February 2015
+                &quot;d MMMM u&quot;,                             // covers 20 January 2015
+                &quot;d MMMM u / d MMMM u&quot;,
+                &quot;u'-'&quot;,                                 // covers 2015-
+                &quot;u'?'&quot;,                                 // covers 2023?
+                &quot;u G&quot;,                                  // covers 1 BC and 1 AD
+                &quot;uuuu G&quot;,                               // covers 0030 BC and 0005 AD
+                &quot;u G/u G&quot;,                              // covers 30 BC/5 AD
+                &quot;uuuu G/uuuu G&quot;,                        // covers 0030 BC/0005 AD
+                &quot;uuuu-MM G/uuuu-MM G&quot;                   // covers 0030-01 BC/0005-02 AD
+                );
+
+<span class="fc" id="L61">        SIMPLE_DATE_FORMATS = formatStrings.stream()</span>
+<span class="fc" id="L62">                                           .map(DateTimeFormatter::ofPattern)</span>
+<span class="fc" id="L63">                                           .reduce(new DateTimeFormatterBuilder(),</span>
+                                                   DateTimeFormatterBuilder::appendOptional,
+<span class="nc" id="L65">                                                   (builder, formatterBuilder) -&gt; builder.append(formatterBuilder.toFormatter()))</span>
+<span class="fc" id="L66">                                           .toFormatter(Locale.US);</span>
+
+        /*
+         * There is also {@link org.jabref.model.entry.Date#parse(java.lang.String)}.
+         * The regex of that method cannot be used as we parse single dates here and that method parses:
+         * i) date ranges
+         * ii) two dates separated by '/'
+         * Additionally, parse method requires the reviewed String to hold only a date.
+         */
+<span class="fc" id="L75">        DATE_REGEX = &quot;\\d{4}-\\d{1,2}-\\d{1,2}&quot; + // covers YYYY-MM-DD, YYYY-M-DD, YYYY-MM-D, YYYY-M-D</span>
+                &quot;|\\d{4}\\.\\d{1,2}\\.\\d{1,2}|&quot; + // covers YYYY.MM.DD, YYYY.M.DD, YYYY.MM.D, YYYY.M.D
+                &quot;(January|February|March|April|May|June|July|August|September|&quot; +
+                &quot;October|November|December) \\d{1,2}, \\d{4}&quot;; // covers Month DD, YYYY &amp; Month D, YYYY
+<span class="fc" id="L79">    }</span>
+
+    private final TemporalAccessor date;
+    private final TemporalAccessor endDate;
+
+    public Date(int year, int month, int dayOfMonth) {
+<span class="nc" id="L85">        this(LocalDate.of(year, month, dayOfMonth));</span>
+<span class="nc" id="L86">    }</span>
+
+    public Date(int year, int month) {
+<span class="fc" id="L89">        this(YearMonth.of(year, month));</span>
+<span class="fc" id="L90">    }</span>
+
+    public Date(int year) {
+<span class="fc" id="L93">        this(Year.of(year));</span>
+<span class="fc" id="L94">    }</span>
+
+<span class="fc" id="L96">    public Date(TemporalAccessor date) {</span>
+<span class="fc" id="L97">        this.date = date;</span>
+<span class="fc" id="L98">        endDate = null;</span>
+<span class="fc" id="L99">    }</span>
+
+    /**
+     * Creates a Date from date and endDate.
+     *
+     * @param date the start date
+     * @param endDate the start date
+     */
+<span class="fc" id="L107">    public Date(TemporalAccessor date, TemporalAccessor endDate) {</span>
+<span class="fc" id="L108">        this.date = date;</span>
+<span class="fc" id="L109">        this.endDate = endDate;</span>
+<span class="fc" id="L110">    }</span>
+
+    /**
+     * Creates a Date from date and endDate.
+     *
+     * @param dateString the string to extract the date information
+     * @throws DateTimeParseException if dataString is mal-formatted
+     */
+    public static Optional&lt;Date&gt; parse(String dateString) {
+<span class="fc" id="L119">        Objects.requireNonNull(dateString);</span>
+
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (dateString.isEmpty()) {</span>
+<span class="fc" id="L122">            return Optional.empty();</span>
+        }
+
+        // if dateString has range format, treat as date range
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (dateString.matches(</span>
+               &quot;\\d{4}/\\d{4}|&quot; + // uuuu/uuuu
+               &quot;\\d{4}-\\d{2}/\\d{4}-\\d{2}|&quot; + // uuuu-mm/uuuu-mm
+               &quot;\\d{4}-\\d{2}-\\d{2}/\\d{4}-\\d{2}-\\d{2}|&quot; + // uuuu-mm-dd/uuuu-mm-dd
+               &quot;(?i)(January|February|March|April|May|June|July|August|September|October|November|December)&quot; +
+               &quot;( |\\-)(\\d{1,4})/(January|February|March|April|May|June|July|August|September|October|November&quot; +
+               &quot;|December)( |\\-)(\\d{1,4})(?i-)|&quot; + // January 2015/January 2015
+               &quot;(?i)(\\d{1,2})( )(January|February|March|April|May|June|July|August|September|October|November|December)&quot; +
+               &quot;( |\\-)(\\d{1,4})/(\\d{1,2})( )&quot; +
+               &quot;(January|February|March|April|May|June|July|August|September|October|November|December)&quot; +
+               &quot;( |\\-)(\\d{1,4})(?i-)&quot; // 20 January 2015/20 January 2015
+        )) {
+            try {
+<span class="fc" id="L139">                String[] strDates = dateString.split(&quot;/&quot;);</span>
+<span class="fc" id="L140">                TemporalAccessor parsedDate = SIMPLE_DATE_FORMATS.parse(strDates[0].strip());</span>
+<span class="fc" id="L141">                TemporalAccessor parsedEndDate = SIMPLE_DATE_FORMATS.parse(strDates[1].strip());</span>
+<span class="fc" id="L142">                return Optional.of(new Date(parsedDate, parsedEndDate));</span>
+<span class="nc" id="L143">            } catch (DateTimeParseException e) {</span>
+<span class="nc" id="L144">                LOGGER.debug(&quot;Invalid Date format for range&quot;, e);</span>
+<span class="nc" id="L145">                return Optional.empty();</span>
+            }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        } else if (dateString.matches(</span>
+              &quot;\\d{4} / \\d{4}|&quot; + // uuuu / uuuu
+              &quot;\\d{4}-\\d{2} / \\d{4}-\\d{2}|&quot; + // uuuu-mm / uuuu-mm
+              &quot;\\d{4}-\\d{2}-\\d{2} / \\d{4}-\\d{2}-\\d{2}|&quot; + // uuuu-mm-dd / uuuu-mm-dd
+              &quot;(?i)(January|February|March|April|May|June|July|August|September|October|November|December)&quot; +
+              &quot;( |\\-)(\\d{1,4}) / (January|February|March|April|May|June|July|August|September|October|November&quot; +
+              &quot;|December)( |\\-)(\\d{1,4})(?i-)|&quot; + // January 2015/January 2015
+              &quot;(?i)(\\d{1,2})( )(January|February|March|April|May|June|July|August|September|October|November|December)&quot; +
+              &quot;( |\\-)(\\d{1,4}) / (\\d{1,2})( )&quot; +
+              &quot;(January|February|March|April|May|June|July|August|September|October|November|December)&quot; +
+              &quot;( |\\-)(\\d{1,4})(?i-)&quot; // 20 January 2015/20 January 2015
+        )) {
+            try {
+<span class="fc" id="L160">                String[] strDates = dateString.split(&quot; / &quot;);</span>
+<span class="fc" id="L161">                TemporalAccessor parsedDate = SIMPLE_DATE_FORMATS.parse(strDates[0].strip());</span>
+<span class="fc" id="L162">                TemporalAccessor parsedEndDate = SIMPLE_DATE_FORMATS.parse(strDates[1].strip());</span>
+<span class="fc" id="L163">                return Optional.of(new Date(parsedDate, parsedEndDate));</span>
+<span class="nc" id="L164">            } catch (DateTimeParseException e) {</span>
+<span class="nc" id="L165">                LOGGER.debug(&quot;Invalid Date format range&quot;, e);</span>
+<span class="nc" id="L166">                return Optional.empty();</span>
+            }
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        } else if (dateString.matches(</span>
+                &quot;\\d{1,4} BC/\\d{1,4} AD|&quot; + // 30 BC/5 AD and 0030 BC/0005 AD
+                &quot;\\d{1,4} BC/\\d{1,4} BC|&quot; + // 30 BC/10 BC and 0030 BC/0010 BC
+                &quot;\\d{1,4} AD/\\d{1,4} AD|&quot; + // 5 AD/10 AD and 0005 AD/0010 AD
+                &quot;\\d{1,4}-\\d{1,2} BC/\\d{1,4}-\\d{1,2} AD|&quot; + // 5 AD/10 AD and 0005 AD/0010 AD
+                &quot;\\d{1,4}-\\d{1,2} BC/\\d{1,4}-\\d{1,2} BC|&quot; + // 5 AD/10 AD and 0005 AD/0010 AD
+                &quot;\\d{1,4}-\\d{1,2} AD/\\d{1,4}-\\d{1,2} AD&quot; // 5 AD/10 AD and 0005 AD/0010 AD
+        )) {
+            try {
+<span class="fc" id="L177">                String[] strDates = dateString.split(&quot;/&quot;);</span>
+<span class="fc" id="L178">                TemporalAccessor parsedDate = parseDateWithEraIndicator(strDates[0]);</span>
+<span class="fc" id="L179">                TemporalAccessor parsedEndDate = parseDateWithEraIndicator(strDates[1]);</span>
+<span class="fc" id="L180">                return Optional.of(new Date(parsedDate, parsedEndDate));</span>
+<span class="nc" id="L181">            } catch (DateTimeParseException e) {</span>
+<span class="nc" id="L182">                LOGGER.debug(&quot;Invalid Date format range&quot;, e);</span>
+<span class="nc" id="L183">                return Optional.empty();</span>
+            }
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        } else if (dateString.matches(</span>
+                &quot;\\d{1,4} BC / \\d{1,4} AD|&quot; + // 30 BC / 5 AD and 0030 BC / 0005 AD
+                &quot;\\d{1,4} BC / \\d{1,4} BC|&quot; + // 30 BC / 10 BC and 0030 BC / 0010 BC
+                &quot;\\d{1,4} AD / \\d{1,4} AD|&quot; + // 5 AD / 10 AD and 0005 AD / 0010 AD
+                &quot;\\d{1,4}-\\d{1,2} BC / \\d{1,4}-\\d{1,2} AD|&quot; + // 5 AD/10 AD and 0005 AD/0010 AD
+                &quot;\\d{1,4}-\\d{1,2} BC / \\d{1,4}-\\d{1,2} BC|&quot; + // 5 AD/10 AD and 0005 AD/0010 AD
+                &quot;\\d{1,4}-\\d{1,2} AD / \\d{1,4}-\\d{1,2} AD&quot; // 5 AD/10 AD and 0005 AD/0010 AD
+        )) {
+            try {
+<span class="fc" id="L194">                String[] strDates = dateString.split(&quot; / &quot;);</span>
+<span class="fc" id="L195">                TemporalAccessor parsedDate = parseDateWithEraIndicator(strDates[0]);</span>
+<span class="fc" id="L196">                TemporalAccessor parsedEndDate = parseDateWithEraIndicator(strDates[1]);</span>
+<span class="fc" id="L197">                return Optional.of(new Date(parsedDate, parsedEndDate));</span>
+<span class="nc" id="L198">            } catch (DateTimeParseException e) {</span>
+<span class="nc" id="L199">                LOGGER.debug(&quot;Invalid Date format range&quot;, e);</span>
+<span class="nc" id="L200">                return Optional.empty();</span>
+            }
+        }
+
+        // if dateString is single year
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (dateString.matches(&quot;\\d{4}-|&quot; + &quot;\\d{4}\\?&quot;)) {</span>
+            try {
+<span class="fc" id="L207">                String year = dateString.substring(0, dateString.length() - 1);</span>
+<span class="fc" id="L208">                TemporalAccessor parsedDate = SIMPLE_DATE_FORMATS.parse(year);</span>
+<span class="fc" id="L209">                return Optional.of(new Date(parsedDate));</span>
+<span class="nc" id="L210">            } catch (DateTimeParseException e) {</span>
+<span class="nc" id="L211">                LOGGER.debug(&quot;Invalid Date format&quot;, e);</span>
+<span class="nc" id="L212">                return Optional.empty();</span>
+            }
+        }
+
+        // handle the new date formats with era indicators
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (dateString.matches(</span>
+                &quot;\\d{1,4} BC|&quot; + // covers 1 BC
+                &quot;\\d{1,4} AD|&quot; + // covers 1 BC
+                &quot;\\d{1,4}-\\d{1,2} BC|&quot; +  // covers 0030-01 BC
+                &quot;\\d{1,4}-\\d{1,2} AD&quot; // covers 0005-01 AD
+        )) {
+            try {
+                // Parse the date with era indicator
+<span class="fc" id="L225">                TemporalAccessor date = parseDateWithEraIndicator(dateString);</span>
+<span class="fc" id="L226">                return Optional.of(new Date(date));</span>
+<span class="nc" id="L227">            } catch (DateTimeParseException e) {</span>
+<span class="nc" id="L228">                LOGGER.debug(&quot;Invalid Date format with era indicator&quot;, e);</span>
+<span class="nc" id="L229">                return Optional.empty();</span>
+            }
+        }
+
+        try {
+<span class="fc" id="L234">            TemporalAccessor parsedDate = SIMPLE_DATE_FORMATS.parse(dateString);</span>
+<span class="fc" id="L235">            return Optional.of(new Date(parsedDate));</span>
+<span class="fc" id="L236">        } catch (DateTimeParseException e) {</span>
+<span class="fc" id="L237">            LOGGER.debug(&quot;Invalid Date format&quot;, e);</span>
+<span class="fc" id="L238">            return Optional.empty();</span>
+        }
+    }
+
+    public static Optional&lt;Date&gt; parse(Optional&lt;String&gt; yearValue,
+                                       Optional&lt;String&gt; monthValue,
+                                       Optional&lt;String&gt; dayValue) {
+<span class="fc" id="L245">        Optional&lt;Year&gt; year = yearValue.flatMap(Date::convertToInt).map(Year::of);</span>
+<span class="fc" id="L246">        Optional&lt;Month&gt; month = monthValue.flatMap(Month::parse);</span>
+<span class="fc" id="L247">        Optional&lt;Integer&gt; day = dayValue.flatMap(Date::convertToInt);</span>
+
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (year.isPresent()) {</span>
+            TemporalAccessor date;
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            if (month.isPresent()) {</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">                if (day.isPresent()) {</span>
+<span class="fc" id="L253">                    date = LocalDate.of(year.get().getValue(), month.get().getNumber(), day.get());</span>
+                } else {
+<span class="fc" id="L255">                    date = YearMonth.of(year.get().getValue(), month.get().getNumber());</span>
+                }
+            } else {
+<span class="fc" id="L258">                date = year.get();</span>
+            }
+
+<span class="fc" id="L261">            return Optional.of(new Date(date));</span>
+        }
+
+<span class="fc" id="L264">        return Optional.empty();</span>
+    }
+
+    private static Optional&lt;Integer&gt; convertToInt(String value) {
+        try {
+<span class="fc" id="L269">            return Optional.of(Integer.valueOf(value));</span>
+<span class="nc" id="L270">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L271">            return Optional.empty();</span>
+        }
+    }
+
+    /**
+     * Create a date with a string with era indicator.
+     *
+     * @param dateString the string which contain era indicator to extract the date information
+     * @return the date information with TemporalAccessor type
+     */
+    private static TemporalAccessor parseDateWithEraIndicator(String dateString) {
+<span class="fc" id="L282">        String yearString = dateString.strip().substring(0, dateString.length() - 2);</span>
+
+<span class="fc" id="L284">        String[] parts = yearString.split(&quot;-&quot;);</span>
+<span class="fc" id="L285">        int year = Integer.parseInt(parts[0].strip());</span>
+
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (dateString.endsWith(&quot;BC&quot;)) {</span>
+<span class="fc" id="L288">            year = 1 - year;</span>
+        }
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        if (parts.length &gt; 1) {</span>
+<span class="fc" id="L291">            int month = Integer.parseInt(parts[1].strip());</span>
+<span class="fc" id="L292">            return YearMonth.of(year, month);</span>
+        }
+<span class="fc" id="L294">        return Year.of(year);</span>
+    }
+
+    public String getNormalized() {
+<span class="fc" id="L298">        return NORMALIZED_DATE_FORMATTER.format(date);</span>
+    }
+
+    public Optional&lt;Integer&gt; getYear() {
+<span class="fc" id="L302">        return get(ChronoField.YEAR);</span>
+    }
+
+    public Optional&lt;Integer&gt; get(ChronoField field) {
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (date.isSupported(field)) {</span>
+<span class="fc" id="L307">            return Optional.of(date.get(field));</span>
+        } else {
+<span class="fc" id="L309">            return Optional.empty();</span>
+        }
+    }
+
+    public Optional&lt;Month&gt; getMonth() {
+<span class="fc" id="L314">        return get(ChronoField.MONTH_OF_YEAR).flatMap(Month::getMonthByNumber);</span>
+    }
+
+    public Optional&lt;Integer&gt; getDay() {
+<span class="fc" id="L318">        return get(ChronoField.DAY_OF_MONTH);</span>
+    }
+
+    public TemporalAccessor toTemporalAccessor() {
+<span class="nc" id="L322">        return date;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L328">            return true;</span>
+        }
+<span class="pc bpc" id="L330" title="2 of 4 branches missed.">        if ((o == null) || (getClass() != o.getClass())) {</span>
+<span class="nc" id="L331">            return false;</span>
+        }
+<span class="fc" id="L333">        Date date1 = (Date) o;</span>
+
+<span class="fc bfc" id="L335" title="All 2 branches covered.">        return Objects.equals(getYear(), date1.getYear()) &amp;&amp;</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">                Objects.equals(getMonth(), date1.getMonth()) &amp;&amp;</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">                Objects.equals(getDay(), date1.getDay()) &amp;&amp;</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">                Objects.equals(get(ChronoField.HOUR_OF_DAY), date1.get(ChronoField.HOUR_OF_DAY)) &amp;&amp;</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">                Objects.equals(get(ChronoField.MINUTE_OF_HOUR), date1.get(ChronoField.MINUTE_OF_HOUR)) &amp;&amp;</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">                Objects.equals(get(ChronoField.SECOND_OF_DAY), date1.get(ChronoField.SECOND_OF_DAY)) &amp;&amp;</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">                Objects.equals(get(ChronoField.OFFSET_SECONDS), date1.get(ChronoField.OFFSET_SECONDS));</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L346">        String formattedDate = date.toString();</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        if (date.isSupported(ChronoField.OFFSET_SECONDS)) {</span>
+<span class="nc" id="L348">            formattedDate = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(date);</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        } else if (date.isSupported(ChronoField.HOUR_OF_DAY)) {</span>
+<span class="nc" id="L350">            formattedDate = DateTimeFormatter.ISO_DATE_TIME.format(date);</span>
+<span class="nc bnc" id="L351" title="All 4 branches missed.">        } else if (date.isSupported(ChronoField.MONTH_OF_YEAR) &amp;&amp; date.isSupported(ChronoField.DAY_OF_MONTH)) {</span>
+<span class="nc" id="L352">            formattedDate = DateTimeFormatter.ISO_DATE.format(date);</span>
+        }
+<span class="nc" id="L354">        return &quot;Date{&quot; +</span>
+               &quot;date=&quot; + formattedDate +
+               '}';
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L361">        return Objects.hash(getYear(), getMonth(), getDay(), get(ChronoField.HOUR_OF_DAY), get(ChronoField.MINUTE_OF_HOUR), get(ChronoField.OFFSET_SECONDS));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

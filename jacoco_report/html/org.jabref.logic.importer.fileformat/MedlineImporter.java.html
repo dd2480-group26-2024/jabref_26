@@ -1,0 +1,1267 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MedlineImporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fileformat</a> &gt; <span class="el_source">MedlineImporter.java</span></div><h1>MedlineImporter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fileformat;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.events.XMLEvent;
+
+import org.jabref.logic.importer.Importer;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.importer.fileformat.medline.ArticleId;
+import org.jabref.logic.importer.fileformat.medline.Investigator;
+import org.jabref.logic.importer.fileformat.medline.MeshHeading;
+import org.jabref.logic.importer.fileformat.medline.OtherId;
+import org.jabref.logic.importer.fileformat.medline.PersonalNameSubject;
+import org.jabref.logic.importer.util.MathMLParser;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.Date;
+import org.jabref.model.entry.Month;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Importer for the Medline/Pubmed format.
+ * &lt;p&gt;
+ * check here for details on the format https://www.nlm.nih.gov/bsd/licensee/elements_descriptions.html
+ */
+public class MedlineImporter extends Importer implements Parser {
+
+<span class="fc" id="L53">    private static final Logger LOGGER = LoggerFactory.getLogger(MedlineImporter.class);</span>
+    private static final String KEYWORD_SEPARATOR = &quot;; &quot;;
+
+<span class="fc" id="L56">    private static final Locale ENGLISH = Locale.ENGLISH;</span>
+    private final XMLInputFactory xmlInputFactory;
+
+<span class="fc" id="L59">    public MedlineImporter() {</span>
+<span class="fc" id="L60">        this.xmlInputFactory = XMLInputFactory.newInstance();</span>
+        // prevent xxe (https://rules.sonarsource.com/java/RSPEC-2755)
+        // Not supported by aalto-xml
+        // xmlInputFactory.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, &quot;&quot;);
+        // required for reading Unicode characters such as &amp;#xf6;
+<span class="fc" id="L65">        xmlInputFactory.setProperty(XMLInputFactory.IS_COALESCING, true);</span>
+        // TODO: decide if necessary, if disabled MedlineImporterTestNbib fails
+<span class="fc" id="L67">        xmlInputFactory.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, false);</span>
+<span class="fc" id="L68">        xmlInputFactory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, true);</span>
+<span class="fc" id="L69">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L73">        return &quot;Medline/PubMed&quot;;</span>
+    }
+
+    @Override
+    public StandardFileType getFileType() {
+<span class="fc" id="L78">        return StandardFileType.MEDLINE;</span>
+    }
+
+    @Override
+    public String getId() {
+<span class="fc" id="L83">        return &quot;medline&quot;;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="fc" id="L88">        return &quot;Importer for the Medline format.&quot;;</span>
+    }
+
+    @Override
+    public boolean isRecognizedFormat(BufferedReader reader) throws IOException {
+        String str;
+<span class="fc" id="L94">        int i = 0;</span>
+<span class="fc bfc" id="L95" title="All 4 branches covered.">        while (((str = reader.readLine()) != null) &amp;&amp; (i &lt; 50)) {</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (str.toLowerCase(ENGLISH).contains(&quot;&lt;pubmedarticle&gt;&quot;)</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                    || str.toLowerCase(ENGLISH).contains(&quot;&lt;pubmedbookarticle&gt;&quot;)) {</span>
+<span class="fc" id="L98">                return true;</span>
+            }
+
+<span class="fc" id="L101">            i++;</span>
+        }
+<span class="fc" id="L103">        return false;</span>
+    }
+
+    @Override
+    public ParserResult importDatabase(BufferedReader input) throws IOException {
+<span class="fc" id="L108">        Objects.requireNonNull(input);</span>
+
+<span class="fc" id="L110">        List&lt;BibEntry&gt; bibItems = new ArrayList&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L113">            XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(input);</span>
+
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            while (reader.hasNext()) {</span>
+<span class="fc" id="L116">                reader.next();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L118">                    String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L119" title="All 3 branches covered.">                    switch (elementName) {</span>
+                        case &quot;PubmedArticle&quot; -&gt; {
+<span class="fc" id="L121">                            parseArticle(reader, bibItems, elementName);</span>
+<span class="fc" id="L122">                        }</span>
+                        case &quot;PubmedBookArticle&quot; -&gt; {
+<span class="fc" id="L124">                            parseBookArticle(reader, bibItems, elementName);</span>
+                        }
+                    }
+<span class="fc" id="L127">                }</span>
+            }
+<span class="fc" id="L129">        } catch (XMLStreamException e) {</span>
+<span class="fc" id="L130">            LOGGER.debug(&quot;could not parse document&quot;, e);</span>
+<span class="fc" id="L131">            return ParserResult.fromError(e);</span>
+<span class="fc" id="L132">        }</span>
+
+<span class="fc" id="L134">        return new ParserResult(bibItems);</span>
+    }
+
+    private void parseBookArticle(XMLStreamReader reader, List&lt;BibEntry&gt; bibItems, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L139">        Map&lt;Field, String&gt; fields = new HashMap&lt;&gt;();</span>
+
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L142">            reader.next();</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L144">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L145" title="All 3 branches covered.">                switch (elementName) {</span>
+                    case &quot;BookDocument&quot; -&gt; {
+<span class="fc" id="L147">                        parseBookDocument(reader, fields, elementName);</span>
+<span class="fc" id="L148">                    }</span>
+                    case &quot;PublicationStatus&quot; -&gt; {
+<span class="fc" id="L150">                        reader.next();</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L152">                            putIfValueNotNull(fields, StandardField.PUBSTATE, reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L158" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L159">                break;</span>
+            }
+        }
+
+<span class="fc" id="L163">        BibEntry entry = new BibEntry(StandardEntryType.Article);</span>
+<span class="fc" id="L164">        entry.setField(fields);</span>
+
+<span class="fc" id="L166">        bibItems.add(entry);</span>
+<span class="fc" id="L167">    }</span>
+
+    private void parseBookDocument(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement)
+            throws XMLStreamException {
+        // multiple occurrences of the following fields can be present
+<span class="fc" id="L172">        List&lt;String&gt; sectionTitleList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L173">        List&lt;String&gt; keywordList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L174">        List&lt;String&gt; publicationTypeList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L175">        List&lt;String&gt; articleTitleList = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L178">            reader.next();</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L180">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L181" title="1 of 10 branches missed.">                switch (elementName) {</span>
+                    case &quot;PMID&quot; -&gt; {
+<span class="fc" id="L183">                        reader.next();</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L185">                            fields.put(StandardField.PMID, reader.getText());</span>
+                        }
+                    }
+                    case &quot;DateRevised&quot;, &quot;ContributionDate&quot; -&gt; {
+<span class="fc" id="L189">                        parseDate(reader, fields, elementName);</span>
+<span class="fc" id="L190">                    }</span>
+                    case &quot;Abstract&quot; -&gt; {
+<span class="fc" id="L192">                        addAbstract(reader, fields, elementName);</span>
+<span class="fc" id="L193">                    }</span>
+                    case &quot;Pagination&quot; -&gt; {
+<span class="fc" id="L195">                        addPagination(reader, fields, elementName);</span>
+<span class="fc" id="L196">                    }</span>
+                    case &quot;Section&quot; -&gt; {
+<span class="fc" id="L198">                        parseSections(reader, sectionTitleList);</span>
+<span class="fc" id="L199">                    }</span>
+                    case &quot;Keyword&quot; -&gt; {
+<span class="nc" id="L201">                        reader.next();</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="nc" id="L203">                            keywordList.add(reader.getText());</span>
+                        }
+                    }
+                    case &quot;PublicationType&quot; -&gt; {
+<span class="fc" id="L207">                        reader.next();</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L209">                            publicationTypeList.add(reader.getText());</span>
+                        }
+                    }
+                    case &quot;ArticleTitle&quot; -&gt; {
+<span class="fc" id="L213">                        reader.next();</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L215">                            articleTitleList.add(reader.getText());</span>
+                        }
+                    }
+                    case &quot;Book&quot; -&gt; {
+<span class="fc" id="L219">                        parseBookInformation(reader, fields, elementName);</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L224" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L225">                break;</span>
+            }
+        }
+
+        // populate multiple occurrence fields
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (!sectionTitleList.isEmpty()) {</span>
+<span class="fc" id="L231">            fields.put(new UnknownField(&quot;sections&quot;), String.join(&quot;; &quot;, sectionTitleList));</span>
+        }
+<span class="fc" id="L233">        addKeywords(fields, keywordList);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (!publicationTypeList.isEmpty()) {</span>
+<span class="fc" id="L235">            fields.put(new UnknownField(&quot;pubtype&quot;), String.join(&quot;, &quot;, publicationTypeList));</span>
+        }
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (!articleTitleList.isEmpty()) {</span>
+<span class="fc" id="L238">            fields.put(new UnknownField(&quot;article&quot;), String.join(&quot;, &quot;, articleTitleList));</span>
+        }
+<span class="fc" id="L240">    }</span>
+
+    private void parseBookInformation(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L244">        List&lt;String&gt; isbnList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L245">        List&lt;String&gt; titleList = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L248">            reader.next();</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L250">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L251" title="4 of 12 branches missed.">                switch (elementName) {</span>
+                    case &quot;PublisherName&quot; -&gt; {
+<span class="fc" id="L253">                        reader.next();</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L255">                            putIfValueNotNull(fields, StandardField.PUBLISHER, reader.getText());</span>
+                        }
+                    }
+                    case &quot;PublisherLocation&quot; -&gt; {
+<span class="fc" id="L259">                        reader.next();</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L261">                            putIfValueNotNull(fields, new UnknownField(&quot;publocation&quot;), reader.getText());</span>
+                        }
+                    }
+                    case &quot;BookTitle&quot; -&gt; {
+<span class="fc" id="L265">                        handleTextElement(reader, titleList, elementName);</span>
+<span class="fc" id="L266">                    }</span>
+                    case &quot;PubDate&quot; -&gt; {
+<span class="fc" id="L268">                        addPubDate(reader, fields, elementName);</span>
+<span class="fc" id="L269">                    }</span>
+                    case &quot;AuthorList&quot; -&gt; {
+<span class="fc" id="L271">                        handleAuthorList(reader, fields, elementName);</span>
+<span class="fc" id="L272">                    }</span>
+                    case &quot;Volume&quot; -&gt; {
+<span class="nc" id="L274">                        reader.next();</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="nc" id="L276">                            putIfValueNotNull(fields, StandardField.VOLUME, reader.getText());</span>
+                        }
+                    }
+                    case &quot;Edition&quot; -&gt; {
+<span class="nc" id="L280">                        reader.next();</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="nc" id="L282">                            putIfValueNotNull(fields, StandardField.EDITION, reader.getText());</span>
+                        }
+                    }
+                    case &quot;Medium&quot; -&gt; {
+<span class="nc" id="L286">                        reader.next();</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="nc" id="L288">                            putIfValueNotNull(fields, new UnknownField(&quot;medium&quot;), reader.getText());</span>
+                        }
+                    }
+                    case &quot;ReportNumber&quot; -&gt; {
+<span class="nc" id="L292">                        reader.next();</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="nc" id="L294">                            putIfValueNotNull(fields, new UnknownField(&quot;reportnumber&quot;), reader.getText());</span>
+                        }
+                    }
+                    case &quot;ELocationID&quot; -&gt; {
+<span class="fc" id="L298">                        String eidType = reader.getAttributeValue(null, &quot;EIdType&quot;);</span>
+<span class="fc" id="L299">                        reader.next();</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L301">                            handleElocationId(fields, reader, eidType);</span>
+                        }
+<span class="fc" id="L303">                    }</span>
+                    case &quot;Isbn&quot; -&gt; {
+<span class="fc" id="L305">                        reader.next();</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L307">                            isbnList.add(reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L313" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L314">                break;</span>
+            }
+        }
+
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        if (!isbnList.isEmpty()) {</span>
+<span class="fc" id="L319">            fields.put(StandardField.ISBN, String.join(&quot;, &quot;, isbnList));</span>
+        }
+
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (!titleList.isEmpty()) {</span>
+<span class="fc" id="L323">            putIfValueNotNull(fields, StandardField.TITLE, String.join(&quot; &quot;, titleList));</span>
+        }
+<span class="fc" id="L325">    }</span>
+
+    private void handleElocationId(Map&lt;Field, String&gt; fields, XMLStreamReader reader, String eidType) {
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (&quot;doi&quot;.equals(eidType)) {</span>
+<span class="fc" id="L329">            fields.put(StandardField.DOI, reader.getText());</span>
+        }
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        if (&quot;pii&quot;.equals(eidType)) {</span>
+<span class="fc" id="L332">            fields.put(new UnknownField(&quot;pii&quot;), reader.getText());</span>
+        }
+<span class="fc" id="L334">    }</span>
+
+    private void parseSections(XMLStreamReader reader, List&lt;String&gt; sectionTitleList) throws XMLStreamException {
+<span class="fc" id="L337">        int sectionLevel = 0;</span>
+
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L340">            reader.next();</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L342">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L343" title="All 3 branches covered.">                switch (elementName) {</span>
+                    case &quot;SectionTitle&quot; -&gt; {
+<span class="fc" id="L345">                        reader.next();</span>
+<span class="pc bpc" id="L346" title="1 of 4 branches missed.">                        if (isCharacterXMLEvent(reader) &amp;&amp; sectionLevel == 0) {</span>
+                            // we only collect SectionTitles from root level Sections
+<span class="fc" id="L348">                            sectionTitleList.add(reader.getText());</span>
+                        }
+                    }
+                    case &quot;Section&quot; -&gt; {
+<span class="fc" id="L352">                        sectionLevel++;</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L357" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; &quot;Section&quot;.equals(reader.getName().getLocalPart())) {</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">                if (sectionLevel == 0) {</span>
+<span class="fc" id="L359">                    break;</span>
+                } else {
+<span class="fc" id="L361">                    sectionLevel--;</span>
+                }
+            }
+        }
+<span class="fc" id="L365">    }</span>
+
+    private void parseArticle(XMLStreamReader reader, List&lt;BibEntry&gt; bibItems, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L369">        Map&lt;Field, String&gt; fields = new HashMap&lt;&gt;();</span>
+
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L372">            reader.next();</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L374">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L375" title="1 of 3 branches missed.">                switch (elementName) {</span>
+                    case &quot;MedlineCitation&quot; -&gt; {
+<span class="fc" id="L377">                        parseMedlineCitation(reader, fields, elementName);</span>
+<span class="fc" id="L378">                    }</span>
+                    case &quot;PubmedData&quot; -&gt; {
+<span class="fc" id="L380">                        parsePubmedData(reader, fields, elementName);</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L385" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L386">                break;</span>
+            }
+        }
+
+<span class="fc" id="L390">        BibEntry entry = new BibEntry(StandardEntryType.Article);</span>
+<span class="fc" id="L391">        entry.setField(fields);</span>
+
+<span class="fc" id="L393">        bibItems.add(entry);</span>
+<span class="fc" id="L394">    }</span>
+
+    private void parsePubmedData(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L398">        String publicationStatus = &quot;&quot;;</span>
+<span class="fc" id="L399">        List&lt;ArticleId&gt; articleIdList = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L402">            reader.next();</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L404">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L405" title="All 3 branches covered.">                switch (elementName) {</span>
+                    case &quot;PublicationStatus&quot; -&gt; {
+<span class="fc" id="L407">                        reader.next();</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L409">                            publicationStatus = reader.getText();</span>
+                        }
+                    }
+                    case &quot;ArticleId&quot; -&gt; {
+<span class="fc" id="L413">                        String idType = reader.getAttributeValue(null, &quot;IdType&quot;);</span>
+<span class="fc" id="L414">                        reader.next();</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L416">                            articleIdList.add(new ArticleId(idType, reader.getText()));</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L422" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L423">                break;</span>
+            }
+        }
+
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        if (fields.get(new UnknownField(&quot;revised&quot;)) != null) {</span>
+<span class="fc" id="L428">            putIfValueNotNull(fields, StandardField.PUBSTATE, publicationStatus);</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">            if (!articleIdList.isEmpty()) {</span>
+<span class="fc" id="L430">                addArticleIdList(fields, articleIdList);</span>
+            }
+        }
+<span class="fc" id="L433">    }</span>
+
+    private void parseMedlineCitation(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement)
+            throws XMLStreamException {
+        // multiple occurrences of the following fields can be present
+<span class="fc" id="L438">        List&lt;String&gt; citationSubsets = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L439">        List&lt;MeshHeading&gt; meshHeadingList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L440">        List&lt;PersonalNameSubject&gt; personalNameSubjectList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L441">        List&lt;OtherId&gt; otherIdList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L442">        List&lt;String&gt; keywordList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L443">        List&lt;String&gt; spaceFlightMissionList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L444">        List&lt;Investigator&gt; investigatorList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L445">        List&lt;String&gt; generalNoteList = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L447">        String status = reader.getAttributeValue(null, &quot;Status&quot;);</span>
+<span class="fc" id="L448">        String owner = reader.getAttributeValue(null, &quot;Owner&quot;);</span>
+<span class="fc" id="L449">        int latestVersion = 0;</span>
+<span class="fc" id="L450">        fields.put(new UnknownField(&quot;status&quot;), status);</span>
+<span class="fc" id="L451">        fields.put(StandardField.OWNER, owner);</span>
+
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L454">            reader.next();</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L456">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L457" title="All 16 branches covered.">                switch (elementName) {</span>
+                    case &quot;DateCreated&quot;, &quot;DateCompleted&quot;, &quot;DateRevised&quot; -&gt; {
+<span class="fc" id="L459">                        parseDate(reader, fields, elementName);</span>
+<span class="fc" id="L460">                    }</span>
+                    case &quot;Article&quot; -&gt; {
+<span class="fc" id="L462">                        parseArticleInformation(reader, fields);</span>
+<span class="fc" id="L463">                    }</span>
+                    case &quot;PMID&quot; -&gt; {
+<span class="fc" id="L465">                        String versionStr = reader.getAttributeValue(null, &quot;Version&quot;);</span>
+<span class="fc" id="L466">                        reader.next();</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">                        if (versionStr != null) {</span>
+<span class="fc" id="L468">                            int version = Integer.parseInt(versionStr);</span>
+<span class="pc bpc" id="L469" title="1 of 4 branches missed.">                            if (isCharacterXMLEvent(reader) &amp;&amp; version &gt; latestVersion) {</span>
+<span class="fc" id="L470">                                latestVersion = version;</span>
+<span class="fc" id="L471">                                fields.put(StandardField.PMID, reader.getText());</span>
+                            }
+                        }
+<span class="fc" id="L474">                    }</span>
+                    case &quot;MedlineJournalInfo&quot; -&gt; {
+<span class="fc" id="L476">                        parseMedlineJournalInfo(reader, fields, elementName);</span>
+<span class="fc" id="L477">                    }</span>
+                    case &quot;ChemicalList&quot; -&gt; {
+<span class="fc" id="L479">                        parseChemicalList(reader, fields, elementName);</span>
+<span class="fc" id="L480">                    }</span>
+                    case &quot;CitationSubset&quot; -&gt; {
+<span class="fc" id="L482">                        reader.next();</span>
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L484">                            citationSubsets.add(reader.getText());</span>
+                        }
+                    }
+                    case &quot;GeneSymbolList&quot; -&gt; {
+<span class="fc" id="L488">                        parseGeneSymbolList(reader, fields, elementName);</span>
+<span class="fc" id="L489">                    }</span>
+                    case &quot;MeshHeading&quot; -&gt; {
+<span class="fc" id="L491">                        parseMeshHeading(reader, meshHeadingList, elementName);</span>
+<span class="fc" id="L492">                    }</span>
+                    case &quot;NumberOfReferences&quot; -&gt; {
+<span class="fc" id="L494">                        reader.next();</span>
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L496">                            putIfValueNotNull(fields, new UnknownField(&quot;references&quot;), reader.getText());</span>
+                        }
+                    }
+                    case &quot;PersonalNameSubject&quot; -&gt; {
+<span class="fc" id="L500">                        parsePersonalNameSubject(reader, personalNameSubjectList, elementName);</span>
+<span class="fc" id="L501">                    }</span>
+                    case &quot;OtherID&quot; -&gt; {
+<span class="fc" id="L503">                        String otherIdSource = reader.getAttributeValue(null, &quot;Source&quot;);</span>
+<span class="fc" id="L504">                        reader.next();</span>
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L506">                            String content = reader.getText();</span>
+<span class="fc" id="L507">                            otherIdList.add(new OtherId(otherIdSource, content));</span>
+                        }
+<span class="fc" id="L509">                    }</span>
+                    case &quot;Keyword&quot; -&gt; {
+<span class="fc" id="L511">                        reader.next();</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L513">                            keywordList.add(reader.getText());</span>
+                        }
+                    }
+                    case &quot;SpaceFlightMission&quot; -&gt; {
+<span class="fc" id="L517">                        reader.next();</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L519">                            spaceFlightMissionList.add(reader.getText());</span>
+                        }
+                    }
+                    case &quot;Investigator&quot; -&gt; {
+<span class="fc" id="L523">                        parseInvestigator(reader, investigatorList, elementName);</span>
+<span class="fc" id="L524">                    }</span>
+                    case &quot;GeneralNote&quot; -&gt; {
+<span class="fc" id="L526">                        reader.next();</span>
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L528">                            generalNoteList.add(reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L534" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L535">                break;</span>
+            }
+        }
+
+        // populate multiple occurrence fields
+<span class="fc bfc" id="L540" title="All 2 branches covered.">        if (!citationSubsets.isEmpty()) {</span>
+<span class="fc" id="L541">            fields.put(new UnknownField(&quot;citation-subset&quot;), String.join(&quot;, &quot;, citationSubsets));</span>
+        }
+<span class="fc" id="L543">        addMeshHeading(fields, meshHeadingList);</span>
+<span class="fc" id="L544">        addPersonalNames(fields, personalNameSubjectList);</span>
+<span class="fc" id="L545">        addOtherId(fields, otherIdList);</span>
+<span class="fc" id="L546">        addKeywords(fields, keywordList);</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">        if (!spaceFlightMissionList.isEmpty()) {</span>
+<span class="fc" id="L548">            fields.put(new UnknownField(&quot;space-flight-mission&quot;), String.join(&quot;, &quot;, spaceFlightMissionList));</span>
+        }
+<span class="fc" id="L550">        addInvestigators(fields, investigatorList);</span>
+<span class="fc" id="L551">        addNotes(fields, generalNoteList);</span>
+<span class="fc" id="L552">    }</span>
+
+    private void parseInvestigator(XMLStreamReader reader, List&lt;Investigator&gt; investigatorList, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L556">        String lastName = &quot;&quot;;</span>
+<span class="fc" id="L557">        String foreName = &quot;&quot;;</span>
+<span class="fc" id="L558">        List&lt;String&gt; affiliationList = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L561">            reader.next();</span>
+<span class="fc bfc" id="L562" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L563">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L564" title="All 4 branches covered.">                switch (elementName) {</span>
+                    case &quot;LastName&quot; -&gt; {
+<span class="fc" id="L566">                        reader.next();</span>
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L568">                            lastName = reader.getText();</span>
+                        }
+                    }
+                    case &quot;ForeName&quot; -&gt; {
+<span class="fc" id="L572">                        reader.next();</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L574">                            foreName = reader.getText();</span>
+                        }
+                    }
+                    case &quot;Affiliation&quot; -&gt; {
+<span class="fc" id="L578">                        reader.next();</span>
+<span class="pc bpc" id="L579" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L580">                            affiliationList.add(reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L586" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L587">                break;</span>
+            }
+        }
+
+<span class="fc" id="L591">        investigatorList.add(new Investigator(lastName, foreName, affiliationList));</span>
+<span class="fc" id="L592">    }</span>
+
+    private void parsePersonalNameSubject(XMLStreamReader reader, List&lt;PersonalNameSubject&gt; personalNameSubjectList, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L596">        String lastName = &quot;&quot;;</span>
+<span class="fc" id="L597">        String foreName = &quot;&quot;;</span>
+
+<span class="pc bpc" id="L599" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L600">            reader.next();</span>
+<span class="fc bfc" id="L601" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L602">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L603" title="All 3 branches covered.">                switch (elementName) {</span>
+                    case &quot;LastName&quot; -&gt; {
+<span class="fc" id="L605">                        reader.next();</span>
+<span class="pc bpc" id="L606" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L607">                            lastName = reader.getText();</span>
+                        }
+                    }
+                    case &quot;ForeName&quot; -&gt; {
+<span class="fc" id="L611">                        reader.next();</span>
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L613">                            foreName = reader.getText();</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L619" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L620">                break;</span>
+            }
+        }
+
+<span class="fc" id="L624">        personalNameSubjectList.add(new PersonalNameSubject(lastName, foreName));</span>
+<span class="fc" id="L625">    }</span>
+
+    private void parseMeshHeading(XMLStreamReader reader, List&lt;MeshHeading&gt; meshHeadingList, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L629">        String descriptorName = &quot;&quot;;</span>
+<span class="fc" id="L630">        List&lt;String&gt; qualifierNames = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L632" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L633">            reader.next();</span>
+<span class="fc bfc" id="L634" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L635">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L636" title="1 of 3 branches missed.">                switch (elementName) {</span>
+                    case &quot;DescriptorName&quot; -&gt; {
+<span class="fc" id="L638">                        reader.next();</span>
+<span class="pc bpc" id="L639" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L640">                            descriptorName = reader.getText();</span>
+                        }
+                    }
+                    case &quot;QualifierName&quot; -&gt; {
+<span class="fc" id="L644">                        reader.next();</span>
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L646">                            qualifierNames.add(reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L652" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L653">                break;</span>
+            }
+        }
+
+<span class="fc" id="L657">        meshHeadingList.add(new MeshHeading(descriptorName, qualifierNames));</span>
+<span class="fc" id="L658">    }</span>
+
+    private void parseGeneSymbolList(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L662">        List&lt;String&gt; geneSymbols = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L665">            reader.next();</span>
+<span class="fc bfc" id="L666" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L667">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L668" title="1 of 2 branches missed.">                if (&quot;GeneSymbol&quot;.equals(elementName)) {</span>
+<span class="fc" id="L669">                    reader.next();</span>
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">                    if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L671">                        geneSymbols.add(reader.getText());</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L676" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L677">                break;</span>
+            }
+        }
+
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">        if (!geneSymbols.isEmpty()) {</span>
+<span class="fc" id="L682">            fields.put(new UnknownField(&quot;gene-symbols&quot;), String.join(&quot;, &quot;, geneSymbols));</span>
+        }
+<span class="fc" id="L684">    }</span>
+
+    private void parseChemicalList(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L688">        List&lt;String&gt; chemicalNames = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L691">            reader.next();</span>
+<span class="fc bfc" id="L692" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L693">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L694" title="All 2 branches covered.">                if (&quot;NameOfSubstance&quot;.equals(elementName)) {</span>
+<span class="fc" id="L695">                    reader.next();</span>
+<span class="pc bpc" id="L696" title="1 of 2 branches missed.">                    if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L697">                        chemicalNames.add(reader.getText());</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L702" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L703">                break;</span>
+            }
+        }
+
+<span class="fc" id="L707">        fields.put(new UnknownField(&quot;chemicals&quot;), String.join(&quot;, &quot;, chemicalNames));</span>
+<span class="fc" id="L708">    }</span>
+
+    private void parseMedlineJournalInfo(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement)
+            throws XMLStreamException {
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L713">            reader.next();</span>
+<span class="fc bfc" id="L714" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L715">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L716" title="All 5 branches covered.">                switch (elementName) {</span>
+                    case &quot;Country&quot; -&gt; {
+<span class="fc" id="L718">                        reader.next();</span>
+<span class="pc bpc" id="L719" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L720">                            putIfValueNotNull(fields, new UnknownField(&quot;country&quot;), reader.getText());</span>
+                        }
+                    }
+                    case &quot;MedlineTA&quot; -&gt; {
+<span class="fc" id="L724">                        reader.next();</span>
+<span class="pc bpc" id="L725" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L726">                            putIfValueNotNull(fields, new UnknownField(&quot;journal-abbreviation&quot;), reader.getText());</span>
+                        }
+                    }
+                    case &quot;NlmUniqueID&quot; -&gt; {
+<span class="fc" id="L730">                        reader.next();</span>
+<span class="pc bpc" id="L731" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L732">                            putIfValueNotNull(fields, new UnknownField(&quot;nlm-id&quot;), reader.getText());</span>
+                        }
+                    }
+                    case &quot;ISSNLinking&quot; -&gt; {
+<span class="fc" id="L736">                        reader.next();</span>
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L738">                            putIfValueNotNull(fields, new UnknownField(&quot;issn-linking&quot;), reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L744" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L745">                break;</span>
+            }
+        }
+<span class="fc" id="L748">    }</span>
+
+    private void parseArticleInformation(XMLStreamReader reader, Map&lt;Field, String&gt; fields) throws XMLStreamException {
+<span class="fc" id="L751">        List&lt;String&gt; titleList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L752">        String pubmodel = reader.getAttributeValue(null, &quot;PubModel&quot;);</span>
+<span class="fc" id="L753">        fields.put(new UnknownField(&quot;pubmodel&quot;), pubmodel);</span>
+
+<span class="pc bpc" id="L755" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L756">            reader.next();</span>
+<span class="fc bfc" id="L757" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L758">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L759" title="All 7 branches covered.">                switch (elementName) {</span>
+                    case &quot;Journal&quot; -&gt; {
+<span class="fc" id="L761">                        parseJournal(reader, fields);</span>
+<span class="fc" id="L762">                    }</span>
+                    case &quot;ArticleTitle&quot; -&gt; {
+<span class="fc" id="L764">                        handleTextElement(reader, titleList, elementName);</span>
+<span class="fc" id="L765">                    }</span>
+                    case &quot;Pagination&quot; -&gt; {
+<span class="fc" id="L767">                        addPagination(reader, fields, elementName);</span>
+<span class="fc" id="L768">                    }</span>
+                    case &quot;ELocationID&quot; -&gt; {
+<span class="fc" id="L770">                        String eidType = reader.getAttributeValue(null, &quot;EIdType&quot;);</span>
+<span class="fc" id="L771">                        String validYN = reader.getAttributeValue(null, &quot;ValidYN&quot;);</span>
+<span class="fc" id="L772">                        reader.next();</span>
+<span class="pc bpc" id="L773" title="1 of 4 branches missed.">                        if (isCharacterXMLEvent(reader) &amp;&amp; &quot;Y&quot;.equals(validYN)) {</span>
+<span class="fc" id="L774">                            handleElocationId(fields, reader, eidType);</span>
+                        }
+<span class="fc" id="L776">                    }</span>
+                    case &quot;Abstract&quot; -&gt; {
+<span class="fc" id="L778">                        addAbstract(reader, fields, elementName);</span>
+<span class="fc" id="L779">                    }</span>
+                    case &quot;AuthorList&quot; -&gt; {
+<span class="fc" id="L781">                        handleAuthorList(reader, fields, elementName);</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L786" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; &quot;Article&quot;.equals(reader.getName().getLocalPart())) {</span>
+<span class="fc" id="L787">                break;</span>
+            }
+        }
+
+<span class="pc bpc" id="L791" title="1 of 2 branches missed.">        if (!titleList.isEmpty()) {</span>
+<span class="fc" id="L792">            fields.put(StandardField.TITLE, StringUtil.stripBrackets(String.join(&quot; &quot;, titleList)));</span>
+        }
+<span class="fc" id="L794">    }</span>
+
+    private void parseJournal(XMLStreamReader reader, Map&lt;Field, String&gt; fields) throws XMLStreamException {
+<span class="pc bpc" id="L797" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L798">            reader.next();</span>
+<span class="fc bfc" id="L799" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L800">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L801" title="All 6 branches covered.">                switch (elementName) {</span>
+                    case &quot;Title&quot; -&gt; {
+<span class="fc" id="L803">                        reader.next();</span>
+<span class="pc bpc" id="L804" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L805">                            putIfValueNotNull(fields, StandardField.JOURNAL, reader.getText());</span>
+                        }
+                    }
+                    case &quot;ISSN&quot; -&gt; {
+<span class="fc" id="L809">                        reader.next();</span>
+<span class="pc bpc" id="L810" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L811">                            putIfValueNotNull(fields, StandardField.ISSN, reader.getText());</span>
+                        }
+                    }
+                    case &quot;Volume&quot; -&gt; {
+<span class="fc" id="L815">                        reader.next();</span>
+<span class="pc bpc" id="L816" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L817">                            putIfValueNotNull(fields, StandardField.VOLUME, reader.getText());</span>
+                        }
+                    }
+                    case &quot;Issue&quot; -&gt; {
+<span class="fc" id="L821">                        reader.next();</span>
+<span class="pc bpc" id="L822" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L823">                            putIfValueNotNull(fields, StandardField.ISSUE, reader.getText());</span>
+                        }
+                    }
+                    case &quot;PubDate&quot; -&gt; {
+<span class="fc" id="L827">                        addPubDate(reader, fields, elementName);</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L832" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; &quot;Journal&quot;.equals(reader.getName().getLocalPart())) {</span>
+<span class="fc" id="L833">                break;</span>
+            }
+        }
+<span class="fc" id="L836">    }</span>
+
+    private void parseDate(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L840">        Optional&lt;String&gt; year = Optional.empty();</span>
+<span class="fc" id="L841">        Optional&lt;String&gt; month = Optional.empty();</span>
+<span class="fc" id="L842">        Optional&lt;String&gt; day = Optional.empty();</span>
+
+        // mapping from date XML element to field name
+<span class="fc" id="L845">        Map&lt;String, String&gt; dateFieldMap = Map.of(</span>
+                &quot;DateCreated&quot;, &quot;created&quot;,
+                &quot;DateCompleted&quot;, &quot;completed&quot;,
+                &quot;DateRevised&quot;, &quot;revised&quot;,
+                &quot;ContributionDate&quot;, &quot;contribution&quot;,
+                &quot;PubDate&quot;, &quot;&quot;
+        );
+
+<span class="pc bpc" id="L853" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L854">            reader.next();</span>
+<span class="fc bfc" id="L855" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L856">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L857" title="1 of 4 branches missed.">                switch (elementName) {</span>
+                    case &quot;Year&quot; -&gt; {
+<span class="fc" id="L859">                        reader.next();</span>
+<span class="pc bpc" id="L860" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L861">                            year = Optional.of(reader.getText());</span>
+                        }
+                    }
+                    case &quot;Month&quot; -&gt; {
+<span class="fc" id="L865">                        reader.next();</span>
+<span class="pc bpc" id="L866" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L867">                            month = Optional.of(reader.getText());</span>
+                        }
+                    }
+                    case &quot;Day&quot; -&gt; {
+<span class="fc" id="L871">                        reader.next();</span>
+<span class="pc bpc" id="L872" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L873">                            day = Optional.of(reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L879" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L880">                break;</span>
+            }
+        }
+
+<span class="fc" id="L884">        Optional&lt;Date&gt; date = Date.parse(year, month, day);</span>
+<span class="fc" id="L885">        date.ifPresent(dateValue -&gt;</span>
+<span class="fc" id="L886">                fields.put(new UnknownField(dateFieldMap.get(startElement)), dateValue.getNormalized()));</span>
+<span class="fc" id="L887">    }</span>
+
+    private void addArticleIdList(Map&lt;Field, String&gt; fields, List&lt;ArticleId&gt; articleIdList) {
+<span class="fc bfc" id="L890" title="All 2 branches covered.">        for (ArticleId id : articleIdList) {</span>
+<span class="pc bpc" id="L891" title="1 of 2 branches missed.">            if (!id.idType().isBlank()) {</span>
+<span class="fc bfc" id="L892" title="All 2 branches covered.">                if (&quot;pubmed&quot;.equals(id.idType())) {</span>
+<span class="pc" id="L893">                    fields.computeIfAbsent(StandardField.PMID, k -&gt; id.content());</span>
+                } else {
+<span class="fc" id="L895">                    fields.computeIfAbsent(FieldFactory.parseField(StandardEntryType.Article, id.idType()), k -&gt; id.content());</span>
+                }
+            }
+<span class="fc" id="L898">        }</span>
+<span class="fc" id="L899">    }</span>
+
+    private void addNotes(Map&lt;Field, String&gt; fields, List&lt;String&gt; generalNoteList) {
+<span class="fc" id="L902">        List&lt;String&gt; notes = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L904" title="All 2 branches covered.">        for (String note : generalNoteList) {</span>
+<span class="pc bpc" id="L905" title="1 of 2 branches missed.">            if (!note.isBlank()) {</span>
+<span class="fc" id="L906">                notes.add(note);</span>
+            }
+<span class="fc" id="L908">        }</span>
+
+<span class="fc bfc" id="L910" title="All 2 branches covered.">        if (!notes.isEmpty()) {</span>
+<span class="fc" id="L911">            fields.put(StandardField.NOTE, String.join(&quot;, &quot;, notes));</span>
+        }
+<span class="fc" id="L913">    }</span>
+
+    private void addInvestigators(Map&lt;Field, String&gt; fields, List&lt;Investigator&gt; investigatorList) {
+<span class="fc" id="L916">        List&lt;String&gt; investigatorNames = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L917">        List&lt;String&gt; affiliationInfos = new ArrayList&lt;&gt;();</span>
+
+        // add the investigators like the authors
+<span class="fc bfc" id="L920" title="All 2 branches covered.">        if (!investigatorList.isEmpty()) {</span>
+<span class="fc bfc" id="L921" title="All 2 branches covered.">            for (Investigator investigator : investigatorList) {</span>
+<span class="fc" id="L922">                StringBuilder result = new StringBuilder(investigator.lastName());</span>
+<span class="pc bpc" id="L923" title="1 of 2 branches missed.">                if (!investigator.foreName().isBlank()) {</span>
+<span class="fc" id="L924">                    result.append(&quot;, &quot;).append(investigator.foreName());</span>
+                }
+<span class="fc" id="L926">                investigatorNames.add(result.toString());</span>
+
+                // now add the affiliation info
+<span class="pc bpc" id="L929" title="1 of 2 branches missed.">                if (!investigator.affiliationList().isEmpty()) {</span>
+<span class="fc" id="L930">                    affiliationInfos.addAll(investigator.affiliationList());</span>
+                }
+<span class="fc" id="L932">            }</span>
+
+<span class="pc bpc" id="L934" title="1 of 2 branches missed.">            if (!affiliationInfos.isEmpty()) {</span>
+<span class="fc" id="L935">                fields.put(new UnknownField(&quot;affiliation&quot;), String.join(&quot;, &quot;, affiliationInfos));</span>
+            }
+
+<span class="fc" id="L938">            fields.put(new UnknownField(&quot;investigator&quot;), String.join(&quot; and &quot;, investigatorNames));</span>
+        }
+<span class="fc" id="L940">    }</span>
+
+    private void addKeywords(Map&lt;Field, String&gt; fields, List&lt;String&gt; keywordList) {
+        // Check whether MeshHeadingList exists or not
+<span class="fc bfc" id="L944" title="All 2 branches covered.">        if (fields.get(StandardField.KEYWORDS) == null) {</span>
+<span class="fc" id="L945">            fields.put(StandardField.KEYWORDS, String.join(KEYWORD_SEPARATOR, keywordList));</span>
+        } else {
+<span class="fc bfc" id="L947" title="All 2 branches covered.">            if (!keywordList.isEmpty()) {</span>
+                // if it exists, combine the MeshHeading with the keywords
+<span class="fc" id="L949">                String result = String.join(&quot;; &quot;, keywordList);</span>
+<span class="fc" id="L950">                result = fields.get(StandardField.KEYWORDS) + KEYWORD_SEPARATOR + result;</span>
+<span class="fc" id="L951">                fields.put(StandardField.KEYWORDS, result);</span>
+            }
+        }
+<span class="fc" id="L954">    }</span>
+
+    private void addOtherId(Map&lt;Field, String&gt; fields, List&lt;OtherId&gt; otherIdList) {
+<span class="fc bfc" id="L957" title="All 2 branches covered.">        for (OtherId id : otherIdList) {</span>
+<span class="pc bpc" id="L958" title="2 of 4 branches missed.">            if (!id.source().isBlank() &amp;&amp; !id.content().isBlank()) {</span>
+<span class="fc" id="L959">                fields.put(FieldFactory.parseField(StandardEntryType.Article, id.source()), id.content());</span>
+            }
+<span class="fc" id="L961">        }</span>
+<span class="fc" id="L962">    }</span>
+
+    private void addPersonalNames(Map&lt;Field, String&gt; fields, List&lt;PersonalNameSubject&gt; personalNameSubjectList) {
+<span class="fc bfc" id="L965" title="All 2 branches covered.">        if (fields.get(StandardField.AUTHOR) == null) {</span>
+            // if no authors appear, then add the personal names as authors
+<span class="fc" id="L967">            List&lt;String&gt; personalNames = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L969" title="1 of 2 branches missed.">            if (!personalNameSubjectList.isEmpty()) {</span>
+<span class="fc bfc" id="L970" title="All 2 branches covered.">                for (PersonalNameSubject personalNameSubject : personalNameSubjectList) {</span>
+<span class="fc" id="L971">                    StringBuilder result = new StringBuilder(personalNameSubject.lastName());</span>
+<span class="pc bpc" id="L972" title="1 of 2 branches missed.">                    if (!personalNameSubject.foreName().isBlank()) {</span>
+<span class="fc" id="L973">                        result.append(&quot;, &quot;).append(personalNameSubject.foreName());</span>
+                    }
+<span class="fc" id="L975">                    personalNames.add(result.toString());</span>
+<span class="fc" id="L976">                }</span>
+
+<span class="fc" id="L978">                fields.put(StandardField.AUTHOR, String.join(&quot; and &quot;, personalNames));</span>
+            }
+        }
+<span class="fc" id="L981">    }</span>
+
+    private void addMeshHeading(Map&lt;Field, String&gt; fields, List&lt;MeshHeading&gt; meshHeadingList) {
+<span class="fc" id="L984">        List&lt;String&gt; keywords = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L986" title="All 2 branches covered.">        if (!meshHeadingList.isEmpty()) {</span>
+<span class="fc bfc" id="L987" title="All 2 branches covered.">            for (MeshHeading meshHeading : meshHeadingList) {</span>
+<span class="fc" id="L988">                StringBuilder result = new StringBuilder(meshHeading.descriptorName());</span>
+<span class="pc bpc" id="L989" title="1 of 2 branches missed.">                if (meshHeading.qualifierNames() != null) {</span>
+<span class="fc bfc" id="L990" title="All 2 branches covered.">                    for (String qualifierName : meshHeading.qualifierNames()) {</span>
+<span class="fc" id="L991">                        result.append(&quot;, &quot;).append(qualifierName);</span>
+<span class="fc" id="L992">                    }</span>
+                }
+<span class="fc" id="L994">                keywords.add(result.toString());</span>
+<span class="fc" id="L995">            }</span>
+
+<span class="fc" id="L997">            fields.put(StandardField.KEYWORDS, String.join(KEYWORD_SEPARATOR, keywords));</span>
+        }
+<span class="fc" id="L999">    }</span>
+
+    private void addPubDate(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement) throws XMLStreamException {
+<span class="pc bpc" id="L1002" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L1003">            reader.next();</span>
+<span class="fc bfc" id="L1004" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L1005">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L1006" title="All 5 branches covered.">                switch (elementName) {</span>
+                    case &quot;MedlineDate&quot; -&gt; {
+<span class="fc" id="L1008">                        reader.next();</span>
+<span class="pc bpc" id="L1009" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1010">                            fields.put(StandardField.YEAR, extractYear(reader.getText()));</span>
+                        }
+                    }
+                    case &quot;Year&quot; -&gt; {
+<span class="fc" id="L1014">                        reader.next();</span>
+<span class="pc bpc" id="L1015" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1016">                            fields.put(StandardField.YEAR, reader.getText());</span>
+                        }
+                    }
+                    case &quot;Month&quot; -&gt; {
+<span class="fc" id="L1020">                        reader.next();</span>
+<span class="pc bpc" id="L1021" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1022">                            Optional&lt;Month&gt; month = Month.parse(reader.getText());</span>
+<span class="fc" id="L1023">                            month.ifPresent(monthValue -&gt; fields.put(StandardField.MONTH, monthValue.getJabRefFormat()));</span>
+<span class="fc" id="L1024">                        }</span>
+                    }
+                    case &quot;Season&quot; -&gt; {
+<span class="fc" id="L1027">                        reader.next();</span>
+<span class="pc bpc" id="L1028" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1029">                            fields.put(new UnknownField(&quot;season&quot;), reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L1035" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L1036">                break;</span>
+            }
+        }
+<span class="fc" id="L1039">    }</span>
+
+    private void addAbstract(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L1043">        List&lt;String&gt; abstractTextList = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L1045" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L1046">            reader.next();</span>
+<span class="fc bfc" id="L1047" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L1048">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L1049" title="1 of 3 branches missed.">                switch (elementName) {</span>
+                    case &quot;CopyrightInformation&quot; -&gt; {
+<span class="fc" id="L1051">                        reader.next();</span>
+<span class="pc bpc" id="L1052" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1053">                            putIfValueNotNull(fields, new UnknownField(&quot;copyright&quot;), reader.getText());</span>
+                        }
+                    }
+                    case &quot;AbstractText&quot; -&gt; {
+<span class="fc" id="L1057">                        handleTextElement(reader, abstractTextList, elementName);</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L1062" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L1063">                break;</span>
+            }
+        }
+
+<span class="pc bpc" id="L1067" title="1 of 2 branches missed.">        if (!abstractTextList.isEmpty()) {</span>
+<span class="fc" id="L1068">            fields.put(StandardField.ABSTRACT, String.join(&quot; &quot;, abstractTextList));</span>
+        }
+<span class="fc" id="L1070">    }</span>
+
+    /**
+     * Handles text entities that can have inner tags such as {@literal &lt;}i{@literal &gt;}, {@literal &lt;}b{@literal &gt;} etc.
+     * We ignore the tags and return only the characters present in the enclosing parent element.
+     *
+     */
+    private void handleTextElement(XMLStreamReader reader, List&lt;String&gt; textList, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L1079">        StringBuilder result = new StringBuilder();</span>
+
+<span class="pc bpc" id="L1081" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L1082">            reader.next();</span>
+<span class="fc bfc" id="L1083" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L1084">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L1085" title="All 3 branches covered.">                switch (elementName) {</span>
+                    case &quot;math&quot; -&gt; {
+<span class="fc" id="L1087">                        result.append(MathMLParser.parse(reader));</span>
+<span class="fc" id="L1088">                    }</span>
+                    case &quot;sup&quot;, &quot;sub&quot; -&gt; {
+<span class="fc" id="L1090">                        reader.next();</span>
+<span class="pc bpc" id="L1091" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1092">                            result.append(&quot;(&quot;).append(reader.getText()).append(&quot;)&quot;);</span>
+                        }
+                    }
+                }
+<span class="fc bfc" id="L1096" title="All 2 branches covered.">            } else if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1097">                result.append(reader.getText().trim()).append(&quot; &quot;);</span>
+            }
+
+<span class="fc bfc" id="L1100" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L1101">                break;</span>
+            }
+        }
+
+<span class="fc" id="L1105">        textList.add(result.toString().trim());</span>
+<span class="fc" id="L1106">    }</span>
+
+    private void addPagination(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement)
+            throws XMLStreamException {
+<span class="fc" id="L1110">        String startPage = &quot;&quot;;</span>
+<span class="fc" id="L1111">        String endPage = &quot;&quot;;</span>
+
+<span class="pc bpc" id="L1113" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L1114">            reader.next();</span>
+<span class="fc bfc" id="L1115" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L1116">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L1117" title="1 of 4 branches missed.">                switch (elementName) {</span>
+                    case &quot;MedlinePgn&quot; -&gt; {
+<span class="fc" id="L1119">                        reader.next();</span>
+<span class="pc bpc" id="L1120" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1121">                            putIfValueNotNull(fields, StandardField.PAGES, fixPageRange(reader.getText()));</span>
+                        }
+                    }
+                    case &quot;StartPage&quot; -&gt; {
+<span class="fc" id="L1125">                        reader.next();</span>
+<span class="pc bpc" id="L1126" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+                            // it could happen, that the article has only a start page
+<span class="fc" id="L1128">                            startPage = reader.getText() + endPage;</span>
+<span class="fc" id="L1129">                            putIfValueNotNull(fields, StandardField.PAGES, startPage);</span>
+                        }
+                    }
+                    case &quot;EndPage&quot; -&gt; {
+<span class="fc" id="L1133">                        reader.next();</span>
+<span class="pc bpc" id="L1134" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1135">                            endPage = reader.getText();</span>
+                            // but it should not happen, that a endpage appears without startpage
+<span class="fc" id="L1137">                            fields.put(StandardField.PAGES, fixPageRange(startPage + &quot;-&quot; + endPage));</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L1143" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L1144">                break;</span>
+            }
+        }
+<span class="fc" id="L1147">    }</span>
+
+    private String extractYear(String medlineDate) {
+        // The year of the medlineDate should be the first 4 digits
+<span class="fc" id="L1151">        return medlineDate.substring(0, 4);</span>
+    }
+
+    private void handleAuthorList(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement) throws XMLStreamException {
+<span class="fc" id="L1155">        List&lt;String&gt; authorNames = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L1157" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L1158">            reader.next();</span>
+<span class="fc bfc" id="L1159" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L1160">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L1161" title="1 of 2 branches missed.">                switch (elementName) {</span>
+                    case &quot;Author&quot; -&gt; {
+<span class="fc" id="L1163">                        parseAuthor(reader, authorNames);</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L1168" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L1169">                break;</span>
+            }
+        }
+
+<span class="fc" id="L1173">        fields.put(StandardField.AUTHOR, String.join(&quot; and &quot;, authorNames));</span>
+<span class="fc" id="L1174">    }</span>
+
+    private void parseAuthor(XMLStreamReader reader, List&lt;String&gt; authorNames) throws XMLStreamException {
+<span class="fc" id="L1177">        StringBuilder authorName = new StringBuilder();</span>
+<span class="fc" id="L1178">        List&lt;String&gt; collectiveNames = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L1180" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L1181">            reader.next();</span>
+<span class="fc bfc" id="L1182" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L1183">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L1184" title="All 4 branches covered.">                switch (elementName) {</span>
+                    case &quot;CollectiveName&quot; -&gt; {
+<span class="fc" id="L1186">                        reader.next();</span>
+<span class="pc bpc" id="L1187" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1188">                            collectiveNames.add(reader.getText());</span>
+                        }
+                    }
+                    case &quot;LastName&quot; -&gt; {
+<span class="fc" id="L1192">                        reader.next();</span>
+<span class="pc bpc" id="L1193" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1194">                            authorName = new StringBuilder(reader.getText());</span>
+                        }
+                    }
+                    case &quot;ForeName&quot; -&gt; {
+<span class="fc" id="L1198">                        reader.next();</span>
+<span class="pc bpc" id="L1199" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L1200">                            authorName.append(&quot;, &quot;).append(reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L1206" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; &quot;Author&quot;.equals(reader.getName().getLocalPart())) {</span>
+<span class="fc" id="L1207">                break;</span>
+            }
+        }
+
+<span class="fc bfc" id="L1211" title="All 2 branches covered.">        if (!collectiveNames.isEmpty()) {</span>
+<span class="fc" id="L1212">            authorNames.addAll(collectiveNames);</span>
+        }
+<span class="fc bfc" id="L1214" title="All 2 branches covered.">        if (!authorName.toString().isBlank()) {</span>
+<span class="fc" id="L1215">            authorNames.add(authorName.toString());</span>
+        }
+<span class="fc" id="L1217">    }</span>
+
+    private void putIfValueNotNull(Map&lt;Field, String&gt; fields, Field field, String value) {
+<span class="pc bpc" id="L1220" title="1 of 2 branches missed.">        if (value != null) {</span>
+<span class="fc" id="L1221">            fields.put(field, value);</span>
+        }
+<span class="fc" id="L1223">    }</span>
+
+    /**
+     * Convert medline page ranges from short form to full form. Medline reports page ranges in a shorthand format.
+     * The last page is reported using only the digits which differ from the first page. i.e. 12345-51 refers to the actual range 12345-12351
+     */
+    private String fixPageRange(String pageRange) {
+<span class="fc" id="L1230">        int minusPos = pageRange.indexOf('-');</span>
+<span class="fc bfc" id="L1231" title="All 2 branches covered.">        if (minusPos &lt; 0) {</span>
+<span class="fc" id="L1232">            return pageRange;</span>
+        }
+<span class="fc" id="L1234">        String startPage = pageRange.substring(0, minusPos).trim();</span>
+<span class="fc" id="L1235">        String endPage = pageRange.substring(minusPos + 1).trim();</span>
+<span class="fc" id="L1236">        int lengthOfEndPage = endPage.length();</span>
+<span class="fc" id="L1237">        int lengthOfStartPage = startPage.length();</span>
+<span class="fc bfc" id="L1238" title="All 2 branches covered.">        if (lengthOfEndPage &lt; lengthOfStartPage) {</span>
+<span class="fc" id="L1239">            endPage = startPage.substring(0, lengthOfStartPage - lengthOfEndPage) + endPage;</span>
+        }
+<span class="fc" id="L1241">        return startPage + &quot;--&quot; + endPage;</span>
+    }
+
+    private boolean isCharacterXMLEvent(XMLStreamReader reader) {
+<span class="fc bfc" id="L1245" title="All 2 branches covered.">        return reader.getEventType() == XMLEvent.CHARACTERS;</span>
+    }
+
+    private boolean isStartXMLEvent(XMLStreamReader reader) {
+<span class="fc bfc" id="L1249" title="All 2 branches covered.">        return reader.getEventType() == XMLEvent.START_ELEMENT;</span>
+    }
+
+    private boolean isEndXMLEvent(XMLStreamReader reader) {
+<span class="fc bfc" id="L1253" title="All 2 branches covered.">        return reader.getEventType() == XMLEvent.END_ELEMENT;</span>
+    }
+
+    @Override
+    public List&lt;BibEntry&gt; parseEntries(InputStream inputStream) throws ParseException {
+        try {
+<span class="fc" id="L1259">            return importDatabase(</span>
+<span class="fc" id="L1260">                    new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))).getDatabase().getEntries();</span>
+<span class="nc" id="L1261">        } catch (IOException e) {</span>
+<span class="nc" id="L1262">            LOGGER.error(e.getLocalizedMessage(), e);</span>
+        }
+<span class="nc" id="L1264">        return Collections.emptyList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

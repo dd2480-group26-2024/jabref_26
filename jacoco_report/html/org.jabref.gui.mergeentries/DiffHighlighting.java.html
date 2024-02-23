@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiffHighlighting.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries</a> &gt; <span class="el_source">DiffHighlighting.java</span></div><h1>DiffHighlighting.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import javafx.scene.text.Text;
+
+import com.github.difflib.DiffUtils;
+import com.github.difflib.patch.AbstractDelta;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class DiffHighlighting {
+
+<span class="nc" id="L17">    private static final Logger LOGGER = LoggerFactory.getLogger(DiffHighlighting.class);</span>
+
+    private DiffHighlighting() {
+    }
+
+    public static List&lt;Text&gt; generateDiffHighlighting(String baseString, String modifiedString, String separator) {
+<span class="nc" id="L23">        List&lt;String&gt; stringList = Arrays.asList(baseString.split(separator));</span>
+<span class="nc" id="L24">        List&lt;Text&gt; result = stringList.stream().map(text -&gt; forUnchanged(text + separator)).collect(Collectors.toList());</span>
+<span class="nc" id="L25">        List&lt;AbstractDelta&lt;String&gt;&gt; deltaList = DiffUtils.diff(stringList, Arrays.asList(modifiedString.split(separator))).getDeltas();</span>
+<span class="nc" id="L26">        Collections.reverse(deltaList);</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        for (AbstractDelta&lt;String&gt; delta : deltaList) {</span>
+<span class="nc" id="L28">            int startPos = delta.getSource().getPosition();</span>
+<span class="nc" id="L29">            List&lt;String&gt; lines = delta.getSource().getLines();</span>
+<span class="nc" id="L30">            int offset = 0;</span>
+<span class="nc bnc" id="L31" title="All 4 branches missed.">            switch (delta.getType()) {</span>
+                case CHANGE:
+<span class="nc bnc" id="L33" title="All 2 branches missed.">                    for (String line : lines) {</span>
+<span class="nc" id="L34">                        result.set(startPos + offset, forRemoved(line + separator));</span>
+<span class="nc" id="L35">                        offset++;</span>
+<span class="nc" id="L36">                    }</span>
+<span class="nc" id="L37">                    result.set(startPos + offset - 1, forRemoved(stringList.get((startPos + offset) - 1) + separator));</span>
+<span class="nc" id="L38">                    result.add(startPos + offset, forAdded(String.join(separator, delta.getTarget().getLines())));</span>
+<span class="nc" id="L39">                    break;</span>
+                case DELETE:
+<span class="nc bnc" id="L41" title="All 2 branches missed.">                    for (String line : lines) {</span>
+<span class="nc" id="L42">                        result.set(startPos + offset, forRemoved(line + separator));</span>
+<span class="nc" id="L43">                        offset++;</span>
+<span class="nc" id="L44">                    }</span>
+<span class="nc" id="L45">                    break;</span>
+                case INSERT:
+<span class="nc" id="L47">                    result.add(delta.getSource().getPosition(), forAdded(String.join(separator, delta.getTarget().getLines())));</span>
+<span class="nc" id="L48">                    break;</span>
+                default:
+                    break;
+            }
+<span class="nc" id="L52">        }</span>
+<span class="nc" id="L53">        return result;</span>
+    }
+
+    public static Text forChanged(String text) {
+<span class="nc" id="L57">        Text node = new Text(text);</span>
+<span class="nc" id="L58">        node.getStyleClass().add(&quot;text-changed&quot;);</span>
+<span class="nc" id="L59">        return node;</span>
+    }
+
+    public static Text forUnchanged(String text) {
+<span class="nc" id="L63">        Text node = new Text(text);</span>
+<span class="nc" id="L64">        node.getStyleClass().add(&quot;text-unchanged&quot;);</span>
+<span class="nc" id="L65">        return node;</span>
+    }
+
+    public static Text forAdded(String text) {
+<span class="nc" id="L69">        Text node = new Text(text);</span>
+<span class="nc" id="L70">        node.getStyleClass().add(&quot;text-added&quot;);</span>
+<span class="nc" id="L71">        return node;</span>
+    }
+
+    public static Text forRemoved(String text) {
+<span class="nc" id="L75">        Text node = new Text(text);</span>
+<span class="nc" id="L76">        node.getStyleClass().add(&quot;text-removed&quot;);</span>
+<span class="nc" id="L77">        return node;</span>
+    }
+
+    public static List&lt;Text&gt; generateSymmetricHighlighting(String baseString, String modifiedString, String separator) {
+<span class="nc" id="L81">        List&lt;String&gt; stringList = Arrays.asList(baseString.split(separator));</span>
+<span class="nc" id="L82">        List&lt;Text&gt; result = stringList.stream().map(text -&gt; DiffHighlighting.forUnchanged(text + separator)).collect(Collectors.toList());</span>
+<span class="nc" id="L83">        List&lt;AbstractDelta&lt;String&gt;&gt; deltaList = DiffUtils.diff(stringList, Arrays.asList(modifiedString.split(separator))).getDeltas();</span>
+<span class="nc" id="L84">        Collections.reverse(deltaList);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        for (AbstractDelta&lt;String&gt; delta : deltaList) {</span>
+<span class="nc" id="L86">            int startPos = delta.getSource().getPosition();</span>
+<span class="nc" id="L87">            List&lt;String&gt; lines = delta.getSource().getLines();</span>
+<span class="nc" id="L88">            int offset = 0;</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">            switch (delta.getType()) {</span>
+                case CHANGE:
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                    for (String line : lines) {</span>
+<span class="nc" id="L92">                        result.set(startPos + offset, forChanged(line + separator));</span>
+<span class="nc" id="L93">                        offset++;</span>
+<span class="nc" id="L94">                    }</span>
+<span class="nc" id="L95">                    break;</span>
+                case DELETE:
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                    for (String line : lines) {</span>
+<span class="nc" id="L98">                        result.set(startPos + offset, forAdded(line + separator));</span>
+<span class="nc" id="L99">                        offset++;</span>
+<span class="nc" id="L100">                    }</span>
+<span class="nc" id="L101">                    break;</span>
+                case INSERT:
+<span class="nc" id="L103">                    break;</span>
+                default:
+                    break;
+            }
+<span class="nc" id="L107">        }</span>
+
+<span class="nc" id="L109">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

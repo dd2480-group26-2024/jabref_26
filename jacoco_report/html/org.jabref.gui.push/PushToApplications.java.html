@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PushToApplications.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.push</a> &gt; <span class="el_source">PushToApplications.java</span></div><h1>PushToApplications.java</h1><pre class="source lang-java linenums">package org.jabref.gui.push;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.gui.DialogService;
+import org.jabref.preferences.PreferencesService;
+
+public class PushToApplications {
+
+    public static final String EMACS = &quot;Emacs&quot;;
+    public static final String LYX = &quot;LyX/Kile&quot;;
+    public static final String TEXMAKER = &quot;Texmaker&quot;;
+    public static final String TEXSTUDIO = &quot;TeXstudio&quot;;
+    public static final String VIM = &quot;Vim&quot;;
+    public static final String WIN_EDT = &quot;WinEdt&quot;;
+    public static final String SUBLIME_TEXT = &quot;Sublime Text&quot;;
+    public static final String TEXSHOP = &quot;TeXShop&quot;;
+
+<span class="nc" id="L21">    private static final List&lt;PushToApplication&gt; APPLICATIONS = new ArrayList&lt;&gt;();</span>
+
+    private PushToApplications() {
+    }
+
+    public static List&lt;PushToApplication&gt; getAllApplications(DialogService dialogService, PreferencesService preferencesService) {
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        if (!APPLICATIONS.isEmpty()) {</span>
+<span class="nc" id="L28">            return APPLICATIONS;</span>
+        }
+
+<span class="nc" id="L31">        APPLICATIONS.addAll(List.of(</span>
+                new PushToEmacs(dialogService, preferencesService),
+                new PushToLyx(dialogService, preferencesService),
+                new PushToSublimeText(dialogService, preferencesService),
+                new PushToTexmaker(dialogService, preferencesService),
+                new PushToTeXstudio(dialogService, preferencesService),
+                new PushToVim(dialogService, preferencesService),
+                new PushToWinEdt(dialogService, preferencesService),
+                new PushToTexShop(dialogService, preferencesService)));
+
+<span class="nc" id="L41">        return APPLICATIONS;</span>
+    }
+
+    public static Optional&lt;PushToApplication&gt; getApplicationByName(String applicationName, DialogService dialogService, PreferencesService preferencesService) {
+<span class="nc" id="L45">        return getAllApplications(dialogService, preferencesService).stream()</span>
+<span class="nc" id="L46">                                                                    .filter(application -&gt; application.getDisplayName().equals(applicationName))</span>
+<span class="nc" id="L47">                                                                    .findAny();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

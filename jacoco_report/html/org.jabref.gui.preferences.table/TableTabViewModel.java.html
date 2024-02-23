@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TableTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.table</a> &gt; <span class="el_source">TableTabViewModel.java</span></div><h1>TableTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.table;
+
+import java.util.EnumSet;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.scene.control.SelectionModel;
+import javafx.util.StringConverter;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.externalfiletype.ExternalFileType;
+import org.jabref.gui.maintable.ColumnPreferences;
+import org.jabref.gui.maintable.MainTableColumnModel;
+import org.jabref.gui.maintable.MainTablePreferences;
+import org.jabref.gui.maintable.NameDisplayPreferences;
+import org.jabref.gui.maintable.NameDisplayPreferences.AbbreviationStyle;
+import org.jabref.gui.maintable.NameDisplayPreferences.DisplayStyle;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.gui.specialfields.SpecialFieldsPreferences;
+import org.jabref.gui.util.NoSelectionModel;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.InternalField;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.preferences.PreferencesService;
+
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+
+public class TableTabViewModel implements PreferenceTabViewModel {
+
+<span class="nc" id="L40">    static StringConverter&lt;MainTableColumnModel&gt; columnNameStringConverter = new StringConverter&lt;&gt;() {</span>
+        @Override
+        public String toString(MainTableColumnModel object) {
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            if (object != null) {</span>
+<span class="nc" id="L44">                return object.getName();</span>
+            } else {
+<span class="nc" id="L46">                return &quot;&quot;;</span>
+            }
+        }
+
+        @Override
+        public MainTableColumnModel fromString(String string) {
+<span class="nc" id="L52">            return MainTableColumnModel.parse(string);</span>
+        }
+    };
+
+<span class="nc" id="L56">    private final ListProperty&lt;MainTableColumnModel&gt; columnsListProperty = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L57">    private final ObjectProperty&lt;SelectionModel&lt;MainTableColumnModel&gt;&gt; selectedColumnModelProperty = new SimpleObjectProperty&lt;&gt;(new NoSelectionModel&lt;&gt;());</span>
+<span class="nc" id="L58">    private final ListProperty&lt;MainTableColumnModel&gt; availableColumnsProperty = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L59">    private final ObjectProperty&lt;MainTableColumnModel&gt; addColumnProperty = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="nc" id="L60">    private final BooleanProperty specialFieldsEnabledProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L61">    private final BooleanProperty extraFileColumnsEnabledProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L62">    private final BooleanProperty autoResizeColumnsProperty = new SimpleBooleanProperty();</span>
+
+<span class="nc" id="L64">    private final BooleanProperty namesNatbibProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L65">    private final BooleanProperty nameAsIsProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L66">    private final BooleanProperty nameFirstLastProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L67">    private final BooleanProperty nameLastFirstProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L68">    private final BooleanProperty abbreviationDisabledProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L69">    private final BooleanProperty abbreviationEnabledProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L70">    private final BooleanProperty abbreviationLastNameOnlyProperty = new SimpleBooleanProperty();</span>
+
+    private final Validator columnsNotEmptyValidator;
+
+    private final DialogService dialogService;
+    private final PreferencesService preferences;
+
+    private ColumnPreferences initialColumnPreferences;
+    private final SpecialFieldsPreferences specialFieldsPreferences;
+    private final NameDisplayPreferences nameDisplayPreferences;
+    private final MainTablePreferences mainTablePreferences;
+
+<span class="nc" id="L82">    public TableTabViewModel(DialogService dialogService, PreferencesService preferences) {</span>
+<span class="nc" id="L83">        this.dialogService = dialogService;</span>
+<span class="nc" id="L84">        this.preferences = preferences;</span>
+<span class="nc" id="L85">        this.specialFieldsPreferences = preferences.getSpecialFieldsPreferences();</span>
+<span class="nc" id="L86">        this.nameDisplayPreferences = preferences.getNameDisplayPreferences();</span>
+<span class="nc" id="L87">        this.mainTablePreferences = preferences.getMainTablePreferences();</span>
+
+<span class="nc" id="L89">        specialFieldsEnabledProperty.addListener((observable, oldValue, newValue) -&gt; {</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (newValue) {</span>
+<span class="nc" id="L91">                insertSpecialFieldColumns();</span>
+            } else {
+<span class="nc" id="L93">                removeSpecialFieldColumns();</span>
+            }
+<span class="nc" id="L95">        });</span>
+
+<span class="nc" id="L97">        extraFileColumnsEnabledProperty.addListener((observable, oldValue, newValue) -&gt; {</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (newValue) {</span>
+<span class="nc" id="L99">                insertExtraFileColumns();</span>
+            } else {
+<span class="nc" id="L101">                removeExtraFileColumns();</span>
+            }
+<span class="nc" id="L103">        });</span>
+
+<span class="nc" id="L105">        columnsNotEmptyValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                columnsListProperty,
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                list -&gt; !list.isEmpty(),</span>
+<span class="nc" id="L108">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L109">                        Localization.lang(&quot;Entry table columns&quot;),</span>
+<span class="nc" id="L110">                        Localization.lang(&quot;Columns&quot;),</span>
+<span class="nc" id="L111">                        Localization.lang(&quot;List must not be empty.&quot;))));</span>
+<span class="nc" id="L112">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L116">        initialColumnPreferences = mainTablePreferences.getColumnPreferences();</span>
+
+<span class="nc" id="L118">        specialFieldsEnabledProperty.setValue(specialFieldsPreferences.isSpecialFieldsEnabled());</span>
+<span class="nc" id="L119">        extraFileColumnsEnabledProperty.setValue(mainTablePreferences.getExtraFileColumnsEnabled());</span>
+<span class="nc" id="L120">        autoResizeColumnsProperty.setValue(mainTablePreferences.getResizeColumnsToFit());</span>
+
+<span class="nc" id="L122">        fillColumnList();</span>
+
+<span class="nc" id="L124">        availableColumnsProperty.clear();</span>
+<span class="nc" id="L125">        availableColumnsProperty.addAll(</span>
+                new MainTableColumnModel(MainTableColumnModel.Type.INDEX),
+                new MainTableColumnModel(MainTableColumnModel.Type.LINKED_IDENTIFIER),
+                new MainTableColumnModel(MainTableColumnModel.Type.GROUPS),
+                new MainTableColumnModel(MainTableColumnModel.Type.GROUP_ICONS),
+                new MainTableColumnModel(MainTableColumnModel.Type.FILES),
+<span class="nc" id="L131">                new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, StandardField.TIMESTAMP.getName()),</span>
+<span class="nc" id="L132">                new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, StandardField.OWNER.getName()),</span>
+<span class="nc" id="L133">                new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, StandardField.GROUPS.getName()),</span>
+<span class="nc" id="L134">                new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, InternalField.KEY_FIELD.getName()),</span>
+<span class="nc" id="L135">                new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, InternalField.TYPE_HEADER.getName())</span>
+        );
+
+<span class="nc" id="L138">        EnumSet.allOf(StandardField.class).stream()</span>
+<span class="nc" id="L139">               .map(Field::getName)</span>
+<span class="nc" id="L140">               .map(name -&gt; new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, name))</span>
+<span class="nc" id="L141">               .forEach(item -&gt; availableColumnsProperty.getValue().add(item));</span>
+
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (specialFieldsEnabledProperty.getValue()) {</span>
+<span class="nc" id="L144">            insertSpecialFieldColumns();</span>
+        }
+
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (mainTablePreferences.getExtraFileColumnsEnabled()) {</span>
+<span class="nc" id="L148">            insertExtraFileColumns();</span>
+        }
+
+<span class="nc bnc" id="L151" title="All 5 branches missed.">        switch (nameDisplayPreferences.getDisplayStyle()) {</span>
+<span class="nc" id="L152">            case NATBIB -&gt; namesNatbibProperty.setValue(true);</span>
+<span class="nc" id="L153">            case AS_IS -&gt; nameAsIsProperty.setValue(true);</span>
+<span class="nc" id="L154">            case FIRSTNAME_LASTNAME -&gt; nameFirstLastProperty.setValue(true);</span>
+<span class="nc" id="L155">            case LASTNAME_FIRSTNAME -&gt; nameLastFirstProperty.setValue(true);</span>
+        }
+
+<span class="nc bnc" id="L158" title="All 4 branches missed.">        switch (nameDisplayPreferences.getAbbreviationStyle()) {</span>
+<span class="nc" id="L159">            case FULL -&gt; abbreviationEnabledProperty.setValue(true);</span>
+<span class="nc" id="L160">            case LASTNAME_ONLY -&gt; abbreviationLastNameOnlyProperty.setValue(true);</span>
+<span class="nc" id="L161">            case NONE -&gt; abbreviationDisabledProperty.setValue(true);</span>
+        }
+<span class="nc" id="L163">    }</span>
+
+    public void fillColumnList() {
+<span class="nc" id="L166">        columnsListProperty.getValue().clear();</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (initialColumnPreferences != null) {</span>
+<span class="nc" id="L168">            initialColumnPreferences.getColumns().forEach(columnsListProperty.getValue()::add);</span>
+        }
+<span class="nc" id="L170">    }</span>
+
+    private void insertSpecialFieldColumns() {
+<span class="nc" id="L173">        EnumSet.allOf(SpecialField.class).stream()</span>
+<span class="nc" id="L174">               .map(Field::getName)</span>
+<span class="nc" id="L175">               .map(name -&gt; new MainTableColumnModel(MainTableColumnModel.Type.SPECIALFIELD, name))</span>
+<span class="nc" id="L176">               .forEach(item -&gt; availableColumnsProperty.getValue().addFirst(item));</span>
+<span class="nc" id="L177">    }</span>
+
+    private void removeSpecialFieldColumns() {
+<span class="nc" id="L180">        columnsListProperty.getValue().removeIf(column -&gt; column.getType().equals(MainTableColumnModel.Type.SPECIALFIELD));</span>
+<span class="nc" id="L181">        availableColumnsProperty.getValue().removeIf(column -&gt; column.getType().equals(MainTableColumnModel.Type.SPECIALFIELD));</span>
+<span class="nc" id="L182">    }</span>
+
+    private void insertExtraFileColumns() {
+<span class="nc" id="L185">        preferences.getFilePreferences().getExternalFileTypes().stream()</span>
+<span class="nc" id="L186">                   .map(ExternalFileType::getName)</span>
+<span class="nc" id="L187">                   .map(name -&gt; new MainTableColumnModel(MainTableColumnModel.Type.EXTRAFILE, name))</span>
+<span class="nc" id="L188">                   .forEach(item -&gt; availableColumnsProperty.getValue().add(item));</span>
+<span class="nc" id="L189">    }</span>
+
+    private void removeExtraFileColumns() {
+<span class="nc" id="L192">        columnsListProperty.getValue().removeIf(column -&gt; column.getType().equals(MainTableColumnModel.Type.EXTRAFILE));</span>
+<span class="nc" id="L193">        availableColumnsProperty.getValue().removeIf(column -&gt; column.getType().equals(MainTableColumnModel.Type.EXTRAFILE));</span>
+<span class="nc" id="L194">    }</span>
+
+    public void insertColumnInList() {
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (addColumnProperty.getValue() == null) {</span>
+<span class="nc" id="L198">            return;</span>
+        }
+
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (columnsListProperty.getValue().stream().filter(item -&gt; item.equals(addColumnProperty.getValue())).findAny().isEmpty()) {</span>
+<span class="nc" id="L202">            columnsListProperty.add(addColumnProperty.getValue());</span>
+<span class="nc" id="L203">            addColumnProperty.setValue(null);</span>
+        }
+<span class="nc" id="L205">    }</span>
+
+    public void removeColumn(MainTableColumnModel column) {
+<span class="nc" id="L208">        columnsListProperty.remove(column);</span>
+<span class="nc" id="L209">    }</span>
+
+    public void moveColumnUp() {
+<span class="nc" id="L212">        MainTableColumnModel selectedColumn = selectedColumnModelProperty.getValue().getSelectedItem();</span>
+<span class="nc" id="L213">        int row = columnsListProperty.getValue().indexOf(selectedColumn);</span>
+<span class="nc bnc" id="L214" title="All 4 branches missed.">        if ((selectedColumn == null) || (row &lt; 1)) {</span>
+<span class="nc" id="L215">            return;</span>
+        }
+
+<span class="nc" id="L218">        columnsListProperty.remove(selectedColumn);</span>
+<span class="nc" id="L219">        columnsListProperty.add(row - 1, selectedColumn);</span>
+<span class="nc" id="L220">        selectedColumnModelProperty.getValue().clearAndSelect(row - 1);</span>
+<span class="nc" id="L221">    }</span>
+
+    public void moveColumnDown() {
+<span class="nc" id="L224">        MainTableColumnModel selectedColumn = selectedColumnModelProperty.getValue().getSelectedItem();</span>
+<span class="nc" id="L225">        int row = columnsListProperty.getValue().indexOf(selectedColumn);</span>
+<span class="nc bnc" id="L226" title="All 4 branches missed.">        if ((selectedColumn == null) || (row &gt; (columnsListProperty.getValue().size() - 2))) {</span>
+<span class="nc" id="L227">            return;</span>
+        }
+
+<span class="nc" id="L230">        columnsListProperty.remove(selectedColumn);</span>
+<span class="nc" id="L231">        columnsListProperty.add(row + 1, selectedColumn);</span>
+<span class="nc" id="L232">        selectedColumnModelProperty.getValue().clearAndSelect(row + 1);</span>
+<span class="nc" id="L233">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L237">        mainTablePreferences.getColumnPreferences().setColumns(columnsListProperty.getValue());</span>
+<span class="nc" id="L238">        mainTablePreferences.setResizeColumnsToFit(autoResizeColumnsProperty.getValue());</span>
+<span class="nc" id="L239">        mainTablePreferences.setExtraFileColumnsEnabled(extraFileColumnsEnabledProperty.getValue());</span>
+
+<span class="nc" id="L241">        specialFieldsPreferences.setSpecialFieldsEnabled(specialFieldsEnabledProperty.getValue());</span>
+
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        if (nameLastFirstProperty.getValue()) {</span>
+<span class="nc" id="L244">            nameDisplayPreferences.setDisplayStyle(DisplayStyle.LASTNAME_FIRSTNAME);</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        } else if (namesNatbibProperty.getValue()) {</span>
+<span class="nc" id="L246">            nameDisplayPreferences.setDisplayStyle(DisplayStyle.NATBIB);</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        } else if (nameAsIsProperty.getValue()) {</span>
+<span class="nc" id="L248">            nameDisplayPreferences.setDisplayStyle(DisplayStyle.AS_IS);</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        } else if (nameFirstLastProperty.getValue()) {</span>
+<span class="nc" id="L250">            nameDisplayPreferences.setDisplayStyle(DisplayStyle.FIRSTNAME_LASTNAME);</span>
+        }
+
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (abbreviationDisabledProperty.getValue()) {</span>
+<span class="nc" id="L254">            nameDisplayPreferences.setAbbreviationStyle(AbbreviationStyle.NONE);</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        } else if (abbreviationEnabledProperty.getValue()) {</span>
+<span class="nc" id="L256">            nameDisplayPreferences.setAbbreviationStyle(AbbreviationStyle.FULL);</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        } else if (abbreviationLastNameOnlyProperty.getValue()) {</span>
+<span class="nc" id="L258">            nameDisplayPreferences.setAbbreviationStyle(AbbreviationStyle.LASTNAME_ONLY);</span>
+        }
+<span class="nc" id="L260">    }</span>
+
+    ValidationStatus columnsListValidationStatus() {
+<span class="nc" id="L263">        return columnsNotEmptyValidator.getValidationStatus();</span>
+    }
+
+    @Override
+    public boolean validateSettings() {
+<span class="nc" id="L268">        ValidationStatus validationStatus = columnsListValidationStatus();</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        if (!validationStatus.isValid()) {</span>
+<span class="nc" id="L270">            validationStatus.getHighestMessage().ifPresent(message -&gt;</span>
+<span class="nc" id="L271">                    dialogService.showErrorDialogAndWait(message.getMessage()));</span>
+<span class="nc" id="L272">            return false;</span>
+        }
+<span class="nc" id="L274">        return true;</span>
+    }
+
+    public ListProperty&lt;MainTableColumnModel&gt; columnsListProperty() {
+<span class="nc" id="L278">        return this.columnsListProperty;</span>
+    }
+
+    public ObjectProperty&lt;SelectionModel&lt;MainTableColumnModel&gt;&gt; selectedColumnModelProperty() {
+<span class="nc" id="L282">        return selectedColumnModelProperty;</span>
+    }
+
+    public ListProperty&lt;MainTableColumnModel&gt; availableColumnsProperty() {
+<span class="nc" id="L286">        return this.availableColumnsProperty;</span>
+    }
+
+    public ObjectProperty&lt;MainTableColumnModel&gt; addColumnProperty() {
+<span class="nc" id="L290">        return this.addColumnProperty;</span>
+    }
+
+    public BooleanProperty specialFieldsEnabledProperty() {
+<span class="nc" id="L294">        return this.specialFieldsEnabledProperty;</span>
+    }
+
+    public BooleanProperty extraFileColumnsEnabledProperty() {
+<span class="nc" id="L298">        return this.extraFileColumnsEnabledProperty;</span>
+    }
+
+    public BooleanProperty autoResizeColumnsProperty() {
+<span class="nc" id="L302">        return autoResizeColumnsProperty;</span>
+    }
+
+    public BooleanProperty namesNatbibProperty() {
+<span class="nc" id="L306">        return namesNatbibProperty;</span>
+    }
+
+    public BooleanProperty nameAsIsProperty() {
+<span class="nc" id="L310">        return nameAsIsProperty;</span>
+    }
+
+    public BooleanProperty nameFirstLastProperty() {
+<span class="nc" id="L314">        return nameFirstLastProperty;</span>
+    }
+
+    public BooleanProperty nameLastFirstProperty() {
+<span class="nc" id="L318">        return nameLastFirstProperty;</span>
+    }
+
+    public BooleanProperty abbreviationDisabledProperty() {
+<span class="nc" id="L322">        return abbreviationDisabledProperty;</span>
+    }
+
+    public BooleanProperty abbreviationEnabledProperty() {
+<span class="nc" id="L326">        return abbreviationEnabledProperty;</span>
+    }
+
+    public BooleanProperty abbreviationLastNameOnlyProperty() {
+<span class="nc" id="L330">        return abbreviationLastNameOnlyProperty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

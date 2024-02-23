@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EditionChecker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.integrity</a> &gt; <span class="el_source">EditionChecker.java</span></div><h1>EditionChecker.java</h1><pre class="source lang-java linenums">package org.jabref.logic.integrity;
+
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.strings.StringUtil;
+
+public class EditionChecker implements ValueChecker {
+
+<span class="fc" id="L14">    private static final Predicate&lt;String&gt; FIRST_LETTER_CAPITALIZED = Pattern.compile(&quot;^[A-Z]&quot;).asPredicate();</span>
+<span class="fc" id="L15">    private static final Predicate&lt;String&gt; ONLY_NUMERALS_OR_LITERALS = Pattern.compile(&quot;^([0-9]+|[^0-9].+)$&quot;)</span>
+<span class="fc" id="L16">                                                                              .asPredicate();</span>
+<span class="fc" id="L17">    private static final Predicate&lt;String&gt; ONLY_NUMERALS = Pattern.compile(&quot;[0-9]+&quot;).asPredicate();</span>
+    private static final String FIRST_EDITION = &quot;1&quot;;
+
+    private final BibDatabaseContext bibDatabaseContextEdition;
+
+    // Allow integers in 'edition' field in BibTeX mode --&gt; see GeneralTab.fml
+    private final boolean allowIntegerEdition;
+
+<span class="fc" id="L25">    public EditionChecker(BibDatabaseContext bibDatabaseContext, boolean allowIntegerEdition) {</span>
+<span class="fc" id="L26">        this.bibDatabaseContextEdition = Objects.requireNonNull(bibDatabaseContext);</span>
+<span class="fc" id="L27">        this.allowIntegerEdition = allowIntegerEdition;</span>
+<span class="fc" id="L28">    }</span>
+
+    /**
+     * Checks, if field contains only an integer or a literal (biblatex mode) Checks, if the first letter is capitalized
+     * (BibTeX mode) biblatex package documentation: The edition of a printed publication. This must be an integer, not
+     * an ordinal. It is also possible to give the edition as a literal string, for example &quot;Third, revised and expanded
+     * edition&quot;. Official BibTeX specification: The edition of a book-for example, &quot;Second&quot;. This should be an ordinal,
+     * and should have the first letter capitalized.
+     */
+    @Override
+    public Optional&lt;String&gt; checkValue(String value) {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (StringUtil.isBlank(value)) {</span>
+<span class="fc" id="L40">            return Optional.empty();</span>
+        }
+
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (value.equals(FIRST_EDITION)) {</span>
+<span class="fc" id="L44">            return Optional.of(Localization.lang(&quot;edition of book reported as just 1&quot;));</span>
+        }
+
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (bibDatabaseContextEdition.isBiblatexMode()) {</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (!ONLY_NUMERALS_OR_LITERALS.test(value.trim())) {</span>
+<span class="fc" id="L49">                return Optional.of(Localization.lang(&quot;should contain an integer or a literal&quot;));</span>
+            }
+        } else {
+<span class="fc bfc" id="L52" title="All 4 branches covered.">            if (ONLY_NUMERALS.test(value) &amp;&amp; (!allowIntegerEdition)) {</span>
+<span class="fc" id="L53">                return Optional.of(Localization.lang(&quot;no integer as values for edition allowed&quot;));</span>
+            }
+        }
+<span class="fc bfc" id="L56" title="All 4 branches covered.">        if (!isFirstCharDigit(value) &amp;&amp; !FIRST_LETTER_CAPITALIZED.test(value.trim())) {</span>
+<span class="fc" id="L57">            return Optional.of(Localization.lang(&quot;should have the first letter capitalized&quot;));</span>
+        }
+<span class="fc" id="L59">        return Optional.empty();</span>
+    }
+
+    boolean isFirstCharDigit(String input) {
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        return !StringUtil.isNullOrEmpty(input) &amp;&amp; Character.isDigit(input.charAt(0));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

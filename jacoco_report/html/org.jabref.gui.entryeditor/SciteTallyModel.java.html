@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SciteTallyModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor</a> &gt; <span class="el_source">SciteTallyModel.java</span></div><h1>SciteTallyModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor;
+
+import kong.unirest.json.JSONObject;
+
+/**
+ * Simple model object to hold the scite.ai tallies data for a given DOI
+ */
+<span class="fc" id="L8">public record SciteTallyModel(</span>
+        String doi,
+        int total,
+        int supporting,
+        int contradicting,
+        int mentioning,
+        int unclassified,
+        int citingPublications) {
+
+    /**
+     * Creates a {@link SciteTallyModel} from a JSONObject (dictionary/map)
+     *
+     * @param jsonObject The JSON object holding the tally values
+     * @return a new {@link SciteTallyModel}
+     */
+    public static SciteTallyModel fromJSONObject(JSONObject jsonObject) {
+<span class="fc" id="L24">        return new SciteTallyModel(</span>
+<span class="fc" id="L25">                jsonObject.getString(&quot;doi&quot;),</span>
+<span class="fc" id="L26">                jsonObject.getInt(&quot;total&quot;),</span>
+<span class="fc" id="L27">                jsonObject.getInt(&quot;supporting&quot;),</span>
+<span class="fc" id="L28">                jsonObject.getInt(&quot;contradicting&quot;),</span>
+<span class="fc" id="L29">                jsonObject.getInt(&quot;mentioning&quot;),</span>
+<span class="fc" id="L30">                jsonObject.getInt(&quot;unclassified&quot;),</span>
+<span class="fc" id="L31">                jsonObject.getInt(&quot;citingPublications&quot;)</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

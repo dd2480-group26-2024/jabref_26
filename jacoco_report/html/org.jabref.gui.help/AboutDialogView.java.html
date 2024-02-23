@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AboutDialogView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.help</a> &gt; <span class="el_source">AboutDialogView.java</span></div><h1>AboutDialogView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.help;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.TextArea;
+
+import org.jabref.gui.ClipBoardManager;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.ControlHelper;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.BuildInfo;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import jakarta.inject.Inject;
+
+public class AboutDialogView extends BaseDialog&lt;Void&gt; {
+
+    @FXML private ButtonType copyVersionButton;
+    @FXML private TextArea textAreaVersions;
+
+    @Inject private DialogService dialogService;
+    @Inject private PreferencesService preferencesService;
+    @Inject private ClipBoardManager clipBoardManager;
+    @Inject private BuildInfo buildInfo;
+
+    private AboutDialogViewModel viewModel;
+
+<span class="nc" id="L30">    public AboutDialogView() {</span>
+<span class="nc" id="L31">        this.setTitle(Localization.lang(&quot;About JabRef&quot;));</span>
+
+<span class="nc" id="L33">        ViewLoader.view(this)</span>
+<span class="nc" id="L34">                  .load()</span>
+<span class="nc" id="L35">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L37">        ControlHelper.setAction(copyVersionButton, getDialogPane(), event -&gt; copyVersionToClipboard());</span>
+<span class="nc" id="L38">    }</span>
+
+    public AboutDialogViewModel getViewModel() {
+<span class="nc" id="L41">        return viewModel;</span>
+    }
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L46">        viewModel = new AboutDialogViewModel(dialogService, preferencesService, clipBoardManager, buildInfo);</span>
+
+<span class="nc" id="L48">        textAreaVersions.setText(viewModel.getVersionInfo());</span>
+<span class="nc" id="L49">        this.setResizable(false);</span>
+<span class="nc" id="L50">    }</span>
+
+    @FXML
+    private void copyVersionToClipboard() {
+<span class="nc" id="L54">        viewModel.copyVersionToClipboard();</span>
+<span class="nc" id="L55">    }</span>
+
+    @FXML
+    private void openJabrefWebsite() {
+<span class="nc" id="L59">        viewModel.openJabrefWebsite();</span>
+<span class="nc" id="L60">    }</span>
+
+    @FXML
+    private void openExternalLibrariesWebsite() {
+<span class="nc" id="L64">        viewModel.openExternalLibrariesWebsite();</span>
+<span class="nc" id="L65">    }</span>
+
+    @FXML
+    private void openGithub() {
+<span class="nc" id="L69">        viewModel.openGithub();</span>
+<span class="nc" id="L70">    }</span>
+
+    @FXML
+    public void openChangeLog() {
+<span class="nc" id="L74">        viewModel.openChangeLog();</span>
+<span class="nc" id="L75">    }</span>
+
+    @FXML
+    public void openLicense() {
+<span class="nc" id="L79">        viewModel.openLicense();</span>
+<span class="nc" id="L80">    }</span>
+
+    @FXML
+    public void openContributors() {
+<span class="nc" id="L84">        viewModel.openContributors();</span>
+<span class="nc" id="L85">    }</span>
+
+    @FXML
+    public void openDonation() {
+<span class="nc" id="L89">        viewModel.openDonation();</span>
+<span class="nc" id="L90">    }</span>
+
+    public void openPrivacyPolicy() {
+<span class="nc" id="L93">        viewModel.openPrivacyPolicy();</span>
+<span class="nc" id="L94">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BackupUIManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.dialogs</a> &gt; <span class="el_source">BackupUIManager.java</span></div><h1>BackupUIManager.java</h1><pre class="source lang-java linenums">package org.jabref.gui.dialogs;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+
+import javafx.scene.control.ButtonType;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.autosaveandbackup.BackupManager;
+import org.jabref.gui.backup.BackupResolverDialog;
+import org.jabref.gui.collab.DatabaseChange;
+import org.jabref.gui.collab.DatabaseChangeList;
+import org.jabref.gui.collab.DatabaseChangeResolverFactory;
+import org.jabref.gui.collab.DatabaseChangesResolverDialog;
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.OpenDatabase;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.util.BackupFileType;
+import org.jabref.logic.util.io.BackupFileUtil;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.util.DummyFileUpdateMonitor;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.ExternalApplicationsPreferences;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Stores all user dialogs related to {@link BackupManager}.
+ */
+public class BackupUIManager {
+<span class="nc" id="L36">    private static final Logger LOGGER = LoggerFactory.getLogger(BackupUIManager.class);</span>
+
+    private BackupUIManager() {
+    }
+
+    public static Optional&lt;ParserResult&gt; showRestoreBackupDialog(DialogService dialogService,
+                                                                 Path originalPath,
+                                                                 PreferencesService preferencesService,
+                                                                 FileUpdateMonitor fileUpdateMonitor) {
+<span class="nc" id="L45">        var actionOpt = showBackupResolverDialog(</span>
+                dialogService,
+<span class="nc" id="L47">                preferencesService.getExternalApplicationsPreferences(),</span>
+                originalPath,
+<span class="nc" id="L49">                preferencesService.getFilePreferences().getBackupDirectory());</span>
+<span class="nc" id="L50">        return actionOpt.flatMap(action -&gt; {</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            if (action == BackupResolverDialog.RESTORE_FROM_BACKUP) {</span>
+<span class="nc" id="L52">                BackupManager.restoreBackup(originalPath, preferencesService.getFilePreferences().getBackupDirectory());</span>
+<span class="nc" id="L53">                return Optional.empty();</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">            } else if (action == BackupResolverDialog.REVIEW_BACKUP) {</span>
+<span class="nc" id="L55">                return showReviewBackupDialog(dialogService, originalPath, preferencesService, fileUpdateMonitor);</span>
+            }
+<span class="nc" id="L57">            return Optional.empty();</span>
+        });
+    }
+
+    private static Optional&lt;ButtonType&gt; showBackupResolverDialog(DialogService dialogService,
+                                                                 ExternalApplicationsPreferences externalApplicationsPreferences,
+                                                                 Path originalPath,
+                                                                 Path backupDir) {
+<span class="nc" id="L65">        return DefaultTaskExecutor.runInJavaFXThread(</span>
+<span class="nc" id="L66">                () -&gt; dialogService.showCustomDialogAndWait(new BackupResolverDialog(originalPath, backupDir, externalApplicationsPreferences)));</span>
+    }
+
+    private static Optional&lt;ParserResult&gt; showReviewBackupDialog(
+            DialogService dialogService,
+            Path originalPath,
+            PreferencesService preferencesService,
+            FileUpdateMonitor fileUpdateMonitor) {
+        try {
+<span class="nc" id="L75">            ImportFormatPreferences importFormatPreferences = preferencesService.getImportFormatPreferences();</span>
+
+            // The database of the originalParserResult will be modified
+<span class="nc" id="L78">            ParserResult originalParserResult = OpenDatabase.loadDatabase(originalPath, importFormatPreferences, fileUpdateMonitor);</span>
+            // This will be modified by using the `DatabaseChangesResolverDialog`.
+<span class="nc" id="L80">            BibDatabaseContext originalDatabase = originalParserResult.getDatabaseContext();</span>
+
+<span class="nc" id="L82">            Path backupPath = BackupFileUtil.getPathOfLatestExistingBackupFile(originalPath, BackupFileType.BACKUP, preferencesService.getFilePreferences().getBackupDirectory()).orElseThrow();</span>
+<span class="nc" id="L83">            BibDatabaseContext backupDatabase = OpenDatabase.loadDatabase(backupPath, importFormatPreferences, new DummyFileUpdateMonitor()).getDatabaseContext();</span>
+
+<span class="nc" id="L85">            DatabaseChangeResolverFactory changeResolverFactory = new DatabaseChangeResolverFactory(dialogService, originalDatabase, preferencesService);</span>
+
+<span class="nc" id="L87">            return DefaultTaskExecutor.runInJavaFXThread(() -&gt; {</span>
+<span class="nc" id="L88">                List&lt;DatabaseChange&gt; changes = DatabaseChangeList.compareAndGetChanges(originalDatabase, backupDatabase, changeResolverFactory);</span>
+<span class="nc" id="L89">                DatabaseChangesResolverDialog reviewBackupDialog = new DatabaseChangesResolverDialog(</span>
+                        changes,
+                        originalDatabase, &quot;Review Backup&quot;
+                );
+<span class="nc" id="L93">                var allChangesResolved = dialogService.showCustomDialogAndWait(reviewBackupDialog);</span>
+<span class="nc bnc" id="L94" title="All 4 branches missed.">                if (allChangesResolved.isEmpty() || !allChangesResolved.get()) {</span>
+                    // In case not all changes are resolved, start from scratch
+<span class="nc" id="L96">                    return showRestoreBackupDialog(dialogService, originalPath, preferencesService, fileUpdateMonitor);</span>
+                }
+
+                // This does NOT return the original ParserResult, but a modified version with all changes accepted or rejected
+<span class="nc" id="L100">                return Optional.of(originalParserResult);</span>
+            });
+<span class="nc" id="L102">        } catch (IOException e) {</span>
+<span class="nc" id="L103">            LOGGER.error(&quot;Error while loading backup or current database&quot;, e);</span>
+<span class="nc" id="L104">            return Optional.empty();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

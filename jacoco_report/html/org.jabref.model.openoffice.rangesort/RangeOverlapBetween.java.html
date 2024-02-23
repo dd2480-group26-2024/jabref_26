@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RangeOverlapBetween.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.rangesort</a> &gt; <span class="el_source">RangeOverlapBetween.java</span></div><h1>RangeOverlapBetween.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.rangesort;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.jabref.model.openoffice.uno.UnoCast;
+import org.jabref.model.openoffice.uno.UnoTextRange;
+import org.jabref.model.openoffice.util.OOTuple3;
+
+import com.sun.star.text.XText;
+import com.sun.star.text.XTextDocument;
+import com.sun.star.text.XTextRange;
+import com.sun.star.text.XTextRangeCompare;
+
+public class RangeOverlapBetween {
+
+    private RangeOverlapBetween() {
+    }
+
+    /**
+     * Check for any overlap between two sets of XTextRange values.
+     * &lt;p&gt;
+     * Assume fewHolders is small (usually a single element, for checking the cursor)
+     * &lt;p&gt;
+     * Returns on first problem found.
+     */
+    public static &lt;V extends RangeHolder&gt;
+    List&lt;RangeOverlap&lt;V&gt;&gt; findFirst(XTextDocument doc,
+                                    List&lt;V&gt; fewHolders,
+                                    List&lt;V&gt; manyHolders,
+                                    boolean includeTouching) {
+
+<span class="nc" id="L33">        List&lt;RangeOverlap&lt;V&gt;&gt; result = new ArrayList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        if (fewHolders.isEmpty()) {</span>
+<span class="nc" id="L36">            return result;</span>
+        }
+
+        /*
+         * Cache all we need to know about fewHolders. We are trying to minimize the number of calls
+         * to LO.
+         */
+<span class="nc" id="L43">        List&lt;OOTuple3&lt;XText, XTextRangeCompare, V&gt;&gt; fewTuples = new ArrayList&lt;&gt;(fewHolders.size());</span>
+
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        for (V aHolder : fewHolders) {</span>
+<span class="nc" id="L46">            XText aText = aHolder.getRange().getText();</span>
+<span class="nc" id="L47">            fewTuples.add(new OOTuple3&lt;&gt;(aText,</span>
+<span class="nc" id="L48">                    UnoCast.cast(XTextRangeCompare.class, aText).get(),</span>
+                    aHolder));
+<span class="nc" id="L50">        }</span>
+
+        /*
+         * We only go through manyHolders once: fewTuples is in the inner loop.
+         */
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        for (V bHolder : manyHolders) {</span>
+<span class="nc" id="L56">            XTextRange bRange = bHolder.getRange();</span>
+<span class="nc" id="L57">            XText bText = bRange.getText();</span>
+<span class="nc" id="L58">            XTextRange bRangeStart = bRange.getStart();</span>
+<span class="nc" id="L59">            XTextRange bRangeEnd = bRange.getEnd();</span>
+
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            for (OOTuple3&lt;XText, XTextRangeCompare, V&gt; tup : fewTuples) {</span>
+<span class="nc" id="L62">                XText aText = tup.a;</span>
+<span class="nc" id="L63">                XTextRangeCompare cmp = tup.b;</span>
+<span class="nc" id="L64">                V aHolder = tup.c;</span>
+<span class="nc" id="L65">                XTextRange aRange = aHolder.getRange();</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                if (aText != bText) {</span>
+<span class="nc" id="L67">                    continue;</span>
+                }
+<span class="nc" id="L69">                int abEndToStart = UnoTextRange.compareStartsUnsafe(cmp, aRange.getEnd(), bRangeStart);</span>
+<span class="nc bnc" id="L70" title="All 6 branches missed.">                if (abEndToStart &lt; 0 || (!includeTouching &amp;&amp; (abEndToStart == 0))) {</span>
+<span class="nc" id="L71">                    continue;</span>
+                }
+<span class="nc" id="L73">                int baEndToStart = UnoTextRange.compareStartsUnsafe(cmp, bRangeEnd, aRange.getStart());</span>
+<span class="nc bnc" id="L74" title="All 6 branches missed.">                if (baEndToStart &lt; 0 || (!includeTouching &amp;&amp; (baEndToStart == 0))) {</span>
+<span class="nc" id="L75">                    continue;</span>
+                }
+
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                boolean equal = UnoTextRange.compareStartsThenEndsUnsafe(cmp, aRange, bRange) == 0;</span>
+<span class="nc bnc" id="L79" title="All 4 branches missed.">                boolean touching = abEndToStart == 0 || baEndToStart == 0;</span>
+
+                // In case of two equal collapsed ranges there is an ambiguity : TOUCH or EQUAL_RANGE ?
+                //
+                // We return EQUAL_RANGE
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                RangeOverlapKind kind = equal ? RangeOverlapKind.EQUAL_RANGE</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                        : (touching ? RangeOverlapKind.TOUCH</span>
+<span class="nc" id="L86">                        : RangeOverlapKind.OVERLAP);</span>
+
+<span class="nc" id="L88">                List&lt;V&gt; valuesForOverlappingRanges = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L89">                valuesForOverlappingRanges.add(aHolder);</span>
+<span class="nc" id="L90">                valuesForOverlappingRanges.add(bHolder);</span>
+
+<span class="nc" id="L92">                result.add(new RangeOverlap&lt;&gt;(kind, valuesForOverlappingRanges));</span>
+<span class="nc" id="L93">                return result;</span>
+            }
+<span class="nc" id="L95">        }</span>
+<span class="nc" id="L96">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

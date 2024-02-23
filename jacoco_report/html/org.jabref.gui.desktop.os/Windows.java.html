@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Windows.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.desktop.os</a> &gt; <span class="el_source">Windows.java</span></div><h1>Windows.java</h1><pre class="source lang-java linenums">package org.jabref.gui.desktop.os;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
+
+import org.jabref.Launcher;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.externalfiletype.ExternalFileType;
+import org.jabref.gui.externalfiletype.ExternalFileTypes;
+import org.jabref.preferences.FilePreferences;
+
+import com.sun.jna.platform.win32.KnownFolders;
+import com.sun.jna.platform.win32.Shell32Util;
+import com.sun.jna.platform.win32.ShlObj;
+import com.sun.jna.platform.win32.Win32Exception;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class contains Windows specific implementations for file directories and file/application open handling methods &lt;br&gt;
+ * We cannot use a static logger instance here in this class as the Logger first needs to be configured in the {@link Launcher#addLogToDisk}
+ * The configuration of tinylog will become immutable as soon as the first log entry is issued.
+ * https://tinylog.org/v2/configuration/
+ **/
+<span class="fc" id="L27">public class Windows extends NativeDesktop {</span>
+
+    private static final String DEFAULT_EXECUTABLE_EXTENSION = &quot;.exe&quot;;
+
+    @Override
+    public void openFile(String filePath, String fileType, FilePreferences filePreferences) throws IOException {
+<span class="nc" id="L33">        Optional&lt;ExternalFileType&gt; type = ExternalFileTypes.getExternalFileTypeByExt(fileType, filePreferences);</span>
+
+<span class="nc bnc" id="L35" title="All 4 branches missed.">        if (type.isPresent() &amp;&amp; !type.get().getOpenWithApplication().isEmpty()) {</span>
+<span class="nc" id="L36">            openFileWithApplication(filePath, type.get().getOpenWithApplication());</span>
+        } else {
+            // quote String so explorer handles URL query strings correctly
+<span class="nc" id="L39">            String quotePath = &quot;\&quot;&quot; + filePath + &quot;\&quot;&quot;;</span>
+<span class="nc" id="L40">            new ProcessBuilder(&quot;explorer.exe&quot;, quotePath).start();</span>
+        }
+<span class="nc" id="L42">    }</span>
+
+    @Override
+    public String detectProgramPath(String programName, String directoryName) {
+<span class="nc" id="L46">        String progFiles = System.getenv(&quot;ProgramFiles(x86)&quot;);</span>
+        String programPath;
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (progFiles != null) {</span>
+<span class="nc" id="L49">            programPath = getProgramPath(programName, directoryName, progFiles);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">            if (programPath != null) {</span>
+<span class="nc" id="L51">                return programPath;</span>
+            }
+        }
+
+<span class="nc" id="L55">        progFiles = System.getenv(&quot;ProgramFiles&quot;);</span>
+<span class="nc" id="L56">        programPath = getProgramPath(programName, directoryName, progFiles);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (programPath != null) {</span>
+<span class="nc" id="L58">            return programPath;</span>
+        }
+
+<span class="nc" id="L61">        return &quot;&quot;;</span>
+    }
+
+    private String getProgramPath(String programName, String directoryName, String progFiles) {
+        Path programPath;
+<span class="nc bnc" id="L66" title="All 4 branches missed.">        if ((directoryName != null) &amp;&amp; !directoryName.isEmpty()) {</span>
+<span class="nc" id="L67">            programPath = Path.of(progFiles, directoryName, programName + DEFAULT_EXECUTABLE_EXTENSION);</span>
+        } else {
+<span class="nc" id="L69">            programPath = Path.of(progFiles, programName + DEFAULT_EXECUTABLE_EXTENSION);</span>
+        }
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (Files.exists(programPath)) {</span>
+<span class="nc" id="L72">            return programPath.toString();</span>
+        }
+<span class="nc" id="L74">        return null;</span>
+    }
+
+    @Override
+    public Path getApplicationDirectory() {
+<span class="nc" id="L79">        String programDir = System.getenv(&quot;ProgramFiles&quot;);</span>
+
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (programDir != null) {</span>
+<span class="nc" id="L82">            return Path.of(programDir);</span>
+        }
+<span class="nc" id="L84">        return getUserDirectory();</span>
+    }
+
+    @Override
+    public Path getDefaultFileChooserDirectory() {
+        try {
+            try {
+<span class="fc" id="L91">                return Path.of(Shell32Util.getKnownFolderPath(KnownFolders.FOLDERID_Documents));</span>
+<span class="nc" id="L92">            } catch (UnsatisfiedLinkError e) {</span>
+                // Windows Vista or earlier
+<span class="nc" id="L94">                return Path.of(Shell32Util.getFolderPath(ShlObj.CSIDL_MYDOCUMENTS));</span>
+            }
+<span class="nc" id="L96">        } catch (Win32Exception e) {</span>
+            // needs to be non-static because of org.jabref.Launcher.addLogToDisk
+<span class="nc" id="L98">            LoggerFactory.getLogger(Windows.class).error(&quot;Error accessing folder&quot;, e);</span>
+<span class="nc" id="L99">            return Path.of(System.getProperty(&quot;user.home&quot;));</span>
+        }
+    }
+
+    @Override
+    public void openFileWithApplication(String filePath, String application) throws IOException {
+<span class="nc" id="L105">        new ProcessBuilder(Path.of(application).toString(), Path.of(filePath).toString()).start();</span>
+<span class="nc" id="L106">    }</span>
+
+    @Override
+    public void openFolderAndSelectFile(Path filePath) throws IOException {
+<span class="nc" id="L110">        new ProcessBuilder(&quot;explorer.exe&quot;, &quot;/select,&quot;, filePath.toString()).start();</span>
+<span class="nc" id="L111">    }</span>
+
+    @Override
+    public void openConsole(String absolutePath, DialogService dialogService) throws IOException {
+<span class="nc" id="L115">        ProcessBuilder process = new ProcessBuilder(&quot;cmd.exe&quot;, &quot;/c&quot;, &quot;start&quot;);</span>
+<span class="nc" id="L116">        process.directory(new File(absolutePath));</span>
+<span class="nc" id="L117">        process.start();</span>
+<span class="nc" id="L118">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

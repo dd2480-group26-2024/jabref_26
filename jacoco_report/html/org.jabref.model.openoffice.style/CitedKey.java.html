@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitedKey.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.style</a> &gt; <span class="el_source">CitedKey.java</span></div><h1>CitedKey.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.style;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.openoffice.ootext.OOText;
+
+/**
+ * Cited keys are collected from the citations in citation groups.
+ * &lt;p&gt;
+ * They contain backreferences to the corresponding citations in {@code where}. This allows the extra information generated using CitedKeys to be distributed back to the in-text citations.
+ */
+public class CitedKey implements
+        ComparableCitedKey,
+        CitationMarkerNormEntry,
+        CitationMarkerNumericBibEntry {
+
+    public final String citationKey;
+    private final List&lt;CitationPath&gt; where;
+
+    private Optional&lt;CitationLookupResult&gt; db;
+    private Optional&lt;Integer&gt; number; // For Numbered citation styles.
+    private Optional&lt;String&gt; uniqueLetter; // For AuthorYear citation styles.
+    private Optional&lt;OOText&gt; normCitMarker;  // For AuthorYear citation styles.
+
+<span class="nc" id="L29">    CitedKey(String citationKey, CitationPath path, Citation citation) {</span>
+<span class="nc" id="L30">        this.citationKey = citationKey;</span>
+<span class="nc" id="L31">        this.where = new ArrayList&lt;&gt;(); // remember order</span>
+<span class="nc" id="L32">        this.where.add(path);</span>
+
+        // synchronized with Citation
+<span class="nc" id="L35">        this.db = citation.getLookupResult();</span>
+<span class="nc" id="L36">        this.number = citation.getNumber();</span>
+<span class="nc" id="L37">        this.uniqueLetter = citation.getUniqueLetter();</span>
+
+        // CitedKey only
+<span class="nc" id="L40">        this.normCitMarker = Optional.empty();</span>
+<span class="nc" id="L41">    }</span>
+
+    /*
+     * Implement ComparableCitedKey
+     */
+    @Override
+    public String getCitationKey() {
+<span class="nc" id="L48">        return citationKey;</span>
+    }
+
+    @Override
+    public Optional&lt;BibEntry&gt; getBibEntry() {
+<span class="nc" id="L53">        return db.map(e -&gt; e.entry);</span>
+    }
+
+    /*
+     * Implement CitationMarkerNormEntry
+     */
+    @Override
+    public Optional&lt;CitationLookupResult&gt; getLookupResult() {
+<span class="nc" id="L61">        return db;</span>
+    }
+
+    /*
+     * Implement CitationMarkerNumericBibEntry
+     */
+    @Override
+    public Optional&lt;Integer&gt; getNumber() {
+<span class="nc" id="L69">        return number;</span>
+    }
+
+    public void setNumber(Optional&lt;Integer&gt; number) {
+<span class="nc" id="L73">        this.number = number;</span>
+<span class="nc" id="L74">    }</span>
+
+    public List&lt;CitationPath&gt; getCitationPaths() {
+<span class="nc" id="L77">        return new ArrayList&lt;&gt;(where);</span>
+    }
+
+    public Optional&lt;String&gt; getUniqueLetter() {
+<span class="nc" id="L81">        return uniqueLetter;</span>
+    }
+
+    public void setUniqueLetter(Optional&lt;String&gt; uniqueLetter) {
+<span class="nc" id="L85">        this.uniqueLetter = uniqueLetter;</span>
+<span class="nc" id="L86">    }</span>
+
+    public Optional&lt;OOText&gt; getNormalizedCitationMarker() {
+<span class="nc" id="L89">        return normCitMarker;</span>
+    }
+
+    public void setNormalizedCitationMarker(Optional&lt;OOText&gt; normCitMarker) {
+<span class="nc" id="L93">        this.normCitMarker = normCitMarker;</span>
+<span class="nc" id="L94">    }</span>
+
+    /**
+     * Appends to end of {@code where}
+     */
+    void addPath(CitationPath path, Citation cit) {
+<span class="nc" id="L100">        this.where.add(path);</span>
+
+        // Check consistency
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (!cit.getLookupResult().equals(this.db)) {</span>
+<span class="nc" id="L104">            throw new IllegalStateException(&quot;CitedKey.addPath: mismatch on cit.db&quot;);</span>
+        }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (!cit.getNumber().equals(this.number)) {</span>
+<span class="nc" id="L107">            throw new IllegalStateException(&quot;CitedKey.addPath: mismatch on cit.number&quot;);</span>
+        }
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (!cit.getUniqueLetter().equals(this.uniqueLetter)) {</span>
+<span class="nc" id="L110">            throw new IllegalStateException(&quot;CitedKey.addPath: mismatch on cit.uniqueLetter&quot;);</span>
+        }
+<span class="nc" id="L112">    }</span>
+
+    /*
+     * Lookup
+     */
+    void lookupInDatabases(List&lt;BibDatabase&gt; databases) {
+<span class="nc" id="L118">        this.db = Citation.lookup(databases, this.citationKey);</span>
+<span class="nc" id="L119">    }</span>
+
+    void distributeLookupResult(CitationGroups citationGroups) {
+<span class="nc" id="L122">        citationGroups.distributeToCitations(where, Citation::setLookupResult, db);</span>
+<span class="nc" id="L123">    }</span>
+
+    /*
+     * Make unique using a letter or by numbering
+     */
+
+    void distributeNumber(CitationGroups citationGroups) {
+<span class="nc" id="L130">        citationGroups.distributeToCitations(where, Citation::setNumber, number);</span>
+<span class="nc" id="L131">    }</span>
+
+    void distributeUniqueLetter(CitationGroups citationGroups) {
+<span class="nc" id="L134">        citationGroups.distributeToCitations(where, Citation::setUniqueLetter, uniqueLetter);</span>
+<span class="nc" id="L135">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

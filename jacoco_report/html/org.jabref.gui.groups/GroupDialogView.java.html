@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GroupDialogView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.groups</a> &gt; <span class="el_source">GroupDialogView.java</span></div><h1>GroupDialogView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.groups;
+
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.ServiceLoader;
+
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ColorPicker;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.Border;
+import javafx.scene.layout.BorderStroke;
+import javafx.scene.layout.BorderStrokeStyle;
+import javafx.scene.layout.CornerRadii;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.Globals;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.help.HelpAction;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.icon.JabrefIconProvider;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.IconValidationDecorator;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.groups.AbstractGroup;
+import org.jabref.model.groups.GroupHierarchyType;
+import org.jabref.model.groups.GroupTreeNode;
+import org.jabref.model.search.rules.SearchRules;
+import org.jabref.model.search.rules.SearchRules.SearchFlags;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+import jakarta.inject.Inject;
+import org.controlsfx.control.GridCell;
+import org.controlsfx.control.GridView;
+import org.controlsfx.control.PopOver;
+import org.controlsfx.control.textfield.CustomTextField;
+import org.jspecify.annotations.Nullable;
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.IkonProvider;
+import org.kordamp.ikonli.javafx.FontIcon;
+
+public class GroupDialogView extends BaseDialog&lt;AbstractGroup&gt; {
+
+<span class="nc" id="L67">    private static boolean useAutoColoring = false;</span>
+
+    // Basic Settings
+    @FXML private TextField nameField;
+    @FXML private TextField descriptionField;
+    @FXML private TextField iconField;
+    @FXML private Button iconPickerButton;
+    @FXML private CheckBox colorUseCheckbox;
+    @FXML private ColorPicker colorField;
+    @FXML private ComboBox&lt;GroupHierarchyType&gt; hierarchicalContextCombo;
+    @FXML private CheckBox autoColorCheckbox;
+
+    // Type
+    @FXML private RadioButton explicitRadioButton;
+    @FXML private RadioButton keywordsRadioButton;
+    @FXML private RadioButton searchRadioButton;
+    @FXML private RadioButton autoRadioButton;
+    @FXML private RadioButton texRadioButton;
+
+    // Option Groups
+    @FXML private TextField keywordGroupSearchTerm;
+    @FXML private TextField keywordGroupSearchField;
+    @FXML private CheckBox keywordGroupCaseSensitive;
+    @FXML private CheckBox keywordGroupRegex;
+
+    @FXML private TextField searchGroupSearchTerm;
+    @FXML private CheckBox searchGroupCaseSensitive;
+    @FXML private CheckBox searchGroupRegex;
+
+    @FXML private RadioButton autoGroupKeywordsOption;
+    @FXML private TextField autoGroupKeywordsField;
+    @FXML private TextField autoGroupKeywordsDeliminator;
+    @FXML private TextField autoGroupKeywordsHierarchicalDeliminator;
+    @FXML private RadioButton autoGroupPersonsOption;
+    @FXML private TextField autoGroupPersonsField;
+
+    @FXML private TextField texGroupFilePath;
+
+<span class="nc" id="L105">    private final EnumMap&lt;GroupHierarchyType, String&gt; hierarchyText = new EnumMap&lt;&gt;(GroupHierarchyType.class);</span>
+<span class="nc" id="L106">    private final EnumMap&lt;GroupHierarchyType, String&gt; hierarchyToolTip = new EnumMap&lt;&gt;(GroupHierarchyType.class);</span>
+
+<span class="nc" id="L108">    private final ControlsFxVisualizer validationVisualizer = new ControlsFxVisualizer();</span>
+
+    private final BibDatabaseContext currentDatabase;
+    private final @Nullable GroupTreeNode parentNode;
+    private final @Nullable AbstractGroup editedGroup;
+
+    private GroupDialogViewModel viewModel;
+
+    @Inject private FileUpdateMonitor fileUpdateMonitor;
+    @Inject private DialogService dialogService;
+    @Inject private PreferencesService preferencesService;
+
+    public GroupDialogView(BibDatabaseContext currentDatabase,
+                           @Nullable GroupTreeNode parentNode,
+                           @Nullable AbstractGroup editedGroup,
+<span class="nc" id="L123">                           GroupDialogHeader groupDialogHeader) {</span>
+<span class="nc" id="L124">        this.currentDatabase = currentDatabase;</span>
+<span class="nc" id="L125">        this.parentNode = parentNode;</span>
+<span class="nc" id="L126">        this.editedGroup = editedGroup;</span>
+
+<span class="nc" id="L128">        ViewLoader.view(this)</span>
+<span class="nc" id="L129">                  .load()</span>
+<span class="nc" id="L130">                  .setAsDialogPane(this);</span>
+
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (editedGroup == null) {</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (groupDialogHeader == GroupDialogHeader.GROUP) {</span>
+<span class="nc" id="L134">                this.setTitle(Localization.lang(&quot;Add group&quot;));</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            } else if (groupDialogHeader == GroupDialogHeader.SUBGROUP) {</span>
+<span class="nc" id="L136">                this.setTitle(Localization.lang(&quot;Add subgroup&quot;));</span>
+            }
+        } else {
+<span class="nc" id="L139">            this.setTitle(Localization.lang(&quot;Edit group&quot;) + &quot; &quot; + editedGroup.getName());</span>
+        }
+
+<span class="nc" id="L142">        ButtonType helpButtonType = new ButtonType(&quot;&quot;, ButtonBar.ButtonData.HELP_2);</span>
+<span class="nc" id="L143">        getDialogPane().getButtonTypes().setAll(helpButtonType, ButtonType.OK, ButtonType.CANCEL);</span>
+
+<span class="nc" id="L145">        final Button confirmDialogButton = (Button) getDialogPane().lookupButton(ButtonType.OK);</span>
+<span class="nc" id="L146">        final Button helpButton = (Button) getDialogPane().lookupButton(helpButtonType);</span>
+
+<span class="nc" id="L148">        ActionFactory actionFactory = new ActionFactory(Globals.getKeyPrefs());</span>
+<span class="nc" id="L149">        HelpAction helpAction = new HelpAction(HelpFile.GROUPS, dialogService, preferencesService.getFilePreferences());</span>
+<span class="nc" id="L150">        actionFactory.configureIconButton(</span>
+                StandardActions.HELP_GROUPS,
+                helpAction,
+                helpButton);
+
+        // Consume the dialog close event, but execute the help action
+<span class="nc" id="L156">        helpButton.addEventFilter(ActionEvent.ACTION, event -&gt; {</span>
+<span class="nc" id="L157">            helpAction.execute();</span>
+<span class="nc" id="L158">            event.consume();</span>
+<span class="nc" id="L159">        });</span>
+
+<span class="nc" id="L161">        confirmDialogButton.disableProperty().bind(viewModel.validationStatus().validProperty().not());</span>
+        // handle validation before closing dialog and calling resultConverter
+<span class="nc" id="L163">        confirmDialogButton.addEventFilter(ActionEvent.ACTION, viewModel::validationHandler);</span>
+<span class="nc" id="L164">    }</span>
+
+    private @Nullable AbstractGroup parentGroup() {
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (parentNode == null) {</span>
+<span class="nc" id="L168">            return null;</span>
+        } else {
+<span class="nc" id="L170">            return parentNode.getGroup();</span>
+        }
+    }
+
+    @FXML
+    public void initialize() {
+<span class="nc" id="L176">        viewModel = new GroupDialogViewModel(dialogService, currentDatabase, preferencesService, editedGroup, parentNode, fileUpdateMonitor);</span>
+
+<span class="nc" id="L178">        setResultConverter(viewModel::resultConverter);</span>
+
+<span class="nc" id="L180">        hierarchyText.put(GroupHierarchyType.INCLUDING, Localization.lang(&quot;Union&quot;));</span>
+<span class="nc" id="L181">        hierarchyToolTip.put(GroupHierarchyType.INCLUDING, Localization.lang(&quot;Include subgroups: When selected, view entries contained in this group or its subgroups&quot;));</span>
+<span class="nc" id="L182">        hierarchyText.put(GroupHierarchyType.REFINING, Localization.lang(&quot;Intersection&quot;));</span>
+<span class="nc" id="L183">        hierarchyToolTip.put(GroupHierarchyType.REFINING, Localization.lang(&quot;Refine supergroup: When selected, view entries contained in both this group and its supergroup&quot;));</span>
+<span class="nc" id="L184">        hierarchyText.put(GroupHierarchyType.INDEPENDENT, Localization.lang(&quot;Independent&quot;));</span>
+<span class="nc" id="L185">        hierarchyToolTip.put(GroupHierarchyType.INDEPENDENT, Localization.lang(&quot;Independent group: When selected, view only this group's entries&quot;));</span>
+
+<span class="nc" id="L187">        nameField.textProperty().bindBidirectional(viewModel.nameProperty());</span>
+<span class="nc" id="L188">        descriptionField.textProperty().bindBidirectional(viewModel.descriptionProperty());</span>
+<span class="nc" id="L189">        iconField.textProperty().bindBidirectional(viewModel.iconProperty());</span>
+<span class="nc" id="L190">        colorUseCheckbox.selectedProperty().bindBidirectional(viewModel.colorUseProperty());</span>
+<span class="nc" id="L191">        colorField.valueProperty().bindBidirectional(viewModel.colorFieldProperty());</span>
+<span class="nc" id="L192">        hierarchicalContextCombo.itemsProperty().bind(viewModel.groupHierarchyListProperty());</span>
+<span class="nc" id="L193">        new ViewModelListCellFactory&lt;GroupHierarchyType&gt;()</span>
+<span class="nc" id="L194">                .withText(hierarchyText::get)</span>
+<span class="nc" id="L195">                .withStringTooltip(hierarchyToolTip::get)</span>
+<span class="nc" id="L196">                .install(hierarchicalContextCombo);</span>
+<span class="nc" id="L197">        hierarchicalContextCombo.valueProperty().bindBidirectional(viewModel.groupHierarchySelectedProperty());</span>
+
+<span class="nc" id="L199">        explicitRadioButton.selectedProperty().bindBidirectional(viewModel.typeExplicitProperty());</span>
+<span class="nc" id="L200">        keywordsRadioButton.selectedProperty().bindBidirectional(viewModel.typeKeywordsProperty());</span>
+<span class="nc" id="L201">        searchRadioButton.selectedProperty().bindBidirectional(viewModel.typeSearchProperty());</span>
+<span class="nc" id="L202">        autoRadioButton.selectedProperty().bindBidirectional(viewModel.typeAutoProperty());</span>
+<span class="nc" id="L203">        texRadioButton.selectedProperty().bindBidirectional(viewModel.typeTexProperty());</span>
+
+<span class="nc" id="L205">        keywordGroupSearchTerm.textProperty().bindBidirectional(viewModel.keywordGroupSearchTermProperty());</span>
+<span class="nc" id="L206">        keywordGroupSearchField.textProperty().bindBidirectional(viewModel.keywordGroupSearchFieldProperty());</span>
+<span class="nc" id="L207">        keywordGroupCaseSensitive.selectedProperty().bindBidirectional(viewModel.keywordGroupCaseSensitiveProperty());</span>
+<span class="nc" id="L208">        keywordGroupRegex.selectedProperty().bindBidirectional(viewModel.keywordGroupRegexProperty());</span>
+
+<span class="nc" id="L210">        searchGroupSearchTerm.textProperty().bindBidirectional(viewModel.searchGroupSearchTermProperty());</span>
+<span class="nc" id="L211">        searchGroupCaseSensitive.setSelected(viewModel.searchFlagsProperty().getValue().contains(SearchFlags.CASE_SENSITIVE));</span>
+<span class="nc" id="L212">        searchGroupCaseSensitive.selectedProperty().addListener((observable, oldValue, newValue) -&gt; {</span>
+<span class="nc" id="L213">            EnumSet&lt;SearchFlags&gt; searchFlags = viewModel.searchFlagsProperty().get();</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">            if (newValue) {</span>
+<span class="nc" id="L215">                searchFlags.add(SearchRules.SearchFlags.CASE_SENSITIVE);</span>
+            } else {
+<span class="nc" id="L217">                searchFlags.remove(SearchRules.SearchFlags.CASE_SENSITIVE);</span>
+            }
+<span class="nc" id="L219">            viewModel.searchFlagsProperty().set(searchFlags);</span>
+<span class="nc" id="L220">        });</span>
+<span class="nc" id="L221">        searchGroupRegex.setSelected(viewModel.searchFlagsProperty().getValue().contains(SearchFlags.REGULAR_EXPRESSION));</span>
+<span class="nc" id="L222">        searchGroupRegex.selectedProperty().addListener((observable, oldValue, newValue) -&gt; {</span>
+<span class="nc" id="L223">            EnumSet&lt;SearchFlags&gt; searchFlags = viewModel.searchFlagsProperty().get();</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">            if (newValue) {</span>
+<span class="nc" id="L225">                searchFlags.add(SearchRules.SearchFlags.REGULAR_EXPRESSION);</span>
+            } else {
+<span class="nc" id="L227">                searchFlags.remove(SearchRules.SearchFlags.REGULAR_EXPRESSION);</span>
+            }
+<span class="nc" id="L229">            viewModel.searchFlagsProperty().set(searchFlags);</span>
+<span class="nc" id="L230">        });</span>
+
+<span class="nc" id="L232">        autoGroupKeywordsOption.selectedProperty().bindBidirectional(viewModel.autoGroupKeywordsOptionProperty());</span>
+<span class="nc" id="L233">        autoGroupKeywordsField.textProperty().bindBidirectional(viewModel.autoGroupKeywordsFieldProperty());</span>
+<span class="nc" id="L234">        autoGroupKeywordsDeliminator.textProperty().bindBidirectional(viewModel.autoGroupKeywordsDeliminatorProperty());</span>
+<span class="nc" id="L235">        autoGroupKeywordsHierarchicalDeliminator.textProperty().bindBidirectional(viewModel.autoGroupKeywordsHierarchicalDeliminatorProperty());</span>
+<span class="nc" id="L236">        autoGroupPersonsOption.selectedProperty().bindBidirectional(viewModel.autoGroupPersonsOptionProperty());</span>
+<span class="nc" id="L237">        autoGroupPersonsField.textProperty().bindBidirectional(viewModel.autoGroupPersonsFieldProperty());</span>
+
+<span class="nc" id="L239">        texGroupFilePath.textProperty().bindBidirectional(viewModel.texGroupFilePathProperty());</span>
+
+<span class="nc" id="L241">        validationVisualizer.setDecoration(new IconValidationDecorator());</span>
+<span class="nc" id="L242">        Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L243">            validationVisualizer.initVisualization(viewModel.nameValidationStatus(), nameField);</span>
+<span class="nc" id="L244">            validationVisualizer.initVisualization(viewModel.nameContainsDelimiterValidationStatus(), nameField, false);</span>
+<span class="nc" id="L245">            validationVisualizer.initVisualization(viewModel.sameNameValidationStatus(), nameField);</span>
+<span class="nc" id="L246">            validationVisualizer.initVisualization(viewModel.searchRegexValidationStatus(), searchGroupSearchTerm);</span>
+<span class="nc" id="L247">            validationVisualizer.initVisualization(viewModel.searchSearchTermEmptyValidationStatus(), searchGroupSearchTerm);</span>
+<span class="nc" id="L248">            validationVisualizer.initVisualization(viewModel.keywordRegexValidationStatus(), keywordGroupSearchTerm);</span>
+<span class="nc" id="L249">            validationVisualizer.initVisualization(viewModel.keywordSearchTermEmptyValidationStatus(), keywordGroupSearchTerm);</span>
+<span class="nc" id="L250">            validationVisualizer.initVisualization(viewModel.keywordFieldEmptyValidationStatus(), keywordGroupSearchField);</span>
+<span class="nc" id="L251">            validationVisualizer.initVisualization(viewModel.texGroupFilePathValidatonStatus(), texGroupFilePath);</span>
+<span class="nc" id="L252">            nameField.requestFocus();</span>
+<span class="nc" id="L253">        });</span>
+
+<span class="nc" id="L255">        autoColorCheckbox.setSelected(useAutoColoring);</span>
+<span class="nc" id="L256">        autoColorCheckbox.setOnAction(event -&gt; {</span>
+<span class="nc" id="L257">            useAutoColoring = autoColorCheckbox.isSelected();</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">            if (!autoColorCheckbox.isSelected()) {</span>
+<span class="nc" id="L259">                return;</span>
+            }
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            if (parentNode == null) {</span>
+<span class="nc" id="L262">                viewModel.colorFieldProperty().setValue(IconTheme.getDefaultGroupColor());</span>
+<span class="nc" id="L263">                return;</span>
+            }
+<span class="nc" id="L265">            List&lt;Color&gt; colorsOfSiblings = parentNode.getChildren().stream().map(child -&gt; child.getGroup().getColor())</span>
+<span class="nc" id="L266">                                                     .flatMap(Optional::stream)</span>
+<span class="nc" id="L267">                                                     .toList();</span>
+<span class="nc" id="L268">            Optional&lt;Color&gt; parentColor = parentGroup().getColor();</span>
+            Color color;
+<span class="nc" id="L270">            color = parentColor.map(value -&gt; GroupColorPicker.generateColor(colorsOfSiblings, value)).orElseGet(() -&gt; GroupColorPicker.generateColor(colorsOfSiblings));</span>
+<span class="nc" id="L271">            viewModel.colorFieldProperty().setValue(color);</span>
+<span class="nc" id="L272">        });</span>
+<span class="nc" id="L273">    }</span>
+
+    @FXML
+    private void texGroupBrowse() {
+<span class="nc" id="L277">        viewModel.texGroupBrowse();</span>
+<span class="nc" id="L278">    }</span>
+
+    @FXML
+    private void openIconPicker() {
+<span class="nc" id="L282">        ObservableList&lt;Ikon&gt; ikonList = FXCollections.observableArrayList();</span>
+<span class="nc" id="L283">        FilteredList&lt;Ikon&gt; filteredList = new FilteredList&lt;&gt;(ikonList);</span>
+
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        for (IkonProvider provider : ServiceLoader.load(IkonProvider.class.getModule().getLayer(), IkonProvider.class)) {</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            if (provider.getClass() != JabrefIconProvider.class) {</span>
+<span class="nc" id="L287">                ikonList.addAll(EnumSet.allOf(provider.getIkon()));</span>
+            }
+<span class="nc" id="L289">        }</span>
+
+<span class="nc" id="L291">        CustomTextField searchBox = new CustomTextField();</span>
+<span class="nc" id="L292">        searchBox.setPromptText(Localization.lang(&quot;Search&quot;) + &quot;...&quot;);</span>
+<span class="nc" id="L293">        searchBox.setLeft(IconTheme.JabRefIcons.SEARCH.getGraphicNode());</span>
+<span class="nc" id="L294">        searchBox.textProperty().addListener((obs, oldValue, newValue) -&gt;</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">                filteredList.setPredicate(ikon -&gt; newValue.isEmpty() || ikon.getDescription().toLowerCase()</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">                                                                            .contains(newValue.toLowerCase())));</span>
+
+<span class="nc" id="L298">        GridView&lt;Ikon&gt; ikonGridView = new GridView&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L299">        ikonGridView.setCellFactory(gridView -&gt; new IkonliCell());</span>
+<span class="nc" id="L300">        ikonGridView.setPrefWidth(520);</span>
+<span class="nc" id="L301">        ikonGridView.setPrefHeight(400);</span>
+<span class="nc" id="L302">        ikonGridView.setHorizontalCellSpacing(4);</span>
+<span class="nc" id="L303">        ikonGridView.setVerticalCellSpacing(4);</span>
+
+<span class="nc" id="L305">        VBox vBox = new VBox(10, searchBox, ikonGridView);</span>
+<span class="nc" id="L306">        vBox.setPadding(new Insets(10));</span>
+
+        // Necessary because of a bug in controlsfx GridView
+        // https://github.com/controlsfx/controlsfx/issues/1400
+        // The issue is closed, but still appears here
+<span class="nc" id="L311">        Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L312">            ikonGridView.setItems(filteredList);</span>
+<span class="nc" id="L313">        });</span>
+
+<span class="nc" id="L315">        PopOver popOver = new PopOver(vBox);</span>
+<span class="nc" id="L316">        popOver.setDetachable(false);</span>
+<span class="nc" id="L317">        popOver.setArrowSize(0);</span>
+<span class="nc" id="L318">        popOver.setCornerRadius(0);</span>
+<span class="nc" id="L319">        popOver.setTitle(&quot;Icon picker&quot;);</span>
+<span class="nc" id="L320">        popOver.show(iconPickerButton);</span>
+<span class="nc" id="L321">    }</span>
+
+<span class="nc" id="L323">    public class IkonliCell extends GridCell&lt;Ikon&gt; {</span>
+        @Override
+        protected void updateItem(Ikon ikon, boolean empty) {
+<span class="nc" id="L326">            super.updateItem(ikon, empty);</span>
+<span class="nc bnc" id="L327" title="All 4 branches missed.">            if (empty || (ikon == null)) {</span>
+<span class="nc" id="L328">                setText(null);</span>
+<span class="nc" id="L329">                setGraphic(null);</span>
+            } else {
+<span class="nc" id="L331">                FontIcon fontIcon = FontIcon.of(ikon);</span>
+<span class="nc" id="L332">                fontIcon.getStyleClass().setAll(&quot;font-icon&quot;);</span>
+<span class="nc" id="L333">                fontIcon.setIconSize(22);</span>
+<span class="nc" id="L334">                setGraphic(fontIcon);</span>
+<span class="nc" id="L335">                setAlignment(Pos.BASELINE_CENTER);</span>
+<span class="nc" id="L336">                setPadding(new Insets(1));</span>
+<span class="nc" id="L337">                setBorder(new Border(new BorderStroke(Color.BLACK, BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderStroke.THIN)));</span>
+
+<span class="nc" id="L339">                setOnMouseClicked(event -&gt; {</span>
+<span class="nc" id="L340">                    iconField.textProperty().setValue(String.valueOf(fontIcon.getIconCode()));</span>
+<span class="nc" id="L341">                    PopOver stage = (PopOver) this.getGridView().getParent().getScene().getWindow();</span>
+<span class="nc" id="L342">                    stage.hide();</span>
+<span class="nc" id="L343">                });</span>
+            }
+<span class="nc" id="L345">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

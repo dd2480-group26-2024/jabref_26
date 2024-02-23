@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RemoveLatexCommandsFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.layout.format</a> &gt; <span class="el_source">RemoveLatexCommandsFormatter.java</span></div><h1>RemoveLatexCommandsFormatter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.layout.format;
+
+import org.jabref.logic.layout.LayoutFormatter;
+import org.jabref.model.strings.StringUtil;
+
+import java.util.HashMap;
+import java.util.Map;
+
+<span class="fc" id="L9">public class RemoveLatexCommandsFormatter implements LayoutFormatter {</span>
+<span class="fc" id="L10">    public static Map&lt;Integer, Boolean&gt; branchCoverage = new HashMap&lt;&gt;();</span>
+
+    @Override
+    public String format(String field) {
+<span class="fc" id="L14">        StringBuilder cleanedField = new StringBuilder();</span>
+<span class="fc" id="L15">        StringBuilder currentCommand = null;</span>
+        char currentCharacter;
+<span class="fc" id="L17">        boolean escaped = false;</span>
+<span class="fc" id="L18">        boolean incommand = false;</span>
+        int currentFieldPosition;
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        for (currentFieldPosition = 0; currentFieldPosition &lt; field.length(); currentFieldPosition++) {</span>
+<span class="fc" id="L21">            branchCoverage.put(1, true);</span>
+<span class="fc" id="L22">            currentCharacter = field.charAt(currentFieldPosition);</span>
+<span class="fc bfc" id="L23" title="All 4 branches covered.">            if (escaped &amp;&amp; (currentCharacter == '\\')) {</span>
+<span class="fc" id="L24">                branchCoverage.put(2, true);</span>
+<span class="fc" id="L25">                branchCoverage.put(3, true);</span>
+<span class="fc" id="L26">                cleanedField.append('\\');</span>
+<span class="fc" id="L27">                escaped = false;</span>
+                // \\ --&gt; first \ begins the command, second \ ends the command
+                // \latexommand\\ -&gt; \latexcommand is the command, terminated by \, which begins a new command
+<span class="fc" id="L30">                incommand = false;</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            } else if (currentCharacter == '\\') {</span>
+<span class="fc" id="L32">                branchCoverage.put(4, true);</span>
+<span class="fc" id="L33">                escaped = true;</span>
+<span class="fc" id="L34">                incommand = true;</span>
+<span class="fc" id="L35">                currentCommand = new StringBuilder();</span>
+<span class="fc bfc" id="L36" title="All 6 branches covered.">            } else if (!incommand &amp;&amp; ((currentCharacter == '{') || (currentCharacter == '}'))) {</span>
+<span class="fc" id="L37">                branchCoverage.put(5, true);</span>
+<span class="fc" id="L38">                branchCoverage.put(6, true);</span>
+<span class="fc" id="L39">                branchCoverage.put(7, true);</span>
+
+                // Swallow the brace.
+<span class="fc bfc" id="L42" title="All 4 branches covered.">            } else if (Character.isLetter(currentCharacter) || StringUtil.SPECIAL_COMMAND_CHARS.contains(String.valueOf(currentCharacter))) {</span>
+<span class="fc" id="L43">                branchCoverage.put(8, true);</span>
+<span class="fc" id="L44">                branchCoverage.put(9, true);</span>
+
+<span class="fc" id="L46">                escaped = false;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                if (incommand) {</span>
+<span class="fc" id="L48">                    branchCoverage.put(10, true);</span>
+<span class="fc" id="L49">                    currentCommand.append(currentCharacter);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                    if ((currentCommand.length() == 1)</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">                            &amp;&amp; StringUtil.SPECIAL_COMMAND_CHARS.contains(currentCommand.toString())) {</span>
+<span class="fc" id="L52">                        branchCoverage.put(11, true);</span>
+<span class="fc" id="L53">                        branchCoverage.put(12, true);</span>
+
+                        // This indicates that we are in a command of the type \^o or \~{n}
+<span class="fc" id="L56">                        incommand = false;</span>
+<span class="fc" id="L57">                        escaped = false;</span>
+                    }
+                } else {
+<span class="fc" id="L60">                    branchCoverage.put(13, true);</span>
+
+<span class="fc" id="L62">                    cleanedField.append(currentCharacter);</span>
+                }
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            } else if (Character.isLetter(currentCharacter)) {</span>
+<span class="nc" id="L65">                branchCoverage.put(14, true);</span>
+
+<span class="nc" id="L67">                escaped = false;</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                if (incommand) {</span>
+<span class="nc" id="L69">                    branchCoverage.put(15, true);</span>
+
+                    // We are in a command, and should not keep the letter.
+<span class="nc" id="L72">                    currentCommand.append(currentCharacter);</span>
+                } else {
+<span class="nc" id="L74">                    branchCoverage.put(16, true);</span>
+
+<span class="nc" id="L76">                    cleanedField.append(currentCharacter);</span>
+                }
+            } else {
+<span class="fc" id="L79">                branchCoverage.put(17, true);</span>
+
+<span class="pc bpc" id="L81" title="1 of 6 branches missed.">                if (!incommand || (!Character.isWhitespace(currentCharacter) &amp;&amp; (currentCharacter != '{'))) {</span>
+<span class="fc" id="L82">                    branchCoverage.put(18, true);</span>
+<span class="fc" id="L83">                    branchCoverage.put(19, true);</span>
+<span class="fc" id="L84">                    branchCoverage.put(20, true);</span>
+<span class="fc" id="L85">                    cleanedField.append(currentCharacter);</span>
+                } else {
+<span class="fc" id="L87">                    branchCoverage.put(21, true);</span>
+
+<span class="pc bpc" id="L89" title="3 of 4 branches missed.">                    if (!Character.isWhitespace(currentCharacter) &amp;&amp; (currentCharacter != '{')) {</span>
+<span class="nc" id="L90">                        branchCoverage.put(22, true);</span>
+<span class="nc" id="L91">                        branchCoverage.put(23, true);</span>
+                        // do not append the opening brace of a command parameter
+                        // do not append the whitespace character
+<span class="nc" id="L94">                        cleanedField.append(currentCharacter);</span>
+                    }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                    if (incommand) {</span>
+<span class="fc" id="L97">                        branchCoverage.put(24, true);</span>
+
+                        // eat up all whitespace characters
+<span class="pc bpc" id="L100" title="1 of 4 branches missed.">                        while (currentFieldPosition + 1 &lt; field.length() &amp;&amp; Character.isWhitespace(field.charAt(currentFieldPosition + 1))) {</span>
+<span class="fc" id="L101">                            branchCoverage.put(25, true);</span>
+<span class="fc" id="L102">                            branchCoverage.put(26, true);</span>
+<span class="fc" id="L103">                            currentFieldPosition++;</span>
+                        }
+                    }
+                }
+<span class="fc" id="L107">                incommand = false;</span>
+<span class="fc" id="L108">                escaped = false;</span>
+            }
+        }
+
+<span class="fc" id="L112">        return cleanedField.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

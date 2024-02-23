@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SourceTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor</a> &gt; <span class="el_source">SourceTab.java</span></div><h1>SourceTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor;
+
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.beans.InvalidationListener;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.geometry.Point2D;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.InputMethodRequests;
+import javafx.scene.input.KeyEvent;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.keyboard.CodeAreaKeyBindings;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.gui.undo.CountingUndoManager;
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.gui.undo.UndoableChangeType;
+import org.jabref.gui.undo.UndoableFieldChange;
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.logic.bibtex.BibEntryWriter;
+import org.jabref.logic.bibtex.FieldPreferences;
+import org.jabref.logic.bibtex.FieldWriter;
+import org.jabref.logic.bibtex.InvalidFieldValueException;
+import org.jabref.logic.exporter.BibWriter;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.importer.fileformat.BibtexParser;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.search.SearchQuery;
+import org.jabref.logic.util.OS;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.util.FileUpdateMonitor;
+
+import de.saxsys.mvvmfx.utils.validation.ObservableRuleBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import org.fxmisc.flowless.VirtualizedScrollPane;
+import org.fxmisc.richtext.CodeArea;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class SourceTab extends EntryEditorTab {
+
+<span class="nc" id="L65">    private static final Logger LOGGER = LoggerFactory.getLogger(SourceTab.class);</span>
+    private final FieldPreferences fieldPreferences;
+    private final BibDatabaseMode mode;
+    private final UndoManager undoManager;
+<span class="nc" id="L69">    private final ObjectProperty&lt;ValidationMessage&gt; sourceIsValid = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="nc" id="L70">    private final ObservableRuleBasedValidator sourceValidator = new ObservableRuleBasedValidator();</span>
+    private final ImportFormatPreferences importFormatPreferences;
+    private final FileUpdateMonitor fileMonitor;
+    private final DialogService dialogService;
+    private final StateManager stateManager;
+    private final BibEntryTypesManager entryTypesManager;
+    private final KeyBindingRepository keyBindingRepository;
+<span class="nc" id="L77">    private Optional&lt;Pattern&gt; searchHighlightPattern = Optional.empty();</span>
+    private CodeArea codeArea;
+
+    private BibEntry previousEntry;
+
+    private class EditAction extends SimpleCommand {
+
+        private final StandardActions command;
+
+<span class="nc" id="L86">        public EditAction(StandardActions command) {</span>
+<span class="nc" id="L87">            this.command = command;</span>
+<span class="nc" id="L88">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc bnc" id="L92" title="All 5 branches missed.">            switch (command) {</span>
+<span class="nc" id="L93">                case COPY -&gt; codeArea.copy();</span>
+<span class="nc" id="L94">                case CUT -&gt; codeArea.cut();</span>
+<span class="nc" id="L95">                case PASTE -&gt; codeArea.paste();</span>
+<span class="nc" id="L96">                case SELECT_ALL -&gt; codeArea.selectAll();</span>
+            }
+<span class="nc" id="L98">            codeArea.requestFocus();</span>
+<span class="nc" id="L99">        }</span>
+    }
+
+    public SourceTab(BibDatabaseContext bibDatabaseContext,
+                     CountingUndoManager undoManager,
+                     FieldPreferences fieldPreferences,
+                     ImportFormatPreferences importFormatPreferences,
+                     FileUpdateMonitor fileMonitor,
+                     DialogService dialogService,
+                     StateManager stateManager,
+                     BibEntryTypesManager entryTypesManager,
+<span class="nc" id="L110">                     KeyBindingRepository keyBindingRepository) {</span>
+<span class="nc" id="L111">        this.mode = bibDatabaseContext.getMode();</span>
+<span class="nc" id="L112">        this.setText(Localization.lang(&quot;%0 source&quot;, mode.getFormattedName()));</span>
+<span class="nc" id="L113">        this.setTooltip(new Tooltip(Localization.lang(&quot;Show/edit %0 source&quot;, mode.getFormattedName())));</span>
+<span class="nc" id="L114">        this.setGraphic(IconTheme.JabRefIcons.SOURCE.getGraphicNode());</span>
+<span class="nc" id="L115">        this.undoManager = undoManager;</span>
+<span class="nc" id="L116">        this.fieldPreferences = fieldPreferences;</span>
+<span class="nc" id="L117">        this.importFormatPreferences = importFormatPreferences;</span>
+<span class="nc" id="L118">        this.fileMonitor = fileMonitor;</span>
+<span class="nc" id="L119">        this.dialogService = dialogService;</span>
+<span class="nc" id="L120">        this.stateManager = stateManager;</span>
+<span class="nc" id="L121">        this.entryTypesManager = entryTypesManager;</span>
+<span class="nc" id="L122">        this.keyBindingRepository = keyBindingRepository;</span>
+
+<span class="nc" id="L124">        stateManager.activeSearchQueryProperty().addListener((observable, oldValue, newValue) -&gt; {</span>
+<span class="nc" id="L125">            searchHighlightPattern = newValue.flatMap(SearchQuery::getPatternForWords);</span>
+<span class="nc" id="L126">            highlightSearchPattern();</span>
+<span class="nc" id="L127">        });</span>
+<span class="nc" id="L128">    }</span>
+
+    private void highlightSearchPattern() {
+<span class="nc bnc" id="L131" title="All 4 branches missed.">        if (searchHighlightPattern.isPresent() &amp;&amp; (codeArea != null)) {</span>
+<span class="nc" id="L132">            codeArea.setStyleClass(0, codeArea.getLength(), &quot;text&quot;);</span>
+<span class="nc" id="L133">            Matcher matcher = searchHighlightPattern.get().matcher(codeArea.getText());</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">            while (matcher.find()) {</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                for (int i = 0; i &lt;= matcher.groupCount(); i++) {</span>
+<span class="nc" id="L136">                    codeArea.setStyleClass(matcher.start(), matcher.end(), &quot;search&quot;);</span>
+                }
+            }
+        }
+<span class="nc" id="L140">    }</span>
+
+    private String getSourceString(BibEntry entry, BibDatabaseMode type, FieldPreferences fieldPreferences) throws IOException {
+<span class="nc" id="L143">        StringWriter writer = new StringWriter();</span>
+<span class="nc" id="L144">        BibWriter bibWriter = new BibWriter(writer, OS.NEWLINE);</span>
+<span class="nc" id="L145">        FieldWriter fieldWriter = FieldWriter.buildIgnoreHashes(fieldPreferences);</span>
+<span class="nc" id="L146">        new BibEntryWriter(fieldWriter, entryTypesManager).write(entry, bibWriter, type);</span>
+<span class="nc" id="L147">        return writer.toString();</span>
+    }
+
+    /* Work around for different input methods.
+     * https://github.com/FXMisc/RichTextFX/issues/146
+     */
+    private static class InputMethodRequestsObject implements InputMethodRequests {
+
+        @Override
+        public String getSelectedText() {
+<span class="nc" id="L157">            return &quot;&quot;;</span>
+        }
+
+        @Override
+        public int getLocationOffset(int x, int y) {
+<span class="nc" id="L162">            return 0;</span>
+        }
+
+        @Override
+        public void cancelLatestCommittedText() {
+<span class="nc" id="L167">            return;</span>
+        }
+
+        @Override
+        public Point2D getTextLocation(int offset) {
+<span class="nc" id="L172">            return new Point2D(0, 0);</span>
+        }
+    }
+
+    private void setupSourceEditor() {
+<span class="nc" id="L177">        codeArea = new CodeArea();</span>
+<span class="nc" id="L178">        codeArea.setWrapText(true);</span>
+<span class="nc" id="L179">        codeArea.setInputMethodRequests(new InputMethodRequestsObject());</span>
+<span class="nc" id="L180">        codeArea.setOnInputMethodTextChanged(event -&gt; {</span>
+<span class="nc" id="L181">            String committed = event.getCommitted();</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (!committed.isEmpty()) {</span>
+<span class="nc" id="L183">                codeArea.insertText(codeArea.getCaretPosition(), committed);</span>
+            }
+<span class="nc" id="L185">        });</span>
+<span class="nc" id="L186">        codeArea.setId(&quot;bibtexSourceCodeArea&quot;);</span>
+<span class="nc" id="L187">        codeArea.addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; CodeAreaKeyBindings.call(codeArea, event, keyBindingRepository));</span>
+<span class="nc" id="L188">        codeArea.addEventFilter(KeyEvent.KEY_PRESSED, this::listenForSaveKeybinding);</span>
+
+<span class="nc" id="L190">        ActionFactory factory = new ActionFactory(keyBindingRepository);</span>
+<span class="nc" id="L191">        ContextMenu contextMenu = new ContextMenu();</span>
+<span class="nc" id="L192">        contextMenu.getItems().addAll(</span>
+<span class="nc" id="L193">                factory.createMenuItem(StandardActions.CUT, new EditAction(StandardActions.CUT)),</span>
+<span class="nc" id="L194">                factory.createMenuItem(StandardActions.COPY, new EditAction(StandardActions.COPY)),</span>
+<span class="nc" id="L195">                factory.createMenuItem(StandardActions.PASTE, new EditAction(StandardActions.PASTE)),</span>
+<span class="nc" id="L196">                factory.createMenuItem(StandardActions.SELECT_ALL, new EditAction(StandardActions.SELECT_ALL))</span>
+        );
+
+<span class="nc" id="L199">        contextMenu.getStyleClass().add(&quot;context-menu&quot;);</span>
+<span class="nc" id="L200">        codeArea.setContextMenu(contextMenu);</span>
+
+<span class="nc" id="L202">        sourceValidator.addRule(sourceIsValid);</span>
+
+<span class="nc" id="L204">        sourceValidator.getValidationStatus().getMessages().addListener((InvalidationListener) c -&gt; {</span>
+<span class="nc" id="L205">            ValidationStatus sourceValidationStatus = sourceValidator.getValidationStatus();</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (!sourceValidationStatus.isValid()) {</span>
+<span class="nc" id="L207">                sourceValidationStatus.getHighestMessage().ifPresent(message -&gt; {</span>
+<span class="nc" id="L208">                    String content = Localization.lang(&quot;User input via entry-editor in `{}bibtex source` tab led to failure.&quot;)</span>
+<span class="nc" id="L209">                            + &quot;\n&quot; + Localization.lang(&quot;Please check your library file for wrong syntax.&quot;)</span>
+<span class="nc" id="L210">                            + &quot;\n\n&quot; + message.getMessage();</span>
+<span class="nc" id="L211">                    dialogService.showWarningDialogAndWait(Localization.lang(&quot;SourceTab error&quot;), content);</span>
+<span class="nc" id="L212">                });</span>
+            }
+<span class="nc" id="L214">        });</span>
+
+<span class="nc" id="L216">        codeArea.focusedProperty().addListener((obs, oldValue, onFocus) -&gt; {</span>
+<span class="nc bnc" id="L217" title="All 4 branches missed.">            if (!onFocus &amp;&amp; (currentEntry != null)) {</span>
+<span class="nc" id="L218">                storeSource(currentEntry, codeArea.textProperty().getValue());</span>
+            }
+<span class="nc" id="L220">        });</span>
+<span class="nc" id="L221">        VirtualizedScrollPane&lt;CodeArea&gt; scrollableCodeArea = new VirtualizedScrollPane&lt;&gt;(codeArea);</span>
+<span class="nc" id="L222">        this.setContent(scrollableCodeArea);</span>
+<span class="nc" id="L223">    }</span>
+
+    @Override
+    public boolean shouldShow(BibEntry entry) {
+<span class="nc" id="L227">        return true;</span>
+    }
+
+    private void updateCodeArea() {
+<span class="nc" id="L231">        DefaultTaskExecutor.runAndWaitInJavaFXThread(() -&gt; {</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            if (codeArea == null) {</span>
+<span class="nc" id="L233">                setupSourceEditor();</span>
+            }
+
+<span class="nc" id="L236">            codeArea.clear();</span>
+            try {
+<span class="nc" id="L238">                codeArea.appendText(getSourceString(currentEntry, mode, fieldPreferences));</span>
+<span class="nc" id="L239">                codeArea.setEditable(true);</span>
+<span class="nc" id="L240">                highlightSearchPattern();</span>
+<span class="nc" id="L241">            } catch (IOException ex) {</span>
+<span class="nc" id="L242">                codeArea.setEditable(false);</span>
+<span class="nc" id="L243">                codeArea.appendText(ex.getMessage() + &quot;\n\n&quot; +</span>
+<span class="nc" id="L244">                        Localization.lang(&quot;Correct the entry, and reopen editor to display/edit source.&quot;));</span>
+<span class="nc" id="L245">                LOGGER.debug(&quot;Incorrect entry&quot;, ex);</span>
+<span class="nc" id="L246">            }</span>
+<span class="nc" id="L247">        });</span>
+<span class="nc" id="L248">    }</span>
+
+    @Override
+    protected void bindToEntry(BibEntry entry) {
+<span class="nc bnc" id="L252" title="All 4 branches missed.">        if ((previousEntry != null) &amp;&amp; (codeArea != null)) {</span>
+<span class="nc" id="L253">            storeSource(previousEntry, codeArea.textProperty().getValue());</span>
+        }
+<span class="nc" id="L255">        this.previousEntry = entry;</span>
+
+<span class="nc" id="L257">        updateCodeArea();</span>
+
+<span class="nc" id="L259">        entry.typeProperty().addListener(listener -&gt; updateCodeArea());</span>
+<span class="nc" id="L260">        entry.getFieldsObservable().addListener((InvalidationListener) listener -&gt; updateCodeArea());</span>
+<span class="nc" id="L261">    }</span>
+
+    private void storeSource(BibEntry outOfFocusEntry, String text) {
+<span class="nc bnc" id="L264" title="All 4 branches missed.">        if ((outOfFocusEntry == null) || text.isEmpty()) {</span>
+<span class="nc" id="L265">            return;</span>
+        }
+
+<span class="nc" id="L268">        BibtexParser bibtexParser = new BibtexParser(importFormatPreferences, fileMonitor);</span>
+        try {
+<span class="nc" id="L270">            ParserResult parserResult = bibtexParser.parse(new StringReader(text));</span>
+<span class="nc" id="L271">            BibDatabase database = parserResult.getDatabase();</span>
+
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            if (database.getEntryCount() &gt; 1) {</span>
+<span class="nc" id="L274">                throw new IllegalStateException(&quot;More than one entry found.&quot;);</span>
+            }
+
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            if (!database.hasEntries()) {</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                if (parserResult.hasWarnings()) {</span>
+                    // put the warning into as exception text -&gt; it will be displayed to the user
+<span class="nc" id="L280">                    throw new IllegalStateException(parserResult.warnings().get(0));</span>
+                } else {
+<span class="nc" id="L282">                    throw new IllegalStateException(&quot;No entries found.&quot;);</span>
+                }
+            }
+
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            if (parserResult.hasWarnings()) {</span>
+                // put the warning into as exception text -&gt; it will be displayed to the user
+<span class="nc" id="L288">                throw new IllegalStateException(parserResult.getErrorMessage());</span>
+            }
+
+<span class="nc" id="L291">            NamedCompound compound = new NamedCompound(Localization.lang(&quot;source edit&quot;));</span>
+<span class="nc" id="L292">            BibEntry newEntry = database.getEntries().get(0);</span>
+<span class="nc" id="L293">            String newKey = newEntry.getCitationKey().orElse(null);</span>
+
+<span class="nc bnc" id="L295" title="All 2 branches missed.">            if (newKey != null) {</span>
+<span class="nc" id="L296">                outOfFocusEntry.setCitationKey(newKey);</span>
+            } else {
+<span class="nc" id="L298">                outOfFocusEntry.clearCiteKey();</span>
+            }
+
+            // First, remove fields that the user has removed.
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            for (Map.Entry&lt;Field, String&gt; field : outOfFocusEntry.getFieldMap().entrySet()) {</span>
+<span class="nc" id="L303">                Field fieldName = field.getKey();</span>
+<span class="nc" id="L304">                String fieldValue = field.getValue();</span>
+
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                if (!newEntry.hasField(fieldName)) {</span>
+<span class="nc" id="L307">                    compound.addEdit(new UndoableFieldChange(outOfFocusEntry, fieldName, fieldValue, null));</span>
+<span class="nc" id="L308">                    outOfFocusEntry.clearField(fieldName);</span>
+                }
+<span class="nc" id="L310">            }</span>
+
+            // Then set all fields that have been set by the user.
+<span class="nc bnc" id="L313" title="All 2 branches missed.">            for (Map.Entry&lt;Field, String&gt; field : newEntry.getFieldMap().entrySet()) {</span>
+<span class="nc" id="L314">                Field fieldName = field.getKey();</span>
+<span class="nc" id="L315">                String oldValue = outOfFocusEntry.getField(fieldName).orElse(null);</span>
+<span class="nc" id="L316">                String newValue = field.getValue();</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">                if (!Objects.equals(oldValue, newValue)) {</span>
+                    // Test if the field is legally set.
+<span class="nc" id="L319">                    new FieldWriter(fieldPreferences).write(fieldName, newValue);</span>
+
+<span class="nc" id="L321">                    compound.addEdit(new UndoableFieldChange(outOfFocusEntry, fieldName, oldValue, newValue));</span>
+<span class="nc" id="L322">                    outOfFocusEntry.setField(fieldName, newValue);</span>
+                }
+<span class="nc" id="L324">            }</span>
+
+            // See if the user has changed the entry type:
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            if (!Objects.equals(newEntry.getType(), outOfFocusEntry.getType())) {</span>
+<span class="nc" id="L328">                compound.addEdit(new UndoableChangeType(outOfFocusEntry, outOfFocusEntry.getType(), newEntry.getType()));</span>
+<span class="nc" id="L329">                outOfFocusEntry.setType(newEntry.getType());</span>
+            }
+<span class="nc" id="L331">            compound.end();</span>
+<span class="nc" id="L332">            undoManager.addEdit(compound);</span>
+
+<span class="nc" id="L334">            sourceIsValid.setValue(null);</span>
+<span class="nc" id="L335">        } catch (InvalidFieldValueException | IllegalStateException | IOException ex) {</span>
+<span class="nc" id="L336">            sourceIsValid.setValue(ValidationMessage.error(Localization.lang(&quot;Problem with parsing entry&quot;) + &quot;: &quot; + ex.getMessage()));</span>
+<span class="nc" id="L337">            LOGGER.debug(&quot;Incorrect source&quot;, ex);</span>
+<span class="nc" id="L338">        }</span>
+<span class="nc" id="L339">    }</span>
+
+    private void listenForSaveKeybinding(KeyEvent event) {
+<span class="nc" id="L342">        keyBindingRepository.mapToKeyBinding(event).ifPresent(binding -&gt; {</span>
+
+<span class="nc bnc" id="L344" title="All 2 branches missed.">            switch (binding) {</span>
+                case SAVE_DATABASE, SAVE_ALL, SAVE_DATABASE_AS -&gt; {
+<span class="nc" id="L346">                    storeSource(currentEntry, codeArea.textProperty().getValue());</span>
+                }
+            }
+<span class="nc" id="L349">        });</span>
+<span class="nc" id="L350">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

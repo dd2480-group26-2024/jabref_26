@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RelatedArticlesTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor</a> &gt; <span class="el_source">RelatedArticlesTab.java</span></div><h1>RelatedArticlesTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor;
+
+import java.io.IOException;
+import java.util.List;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.DoubleBinding;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontPosture;
+import javafx.scene.text.Text;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.Globals;
+import org.jabref.gui.desktop.JabRefDesktop;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.importer.ImportCleanup;
+import org.jabref.logic.importer.fetcher.MrDLibFetcher;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.database.BibDatabaseModeDetection;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.preferences.MrDlibPreferences;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * GUI for tab displaying article recommendations based on the currently selected BibEntry
+ */
+public class RelatedArticlesTab extends EntryEditorTab {
+
+    public static final String NAME = &quot;Related articles&quot;;
+<span class="nc" id="L45">    private static final Logger LOGGER = LoggerFactory.getLogger(RelatedArticlesTab.class);</span>
+    private final EntryEditorPreferences preferences;
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+    private final TaskExecutor taskExecutor;
+
+    public RelatedArticlesTab(EntryEditorPreferences preferences,
+                              PreferencesService preferencesService,
+                              DialogService dialogService,
+<span class="nc" id="L54">                              TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L55">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L56">        setText(Localization.lang(&quot;Related articles&quot;));</span>
+<span class="nc" id="L57">        setTooltip(new Tooltip(Localization.lang(&quot;Related articles&quot;)));</span>
+<span class="nc" id="L58">        this.preferences = preferences;</span>
+<span class="nc" id="L59">        this.dialogService = dialogService;</span>
+<span class="nc" id="L60">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L61">    }</span>
+
+    /**
+     * Gets a StackPane of related article information to be displayed in the Related Articles tab
+     *
+     * @param entry The currently selected BibEntry on the JabRef UI.
+     * @return A StackPane with related article information to be displayed in the Related Articles tab.
+     */
+    private StackPane getRelatedArticlesPane(BibEntry entry) {
+<span class="nc" id="L70">        StackPane root = new StackPane();</span>
+<span class="nc" id="L71">        root.setId(&quot;related-articles-tab&quot;);</span>
+<span class="nc" id="L72">        ProgressIndicator progress = new ProgressIndicator();</span>
+<span class="nc" id="L73">        progress.setMaxSize(100, 100);</span>
+
+<span class="nc" id="L75">        MrDLibFetcher fetcher = new MrDLibFetcher(preferencesService.getWorkspacePreferences().getLanguage().name(),</span>
+<span class="nc" id="L76">                Globals.BUILD_INFO.version, preferencesService.getMrDlibPreferences());</span>
+<span class="nc" id="L77">        BackgroundTask</span>
+<span class="nc" id="L78">                .wrap(() -&gt; fetcher.performSearch(entry))</span>
+<span class="nc" id="L79">                .onRunning(() -&gt; progress.setVisible(true))</span>
+<span class="nc" id="L80">                .onSuccess(relatedArticles -&gt; {</span>
+<span class="nc" id="L81">                    ImportCleanup cleanup = ImportCleanup.targeting(BibDatabaseModeDetection.inferMode(new BibDatabase(List.of(entry))));</span>
+<span class="nc" id="L82">                    cleanup.doPostCleanup(relatedArticles);</span>
+<span class="nc" id="L83">                    progress.setVisible(false);</span>
+<span class="nc" id="L84">                    root.getChildren().add(getRelatedArticleInfo(relatedArticles, fetcher));</span>
+<span class="nc" id="L85">                })</span>
+<span class="nc" id="L86">                .onFailure(exception -&gt; {</span>
+<span class="nc" id="L87">                    LOGGER.error(&quot;Error while fetching from Mr. DLib&quot;, exception);</span>
+<span class="nc" id="L88">                    progress.setVisible(false);</span>
+<span class="nc" id="L89">                    root.getChildren().add(getErrorInfo());</span>
+<span class="nc" id="L90">                })</span>
+<span class="nc" id="L91">                .executeWith(taskExecutor);</span>
+
+<span class="nc" id="L93">        root.getChildren().add(progress);</span>
+
+<span class="nc" id="L95">        return root;</span>
+    }
+
+    /**
+     * Creates a VBox of the related article information to be used in the StackPane displayed in the Related Articles tab
+     *
+     * @param list List of BibEntries of related articles
+     * @return VBox of related article descriptions to be displayed in the Related Articles tab
+     */
+    private ScrollPane getRelatedArticleInfo(List&lt;BibEntry&gt; list, MrDLibFetcher fetcher) {
+<span class="nc" id="L105">        ScrollPane scrollPane = new ScrollPane();</span>
+
+<span class="nc" id="L107">        VBox vBox = new VBox();</span>
+<span class="nc" id="L108">        vBox.setSpacing(20.0);</span>
+
+<span class="nc" id="L110">        String heading = fetcher.getHeading();</span>
+<span class="nc" id="L111">        Text headingText = new Text(heading);</span>
+<span class="nc" id="L112">        headingText.getStyleClass().add(&quot;heading&quot;);</span>
+<span class="nc" id="L113">        String description = fetcher.getDescription();</span>
+<span class="nc" id="L114">        Text descriptionText = new Text(description);</span>
+<span class="nc" id="L115">        descriptionText.getStyleClass().add(&quot;description&quot;);</span>
+<span class="nc" id="L116">        vBox.getChildren().add(headingText);</span>
+<span class="nc" id="L117">        vBox.getChildren().add(descriptionText);</span>
+
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        for (BibEntry entry : list) {</span>
+<span class="nc" id="L120">            HBox hBox = new HBox();</span>
+<span class="nc" id="L121">            hBox.setSpacing(5.0);</span>
+<span class="nc" id="L122">            hBox.getStyleClass().add(&quot;recommendation-item&quot;);</span>
+
+<span class="nc" id="L124">            String title = entry.getTitle().orElse(&quot;&quot;);</span>
+<span class="nc" id="L125">            String journal = entry.getField(StandardField.JOURNAL).orElse(&quot;&quot;);</span>
+<span class="nc" id="L126">            String authors = entry.getField(StandardField.AUTHOR).orElse(&quot;&quot;);</span>
+<span class="nc" id="L127">            String year = entry.getField(StandardField.YEAR).orElse(&quot;&quot;);</span>
+
+<span class="nc" id="L129">            Hyperlink titleLink = new Hyperlink(title);</span>
+<span class="nc" id="L130">            Text journalText = new Text(journal);</span>
+<span class="nc" id="L131">            journalText.setFont(Font.font(Font.getDefault().getFamily(), FontPosture.ITALIC, Font.getDefault().getSize()));</span>
+<span class="nc" id="L132">            Text authorsText = new Text(authors);</span>
+<span class="nc" id="L133">            Text yearText = new Text(&quot;(&quot; + year + &quot;)&quot;);</span>
+<span class="nc" id="L134">            titleLink.setOnAction(event -&gt; {</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (entry.getField(StandardField.URL).isPresent()) {</span>
+                    try {
+<span class="nc" id="L137">                        JabRefDesktop.openBrowser(entry.getField(StandardField.URL).get(), preferencesService.getFilePreferences());</span>
+<span class="nc" id="L138">                    } catch (IOException e) {</span>
+<span class="nc" id="L139">                        LOGGER.error(&quot;Error opening the browser to: &quot; + entry.getField(StandardField.URL).get(), e);</span>
+<span class="nc" id="L140">                        dialogService.showErrorDialogAndWait(e);</span>
+<span class="nc" id="L141">                    }</span>
+                }
+<span class="nc" id="L143">            });</span>
+
+<span class="nc" id="L145">            hBox.getChildren().addAll(titleLink, journalText, authorsText, yearText);</span>
+<span class="nc" id="L146">            vBox.getChildren().add(hBox);</span>
+<span class="nc" id="L147">        }</span>
+<span class="nc" id="L148">        scrollPane.setContent(vBox);</span>
+<span class="nc" id="L149">        return scrollPane;</span>
+    }
+
+    /**
+     * Gets a ScrollPane to display error info when recommendations fail.
+     *
+     * @return ScrollPane to display in place of recommendations
+     */
+    private ScrollPane getErrorInfo() {
+<span class="nc" id="L158">        ScrollPane scrollPane = new ScrollPane();</span>
+
+<span class="nc" id="L160">        VBox vBox = new VBox();</span>
+<span class="nc" id="L161">        vBox.setSpacing(20.0);</span>
+
+<span class="nc" id="L163">        Text descriptionText = new Text(Localization.lang(&quot;No recommendations received from Mr. DLib for this entry.&quot;));</span>
+<span class="nc" id="L164">        descriptionText.getStyleClass().add(&quot;description&quot;);</span>
+<span class="nc" id="L165">        vBox.getChildren().add(descriptionText);</span>
+<span class="nc" id="L166">        scrollPane.setContent(vBox);</span>
+
+<span class="nc" id="L168">        return scrollPane;</span>
+    }
+
+    /**
+     * Returns a consent dialog used to ask permission to send data to Mr. DLib.
+     *
+     * @param entry Currently selected BibEntry. (required to allow reloading of pane if accepted)
+     * @return StackPane returned to be placed into Related Articles tab.
+     */
+    private ScrollPane getPrivacyDialog(BibEntry entry) {
+<span class="nc" id="L178">        ScrollPane root = new ScrollPane();</span>
+<span class="nc" id="L179">        root.setId(&quot;related-articles-tab&quot;);</span>
+<span class="nc" id="L180">        VBox vbox = new VBox();</span>
+<span class="nc" id="L181">        vbox.setId(&quot;gdpr-dialog&quot;);</span>
+<span class="nc" id="L182">        vbox.setSpacing(20.0);</span>
+
+<span class="nc" id="L184">        Text title = new Text(Localization.lang(&quot;Mr. DLib Privacy settings&quot;));</span>
+<span class="nc" id="L185">        title.getStyleClass().add(&quot;heading&quot;);</span>
+
+<span class="nc" id="L187">        Button button = new Button(Localization.lang(&quot;I Agree&quot;));</span>
+<span class="nc" id="L188">        button.setDefaultButton(true);</span>
+
+<span class="nc" id="L190">        DoubleBinding rootWidth = Bindings.subtract(root.widthProperty(), 88d);</span>
+
+<span class="nc" id="L192">        Text line1 = new Text(Localization.lang(&quot;JabRef requests recommendations from Mr. DLib, which is an external service. To enable Mr. DLib to calculate recommendations, some of your data must be shared with Mr. DLib. Generally, the more data is shared the better recommendations can be calculated. However, we understand that some of your data in JabRef is sensitive, and you may not want to share it. Therefore, Mr. DLib offers a choice of which data you would like to share.&quot;));</span>
+<span class="nc" id="L193">        line1.wrappingWidthProperty().bind(rootWidth);</span>
+<span class="nc" id="L194">        Text line2 = new Text(Localization.lang(&quot;Whatever option you choose, Mr. DLib may share its data with research partners to further improve recommendation quality as part of a 'living lab'. Mr. DLib may also release public datasets that may contain anonymized information about you and the recommendations (sensitive information such as metadata of your articles will be anonymised through e.g. hashing). Research partners are obliged to adhere to the same strict data protection policy as Mr. DLib.&quot;));</span>
+<span class="nc" id="L195">        line2.wrappingWidthProperty().bind(rootWidth);</span>
+<span class="nc" id="L196">        Text line3 = new Text(Localization.lang(&quot;This setting may be changed in preferences at any time.&quot;));</span>
+<span class="nc" id="L197">        line3.wrappingWidthProperty().bind(rootWidth);</span>
+<span class="nc" id="L198">        Hyperlink mdlLink = new Hyperlink(Localization.lang(&quot;Further information about Mr. DLib for JabRef users.&quot;));</span>
+<span class="nc" id="L199">        mdlLink.setOnAction(event -&gt; {</span>
+            try {
+<span class="nc" id="L201">                JabRefDesktop.openBrowser(&quot;http://mr-dlib.org/information-for-users/information-about-mr-dlib-for-jabref-users/&quot;, preferencesService.getFilePreferences());</span>
+<span class="nc" id="L202">            } catch (IOException e) {</span>
+<span class="nc" id="L203">                LOGGER.error(&quot;Error opening the browser to Mr. DLib information page.&quot;, e);</span>
+<span class="nc" id="L204">                dialogService.showErrorDialogAndWait(e);</span>
+<span class="nc" id="L205">            }</span>
+<span class="nc" id="L206">        });</span>
+<span class="nc" id="L207">        VBox vb = new VBox();</span>
+<span class="nc" id="L208">        CheckBox cbTitle = new CheckBox(Localization.lang(&quot;Entry Title (Required to deliver recommendations.)&quot;));</span>
+<span class="nc" id="L209">        cbTitle.setSelected(true);</span>
+<span class="nc" id="L210">        cbTitle.setDisable(true);</span>
+<span class="nc" id="L211">        CheckBox cbVersion = new CheckBox(Localization.lang(&quot;JabRef Version (Required to ensure backwards compatibility with Mr. DLib's Web Service)&quot;));</span>
+<span class="nc" id="L212">        cbVersion.setSelected(true);</span>
+<span class="nc" id="L213">        cbVersion.setDisable(true);</span>
+<span class="nc" id="L214">        CheckBox cbLanguage = new CheckBox(Localization.lang(&quot;JabRef Language (Provides for better recommendations by giving an indication of user's preferred language.)&quot;));</span>
+<span class="nc" id="L215">        CheckBox cbOS = new CheckBox(Localization.lang(&quot;Operating System (Provides for better recommendations by giving an indication of user's system set-up.)&quot;));</span>
+<span class="nc" id="L216">        CheckBox cbTimezone = new CheckBox(Localization.lang(&quot;Timezone (Provides for better recommendations by indicating the time of day the request is being made.)&quot;));</span>
+<span class="nc" id="L217">        vb.getChildren().addAll(cbTitle, cbVersion, cbLanguage, cbOS, cbTimezone);</span>
+<span class="nc" id="L218">        vb.setSpacing(10);</span>
+
+<span class="nc" id="L220">        button.setOnAction(event -&gt; {</span>
+<span class="nc" id="L221">            MrDlibPreferences mrDlibPreferences = preferencesService.getMrDlibPreferences();</span>
+<span class="nc" id="L222">            mrDlibPreferences.setAcceptRecommendations(true);</span>
+<span class="nc" id="L223">            mrDlibPreferences.setSendLanguage(cbLanguage.isSelected());</span>
+<span class="nc" id="L224">            mrDlibPreferences.setSendOs(cbOS.isSelected());</span>
+<span class="nc" id="L225">            mrDlibPreferences.setSendTimezone(cbTimezone.isSelected());</span>
+
+<span class="nc" id="L227">            dialogService.showWarningDialogAndWait(Localization.lang(&quot;Restart&quot;), Localization.lang(&quot;Please restart JabRef for preferences to take effect.&quot;));</span>
+<span class="nc" id="L228">            setContent(getRelatedArticlesPane(entry));</span>
+<span class="nc" id="L229">        });</span>
+
+<span class="nc" id="L231">        vbox.getChildren().addAll(title, line1, line2, mdlLink, line3, vb, button);</span>
+<span class="nc" id="L232">        root.setContent(vbox);</span>
+
+<span class="nc" id="L234">        return root;</span>
+    }
+
+    @Override
+    public boolean shouldShow(BibEntry entry) {
+<span class="nc" id="L239">        return preferences.shouldShowRecommendationsTab();</span>
+    }
+
+    @Override
+    protected void bindToEntry(BibEntry entry) {
+        // Ask for consent to send data to Mr. DLib on first time to tab
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        if (preferencesService.getMrDlibPreferences().shouldAcceptRecommendations()) {</span>
+<span class="nc" id="L246">            setContent(getRelatedArticlesPane(entry));</span>
+        } else {
+<span class="nc" id="L248">            setContent(getPrivacyDialog(entry));</span>
+        }
+<span class="nc" id="L250">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

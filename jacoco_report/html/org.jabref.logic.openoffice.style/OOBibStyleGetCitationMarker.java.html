@@ -1,0 +1,769 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OOBibStyleGetCitationMarker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice.style</a> &gt; <span class="el_source">OOBibStyleGetCitationMarker.java</span></div><h1>OOBibStyleGetCitationMarker.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice.style;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.OrFields;
+import org.jabref.model.openoffice.ootext.OOText;
+import org.jabref.model.openoffice.style.CitationLookupResult;
+import org.jabref.model.openoffice.style.CitationMarkerEntry;
+import org.jabref.model.openoffice.style.CitationMarkerNormEntry;
+import org.jabref.model.openoffice.style.NonUniqueCitationMarker;
+import org.jabref.model.openoffice.style.PageInfo;
+import org.jabref.model.strings.StringUtil;
+
+class OOBibStyleGetCitationMarker {
+
+    private OOBibStyleGetCitationMarker() {
+    }
+
+    /**
+     * Look up the nth author and return the &quot;proper&quot; last name for
+     * citation markers.
+     *
+     * Note: &quot;proper&quot; in the sense that it includes the &quot;von&quot; part
+     *        of the name (followed by a space) if there is one.
+     *
+     * @param authorList     The author list.
+     * @param number The number of the author to return.
+     * @return The author name, or an empty String if inapplicable.
+     */
+    private static String getAuthorLastName(AuthorList authorList, int number) {
+<span class="fc" id="L40">        StringBuilder stringBuilder = new StringBuilder();</span>
+
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (authorList.getNumberOfAuthors() &gt; number) {</span>
+<span class="fc" id="L43">            Author author = authorList.getAuthor(number);</span>
+            // &quot;von &quot; if von exists
+<span class="fc" id="L45">            Optional&lt;String&gt; von = author.getVon();</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">            if (von.isPresent() &amp;&amp; !von.get().isEmpty()) {</span>
+<span class="fc" id="L47">                stringBuilder.append(von.get());</span>
+<span class="fc" id="L48">                stringBuilder.append(' ');</span>
+            }
+            // last name if it exists
+<span class="fc" id="L51">            stringBuilder.append(author.getLast().orElse(&quot;&quot;));</span>
+        }
+
+<span class="fc" id="L54">        return stringBuilder.toString();</span>
+    }
+
+    private static String markupAuthorName(OOBibStyle style, String name) {
+<span class="fc" id="L58">        return style.getAuthorNameMarkupBefore()</span>
+                + name
+<span class="fc" id="L60">                + style.getAuthorNameMarkupAfter();</span>
+    }
+
+    /**
+     * @param authorList Parsed list of authors.
+     *
+     * @param maxAuthors The maximum number of authors to write out.
+     *                   If there are more authors, then ET_AL_STRING is emitted
+     *                   to mark their omission.
+     *                   Set to -1 to write out all authors.
+     *
+     *                   maxAuthors=0 is pointless, now throws IllegalArgumentException
+     *                   (Earlier it behaved as maxAuthors=1)
+     *
+     *                   maxAuthors less than -1 : throw IllegalArgumentException
+     *
+     * @param andString  For &quot;A, B[ and ]C&quot;
+     *
+     * @return &quot;Au[AS]Bu[AS]Cu[OXFORD_COMMA][andString]Du[yearSep]&quot;
+     *      or &quot;Au[etAlString][yearSep]&quot;
+     *
+     *             where AS = AUTHOR_SEPARATOR
+     *                   Au, Bu, Cu, Du are last names of authors.
+     *
+     *         Note:
+     *          - The &quot;Au[AS]Bu[AS]Cu&quot; (or the &quot;Au&quot;) part may be empty (maxAuthors==0 or nAuthors==0).
+     *          - OXFORD_COMMA is only emitted if nAuthors is at least 3.
+     *          - andString  is only emitted if nAuthors is at least 2.
+     */
+    private static String formatAuthorList(OOBibStyle style,
+                                           AuthorList authorList,
+                                           int maxAuthors,
+                                           String andString) {
+
+<span class="fc" id="L94">        Objects.requireNonNull(authorList);</span>
+
+        // Apparently maxAuthorsBeforeEtAl is always 1 for in-text citations.
+        // In reference lists can be for example 7,
+        // (https://www.chicagomanualofstyle.org/turabian/turabian-author-date-citation-quick-guide.html)
+        // but those are handled elsewhere.
+        //
+        // There is also
+        // https://apastyle.apa.org/style-grammar-guidelines/ ...
+        //          ... citations/basic-principles/same-year-first-author
+        // suggesting the to avoid ambiguity, we may need more than one name
+        // before &quot;et al.&quot;. We do not currently do this kind of disambiguation,
+        // but we might, one day.
+        //
+<span class="fc" id="L108">        final int maxAuthorsBeforeEtAl = 1;</span>
+
+        // The String to represent authors that are not mentioned,
+        // e.g. &quot; et al.&quot;
+<span class="fc" id="L112">        String etAlString = style.getEtAlString();</span>
+
+        // getItalicEtAl is not necessary now, since etAlString could
+        // itself contain the markup.
+        // This is for backward compatibility.
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (style.getItalicEtAl()) {</span>
+<span class="nc" id="L118">            etAlString = &quot;&lt;i&gt;&quot; + etAlString + &quot;&lt;/i&gt;&quot;;</span>
+        }
+
+        // The String to add between author names except the last two,
+        // e.g. &quot;, &quot;.
+<span class="fc" id="L123">        String authorSep = style.getAuthorSeparator();</span>
+
+        // The String to put after the second to last author in case
+        // of three or more authors: (A, B[,] and C)
+<span class="fc" id="L127">        String oxfordComma = style.getOxfordComma();</span>
+
+<span class="fc" id="L129">        StringBuilder stringBuilder = new StringBuilder();</span>
+
+<span class="fc" id="L131">        final int nAuthors = authorList.getNumberOfAuthors();</span>
+
+        // To reduce ambiguity, throw on unexpected values of maxAuthors
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">        if (maxAuthors == 0 &amp;&amp; nAuthors != 0) {</span>
+<span class="nc" id="L135">            throw new IllegalArgumentException(&quot;maxAuthors = 0 in formatAuthorList&quot;);</span>
+        }
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (maxAuthors &lt; -1) {</span>
+<span class="nc" id="L138">            throw new IllegalArgumentException(&quot;maxAuthors &lt; -1 in formatAuthorList&quot;);</span>
+        }
+
+        // emitAllAuthors == false means use &quot;et al.&quot;
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">        boolean emitAllAuthors = (nAuthors &lt;= maxAuthors) || (maxAuthors == -1);</span>
+
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        int nAuthorsToEmit = emitAllAuthors</span>
+<span class="fc" id="L145">                              ? nAuthors</span>
+                              // If we use &quot;et al.&quot; maxAuthorsBeforeEtAl also limits the
+                              // number of authors emitted.
+<span class="fc" id="L148">                              : Math.min(maxAuthorsBeforeEtAl, nAuthors);</span>
+
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (nAuthorsToEmit &gt;= 1) {</span>
+<span class="fc" id="L151">            stringBuilder.append(style.getAuthorsPartMarkupBefore());</span>
+<span class="fc" id="L152">            stringBuilder.append(style.getAuthorNamesListMarkupBefore());</span>
+            // The first author
+<span class="fc" id="L154">            String name = getAuthorLastName(authorList, 0);</span>
+<span class="fc" id="L155">            stringBuilder.append(markupAuthorName(style, name));</span>
+        }
+
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (nAuthors &gt;= 2) {</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (emitAllAuthors) {</span>
+                // Emit last names, except for the last author
+<span class="fc" id="L161">                int j = 1;</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                while (j &lt; (nAuthors - 1)) {</span>
+<span class="fc" id="L163">                    stringBuilder.append(authorSep);</span>
+<span class="fc" id="L164">                    String name = getAuthorLastName(authorList, j);</span>
+<span class="fc" id="L165">                    stringBuilder.append(markupAuthorName(style, name));</span>
+<span class="fc" id="L166">                    j++;</span>
+<span class="fc" id="L167">                }</span>
+                // oxfordComma if at least 3 authors
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                if (nAuthors &gt;= 3) {</span>
+<span class="fc" id="L170">                    stringBuilder.append(oxfordComma);</span>
+                }
+                // Emit &quot; and &quot;+&quot;LastAuthor&quot;
+<span class="fc" id="L173">                stringBuilder.append(andString);</span>
+<span class="fc" id="L174">                String name = getAuthorLastName(authorList, nAuthors - 1);</span>
+<span class="fc" id="L175">                stringBuilder.append(markupAuthorName(style, name));</span>
+            } else {
+                // Emit last names up to nAuthorsToEmit.
+                //
+                // The (maxAuthorsBeforeEtAl &gt; 1) test is intended to
+                // make sure the compiler eliminates this block as
+                // long as maxAuthorsBeforeEtAl is fixed to 1.
+                if (maxAuthorsBeforeEtAl &gt; 1) {
+                    int j = 1;
+                    while (j &lt; nAuthorsToEmit) {
+                        stringBuilder.append(authorSep);
+                        String name = getAuthorLastName(authorList, j);
+                        stringBuilder.append(markupAuthorName(style, name));
+                        j++;
+                    }
+                }
+            }
+        }
+
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (nAuthorsToEmit &gt;= 1) {</span>
+<span class="fc" id="L195">            stringBuilder.append(style.getAuthorNamesListMarkupAfter());</span>
+        }
+
+<span class="fc bfc" id="L198" title="All 4 branches covered.">        if (nAuthors &gt;= 2 &amp;&amp; !emitAllAuthors) {</span>
+<span class="fc" id="L199">            stringBuilder.append(etAlString);</span>
+        }
+
+<span class="fc" id="L202">        stringBuilder.append(style.getAuthorsPartMarkupAfter());</span>
+<span class="fc" id="L203">        return stringBuilder.toString();</span>
+    }
+
+    /**
+     * On success, getRawCitationMarkerField returns content,
+     * but we also need to know which field matched, because
+     * for some fields (actually: for author names) we need to
+     * reproduce the surrounding braces to inform AuthorList.parse
+     * not to split up the content.
+     */
+    private static class FieldAndContent {
+        Field field;
+        String content;
+<span class="fc" id="L216">        FieldAndContent(Field field, String content) {</span>
+<span class="fc" id="L217">            this.field = field;</span>
+<span class="fc" id="L218">            this.content = content;</span>
+<span class="fc" id="L219">        }</span>
+    }
+
+    /**
+     * @return the field and the content of the first nonempty (after trimming)
+     * field (or alias) from {@code fields} found in {@code entry}.
+     * Return {@code Optional.empty()} if found nothing.
+     */
+    private static Optional&lt;FieldAndContent&gt; getRawCitationMarkerField(BibEntry entry,
+                                                                       BibDatabase database,
+                                                                       OrFields fields) {
+<span class="fc" id="L230">        Objects.requireNonNull(entry, &quot;Entry cannot be null&quot;);</span>
+<span class="fc" id="L231">        Objects.requireNonNull(database, &quot;database cannot be null&quot;);</span>
+
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (Field field : fields.getFields() /* FieldFactory.parseOrFields(fields)*/) {</span>
+<span class="fc" id="L234">            Optional&lt;String&gt; optionalContent = entry.getResolvedFieldOrAlias(field, database);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            final boolean foundSomething = optionalContent.isPresent()</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                                            &amp;&amp; !optionalContent.get().trim().isEmpty();</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            if (foundSomething) {</span>
+<span class="fc" id="L238">                return Optional.of(new FieldAndContent(field, optionalContent.get()));</span>
+            }
+<span class="fc" id="L240">        }</span>
+<span class="fc" id="L241">        return Optional.empty();</span>
+    }
+
+    /**
+     * This method looks up a field for an entry in a database.
+     *
+     * Any number of backup fields can be used if the primary field is
+     * empty.
+     *
+     * @param fields   A list of fields, to look up, using first nonempty hit.
+     *
+     *                 If backup fields are needed, separate field
+     *                 names by /.
+     *
+     *                 E.g. to use &quot;author&quot; with &quot;editor&quot; as backup,
+     *                 specify
+     *                     FieldFactory.serializeOrFields(StandardField.AUTHOR,
+     *                                                    StandardField.EDITOR)
+     *
+     * @return The resolved field content, or an empty string if the
+     *         field(s) were empty.
+     *
+     *
+     *
+     */
+    private static String getCitationMarkerField(OOBibStyle style,
+                                                 CitationLookupResult db,
+                                                 OrFields fields) {
+<span class="fc" id="L269">        Objects.requireNonNull(db);</span>
+
+<span class="fc" id="L271">        Optional&lt;FieldAndContent&gt; optionalFieldAndContent =</span>
+<span class="fc" id="L272">            getRawCitationMarkerField(db.entry, db.database, fields);</span>
+
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (optionalFieldAndContent.isEmpty()) {</span>
+            // No luck? Return an empty string:
+<span class="fc" id="L276">            return &quot;&quot;;</span>
+        }
+
+<span class="fc" id="L279">        FieldAndContent fieldAndContent = optionalFieldAndContent.get();</span>
+<span class="fc" id="L280">        String result = style.getFieldFormatter().format(fieldAndContent.content);</span>
+
+        // If the field we found is mentioned in authorFieldNames and
+        // content has a pair of braces around it, we add a pair of
+        // braces around the result, so that AuthorList.parse does not split
+        // the content.
+<span class="fc" id="L286">        final OrFields fieldsToRebrace = style.getAuthorFieldNames();</span>
+<span class="fc bfc" id="L287" title="All 4 branches covered.">        if (fieldsToRebrace.contains(fieldAndContent.field) &amp;&amp; StringUtil.isInCurlyBrackets(fieldAndContent.content)) {</span>
+<span class="fc" id="L288">            result = &quot;{&quot; + result + &quot;}&quot;;</span>
+        }
+<span class="fc" id="L290">        return result;</span>
+    }
+
+    private static AuthorList getAuthorList(OOBibStyle style, CitationLookupResult db) {
+        // The bibtex fields providing author names, e.g. &quot;author&quot; or
+        // &quot;editor&quot;.
+<span class="fc" id="L296">        OrFields authorFieldNames = style.getAuthorFieldNames();</span>
+
+<span class="fc" id="L298">        String authorListAsString = getCitationMarkerField(style, db, authorFieldNames);</span>
+<span class="fc" id="L299">        return AuthorList.parse(authorListAsString);</span>
+    }
+
+<span class="fc" id="L302">    private enum AuthorYearMarkerPurpose {</span>
+<span class="fc" id="L303">        IN_PARENTHESIS,</span>
+<span class="fc" id="L304">        IN_TEXT,</span>
+<span class="fc" id="L305">        NORMALIZED</span>
+    }
+
+    /**
+     * How many authors would be emitted for entry, considering
+     * style and entry.getIsFirstAppearanceOfSource()
+     *
+     * If entry is unresolved, return 0.
+     */
+    private static int calculateNAuthorsToEmit(OOBibStyle style, CitationMarkerEntry entry) {
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (entry.getLookupResult().isEmpty()) {</span>
+            // unresolved
+<span class="nc" id="L317">            return 0;</span>
+        }
+
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        int maxAuthors = entry.getIsFirstAppearanceOfSource()</span>
+<span class="fc" id="L321">                          ? style.getMaxAuthorsFirst()</span>
+<span class="fc" id="L322">                          : style.getMaxAuthors();</span>
+
+<span class="fc" id="L324">        AuthorList authorList = getAuthorList(style, entry.getLookupResult().get());</span>
+<span class="fc" id="L325">        int nAuthors = authorList.getNumberOfAuthors();</span>
+
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (maxAuthors == -1) {</span>
+<span class="fc" id="L328">            return nAuthors;</span>
+        } else {
+<span class="fc" id="L330">            return Integer.min(nAuthors, maxAuthors);</span>
+        }
+    }
+
+    /**
+     * Produce (Author, year) or &quot;Author (year)&quot; style citation strings.
+     *
+     * @param purpose IN_PARENTHESIS and NORMALIZED puts parentheses around the whole,
+     *                IN_TEXT around each (year,uniqueLetter,pageInfo) part.
+     *
+     *                NORMALIZED omits uniqueLetter and pageInfo,
+     *                ignores isFirstAppearanceOfSource (always
+     *                style.getMaxAuthors, not getMaxAuthorsFirst)
+     *
+     * @param entries   The list of CitationMarkerEntry values to process.
+     *
+     *              Here we do not check for duplicate entries: those
+     *              are handled by {@code getCitationMarker} by
+     *              omitting them from the list.
+     *
+     *              Unresolved citations recognized by
+     *              entry.getBibEntry() and/or
+     *              entry.getDatabase() returning empty, and
+     *              emitted as &quot;Unresolved${citationKey}&quot;.
+     *
+     *              Neither uniqueLetter nor pageInfo are emitted
+     *              for unresolved citations.
+     *
+     * @param startsNewGroup Should have the same length as {@code entries}, and
+     *               contain true for entries starting a new group,
+     *               false for those that only add a uniqueLetter to
+     *               the grouped presentation.
+     *
+     * @param maxAuthorsOverride If not empty, always show this number of authors.
+     *               Added to allow NORMALIZED to use maxAuthors value that differs from
+     *               style.getMaxAuthors()
+     *
+     * @return The formatted citation.
+     *
+     */
+    private static OOText getAuthorYearParenthesisMarker2(OOBibStyle style,
+                                                          AuthorYearMarkerPurpose purpose,
+                                                          List&lt;CitationMarkerEntry&gt; entries,
+                                                          boolean[] startsNewGroup,
+                                                          Optional&lt;Integer&gt; maxAuthorsOverride) {
+
+<span class="fc bfc" id="L376" title="All 4 branches covered.">        boolean inParenthesis = purpose == AuthorYearMarkerPurpose.IN_PARENTHESIS</span>
+                                 || purpose == AuthorYearMarkerPurpose.NORMALIZED;
+
+        // The String to separate authors from year, e.g. &quot;; &quot;.
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        String yearSep = inParenthesis</span>
+<span class="fc" id="L381">                          ? style.getYearSeparator()</span>
+<span class="fc" id="L382">                          : style.getYearSeparatorInText();</span>
+
+        // The opening parenthesis.
+<span class="fc" id="L385">        String startBrace = style.getBracketBefore();</span>
+
+        // The closing parenthesis.
+<span class="fc" id="L388">        String endBrace = style.getBracketAfter();</span>
+
+        // The String to separate citations from each other.
+<span class="fc" id="L391">        String citationSeparator = style.getCitationSeparator();</span>
+
+        // The bibtex field providing the year, e.g. &quot;year&quot;.
+<span class="fc" id="L394">        OrFields yearFieldNames = style.getYearFieldNames();</span>
+
+        // The String to add between the two last author names, e.g. &quot; &amp; &quot;.
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        String andString = inParenthesis</span>
+<span class="fc" id="L398">                            ? style.getAuthorLastSeparator()</span>
+<span class="fc" id="L399">                            : style.getAuthorLastSeparatorInTextWithFallBack();</span>
+
+<span class="fc" id="L401">        String pageInfoSeparator = style.getPageInfoSeparator();</span>
+<span class="fc" id="L402">        String uniquefierSeparator = style.getUniquefierSeparator();</span>
+
+<span class="fc" id="L404">        StringBuilder stringBuilder = new StringBuilder();</span>
+<span class="fc" id="L405">        stringBuilder.append(style.getCitationGroupMarkupBefore());</span>
+
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        if (inParenthesis) {</span>
+<span class="fc" id="L408">            stringBuilder.append(startBrace); // shared parenthesis</span>
+        }
+
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        for (int j = 0; j &lt; entries.size(); j++) {</span>
+<span class="fc" id="L412">            CitationMarkerEntry entry = entries.get(j);</span>
+<span class="fc" id="L413">            boolean startingNewGroup = startsNewGroup[j];</span>
+<span class="fc bfc" id="L414" title="All 4 branches covered.">            boolean endingAGroup = (j + 1 == entries.size()) || startsNewGroup[j + 1];</span>
+
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            if (!startingNewGroup) {</span>
+                // Just add our uniqueLetter
+<span class="fc" id="L418">                String uniqueLetter = entry.getUniqueLetter().orElse(null);</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">                if (uniqueLetter != null) {</span>
+<span class="fc" id="L420">                    stringBuilder.append(uniquefierSeparator);</span>
+<span class="fc" id="L421">                    stringBuilder.append(uniqueLetter);</span>
+                }
+
+                // And close the brace, if we are the last in the group.
+<span class="fc bfc" id="L425" title="All 4 branches covered.">                if (!inParenthesis &amp;&amp; endingAGroup) {</span>
+<span class="fc" id="L426">                    stringBuilder.append(endBrace);</span>
+                }
+                continue;
+            }
+
+<span class="fc bfc" id="L431" title="All 2 branches covered.">            if (j &gt; 0) {</span>
+<span class="fc" id="L432">                stringBuilder.append(citationSeparator);</span>
+            }
+
+<span class="fc" id="L435">            StringBuilder pageInfoPart = new StringBuilder(&quot;&quot;);</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">            if (purpose != AuthorYearMarkerPurpose.NORMALIZED) {</span>
+<span class="fc" id="L437">                Optional&lt;OOText&gt; pageInfo =</span>
+<span class="fc" id="L438">                    PageInfo.normalizePageInfo(entry.getPageInfo());</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">                if (pageInfo.isPresent()) {</span>
+<span class="fc" id="L440">                    pageInfoPart.append(pageInfoSeparator);</span>
+<span class="fc" id="L441">                    pageInfoPart.append(OOText.toString(pageInfo.get()));</span>
+                }
+            }
+
+<span class="fc" id="L445">            final boolean isUnresolved = entry.getLookupResult().isEmpty();</span>
+<span class="pc bpc" id="L446" title="1 of 2 branches missed.">            if (isUnresolved) {</span>
+<span class="nc" id="L447">                stringBuilder.append(&quot;Unresolved(%s)&quot;.formatted(entry.getCitationKey()));</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">                if (purpose != AuthorYearMarkerPurpose.NORMALIZED) {</span>
+<span class="nc" id="L449">                    stringBuilder.append(pageInfoPart);</span>
+                }
+            } else {
+<span class="fc" id="L452">                CitationLookupResult db = entry.getLookupResult().get();</span>
+
+<span class="fc bfc" id="L454" title="All 2 branches covered.">                int maxAuthors = purpose == AuthorYearMarkerPurpose.NORMALIZED</span>
+<span class="fc" id="L455">                                  ? style.getMaxAuthors()</span>
+<span class="fc" id="L456">                                  : calculateNAuthorsToEmit(style, entry);</span>
+
+<span class="fc bfc" id="L458" title="All 2 branches covered.">                if (maxAuthorsOverride.isPresent()) {</span>
+<span class="fc" id="L459">                    maxAuthors = maxAuthorsOverride.get();</span>
+                }
+
+<span class="fc" id="L462">                AuthorList authorList = getAuthorList(style, db);</span>
+<span class="fc" id="L463">                String authorString = formatAuthorList(style, authorList, maxAuthors, andString);</span>
+<span class="fc" id="L464">                stringBuilder.append(authorString);</span>
+<span class="fc" id="L465">                stringBuilder.append(yearSep);</span>
+
+<span class="fc bfc" id="L467" title="All 2 branches covered.">                if (!inParenthesis) {</span>
+<span class="fc" id="L468">                    stringBuilder.append(startBrace); // parenthesis before year</span>
+                }
+
+<span class="fc" id="L471">                String year = getCitationMarkerField(style, db, yearFieldNames);</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">                if (year != null) {</span>
+<span class="fc" id="L473">                    stringBuilder.append(year);</span>
+                }
+
+<span class="fc bfc" id="L476" title="All 2 branches covered.">                if (purpose != AuthorYearMarkerPurpose.NORMALIZED) {</span>
+<span class="fc" id="L477">                    String uniqueLetter = entry.getUniqueLetter().orElse(null);</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">                    if (uniqueLetter != null) {</span>
+<span class="fc" id="L479">                        stringBuilder.append(uniqueLetter);</span>
+                    }
+                }
+
+<span class="fc bfc" id="L483" title="All 2 branches covered.">                if (purpose != AuthorYearMarkerPurpose.NORMALIZED) {</span>
+<span class="fc" id="L484">                    stringBuilder.append(pageInfoPart);</span>
+                }
+
+<span class="fc bfc" id="L487" title="All 4 branches covered.">                if (!inParenthesis &amp;&amp; endingAGroup) {</span>
+<span class="fc" id="L488">                    stringBuilder.append(endBrace);  // parenthesis after year</span>
+                }
+            }
+        } // for j
+
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        if (inParenthesis) {</span>
+<span class="fc" id="L494">            stringBuilder.append(endBrace); // shared parenthesis</span>
+        }
+<span class="fc" id="L496">        stringBuilder.append(style.getCitationGroupMarkupAfter());</span>
+<span class="fc" id="L497">        return OOText.fromString(stringBuilder.toString());</span>
+    }
+
+    /**
+     * Add / override methods for the purpose of creating a normalized citation marker.
+     */
+    private static class CitationMarkerNormEntryWrap implements CitationMarkerEntry {
+
+        CitationMarkerNormEntry inner;
+
+<span class="fc" id="L507">        CitationMarkerNormEntryWrap(CitationMarkerNormEntry inner) {</span>
+<span class="fc" id="L508">            this.inner = inner;</span>
+<span class="fc" id="L509">        }</span>
+
+        @Override
+        public String getCitationKey() {
+<span class="nc" id="L513">            return inner.getCitationKey();</span>
+        }
+
+        @Override
+        public Optional&lt;CitationLookupResult&gt; getLookupResult() {
+<span class="fc" id="L518">            return inner.getLookupResult();</span>
+        }
+
+        @Override
+        public Optional&lt;String&gt; getUniqueLetter() {
+<span class="nc" id="L523">            return Optional.empty();</span>
+        }
+
+        @Override
+        public Optional&lt;OOText&gt; getPageInfo() {
+<span class="nc" id="L528">            return Optional.empty();</span>
+        }
+
+        @Override
+        public boolean getIsFirstAppearanceOfSource() {
+<span class="nc" id="L533">            return false;</span>
+        }
+    }
+
+    /**
+     * @param normEntry          A citation to process.
+     *
+     * @return A normalized citation marker for deciding which
+     *         citations need uniqueLetters.
+     *
+     * For details of what &quot;normalized&quot; means: {@see getAuthorYearParenthesisMarker2}
+     *
+     * Note: now includes some markup.
+     */
+    static OOText getNormalizedCitationMarker(OOBibStyle style,
+                                              CitationMarkerNormEntry normEntry,
+                                              Optional&lt;Integer&gt; maxAuthorsOverride) {
+<span class="fc" id="L550">        boolean[] startsNewGroup = {true};</span>
+<span class="fc" id="L551">        CitationMarkerEntry entry = new CitationMarkerNormEntryWrap(normEntry);</span>
+<span class="fc" id="L552">        return getAuthorYearParenthesisMarker2(style,</span>
+                                               AuthorYearMarkerPurpose.NORMALIZED,
+<span class="fc" id="L554">                                               Collections.singletonList(entry),</span>
+                                               startsNewGroup,
+                                               maxAuthorsOverride);
+    }
+
+    private static List&lt;OOText&gt;
+    getNormalizedCitationMarkers(OOBibStyle style,
+                                 List&lt;CitationMarkerEntry&gt; citationMarkerEntries,
+                                 Optional&lt;Integer&gt; maxAuthorsOverride) {
+
+<span class="fc" id="L564">        List&lt;OOText&gt; normalizedMarkers = new ArrayList&lt;&gt;(citationMarkerEntries.size());</span>
+<span class="fc bfc" id="L565" title="All 2 branches covered.">        for (CitationMarkerEntry citationMarkerEntry : citationMarkerEntries) {</span>
+<span class="fc" id="L566">            OOText normalized = getNormalizedCitationMarker(style,</span>
+                                                            citationMarkerEntry,
+                                                            maxAuthorsOverride);
+<span class="fc" id="L569">            normalizedMarkers.add(normalized);</span>
+<span class="fc" id="L570">        }</span>
+<span class="fc" id="L571">        return normalizedMarkers;</span>
+    }
+
+    /**
+     * Produce citation marker for a citation group.
+     *
+     * Attempts to join consecutive citations: if normalized citations
+     *    markers match and no pageInfo is present, the second entry
+     *    can be presented by appending its uniqueLetter to the
+     *    previous.
+     *
+     *    If either entry has pageInfo, join is inhibited.
+     *    If the previous entry has more names than we need
+     *    we check with extended normalizedMarkers if they match.
+     *
+     * For consecutive identical entries, the second one is omitted.
+     *     Identical requires same pageInfo here, we do not try to merge them.
+     *     Note: notifying the user about them would be nice.
+     *
+     * @param citationMarkerEntries A group of citations to process.
+     *
+     * @param inParenthesis If true, put parenthesis around the whole group,
+     *             otherwise around each (year,uniqueLetter,pageInfo) part.
+     *
+     * @param nonUniqueCitationMarkerHandling What should happen if we
+     *             stumble upon citations with identical normalized
+     *             citation markers which cite different sources and
+     *             are not distinguished by uniqueLetters.
+     *
+     *             Note: only consecutive citations are checked.
+     *
+     */
+    public static OOText
+    createCitationMarker(OOBibStyle style,
+                         List&lt;CitationMarkerEntry&gt; citationMarkerEntries,
+                         boolean inParenthesis,
+                         NonUniqueCitationMarker nonUniqueCitationMarkerHandling) {
+
+<span class="fc" id="L609">        final int nEntries = citationMarkerEntries.size();</span>
+
+        // Original:
+        //
+        // Look for groups of uniquefied entries that should be combined in the output.
+        // E.g. (Olsen, 2005a, b) should be output instead of (Olsen, 2005a; Olsen, 2005b).
+        //
+        // Now:
+        // - handle pageInfos
+        // - allow duplicate entries with same or different pageInfos.
+        //
+        // We assume entries are already sorted, all we need is to
+        // group consecutive entries if we can.
+        //
+        // We also assume, that identical entries have the same uniqueLetters.
+        //
+
+<span class="fc" id="L626">        List&lt;OOText&gt; normalizedMarkers = getNormalizedCitationMarkers(style,</span>
+                                                                      citationMarkerEntries,
+<span class="fc" id="L628">                                                                      Optional.empty());</span>
+
+        // How many authors would be emitted without grouping.
+<span class="fc" id="L631">        int[] nAuthorsToEmit = new int[nEntries];</span>
+<span class="fc" id="L632">        int[] nAuthorsToEmitRevised = new int[nEntries];</span>
+<span class="fc bfc" id="L633" title="All 2 branches covered.">        for (int i = 0; i &lt; nEntries; i++) {</span>
+<span class="fc" id="L634">            CitationMarkerEntry entry = citationMarkerEntries.get(i);</span>
+<span class="fc" id="L635">            int nAuthors = calculateNAuthorsToEmit(style, entry);</span>
+<span class="fc" id="L636">            nAuthorsToEmit[i] = nAuthors;</span>
+<span class="fc" id="L637">            nAuthorsToEmitRevised[i] = nAuthors;</span>
+        }
+
+<span class="fc" id="L640">        boolean[] startsNewGroup = new boolean[nEntries];</span>
+<span class="fc" id="L641">        List&lt;CitationMarkerEntry&gt; filteredCitationMarkerEntries = new ArrayList&lt;&gt;(nEntries);</span>
+<span class="fc" id="L642">        int i_out = 0;</span>
+
+<span class="pc bpc" id="L644" title="1 of 2 branches missed.">        if (nEntries &gt; 0) {</span>
+<span class="fc" id="L645">            filteredCitationMarkerEntries.add(citationMarkerEntries.getFirst());</span>
+<span class="fc" id="L646">            startsNewGroup[i_out] = true;</span>
+<span class="fc" id="L647">            i_out++;</span>
+        }
+
+<span class="fc bfc" id="L650" title="All 2 branches covered.">        for (int i = 1; i &lt; nEntries; i++) {</span>
+<span class="fc" id="L651">            final CitationMarkerEntry ce1 = citationMarkerEntries.get(i - 1);</span>
+<span class="fc" id="L652">            final CitationMarkerEntry ce2 = citationMarkerEntries.get(i);</span>
+
+<span class="fc" id="L654">            final String nm1 = OOText.toString(normalizedMarkers.get(i - 1));</span>
+<span class="fc" id="L655">            final String nm2 = OOText.toString(normalizedMarkers.get(i));</span>
+
+<span class="fc" id="L657">            final boolean isUnresolved1 = ce1.getLookupResult().isEmpty();</span>
+<span class="fc" id="L658">            final boolean isUnresolved2 = ce2.getLookupResult().isEmpty();</span>
+
+            boolean startingNewGroup;
+            boolean sameAsPrev; /* true indicates ce2 may be omitted from output */
+<span class="pc bpc" id="L662" title="1 of 2 branches missed.">            if (isUnresolved2) {</span>
+<span class="nc" id="L663">                startingNewGroup = true;</span>
+<span class="nc" id="L664">                sameAsPrev = false; // keep it visible</span>
+            } else {
+                // Does the number of authors to be shown differ?
+                // Since we compared normalizedMarkers, the difference
+                // between maxAuthors and maxAuthorsFirst may invalidate
+                // our expectation that adding uniqueLetter is valid.
+
+                boolean nAuthorsShownInhibitsJoin;
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                if (isUnresolved1) {</span>
+<span class="nc" id="L673">                    nAuthorsShownInhibitsJoin = true; // no join for unresolved</span>
+                } else {
+<span class="fc" id="L675">                    final boolean isFirst1 = ce1.getIsFirstAppearanceOfSource();</span>
+<span class="fc" id="L676">                    final boolean isFirst2 = ce2.getIsFirstAppearanceOfSource();</span>
+
+                    // nAuthorsToEmitRevised[i-1] may have been indirectly increased,
+                    // we have to check that too.
+<span class="fc bfc" id="L680" title="All 6 branches covered.">                    if (!isFirst1 &amp;&amp;</span>
+                        !isFirst2 &amp;&amp;
+                        (nAuthorsToEmitRevised[i - 1] == nAuthorsToEmit[i - 1])) {
+                        // we can rely on normalizedMarkers
+<span class="fc" id="L684">                        nAuthorsShownInhibitsJoin = false;</span>
+<span class="pc bpc" id="L685" title="1 of 2 branches missed.">                    } else if (style.getMaxAuthors() == style.getMaxAuthorsFirst()) {</span>
+                        // we can rely on normalizedMarkers
+<span class="nc" id="L687">                        nAuthorsShownInhibitsJoin = false;</span>
+                    } else {
+<span class="fc" id="L689">                        final int prevShown = nAuthorsToEmitRevised[i - 1];</span>
+<span class="fc" id="L690">                        final int need = nAuthorsToEmit[i];</span>
+
+<span class="fc bfc" id="L692" title="All 2 branches covered.">                        if (prevShown &lt; need) {</span>
+                            // We do not retrospectively change the number of authors shown
+                            // at the previous entry, take that as decided.
+<span class="fc" id="L695">                            nAuthorsShownInhibitsJoin = true;</span>
+                        } else {
+                            // prevShown &gt;= need
+                            // Check with extended normalizedMarkers.
+<span class="fc" id="L699">                            OOText nmx1 =</span>
+<span class="fc" id="L700">                                getNormalizedCitationMarker(style, ce1, Optional.of(prevShown));</span>
+<span class="fc" id="L701">                            OOText nmx2 =</span>
+<span class="fc" id="L702">                                getNormalizedCitationMarker(style, ce2, Optional.of(prevShown));</span>
+<span class="fc bfc" id="L703" title="All 2 branches covered.">                            boolean extendedMarkersDiffer = !nmx2.equals(nmx1);</span>
+<span class="fc" id="L704">                            nAuthorsShownInhibitsJoin = extendedMarkersDiffer;</span>
+                        }
+                    }
+                }
+
+<span class="fc bfc" id="L709" title="All 2 branches covered.">                final boolean citationKeysDiffer = !ce2.getCitationKey().equals(ce1.getCitationKey());</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">                final boolean normalizedMarkersDiffer = !nm2.equals(nm1);</span>
+
+<span class="fc" id="L712">                Optional&lt;OOText&gt; pageInfo2 = PageInfo.normalizePageInfo(ce2.getPageInfo());</span>
+<span class="fc" id="L713">                Optional&lt;OOText&gt; pageInfo1 = PageInfo.normalizePageInfo(ce1.getPageInfo());</span>
+<span class="fc bfc" id="L714" title="All 4 branches covered.">                final boolean bothPageInfosAreEmpty = pageInfo2.isEmpty() &amp;&amp; pageInfo1.isEmpty();</span>
+<span class="fc bfc" id="L715" title="All 2 branches covered.">                final boolean pageInfosDiffer = !pageInfo2.equals(pageInfo1);</span>
+
+<span class="fc" id="L717">                Optional&lt;String&gt; ul2 = ce2.getUniqueLetter();</span>
+<span class="fc" id="L718">                Optional&lt;String&gt; ul1 = ce1.getUniqueLetter();</span>
+<span class="pc bpc" id="L719" title="1 of 2 branches missed.">                final boolean uniqueLetterPresenceChanged = ul2.isPresent() != ul1.isPresent();</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">                final boolean uniqueLettersDiffer = !ul2.equals(ul1);</span>
+
+<span class="fc bfc" id="L722" title="All 6 branches covered.">                final boolean uniqueLetterDoesNotMakeUnique = citationKeysDiffer</span>
+                                                               &amp;&amp; !normalizedMarkersDiffer
+                                                               &amp;&amp; !uniqueLettersDiffer;
+
+<span class="pc bpc" id="L726" title="1 of 4 branches missed.">                if (uniqueLetterDoesNotMakeUnique &amp;&amp;</span>
+                        nonUniqueCitationMarkerHandling == NonUniqueCitationMarker.THROWS) {
+<span class="nc" id="L728">                    throw new IllegalArgumentException(&quot;different citation keys,&quot;</span>
+                                                       + &quot; but same normalizedMarker and uniqueLetter&quot;);
+                }
+
+<span class="fc bfc" id="L732" title="All 2 branches covered.">                final boolean pageInfoInhibitsJoin = bothPageInfosAreEmpty</span>
+<span class="fc" id="L733">                                                      ? false</span>
+<span class="fc bfc" id="L734" title="All 4 branches covered.">                                                      : (citationKeysDiffer || pageInfosDiffer);</span>
+
+<span class="pc bpc" id="L736" title="1 of 10 branches missed.">                startingNewGroup = normalizedMarkersDiffer</span>
+                                    || nAuthorsShownInhibitsJoin
+                                    || pageInfoInhibitsJoin
+                                    || uniqueLetterPresenceChanged
+                                    || uniqueLetterDoesNotMakeUnique;
+
+<span class="fc bfc" id="L742" title="All 2 branches covered.">                if (!startingNewGroup) {</span>
+                    // inherit from first of group. Used at next i.
+<span class="fc" id="L744">                    nAuthorsToEmitRevised[i] = nAuthorsToEmitRevised[i - 1];</span>
+                }
+
+<span class="pc bpc" id="L747" title="2 of 8 branches missed.">                sameAsPrev = !startingNewGroup</span>
+                              &amp;&amp; !uniqueLettersDiffer
+                              &amp;&amp; !citationKeysDiffer
+                              &amp;&amp; !pageInfosDiffer;
+            }
+
+<span class="fc bfc" id="L753" title="All 2 branches covered.">            if (!sameAsPrev) {</span>
+<span class="fc" id="L754">                filteredCitationMarkerEntries.add(ce2);</span>
+<span class="fc" id="L755">                startsNewGroup[i_out] = startingNewGroup;</span>
+<span class="fc" id="L756">                i_out++;</span>
+            }
+        }
+
+<span class="fc" id="L760">        return getAuthorYearParenthesisMarker2(style,</span>
+<span class="fc bfc" id="L761" title="All 2 branches covered.">                                               (inParenthesis</span>
+<span class="fc" id="L762">                                               ? AuthorYearMarkerPurpose.IN_PARENTHESIS</span>
+<span class="fc" id="L763">                                               : AuthorYearMarkerPurpose.IN_TEXT),</span>
+                                              filteredCitationMarkerEntries,
+                                              startsNewGroup,
+<span class="fc" id="L766">                                              Optional.empty());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

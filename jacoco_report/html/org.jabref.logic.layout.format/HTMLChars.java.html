@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HTMLChars.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.layout.format</a> &gt; <span class="el_source">HTMLChars.java</span></div><h1>HTMLChars.java</h1><pre class="source lang-java linenums">package org.jabref.logic.layout.format;
+
+import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.layout.LayoutFormatter;
+import org.jabref.logic.util.strings.HTMLUnicodeConversionMaps;
+import org.jabref.model.strings.StringUtil;
+
+/**
+ * This formatter escapes characters so they are suitable for HTML.
+ */
+<span class="fc" id="L14">public class HTMLChars implements LayoutFormatter {</span>
+
+<span class="fc" id="L16">    private static final Map&lt;String, String&gt; HTML_CHARS = HTMLUnicodeConversionMaps.LATEX_HTML_CONVERSION_MAP;</span>
+    /**
+     * This regex matches '&lt;b&gt;&amp;&lt;/b&gt;' that DO NOT BEGIN an HTML entity.
+     * &lt;p&gt;
+     * &lt;b&gt;&amp;&lt;/b&gt;{@literal amp;} &lt;b&gt;Not Matched&lt;/b&gt;&lt;br&gt;
+     * &lt;b&gt;&amp;&lt;/b&gt;{@literal #34;} &lt;b&gt;Not Matched&lt;/b&gt;&lt;br&gt;
+     * &lt;b&gt;&amp;&lt;/b&gt;Hey &lt;b&gt;Matched&lt;/b&gt;
+     * */
+<span class="fc" id="L24">    private static final Pattern HTML_ENTITY_PATTERN = Pattern.compile(&quot;&amp;(?!(?:[a-z0-9]+|#[0-9]{1,6}|#x[0-9a-fA-F]{1,6});)&quot;);</span>
+
+    @Override
+    public String format(String inField) {
+<span class="fc" id="L28">        String field = normalizedField(inField);</span>
+
+<span class="fc" id="L30">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L31">        StringBuilder currentCommand = null;</span>
+
+        char c;
+<span class="fc" id="L34">        boolean escaped = false;</span>
+<span class="fc" id="L35">        boolean incommand = false;</span>
+
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (int i = 0; i &lt; field.length(); i++) {</span>
+<span class="fc" id="L38">            c = field.charAt(i);</span>
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">            if (escaped &amp;&amp; (c == '\\')) {</span>
+<span class="nc" id="L40">                sb.append('\\');</span>
+<span class="nc" id="L41">                escaped = false;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            } else if (c == '\\') {</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                if (incommand) {</span>
+                    /* Close Command */
+<span class="fc" id="L45">                    String command = currentCommand.toString();</span>
+<span class="fc" id="L46">                    String result = HTML_CHARS.get(command);</span>
+<span class="fc" id="L47">                    sb.append(Objects.requireNonNullElse(result, command));</span>
+                }
+<span class="fc" id="L49">                escaped = true;</span>
+<span class="fc" id="L50">                incommand = true;</span>
+<span class="fc" id="L51">                currentCommand = new StringBuilder();</span>
+<span class="fc bfc" id="L52" title="All 6 branches covered.">            } else if (!incommand &amp;&amp; ((c == '{') || (c == '}'))) {</span>
+                // Swallow the brace.
+<span class="fc bfc" id="L54" title="All 4 branches covered.">            } else if (Character.isLetter(c) || StringUtil.SPECIAL_COMMAND_CHARS.contains(String.valueOf(c))) {</span>
+<span class="fc" id="L55">                escaped = false;</span>
+
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                if (!incommand) {</span>
+<span class="fc" id="L58">                    sb.append(c);</span>
+                } else {
+<span class="fc" id="L60">                    currentCommand.append(c);</span>
+                    testCharCom:
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                    if ((currentCommand.length() == 1)</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                            &amp;&amp; StringUtil.SPECIAL_COMMAND_CHARS.contains(currentCommand.toString())) {</span>
+                        // This indicates that we are in a command of the type
+                        // \^o or \~{n}
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                        if (i &gt;= (field.length() - 1)) {</span>
+<span class="nc" id="L67">                            break testCharCom;</span>
+                        }
+
+<span class="fc" id="L70">                        String command = currentCommand.toString();</span>
+<span class="fc" id="L71">                        i++;</span>
+<span class="fc" id="L72">                        c = field.charAt(i);</span>
+                        String commandBody;
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                        if (c == '{') {</span>
+<span class="fc" id="L75">                            String part = StringUtil.getPart(field, i, false);</span>
+<span class="fc" id="L76">                            i += part.length();</span>
+<span class="fc" id="L77">                            commandBody = part;</span>
+<span class="fc" id="L78">                        } else {</span>
+<span class="fc" id="L79">                            commandBody = field.substring(i, i + 1);</span>
+                        }
+<span class="fc" id="L81">                        String result = HTML_CHARS.get(command + commandBody);</span>
+
+<span class="fc" id="L83">                        sb.append(Objects.requireNonNullElse(result, commandBody));</span>
+
+<span class="fc" id="L85">                        incommand = false;</span>
+<span class="fc" id="L86">                        escaped = false;</span>
+<span class="fc" id="L87">                    } else {</span>
+                        // Are we already at the end of the string?
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                        if ((i + 1) == field.length()) {</span>
+<span class="fc" id="L90">                            String command = currentCommand.toString();</span>
+<span class="fc" id="L91">                            String result = HTML_CHARS.get(command);</span>
+                            /* If found, then use translated version. If not,
+                             * then keep
+                             * the text of the parameter intact.
+                             */
+<span class="fc" id="L96">                            sb.append(Objects.requireNonNullElse(result, command));</span>
+<span class="fc" id="L97">                        }</span>
+                    }
+                }
+            } else {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                if (!incommand) {</span>
+<span class="fc" id="L102">                    sb.append(c);</span>
+<span class="fc bfc" id="L103" title="All 6 branches covered.">                } else if (Character.isWhitespace(c) || (c == '{') || (c == '}')) {</span>
+<span class="fc" id="L104">                    String command = currentCommand.toString();</span>
+
+                    // Test if we are dealing with a formatting
+                    // command.
+                    // If so, handle.
+<span class="fc" id="L109">                    String tag = getHTMLTag(command);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                    if (!tag.isEmpty()) {</span>
+<span class="fc" id="L111">                        String part = StringUtil.getPart(field, i, true);</span>
+<span class="fc" id="L112">                        i += part.length();</span>
+<span class="fc" id="L113">                        sb.append('&lt;').append(tag).append('&gt;').append(part).append(&quot;&lt;/&quot;).append(tag).append('&gt;');</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                    } else if (c == '{') {</span>
+<span class="fc" id="L115">                        String argument = StringUtil.getPart(field, i, true);</span>
+<span class="fc" id="L116">                        i += argument.length();</span>
+                        // handle common case of general latex command
+<span class="fc" id="L118">                        String result = HTML_CHARS.get(command + argument);</span>
+                        // If found, then use translated version. If not, then keep
+                        // the text of the parameter intact.
+
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                        if (result == null) {</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                            if (argument.isEmpty()) {</span>
+                                // Maybe a separator, such as in \LaTeX{}, so use command
+<span class="fc" id="L125">                                sb.append(command);</span>
+                            } else {
+                                // Otherwise, use argument
+<span class="fc" id="L128">                                sb.append(argument);</span>
+                            }
+                        } else {
+<span class="fc" id="L131">                            sb.append(result);</span>
+                        }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                    } else if (c == '}') {</span>
+                        // This end brace terminates a command. This can be the case in
+                        // constructs like {\aa}. The correct behaviour should be to
+                        // substitute the evaluated command and swallow the brace:
+<span class="fc" id="L137">                        String result = HTML_CHARS.get(command);</span>
+                        // If the command is unknown, just print it:
+<span class="fc" id="L139">                        sb.append(Objects.requireNonNullElse(result, command));</span>
+<span class="fc" id="L140">                    } else {</span>
+<span class="fc" id="L141">                        String result = HTML_CHARS.get(command);</span>
+<span class="fc" id="L142">                        sb.append(Objects.requireNonNullElse(result, command));</span>
+<span class="fc" id="L143">                        sb.append(' ');</span>
+                    }
+<span class="fc" id="L145">                } else {</span>
+<span class="fc" id="L146">                    sb.append(c);</span>
+                    /*
+                     * TODO: this point is reached, apparently, if a command is
+                     * terminated in a strange way, such as with &quot;$\omega$&quot;.
+                     * Also, the command &quot;\&amp;&quot; causes us to get here. The former
+                     * issue is maybe a little difficult to address, since it
+                     * involves the LaTeX math mode. We don't have a complete
+                     * LaTeX parser, so maybe it's better to ignore these
+                     * commands?
+                     */
+                }
+
+<span class="fc" id="L158">                incommand = false;</span>
+<span class="fc" id="L159">                escaped = false;</span>
+            }
+        }
+
+<span class="fc" id="L163">        return sb.toString().replace(&quot;~&quot;, &quot;&amp;nbsp;&quot;); // Replace any remaining ~ with &amp;nbsp; (non-breaking spaces)</span>
+    }
+
+    private String normalizedField(String inField) {
+        // Cannot use StringEscapeUtils#escapeHtml4 because it does not handle LaTeX characters and commands.
+<span class="fc" id="L168">        return HTML_ENTITY_PATTERN.matcher(inField).replaceAll(&quot;&amp;amp;&quot;) // Replace &amp; with &amp;amp; if it does not begin an HTML entity</span>
+<span class="fc" id="L169">                                  .replaceAll(&quot;\\\\&amp;&quot;, &quot;&amp;amp;&quot;) // Replace \&amp; with &amp;amp;</span>
+<span class="fc" id="L170">                                  .replaceAll(&quot;[\\n]{2,}&quot;, &quot;&lt;p&gt;&quot;) // Replace double line breaks with &lt;p&gt;</span>
+<span class="fc" id="L171">                                  .replace(&quot;\n&quot;, &quot;&lt;br&gt;&quot;) // Replace single line breaks with &lt;br&gt;</span>
+<span class="fc" id="L172">                                  .replace(&quot;\\$&quot;, &quot;&amp;dollar;&quot;) // Replace \$ with &amp;dollar;</span>
+<span class="fc" id="L173">                                  .replaceAll(&quot;\\$([^$]*)\\$&quot;, &quot;\\{$1\\}&quot;);</span>
+    }
+
+    private String getHTMLTag(String latexCommand) {
+<span class="fc" id="L177">        String result = &quot;&quot;;</span>
+<span class="fc bfc" id="L178" title="All 9 branches covered.">        switch (latexCommand) {</span>
+            // Italic
+            case &quot;textit&quot;:
+            case &quot;it&quot;:
+<span class="fc" id="L182">                result = &quot;i&quot;;</span>
+<span class="fc" id="L183">                break;</span>
+            // Emphasize
+            case &quot;emph&quot;:
+            case &quot;em&quot;:
+<span class="fc" id="L187">                result = &quot;em&quot;;</span>
+<span class="fc" id="L188">                break;</span>
+            // Bold font
+            case &quot;textbf&quot;:
+            case &quot;bf&quot;:
+<span class="fc" id="L192">                result = &quot;b&quot;;</span>
+<span class="fc" id="L193">                break;</span>
+            // Underline
+            case &quot;underline&quot;:
+<span class="fc" id="L196">                result = &quot;u&quot;;</span>
+<span class="fc" id="L197">                break;</span>
+            // Strikeout, sout is the &quot;standard&quot; command, although it is actually based on the package ulem
+            case &quot;sout&quot;:
+<span class="fc" id="L200">                result = &quot;s&quot;;</span>
+<span class="fc" id="L201">                break;</span>
+            // Monospace font
+            case &quot;texttt&quot;:
+<span class="fc" id="L204">                result = &quot;tt&quot;;</span>
+<span class="fc" id="L205">                break;</span>
+            // Superscript
+            case &quot;textsuperscript&quot;:
+<span class="fc" id="L208">                result = &quot;sup&quot;;</span>
+<span class="fc" id="L209">                break;</span>
+            // Subscript
+            case &quot;textsubscript&quot;:
+<span class="fc" id="L212">                result = &quot;sub&quot;;</span>
+<span class="fc" id="L213">                break;</span>
+            default:
+                break;
+        }
+<span class="fc" id="L217">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

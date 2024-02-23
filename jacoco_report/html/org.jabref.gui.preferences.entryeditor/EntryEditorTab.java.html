@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryEditorTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.entryeditor</a> &gt; <span class="el_source">EntryEditorTab.java</span></div><h1>EntryEditorTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.entryeditor;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.TextArea;
+
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.help.HelpAction;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.l10n.Localization;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import jakarta.inject.Inject;
+
+public class EntryEditorTab extends AbstractPreferenceTabView&lt;EntryEditorTabViewModel&gt; implements PreferencesTab {
+
+    @FXML private CheckBox openOnNewEntry;
+    @FXML private CheckBox defaultSource;
+    @FXML private CheckBox enableRelatedArticlesTab;
+    @FXML private CheckBox acceptRecommendations;
+    @FXML private CheckBox enableLatexCitationsTab;
+    @FXML private CheckBox enableValidation;
+    @FXML private CheckBox allowIntegerEdition;
+    @FXML private CheckBox journalPopupEnabled;
+    @FXML private CheckBox autoLinkFilesEnabled;
+    @FXML private CheckBox enableSciteTab;
+    @FXML private CheckBox showUserCommentsField;
+
+    @FXML private Button generalFieldsHelp;
+    @FXML private TextArea fieldsTextArea;
+
+    @Inject private KeyBindingRepository keyBindingRepository;
+
+<span class="nc" id="L39">    public EntryEditorTab() {</span>
+<span class="nc" id="L40">        ViewLoader.view(this)</span>
+<span class="nc" id="L41">                  .root(this)</span>
+<span class="nc" id="L42">                  .load();</span>
+<span class="nc" id="L43">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L47">        return Localization.lang(&quot;Entry editor&quot;);</span>
+    }
+
+    public void initialize() {
+<span class="nc" id="L51">        this.viewModel = new EntryEditorTabViewModel(dialogService, preferencesService);</span>
+
+<span class="nc" id="L53">        openOnNewEntry.selectedProperty().bindBidirectional(viewModel.openOnNewEntryProperty());</span>
+<span class="nc" id="L54">        defaultSource.selectedProperty().bindBidirectional(viewModel.defaultSourceProperty());</span>
+<span class="nc" id="L55">        enableRelatedArticlesTab.selectedProperty().bindBidirectional(viewModel.enableRelatedArticlesTabProperty());</span>
+<span class="nc" id="L56">        acceptRecommendations.selectedProperty().bindBidirectional(viewModel.acceptRecommendationsProperty());</span>
+<span class="nc" id="L57">        enableLatexCitationsTab.selectedProperty().bindBidirectional(viewModel.enableLatexCitationsTabProperty());</span>
+<span class="nc" id="L58">        enableValidation.selectedProperty().bindBidirectional(viewModel.enableValidationProperty());</span>
+<span class="nc" id="L59">        allowIntegerEdition.selectedProperty().bindBidirectional(viewModel.allowIntegerEditionProperty());</span>
+<span class="nc" id="L60">        journalPopupEnabled.selectedProperty().bindBidirectional(viewModel.journalPopupProperty());</span>
+<span class="nc" id="L61">        autoLinkFilesEnabled.selectedProperty().bindBidirectional(viewModel.autoLinkFilesEnabledProperty());</span>
+<span class="nc" id="L62">        enableSciteTab.selectedProperty().bindBidirectional(viewModel.enableSciteTabProperty());</span>
+<span class="nc" id="L63">        showUserCommentsField.selectedProperty().bindBidirectional(viewModel.showUserCommentsProperty());</span>
+
+<span class="nc" id="L65">        fieldsTextArea.textProperty().bindBidirectional(viewModel.fieldsProperty());</span>
+
+<span class="nc" id="L67">        ActionFactory actionFactory = new ActionFactory(keyBindingRepository);</span>
+<span class="nc" id="L68">        actionFactory.configureIconButton(StandardActions.HELP, new HelpAction(HelpFile.GENERAL_FIELDS, dialogService, preferencesService.getFilePreferences()), generalFieldsHelp);</span>
+<span class="nc" id="L69">    }</span>
+
+    @FXML
+    void resetToDefaults() {
+<span class="nc" id="L73">        viewModel.resetToDefaults();</span>
+<span class="nc" id="L74">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

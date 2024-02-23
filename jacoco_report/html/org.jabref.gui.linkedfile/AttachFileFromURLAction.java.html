@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AttachFileFromURLAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.linkedfile</a> &gt; <span class="el_source">AttachFileFromURLAction.java</span></div><h1>AttachFileFromURLAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.linkedfile;
+
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Optional;
+
+import org.jabref.gui.ClipBoardManager;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.fieldeditors.LinkedFileViewModel;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.preferences.PreferencesService;
+
+public class AttachFileFromURLAction extends SimpleCommand {
+
+    private final StateManager stateManager;
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+    private final TaskExecutor taskExecutor;
+
+    public AttachFileFromURLAction(DialogService dialogService,
+                                   StateManager stateManager,
+                                   TaskExecutor taskExecutor,
+<span class="nc" id="L31">                                   PreferencesService preferencesService) {</span>
+<span class="nc" id="L32">        this.stateManager = stateManager;</span>
+<span class="nc" id="L33">        this.dialogService = dialogService;</span>
+<span class="nc" id="L34">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L35">        this.preferencesService = preferencesService;</span>
+
+<span class="nc" id="L37">        this.executable.bind(ActionHelper.needsEntriesSelected(1, stateManager));</span>
+<span class="nc" id="L38">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (stateManager.getActiveDatabase().isEmpty()) {</span>
+<span class="nc" id="L43">            dialogService.notify(Localization.lang(&quot;This operation requires an open library.&quot;));</span>
+<span class="nc" id="L44">            return;</span>
+        }
+
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (stateManager.getSelectedEntries().size() != 1) {</span>
+<span class="nc" id="L48">            dialogService.notify(Localization.lang(&quot;This operation requires exactly one item to be selected.&quot;));</span>
+<span class="nc" id="L49">            return;</span>
+        }
+
+<span class="nc" id="L52">        BibDatabaseContext databaseContext = stateManager.getActiveDatabase().get();</span>
+
+<span class="nc" id="L54">        BibEntry entry = stateManager.getSelectedEntries().get(0);</span>
+
+<span class="nc" id="L56">        Optional&lt;String&gt; urlforDownload = getUrlForDownloadFromClipBoardOrEntry(dialogService, entry);</span>
+
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (urlforDownload.isEmpty()) {</span>
+<span class="nc" id="L59">            return;</span>
+        }
+
+        try {
+<span class="nc" id="L63">            URL url = new URL(urlforDownload.get());</span>
+<span class="nc" id="L64">            LinkedFileViewModel onlineFile = new LinkedFileViewModel(</span>
+                             new LinkedFile(url, &quot;&quot;),
+                             entry,
+                             databaseContext,
+                             taskExecutor,
+                             dialogService,
+                             preferencesService);
+<span class="nc" id="L71">            onlineFile.download();</span>
+<span class="nc" id="L72">        } catch (MalformedURLException exception) {</span>
+<span class="nc" id="L73">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Invalid URL&quot;), exception);</span>
+<span class="nc" id="L74">        }</span>
+<span class="nc" id="L75">    }</span>
+
+    public static Optional&lt;String&gt; getUrlForDownloadFromClipBoardOrEntry(DialogService dialogService, BibEntry entry) {
+<span class="nc" id="L78">        String clipText = ClipBoardManager.getContents();</span>
+        Optional&lt;String&gt; urlText;
+<span class="nc" id="L80">        String urlField = entry.getField(StandardField.URL).orElse(&quot;&quot;);</span>
+<span class="nc bnc" id="L81" title="All 6 branches missed.">        if (clipText.startsWith(&quot;http://&quot;) || clipText.startsWith(&quot;https://&quot;) || clipText.startsWith(&quot;ftp://&quot;)) {</span>
+<span class="nc" id="L82">            urlText = dialogService.showInputDialogWithDefaultAndWait(</span>
+<span class="nc" id="L83">                    Localization.lang(&quot;Download file&quot;), Localization.lang(&quot;Enter URL to download&quot;), clipText);</span>
+<span class="nc bnc" id="L84" title="All 6 branches missed.">        } else if (urlField.startsWith(&quot;http://&quot;) || urlField.startsWith(&quot;https://&quot;) || urlField.startsWith(&quot;ftp://&quot;)) {</span>
+<span class="nc" id="L85">            urlText = dialogService.showInputDialogWithDefaultAndWait(</span>
+<span class="nc" id="L86">                    Localization.lang(&quot;Download file&quot;), Localization.lang(&quot;Enter URL to download&quot;), urlField);</span>
+        } else {
+<span class="nc" id="L88">            urlText = dialogService.showInputDialogAndWait(</span>
+<span class="nc" id="L89">                    Localization.lang(&quot;Download file&quot;), Localization.lang(&quot;Enter URL to download&quot;));</span>
+        }
+<span class="nc" id="L91">        return urlText;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

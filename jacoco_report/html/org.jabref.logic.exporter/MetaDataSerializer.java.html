@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MetaDataSerializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.exporter</a> &gt; <span class="el_source">MetaDataSerializer.java</span></div><h1>MetaDataSerializer.java</h1><pre class="source lang-java linenums">package org.jabref.logic.exporter;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.StringJoiner;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.citationkeypattern.AbstractCitationKeyPattern;
+import org.jabref.logic.citationkeypattern.GlobalCitationKeyPattern;
+import org.jabref.logic.cleanup.FieldFormatterCleanups;
+import org.jabref.logic.util.OS;
+import org.jabref.model.entry.BibEntryType;
+import org.jabref.model.entry.field.BibField;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.groups.GroupTreeNode;
+import org.jabref.model.metadata.ContentSelector;
+import org.jabref.model.metadata.MetaData;
+import org.jabref.model.strings.StringUtil;
+
+/**
+ * Reading is done at {@link org.jabref.logic.importer.util.MetaDataParser}
+ */
+public class MetaDataSerializer {
+
+    private MetaDataSerializer() {
+    }
+
+    /**
+     * Writes all data in the format &amp;lt;key, serialized data&gt;.
+     */
+    public static Map&lt;String, String&gt; getSerializedStringMap(MetaData metaData,
+                                                             GlobalCitationKeyPattern globalCiteKeyPattern) {
+
+        // metadata-key, list of contents
+        //  - contents to be separated by OS.NEWLINE
+        //  - each meta data item is written as separate @Comment entry - see org.jabref.logic.exporter.BibtexDatabaseWriter.writeMetaDataItem
+<span class="fc" id="L42">        Map&lt;String, List&lt;String&gt;&gt; stringyMetaData = new HashMap&lt;&gt;();</span>
+
+        // First write all meta data except groups
+<span class="fc" id="L45">        metaData.getSaveOrder().ifPresent(</span>
+<span class="fc" id="L46">                saveOrderConfig -&gt; stringyMetaData.put(MetaData.SAVE_ORDER_CONFIG, saveOrderConfig.getAsStringList()));</span>
+<span class="fc" id="L47">        metaData.getSaveActions().ifPresent(</span>
+<span class="fc" id="L48">                saveActions -&gt; stringyMetaData.put(MetaData.SAVE_ACTIONS, saveActions.getAsStringList(OS.NEWLINE)));</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (metaData.isProtected()) {</span>
+<span class="fc" id="L50">            stringyMetaData.put(MetaData.PROTECTED_FLAG_META, Collections.singletonList(&quot;true&quot;));</span>
+        }
+<span class="fc" id="L52">        stringyMetaData.putAll(serializeCiteKeyPattern(metaData, globalCiteKeyPattern));</span>
+<span class="fc" id="L53">        metaData.getMode().ifPresent(</span>
+<span class="fc" id="L54">                mode -&gt; stringyMetaData.put(MetaData.DATABASE_TYPE, Collections.singletonList(mode.getAsString())));</span>
+<span class="fc" id="L55">        metaData.getDefaultFileDirectory().ifPresent(</span>
+<span class="fc" id="L56">                path -&gt; stringyMetaData.put(MetaData.FILE_DIRECTORY, Collections.singletonList(path.trim())));</span>
+<span class="fc" id="L57">        metaData.getUserFileDirectories().forEach((user, path) -&gt; stringyMetaData</span>
+<span class="fc" id="L58">                .put(MetaData.FILE_DIRECTORY + '-' + user, Collections.singletonList(path.trim())));</span>
+<span class="fc" id="L59">        metaData.getLatexFileDirectories().forEach((user, path) -&gt; stringyMetaData</span>
+<span class="fc" id="L60">                .put(MetaData.FILE_DIRECTORY_LATEX + '-' + user, Collections.singletonList(path.toString().trim())));</span>
+<span class="fc" id="L61">        metaData.getVersionDBStructure().ifPresent(</span>
+<span class="nc" id="L62">                versionDBStructure -&gt; stringyMetaData.put(MetaData.VERSION_DB_STRUCT, Collections.singletonList(versionDBStructure.trim())));</span>
+
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (ContentSelector selector : metaData.getContentSelectorList()) {</span>
+<span class="fc" id="L65">            stringyMetaData.put(MetaData.SELECTOR_META_PREFIX + selector.getField().getName(), selector.getValues());</span>
+<span class="fc" id="L66">        }</span>
+
+<span class="fc" id="L68">        Map&lt;String, String&gt; serializedMetaData = serializeMetaData(stringyMetaData);</span>
+
+        // Write groups if present.
+        // Skip this if only the root node exists (which is always the AllEntriesGroup).
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        metaData.getGroups().filter(root -&gt; root.getNumberOfChildren() &gt; 0).ifPresent(</span>
+<span class="fc" id="L73">                root -&gt; serializedMetaData.put(MetaData.GROUPSTREE, serializeGroups(root)));</span>
+
+        // finally add all unknown meta data items to the serialization map
+<span class="fc" id="L76">        Map&lt;String, List&lt;String&gt;&gt; unknownMetaData = metaData.getUnknownMetaData();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : unknownMetaData.entrySet()) {</span>
+            // The last &quot;MetaData.SEPARATOR_STRING&quot; adds compatibility to JabRef v5.9 and earlier
+<span class="fc" id="L79">            StringJoiner value = new StringJoiner(MetaData.SEPARATOR_STRING + OS.NEWLINE, OS.NEWLINE, MetaData.SEPARATOR_STRING + OS.NEWLINE);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            for (String line : entry.getValue()) {</span>
+<span class="fc" id="L81">                value.add(line.replace(MetaData.SEPARATOR_STRING, &quot;\\&quot; + MetaData.SEPARATOR_STRING));</span>
+<span class="fc" id="L82">            }</span>
+<span class="fc" id="L83">            serializedMetaData.put(entry.getKey(), value.toString());</span>
+<span class="fc" id="L84">        }</span>
+
+<span class="fc" id="L86">        return serializedMetaData;</span>
+    }
+
+    private static Map&lt;String, String&gt; serializeMetaData(Map&lt;String, List&lt;String&gt;&gt; stringyMetaData) {
+<span class="fc" id="L90">        Map&lt;String, String&gt; serializedMetaData = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; metaItem : stringyMetaData.entrySet()) {</span>
+<span class="fc" id="L92">            List&lt;String&gt; itemList = metaItem.getValue();</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (itemList.isEmpty()) {</span>
+                // Only add non-empty values
+<span class="nc" id="L95">                continue;</span>
+            }
+
+<span class="fc" id="L98">            boolean isSaveActions = metaItem.getKey().equals(MetaData.SAVE_ACTIONS);</span>
+            // The last &quot;MetaData.SEPARATOR_STRING&quot; adds compatibility to JabRef v5.9 and earlier
+<span class="fc" id="L100">            StringJoiner joiner = new StringJoiner(MetaData.SEPARATOR_STRING, &quot;&quot;, MetaData.SEPARATOR_STRING);</span>
+<span class="fc" id="L101">            boolean lastWasSaveActionsEnablement = false;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            for (String dataItem : itemList) {</span>
+                String string;
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                if (lastWasSaveActionsEnablement) {</span>
+<span class="fc" id="L105">                    string = OS.NEWLINE;</span>
+                } else {
+<span class="fc" id="L107">                    string = &quot;&quot;;</span>
+                }
+<span class="fc" id="L109">                string += StringUtil.quote(dataItem, MetaData.SEPARATOR_STRING, MetaData.ESCAPE_CHARACTER);</span>
+                // in case of save actions, add an additional newline after the enabled flag
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                lastWasSaveActionsEnablement = isSaveActions</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                        &amp;&amp; (FieldFormatterCleanups.ENABLED.equals(dataItem)</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                        || FieldFormatterCleanups.DISABLED.equals(dataItem));</span>
+<span class="fc" id="L114">                joiner.add(string);</span>
+<span class="fc" id="L115">            }</span>
+<span class="fc" id="L116">            String serializedItem = joiner.toString();</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (!serializedItem.isEmpty()) {</span>
+                // Only add non-empty values
+<span class="fc" id="L119">                serializedMetaData.put(metaItem.getKey(), serializedItem);</span>
+            }
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">        return serializedMetaData;</span>
+    }
+
+    private static Map&lt;String, List&lt;String&gt;&gt; serializeCiteKeyPattern(MetaData metaData, GlobalCitationKeyPattern globalCitationKeyPattern) {
+<span class="fc" id="L126">        Map&lt;String, List&lt;String&gt;&gt; stringyPattern = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L127">        AbstractCitationKeyPattern citationKeyPattern = metaData.getCiteKeyPattern(globalCitationKeyPattern);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (EntryType key : citationKeyPattern.getAllKeys()) {</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (!citationKeyPattern.isDefaultValue(key)) {</span>
+<span class="fc" id="L130">                List&lt;String&gt; data = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L131">                data.add(citationKeyPattern.getValue(key).get(0));</span>
+<span class="fc" id="L132">                String metaDataKey = MetaData.PREFIX_KEYPATTERN + key.getName();</span>
+<span class="fc" id="L133">                stringyPattern.put(metaDataKey, data);</span>
+            }
+<span class="fc" id="L135">        }</span>
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">        if ((citationKeyPattern.getDefaultValue() != null) &amp;&amp; !citationKeyPattern.getDefaultValue().isEmpty()) {</span>
+<span class="fc" id="L137">            List&lt;String&gt; data = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L138">            data.add(citationKeyPattern.getDefaultValue().get(0));</span>
+<span class="fc" id="L139">            stringyPattern.put(MetaData.KEYPATTERNDEFAULT, data);</span>
+        }
+<span class="fc" id="L141">        return stringyPattern;</span>
+    }
+
+    private static String serializeGroups(GroupTreeNode root) {
+<span class="fc" id="L145">        StringBuilder stringBuilder = new StringBuilder();</span>
+<span class="fc" id="L146">        stringBuilder.append(OS.NEWLINE);</span>
+
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        for (String groupNode : new GroupSerializer().serializeTree(root)) {</span>
+<span class="fc" id="L149">            stringBuilder.append(StringUtil.quote(groupNode, MetaData.SEPARATOR_STRING, MetaData.ESCAPE_CHARACTER));</span>
+<span class="fc" id="L150">            stringBuilder.append(MetaData.SEPARATOR_STRING);</span>
+<span class="fc" id="L151">            stringBuilder.append(OS.NEWLINE);</span>
+<span class="fc" id="L152">        }</span>
+<span class="fc" id="L153">        return stringBuilder.toString();</span>
+    }
+
+    public static String serializeCustomEntryTypes(BibEntryType entryType) {
+<span class="fc" id="L157">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L158">        builder.append(MetaData.ENTRYTYPE_FLAG);</span>
+<span class="fc" id="L159">        builder.append(entryType.getType().getName());</span>
+<span class="fc" id="L160">        builder.append(&quot;: req[&quot;);</span>
+<span class="fc" id="L161">        builder.append(FieldFactory.serializeOrFieldsList(entryType.getRequiredFields()));</span>
+<span class="fc" id="L162">        builder.append(&quot;] opt[&quot;);</span>
+<span class="fc" id="L163">        builder.append(FieldFactory.serializeFieldsList(</span>
+<span class="fc" id="L164">                entryType.getOptionalFields()</span>
+<span class="fc" id="L165">                         .stream()</span>
+<span class="fc" id="L166">                         .map(BibField::field)</span>
+<span class="fc" id="L167">                         .collect(Collectors.toList())));</span>
+<span class="fc" id="L168">        builder.append(&quot;]&quot;);</span>
+<span class="fc" id="L169">        return builder.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

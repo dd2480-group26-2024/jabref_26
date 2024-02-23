@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompareCitedKey.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.style</a> &gt; <span class="el_source">CompareCitedKey.java</span></div><h1>CompareCitedKey.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.style;
+
+import java.util.Comparator;
+import java.util.Optional;
+
+import org.jabref.model.entry.BibEntry;
+
+/*
+ * Given a Comparator&lt;BibEntry&gt; provide a Comparator&lt;ComparableCitedKey&gt; that also handles
+ * unresolved citation keys.
+ */
+public class CompareCitedKey implements Comparator&lt;ComparableCitedKey&gt; {
+
+    Comparator&lt;BibEntry&gt; entryComparator;
+    boolean unresolvedComesFirst;
+
+<span class="nc" id="L17">    CompareCitedKey(Comparator&lt;BibEntry&gt; entryComparator, boolean unresolvedComesFirst) {</span>
+<span class="nc" id="L18">        this.entryComparator = entryComparator;</span>
+<span class="nc" id="L19">        this.unresolvedComesFirst = unresolvedComesFirst;</span>
+<span class="nc" id="L20">    }</span>
+
+    public int compare(ComparableCitedKey a, ComparableCitedKey b) {
+<span class="nc" id="L23">        Optional&lt;BibEntry&gt; aBibEntry = a.getBibEntry();</span>
+<span class="nc" id="L24">        Optional&lt;BibEntry&gt; bBibEntry = b.getBibEntry();</span>
+<span class="nc bnc" id="L25" title="All 2 branches missed.">        final int mul = unresolvedComesFirst ? (+1) : -1;</span>
+
+<span class="nc bnc" id="L27" title="All 4 branches missed.">        if (aBibEntry.isEmpty() &amp;&amp; bBibEntry.isEmpty()) {</span>
+            // Both are unresolved: compare them by citation key.
+<span class="nc" id="L29">            return a.getCitationKey().compareTo(b.getCitationKey());</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">        } else if (aBibEntry.isEmpty()) {</span>
+<span class="nc" id="L31">            return -mul;</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        } else if (bBibEntry.isEmpty()) {</span>
+<span class="nc" id="L33">            return mul;</span>
+        } else {
+            // Proper comparison of entries
+<span class="nc" id="L36">            return entryComparator.compare(aBibEntry.get(), bBibEntry.get());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

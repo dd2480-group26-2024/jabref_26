@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomTitledPaneSkin.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">CustomTitledPaneSkin.java</span></div><h1>CustomTitledPaneSkin.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.DoubleBinding;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.Property;
+import javafx.css.CssMetaData;
+import javafx.css.SimpleStyleableObjectProperty;
+import javafx.css.StyleableObjectProperty;
+import javafx.css.StyleableProperty;
+import javafx.scene.Node;
+import javafx.scene.control.Skin;
+import javafx.scene.control.TitledPane;
+import javafx.scene.control.skin.TitledPaneSkin;
+import javafx.scene.layout.Region;
+import javafx.scene.text.Text;
+import javafx.scene.transform.Rotate;
+
+import static javafx.css.StyleConverter.getEnumConverter;
+
+/**
+ *
+ * CustomTitledPaneSkin with option to move arrow to the right
+ * https://stackoverflow.com/a/55085777/3450689s
+ */
+public class CustomTitledPaneSkin extends TitledPaneSkin {
+
+<span class="nc" id="L33">    public enum ArrowSide {</span>
+<span class="nc" id="L34">        LEFT, RIGHT</span>
+    }
+
+    /* ********************************************************
+     *                                                        *
+     * Properties                                             *
+     *                                                        *
+     **********************************************************/
+
+<span class="nc" id="L43">    private final StyleableObjectProperty&lt;ArrowSide&gt; arrowSide = new SimpleStyleableObjectProperty&lt;&gt;(StyleableProperties.ARROW_SIDE, this, &quot;arrowSide&quot;, ArrowSide.LEFT) {</span>
+
+        @Override
+        protected void invalidated() {
+<span class="nc" id="L47">            adjustTitleLayout();</span>
+<span class="nc" id="L48">        }</span>
+    };
+
+    public final void setArrowSide(ArrowSide arrowSide) {
+<span class="nc" id="L52">        this.arrowSide.set(arrowSide);</span>
+<span class="nc" id="L53">    }</span>
+
+    public final ArrowSide getArrowSide() {
+<span class="nc" id="L56">        return arrowSide.get();</span>
+    }
+
+    public final ObjectProperty&lt;ArrowSide&gt; arrowSideProperty() {
+<span class="nc" id="L60">        return arrowSide;</span>
+    }
+
+    /* ********************************************************
+     *                                                        *
+     * Instance Fields                                        *
+     *                                                        *
+     **********************************************************/
+
+    private final Region title;
+    private final Region arrowButton;
+    private final Region arrow;
+    private final Text text;
+
+    private DoubleBinding arrowTranslateBinding;
+    private DoubleBinding textGraphicTranslateBinding;
+    private Node graphic;
+
+    /* ********************************************************
+     *                                                        *
+     * Constructors                                           *
+     *                                                        *
+     **********************************************************/
+
+    public CustomTitledPaneSkin(TitledPane control) {
+<span class="nc" id="L85">        super(control);</span>
+<span class="nc" id="L86">        title = (Region) Objects.requireNonNull(control.lookup(&quot;.title&quot;));</span>
+<span class="nc" id="L87">        arrowButton = (Region) Objects.requireNonNull(title.lookup(&quot;.arrow-button&quot;));</span>
+<span class="nc" id="L88">        arrow = (Region) Objects.requireNonNull(arrowButton.lookup(&quot;.arrow&quot;));</span>
+<span class="nc" id="L89">        text = (Text) Objects.requireNonNull(title.lookup(&quot;.text&quot;));</span>
+
+        // based on https://stackoverflow.com/a/55156460/3450689
+<span class="nc" id="L92">        Rotate rotate = new Rotate();</span>
+<span class="nc" id="L93">        rotate.pivotXProperty().bind(arrow.widthProperty().divide(2.0));</span>
+<span class="nc" id="L94">        rotate.pivotYProperty().bind(arrow.heightProperty().divide(2.0));</span>
+<span class="nc" id="L95">        rotate.angleProperty().bind(</span>
+<span class="nc" id="L96">                Bindings.when(control.expandedProperty())</span>
+<span class="nc" id="L97">                        .then(-180.0)</span>
+<span class="nc" id="L98">                        .otherwise(90.0));</span>
+
+<span class="nc" id="L100">        arrow.getTransforms().add(rotate);</span>
+
+<span class="nc" id="L102">        registerChangeListener(control.graphicProperty(), ov -&gt; adjustTitleLayout());</span>
+<span class="nc" id="L103">    }</span>
+
+    /* ********************************************************
+     *                                                        *
+     * Skin Stuff                                             *
+     *                                                        *
+     **********************************************************/
+
+    private void adjustTitleLayout() {
+<span class="nc" id="L112">        clearBindings();</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (getArrowSide() != ArrowSide.RIGHT) {</span>
+            // if arrow is on the left we don't need to translate anything
+<span class="nc" id="L115">            return;</span>
+        }
+
+<span class="nc" id="L118">        arrowTranslateBinding = Bindings.createDoubleBinding(() -&gt; {</span>
+<span class="nc" id="L119">            double rightInset = title.getPadding().getRight();</span>
+<span class="nc" id="L120">            return title.getWidth() - arrowButton.getLayoutX() - arrowButton.getWidth() - rightInset;</span>
+<span class="nc" id="L121">        }, title.paddingProperty(), title.widthProperty(), arrowButton.widthProperty(), arrowButton.layoutXProperty());</span>
+<span class="nc" id="L122">        arrowButton.translateXProperty().bind(arrowTranslateBinding);</span>
+
+<span class="nc" id="L124">        textGraphicTranslateBinding = Bindings.createDoubleBinding(</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                () -&gt; switch (getSkinnable().getAlignment()) {</span>
+<span class="nc" id="L126">                    case TOP_CENTER, CENTER, BOTTOM_CENTER, BASELINE_CENTER -&gt; 0.0;</span>
+<span class="nc" id="L127">                    default -&gt; -arrowButton.getWidth();</span>
+<span class="nc" id="L128">                }, getSkinnable().alignmentProperty(), arrowButton.widthProperty());</span>
+<span class="nc" id="L129">        text.translateXProperty().bind(textGraphicTranslateBinding);</span>
+
+<span class="nc" id="L131">        graphic = getSkinnable().getGraphic();</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (graphic != null) {</span>
+<span class="nc" id="L133">            graphic.translateXProperty().bind(textGraphicTranslateBinding);</span>
+        }
+<span class="nc" id="L135">    }</span>
+
+    private void clearBindings() {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (arrowTranslateBinding != null) {</span>
+<span class="nc" id="L139">            arrowButton.translateXProperty().unbind();</span>
+<span class="nc" id="L140">            arrowButton.setTranslateX(0);</span>
+<span class="nc" id="L141">            arrowTranslateBinding.dispose();</span>
+<span class="nc" id="L142">            arrowTranslateBinding = null;</span>
+        }
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (textGraphicTranslateBinding != null) {</span>
+<span class="nc" id="L145">            text.translateXProperty().unbind();</span>
+<span class="nc" id="L146">            text.setTranslateX(0);</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            if (graphic != null) {</span>
+<span class="nc" id="L148">                graphic.translateXProperty().unbind();</span>
+<span class="nc" id="L149">                graphic.setTranslateX(0);</span>
+<span class="nc" id="L150">                graphic = null;</span>
+            }
+<span class="nc" id="L152">            textGraphicTranslateBinding.dispose();</span>
+<span class="nc" id="L153">            textGraphicTranslateBinding = null;</span>
+        }
+<span class="nc" id="L155">    }</span>
+
+    @Override
+    public void dispose() {
+<span class="nc" id="L159">        clearBindings();</span>
+<span class="nc" id="L160">        unregisterChangeListeners(getSkinnable().graphicProperty());</span>
+<span class="nc" id="L161">        super.dispose();</span>
+<span class="nc" id="L162">    }</span>
+
+    /* ********************************************************
+     *                                                        *
+     * Stylesheet Handling                                    *
+     *                                                        *
+     **********************************************************/
+
+    public static List&lt;CssMetaData&lt;?, ?&gt;&gt; getClassCssMetaData() {
+<span class="nc" id="L171">        return StyleableProperties.CSS_META_DATA;</span>
+    }
+
+    @Override
+    public List&lt;CssMetaData&lt;?, ?&gt;&gt; getCssMetaData() {
+<span class="nc" id="L176">        return getClassCssMetaData();</span>
+    }
+
+    private static class StyleableProperties {
+
+<span class="nc" id="L181">        private static final CssMetaData&lt;TitledPane, ArrowSide&gt; ARROW_SIDE = new CssMetaData&lt;&gt;(&quot;-fx-arrow-side&quot;, getEnumConverter(ArrowSide.class), ArrowSide.LEFT) {</span>
+
+            @Override
+            public boolean isSettable(TitledPane styleable) {
+<span class="nc" id="L185">                Property&lt;?&gt; prop = (Property&lt;?&gt;) getStyleableProperty(styleable);</span>
+<span class="nc bnc" id="L186" title="All 4 branches missed.">                return (prop != null) &amp;&amp; !prop.isBound();</span>
+            }
+
+            @Override
+            public StyleableProperty&lt;ArrowSide&gt; getStyleableProperty(TitledPane styleable) {
+<span class="nc" id="L191">                Skin&lt;?&gt; skin = styleable.getSkin();</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                if (skin instanceof CustomTitledPaneSkin paneSkin) {</span>
+<span class="nc" id="L193">                    return paneSkin.arrowSide;</span>
+                }
+<span class="nc" id="L195">                return null;</span>
+            }
+
+        };
+
+        private static final List&lt;CssMetaData&lt;?, ?&gt;&gt; CSS_META_DATA;
+
+        static {
+<span class="nc" id="L203">            List&lt;CssMetaData&lt;?, ?&gt;&gt; list = new ArrayList&lt;&gt;(TitledPane.getClassCssMetaData().size() + 1);</span>
+<span class="nc" id="L204">            list.addAll(TitledPaneSkin.getClassCssMetaData());</span>
+<span class="nc" id="L205">            list.add(ARROW_SIDE);</span>
+<span class="nc" id="L206">            CSS_META_DATA = Collections.unmodifiableList(list);</span>
+<span class="nc" id="L207">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

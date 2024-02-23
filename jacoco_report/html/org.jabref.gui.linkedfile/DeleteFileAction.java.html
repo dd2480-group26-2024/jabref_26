@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeleteFileAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.linkedfile</a> &gt; <span class="el_source">DeleteFileAction.java</span></div><h1>DeleteFileAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.linkedfile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ListView;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.fieldeditors.LinkedFileViewModel;
+import org.jabref.gui.fieldeditors.LinkedFilesEditorViewModel;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class DeleteFileAction extends SimpleCommand {
+
+<span class="nc" id="L28">    private static final Logger LOGGER = LoggerFactory.getLogger(DeleteFileAction.class);</span>
+
+    private final DialogService dialogService;
+    private final PreferencesService preferences;
+    private final BibDatabaseContext databaseContext;
+    private final LinkedFilesEditorViewModel viewModel;
+    private final ListView&lt;LinkedFileViewModel&gt; listView;
+
+    public DeleteFileAction(DialogService dialogService,
+                            PreferencesService preferences,
+                            BibDatabaseContext databaseContext,
+                            LinkedFilesEditorViewModel viewModel,
+<span class="nc" id="L40">                            ListView&lt;LinkedFileViewModel&gt; listView) {</span>
+<span class="nc" id="L41">        this.dialogService = dialogService;</span>
+<span class="nc" id="L42">        this.preferences = preferences;</span>
+<span class="nc" id="L43">        this.databaseContext = databaseContext;</span>
+<span class="nc" id="L44">        this.viewModel = viewModel;</span>
+<span class="nc" id="L45">        this.listView = listView;</span>
+<span class="nc" id="L46">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc" id="L50">        List&lt;LinkedFileViewModel&gt; toBeDeleted = List.copyOf(listView.getSelectionModel().getSelectedItems());</span>
+
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (toBeDeleted.isEmpty()) {</span>
+<span class="nc" id="L53">            dialogService.notify(Localization.lang(&quot;This operation requires selected linked files.&quot;));</span>
+<span class="nc" id="L54">            return;</span>
+        }
+
+        String dialogTitle;
+        String dialogContent;
+
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (toBeDeleted.size() != 1) {</span>
+<span class="nc" id="L61">            dialogTitle = Localization.lang(&quot;Delete %0 files&quot;, toBeDeleted.size());</span>
+<span class="nc" id="L62">            dialogContent = Localization.lang(&quot;Delete %0 files permanently from disk, or just remove the files from the entry? &quot; +</span>
+<span class="nc" id="L63">                    &quot;Pressing Delete will delete the files permanently from disk.&quot;, toBeDeleted.size());</span>
+        } else {
+<span class="nc" id="L65">            Optional&lt;Path&gt; file = toBeDeleted.getFirst().getFile().findIn(databaseContext, preferences.getFilePreferences());</span>
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            if (file.isPresent()) {</span>
+<span class="nc" id="L68">                dialogTitle = Localization.lang(&quot;Delete '%0'&quot;, file.get().getFileName().toString());</span>
+<span class="nc" id="L69">                dialogContent = Localization.lang(&quot;Delete '%0' permanently from disk, or just remove the file from the entry? &quot; +</span>
+<span class="nc" id="L70">                        &quot;Pressing Delete will delete the file permanently from disk.&quot;, file.get().toString());</span>
+            } else {
+<span class="nc" id="L72">                dialogService.notify(Localization.lang(&quot;Error accessing file '%0'.&quot;, toBeDeleted.getFirst().getFile().getLink()));</span>
+<span class="nc" id="L73">                return;</span>
+            }
+        }
+
+<span class="nc" id="L77">        ButtonType removeFromEntry = new ButtonType(Localization.lang(&quot;Remove from entry&quot;), ButtonBar.ButtonData.YES);</span>
+<span class="nc" id="L78">        ButtonType deleteFromEntry = new ButtonType(Localization.lang(&quot;Delete from disk&quot;));</span>
+<span class="nc" id="L79">        Optional&lt;ButtonType&gt; buttonType = dialogService.showCustomButtonDialogAndWait(Alert.AlertType.INFORMATION,</span>
+                dialogTitle, dialogContent, removeFromEntry, deleteFromEntry, ButtonType.CANCEL);
+
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (buttonType.isPresent()) {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (buttonType.get().equals(removeFromEntry)) {</span>
+<span class="nc" id="L84">                deleteFiles(toBeDeleted, false);</span>
+            }
+
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (buttonType.get().equals(deleteFromEntry)) {</span>
+<span class="nc" id="L88">                deleteFiles(toBeDeleted, true);</span>
+            }
+        }
+<span class="nc" id="L91">    }</span>
+
+    /**
+     * Deletes the files from the entry and optionally from disk.
+     *
+     * @param toBeDeleted the files to be deleted
+     * @param deleteFromDisk if true, the files are deleted from disk, otherwise they are only removed from the entry
+     */
+    private void deleteFiles(List&lt;LinkedFileViewModel&gt; toBeDeleted, boolean deleteFromDisk) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        for (LinkedFileViewModel fileViewModel : toBeDeleted) {</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (fileViewModel.getFile().isOnlineLink()) {</span>
+<span class="nc" id="L102">                viewModel.removeFileLink(fileViewModel);</span>
+            } else {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                if (deleteFromDisk) {</span>
+<span class="nc" id="L105">                    deleteFileFromDisk(fileViewModel);</span>
+                }
+<span class="nc" id="L107">                viewModel.getFiles().remove(fileViewModel);</span>
+            }
+<span class="nc" id="L109">        }</span>
+<span class="nc" id="L110">    }</span>
+
+    /**
+     * Deletes the file from disk without asking the user for confirmation.
+     *
+     * @param fileViewModel the file to be deleted
+     */
+    public void deleteFileFromDisk(LinkedFileViewModel fileViewModel) {
+<span class="nc" id="L118">        LinkedFile linkedFile = fileViewModel.getFile();</span>
+
+<span class="nc" id="L120">        Optional&lt;Path&gt; file = linkedFile.findIn(databaseContext, preferences.getFilePreferences());</span>
+
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (file.isEmpty()) {</span>
+<span class="nc" id="L123">            LOGGER.warn(&quot;Could not find file {}&quot;, linkedFile.getLink());</span>
+        }
+
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (file.isPresent()) {</span>
+            try {
+<span class="nc" id="L128">                Files.delete(file.get());</span>
+<span class="nc" id="L129">            } catch (</span>
+                    IOException ex) {
+<span class="nc" id="L131">                dialogService.showErrorDialogAndWait(Localization.lang(&quot;Cannot delete file&quot;), Localization.lang(&quot;File permission error&quot;));</span>
+<span class="nc" id="L132">                LOGGER.warn(&quot;File permission error while deleting: {}&quot;, linkedFile, ex);</span>
+<span class="nc" id="L133">            }</span>
+        } else {
+<span class="nc" id="L135">            dialogService.notify(Localization.lang(&quot;Error accessing file '%0'.&quot;, linkedFile.getLink()));</span>
+        }
+<span class="nc" id="L137">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

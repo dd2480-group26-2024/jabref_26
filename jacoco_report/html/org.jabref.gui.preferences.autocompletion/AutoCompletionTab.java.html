@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutoCompletionTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.autocompletion</a> &gt; <span class="el_source">AutoCompletionTab.java</span></div><h1>AutoCompletionTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.autocompletion;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.TextField;
+
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.logic.l10n.Localization;
+
+import com.airhacks.afterburner.views.ViewLoader;
+
+public class AutoCompletionTab extends AbstractPreferenceTabView&lt;AutoCompletionTabViewModel&gt; implements PreferencesTab {
+
+    @FXML private CheckBox enableAutoComplete;
+    @FXML private TextField autoCompleteFields;
+    @FXML private RadioButton autoCompleteFirstLast;
+    @FXML private RadioButton autoCompleteLastFirst;
+    @FXML private RadioButton autoCompleteBoth;
+    @FXML private RadioButton firstNameModeAbbreviated;
+    @FXML private RadioButton firstNameModeFull;
+    @FXML private RadioButton firstNameModeBoth;
+
+<span class="nc" id="L25">    public AutoCompletionTab() {</span>
+<span class="nc" id="L26">        ViewLoader.view(this)</span>
+<span class="nc" id="L27">                  .root(this)</span>
+<span class="nc" id="L28">                  .load();</span>
+<span class="nc" id="L29">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L33">        return Localization.lang(&quot;Autocompletion&quot;);</span>
+    }
+
+    public void initialize() {
+<span class="nc" id="L37">        viewModel = new AutoCompletionTabViewModel(preferencesService.getAutoCompletePreferences());</span>
+
+<span class="nc" id="L39">        enableAutoComplete.selectedProperty().bindBidirectional(viewModel.enableAutoCompleteProperty());</span>
+<span class="nc" id="L40">        autoCompleteFields.textProperty().bindBidirectional(viewModel.autoCompleteFieldsProperty());</span>
+<span class="nc" id="L41">        autoCompleteFirstLast.selectedProperty().bindBidirectional(viewModel.autoCompleteFirstLastProperty());</span>
+<span class="nc" id="L42">        autoCompleteLastFirst.selectedProperty().bindBidirectional(viewModel.autoCompleteLastFirstProperty());</span>
+<span class="nc" id="L43">        autoCompleteBoth.selectedProperty().bindBidirectional(viewModel.autoCompleteBothProperty());</span>
+<span class="nc" id="L44">        firstNameModeAbbreviated.selectedProperty().bindBidirectional(viewModel.firstNameModeAbbreviatedProperty());</span>
+<span class="nc" id="L45">        firstNameModeFull.selectedProperty().bindBidirectional(viewModel.firstNameModeFullProperty());</span>
+<span class="nc" id="L46">        firstNameModeBoth.selectedProperty().bindBidirectional(viewModel.firstNameModeBothProperty());</span>
+<span class="nc" id="L47">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActionHelper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.actions</a> &gt; <span class="el_source">ActionHelper.java</span></div><h1>ActionHelper.java</h1><pre class="source lang-java linenums">package org.jabref.gui.actions;
+
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import javafx.beans.binding.Binding;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanExpression;
+import javafx.collections.ObservableList;
+import javafx.scene.control.TabPane;
+
+import org.jabref.gui.StateManager;
+import org.jabref.logic.shared.DatabaseLocation;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.model.entry.field.Field;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+import com.tobiasdiez.easybind.EasyBinding;
+
+<span class="nc" id="L26">public class ActionHelper {</span>
+
+    public static BooleanExpression needsDatabase(StateManager stateManager) {
+<span class="fc" id="L29">        return stateManager.activeDatabaseProperty().isPresent();</span>
+    }
+
+    public static BooleanExpression needsSharedDatabase(StateManager stateManager) {
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        EasyBinding&lt;Boolean&gt; binding = EasyBind.map(stateManager.activeDatabaseProperty(), context -&gt; context.filter(c -&gt; c.getLocation() == DatabaseLocation.SHARED).isPresent());</span>
+<span class="nc" id="L34">        return BooleanExpression.booleanExpression(binding);</span>
+    }
+
+    public static BooleanExpression needsStudyDatabase(StateManager stateManager) {
+<span class="nc" id="L38">        EasyBinding&lt;Boolean&gt; binding = EasyBind.map(stateManager.activeDatabaseProperty(), context -&gt; context.filter(BibDatabaseContext::isStudy).isPresent());</span>
+<span class="nc" id="L39">        return BooleanExpression.booleanExpression(binding);</span>
+    }
+
+    public static BooleanExpression needsEntriesSelected(StateManager stateManager) {
+<span class="fc" id="L43">        return Bindings.isNotEmpty(stateManager.getSelectedEntries());</span>
+    }
+
+    public static BooleanExpression needsEntriesSelected(int numberOfEntries, StateManager stateManager) {
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        return Bindings.createBooleanBinding(() -&gt; stateManager.getSelectedEntries().size() == numberOfEntries,</span>
+<span class="nc" id="L48">                                             stateManager.getSelectedEntries());</span>
+    }
+
+    public static BooleanExpression isFieldSetForSelectedEntry(Field field, StateManager stateManager) {
+<span class="nc" id="L52">        return isAnyFieldSetForSelectedEntry(Collections.singletonList(field), stateManager);</span>
+    }
+
+    public static BooleanExpression isAnyFieldSetForSelectedEntry(List&lt;Field&gt; fields, StateManager stateManager) {
+<span class="nc" id="L56">        ObservableList&lt;BibEntry&gt; selectedEntries = stateManager.getSelectedEntries();</span>
+<span class="nc" id="L57">        Binding&lt;Boolean&gt; fieldsAreSet = EasyBind.valueAt(selectedEntries, 0)</span>
+<span class="nc" id="L58">                                                .mapObservable(entry -&gt; Bindings.createBooleanBinding(() -&gt; {</span>
+<span class="nc" id="L59">                                                    return entry.getFields().stream().anyMatch(fields::contains);</span>
+<span class="nc" id="L60">                                                }, entry.getFieldsObservable()))</span>
+<span class="nc" id="L61">                                                .orElseOpt(false);</span>
+<span class="nc" id="L62">        return BooleanExpression.booleanExpression(fieldsAreSet);</span>
+    }
+
+    public static BooleanExpression isFilePresentForSelectedEntry(StateManager stateManager, PreferencesService preferencesService) {
+<span class="nc" id="L66">        ObservableList&lt;BibEntry&gt; selectedEntries = stateManager.getSelectedEntries();</span>
+<span class="nc" id="L67">        Binding&lt;Boolean&gt; fileIsPresent = EasyBind.valueAt(selectedEntries, 0).mapOpt(entry -&gt; {</span>
+<span class="nc" id="L68">            List&lt;LinkedFile&gt; files = entry.getFiles();</span>
+
+<span class="nc bnc" id="L70" title="All 4 branches missed.">            if ((!entry.getFiles().isEmpty()) &amp;&amp; stateManager.getActiveDatabase().isPresent()) {</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">                if (files.getFirst().isOnlineLink()) {</span>
+<span class="nc" id="L72">                    return true;</span>
+                }
+
+<span class="nc" id="L75">                Optional&lt;Path&gt; filename = FileUtil.find(</span>
+<span class="nc" id="L76">                        stateManager.getActiveDatabase().get(),</span>
+<span class="nc" id="L77">                        files.getFirst().getLink(),</span>
+<span class="nc" id="L78">                        preferencesService.getFilePreferences());</span>
+<span class="nc" id="L79">                return filename.isPresent();</span>
+            } else {
+<span class="nc" id="L81">                return false;</span>
+            }
+<span class="nc" id="L83">        }).orElseOpt(false);</span>
+
+<span class="nc" id="L85">        return BooleanExpression.booleanExpression(fileIsPresent);</span>
+    }
+
+    /**
+     * Check if at least one of the selected entries has linked files
+     * &lt;br&gt;
+     * Used in {@link org.jabref.gui.maintable.OpenExternalFileAction} when multiple entries selected
+     *
+     * @param stateManager manager for the state of the GUI
+     * @return a boolean binding
+     */
+    public static BooleanExpression hasLinkedFileForSelectedEntries(StateManager stateManager) {
+<span class="nc" id="L97">        return BooleanExpression.booleanExpression(EasyBind.reduce(stateManager.getSelectedEntries(),</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                entries -&gt; entries.anyMatch(entry -&gt; !entry.getFiles().isEmpty())));</span>
+    }
+
+    public static BooleanExpression isOpenMultiDatabase(TabPane tabbedPane) {
+<span class="nc" id="L102">        return Bindings.size(tabbedPane.getTabs()).greaterThan(1);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
