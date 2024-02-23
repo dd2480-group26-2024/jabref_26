@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UiThreadList.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">UiThreadList.java</span></div><h1>UiThreadList.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import java.util.concurrent.CountDownLatch;
+
+import javafx.application.Platform;
+import javafx.collections.ListChangeListener;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.TransformationList;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+class UiThreadList&lt;T&gt; extends TransformationList&lt;T, T&gt; {
+<span class="nc" id="L14">    private static final Logger LOGGER = LoggerFactory.getLogger(UiThreadList.class);</span>
+
+    public UiThreadList(ObservableList&lt;? extends T&gt; source) {
+<span class="nc" id="L17">        super(source);</span>
+<span class="nc" id="L18">    }</span>
+
+    @Override
+    protected void sourceChanged(ListChangeListener.Change&lt;? extends T&gt; change) {
+<span class="nc bnc" id="L22" title="All 2 branches missed.">        if (Platform.isFxApplicationThread()) {</span>
+<span class="nc" id="L23">            fireChange(change);</span>
+        } else {
+<span class="nc" id="L25">            CountDownLatch latch = new CountDownLatch(1);</span>
+<span class="nc" id="L26">            Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L27">                fireChange(change);</span>
+<span class="nc" id="L28">                latch.countDown();</span>
+<span class="nc" id="L29">            });</span>
+
+            try {
+<span class="nc" id="L32">                latch.await();</span>
+<span class="nc" id="L33">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L34">                LOGGER.error(&quot;Error while running on JavaFX thread&quot;, e);</span>
+<span class="nc" id="L35">            }</span>
+        }
+<span class="nc" id="L37">    }</span>
+
+    @Override
+    public int getSourceIndex(int index) {
+<span class="nc" id="L41">        return index;</span>
+    }
+
+    @Override
+    public int getViewIndex(int index) {
+<span class="nc" id="L46">        return index;</span>
+    }
+
+    @Override
+    public T get(int index) {
+<span class="nc" id="L51">        return getSource().get(index);</span>
+    }
+
+    @Override
+    public int size() {
+<span class="nc" id="L56">        return getSource().size();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PushToApplicationCommand.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.push</a> &gt; <span class="el_source">PushToApplicationCommand.java</span></div><h1>PushToApplicationCommand.java</h1><pre class="source lang-java linenums">package org.jabref.gui.push;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+import javafx.scene.control.ButtonBase;
+import javafx.scene.control.MenuItem;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.Action;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.BindingsHelper;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.jabref.gui.actions.ActionHelper.needsDatabase;
+import static org.jabref.gui.actions.ActionHelper.needsEntriesSelected;
+
+/**
+ * An Action class representing the process of invoking a PushToApplication operation.
+ */
+public class PushToApplicationCommand extends SimpleCommand {
+
+<span class="nc" id="L37">    private static final Logger LOGGER = LoggerFactory.getLogger(PushToApplicationCommand.class);</span>
+
+    private final StateManager stateManager;
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+
+<span class="nc" id="L43">    private final List&lt;Object&gt; reconfigurableControls = new ArrayList&lt;&gt;();</span>
+    private final TaskExecutor taskExecutor;
+
+    private PushToApplication application;
+
+<span class="nc" id="L48">    public PushToApplicationCommand(StateManager stateManager, DialogService dialogService, PreferencesService preferencesService, TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L49">        this.stateManager = stateManager;</span>
+<span class="nc" id="L50">        this.dialogService = dialogService;</span>
+<span class="nc" id="L51">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L52">        this.taskExecutor = taskExecutor;</span>
+
+<span class="nc" id="L54">        setApplication(preferencesService.getPushToApplicationPreferences()</span>
+<span class="nc" id="L55">                                                            .getActiveApplicationName());</span>
+
+<span class="nc" id="L57">        EasyBind.subscribe(preferencesService.getPushToApplicationPreferences().activeApplicationNameProperty(),</span>
+                this::setApplication);
+
+<span class="nc" id="L60">        this.executable.bind(needsDatabase(stateManager).and(needsEntriesSelected(stateManager)));</span>
+<span class="nc" id="L61">        this.statusMessage.bind(BindingsHelper.ifThenElse(</span>
+                this.executable,
+                &quot;&quot;,
+<span class="nc" id="L64">                Localization.lang(&quot;This operation requires one or more entries to be selected.&quot;)));</span>
+<span class="nc" id="L65">    }</span>
+
+    public void registerReconfigurable(Object node) {
+<span class="nc bnc" id="L68" title="All 4 branches missed.">        if (!(node instanceof MenuItem) &amp;&amp; !(node instanceof ButtonBase)) {</span>
+<span class="nc" id="L69">            LOGGER.error(&quot;Node must be either a MenuItem or a ButtonBase&quot;);</span>
+<span class="nc" id="L70">            return;</span>
+        }
+
+<span class="nc" id="L73">        this.reconfigurableControls.add(node);</span>
+<span class="nc" id="L74">    }</span>
+
+    private void setApplication(String applicationName) {
+<span class="nc" id="L77">        final ActionFactory factory = new ActionFactory(preferencesService.getKeyBindingRepository());</span>
+<span class="nc" id="L78">        PushToApplication application = PushToApplications.getApplicationByName(</span>
+                                                                  applicationName,
+                                                                  dialogService,
+                                                                  preferencesService)
+<span class="nc" id="L82">                                                          .orElse(new PushToEmacs(dialogService, preferencesService));</span>
+
+<span class="nc" id="L84">        preferencesService.getPushToApplicationPreferences().setActiveApplicationName(application.getDisplayName());</span>
+<span class="nc" id="L85">        this.application = Objects.requireNonNull(application);</span>
+
+<span class="nc" id="L87">        reconfigurableControls.forEach(object -&gt; {</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            if (object instanceof MenuItem) {</span>
+<span class="nc" id="L89">                factory.configureMenuItem(application.getAction(), this, (MenuItem) object);</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            } else if (object instanceof ButtonBase) {</span>
+<span class="nc" id="L91">                factory.configureIconButton(application.getAction(), this, (ButtonBase) object);</span>
+            }
+<span class="nc" id="L93">        });</span>
+<span class="nc" id="L94">    }</span>
+
+    public Action getAction() {
+<span class="nc" id="L97">        return application.getAction();</span>
+    }
+
+    private static String getKeyString(List&lt;BibEntry&gt; entries, String delimiter) {
+<span class="nc" id="L101">        StringBuilder result = new StringBuilder();</span>
+        Optional&lt;String&gt; citeKey;
+<span class="nc" id="L103">        boolean first = true;</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        for (BibEntry bes : entries) {</span>
+<span class="nc" id="L105">            citeKey = bes.getCitationKey();</span>
+<span class="nc bnc" id="L106" title="All 4 branches missed.">            if (citeKey.isEmpty() || citeKey.get().isEmpty()) {</span>
+                // Should never occur, because we made sure that all entries have keys
+<span class="nc" id="L108">                continue;</span>
+            }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">            if (first) {</span>
+<span class="nc" id="L111">                result.append(citeKey.get());</span>
+<span class="nc" id="L112">                first = false;</span>
+            } else {
+<span class="nc" id="L114">                result.append(delimiter).append(citeKey.get());</span>
+            }
+<span class="nc" id="L116">        }</span>
+<span class="nc" id="L117">        return result.toString();</span>
+    }
+
+    @Override
+    public void execute() {
+        // If required, check that all entries have citation keys defined:
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (application.requiresCitationKeys()) {</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">            for (BibEntry entry : stateManager.getSelectedEntries()) {</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                if (StringUtil.isBlank(entry.getCitationKey())) {</span>
+<span class="nc" id="L126">                    dialogService.showErrorDialogAndWait(</span>
+<span class="nc" id="L127">                            application.getDisplayName(),</span>
+<span class="nc" id="L128">                            Localization.lang(&quot;This operation requires all selected entries to have citation keys defined.&quot;));</span>
+<span class="nc" id="L129">                    return;</span>
+                }
+<span class="nc" id="L131">            }</span>
+        }
+
+        // All set, call the operation in a new thread:
+<span class="nc" id="L135">        BackgroundTask.wrap(this::pushEntries)</span>
+<span class="nc" id="L136">                      .onSuccess(s -&gt; application.onOperationCompleted())</span>
+<span class="nc" id="L137">                      .onFailure(ex -&gt; LOGGER.error(&quot;Error pushing citation&quot;, ex))</span>
+<span class="nc" id="L138">                      .executeWith(taskExecutor);</span>
+<span class="nc" id="L139">    }</span>
+
+    private void pushEntries() {
+<span class="nc" id="L142">        BibDatabaseContext database = stateManager.getActiveDatabase().orElseThrow(() -&gt; new NullPointerException(&quot;Database null&quot;));</span>
+<span class="nc" id="L143">        application.pushEntries(database, stateManager.getSelectedEntries(), getKeyString(stateManager.getSelectedEntries(), application.getDelimiter()));</span>
+<span class="nc" id="L144">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

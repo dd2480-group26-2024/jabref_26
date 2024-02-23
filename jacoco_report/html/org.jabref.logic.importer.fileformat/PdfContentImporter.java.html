@@ -1,0 +1,598 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfContentImporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fileformat</a> &gt; <span class="el_source">PdfContentImporter.java</span></div><h1>PdfContentImporter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fileformat;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.importer.Importer;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.OS;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.logic.xmp.EncryptedPdfsNotSupportedException;
+import org.jabref.logic.xmp.XmpUtilReader;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+
+import com.google.common.base.Strings;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+
+/**
+ * PdfContentImporter parses data of the first page of the PDF and creates a BibTeX entry.
+ * &lt;p&gt;
+ * Currently, Springer and IEEE formats are supported.
+ * &lt;p&gt;
+ */
+<span class="fc" id="L38">public class PdfContentImporter extends Importer {</span>
+
+<span class="fc" id="L40">    private static final Pattern YEAR_EXTRACT_PATTERN = Pattern.compile(&quot;\\d{4}&quot;);</span>
+    // input lines into several lines
+    private String[] lines;
+    // current index in lines
+    private int lineIndex;
+    private String curString;
+    private String year;
+
+    /**
+     * Removes all non-letter characters at the end
+     * &lt;p&gt;
+     * EXCEPTION: a closing bracket is NOT removed
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * TODO: Additionally replace multiple subsequent spaces by one space, which will cause a rename of this method
+     * &lt;/p&gt;
+     */
+    private String removeNonLettersAtEnd(String input) {
+<span class="fc" id="L58">        String result = input.trim();</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (result.isEmpty()) {</span>
+<span class="nc" id="L60">            return result;</span>
+        }
+<span class="fc" id="L62">        char lastC = result.charAt(result.length() - 1);</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        while (!Character.isLetter(lastC) &amp;&amp; (lastC != ')')) {</span>
+            // if there is an asterix, a dot or something else at the end: remove it
+<span class="fc" id="L65">            result = result.substring(0, result.length() - 1);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (result.isEmpty()) {</span>
+<span class="fc" id="L67">                break;</span>
+            } else {
+<span class="nc" id="L69">                lastC = result.charAt(result.length() - 1);</span>
+            }
+        }
+<span class="fc" id="L72">        return result;</span>
+    }
+
+    private String streamlineNames(String names) {
+        // TODO: replace with NormalizeNamesFormatter?!
+        String res;
+        // supported formats:
+        //   Matthias Schrepfer1, Johannes Wolf1, Jan Mendling1, and Hajo A. Reijers2
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (names.contains(&quot;,&quot;)) {</span>
+<span class="fc" id="L81">            String[] splitNames = names.split(&quot;,&quot;);</span>
+<span class="fc" id="L82">            res = &quot;&quot;;</span>
+<span class="fc" id="L83">            boolean isFirst = true;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            for (String splitName : splitNames) {</span>
+<span class="fc" id="L85">                String curName = removeNonLettersAtEnd(splitName);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                if (curName.indexOf(&quot;and&quot;) == 0) {</span>
+                    // skip possible ands between names
+<span class="nc" id="L88">                    curName = curName.substring(3).trim();</span>
+                } else {
+<span class="fc" id="L90">                    int posAnd = curName.indexOf(&quot; and &quot;);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                    if (posAnd &gt;= 0) {</span>
+<span class="nc" id="L92">                        String nameBefore = curName.substring(0, posAnd);</span>
+                        // cannot be first name as &quot;,&quot; is contained in the string
+<span class="nc" id="L94">                        res = res.concat(&quot; and &quot;).concat(removeNonLettersAtEnd(nameBefore));</span>
+<span class="nc" id="L95">                        curName = curName.substring(posAnd + 5);</span>
+                    }
+                }
+
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                if (!curName.isEmpty()) {</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                    if (&quot;et al.&quot;.equalsIgnoreCase(curName)) {</span>
+<span class="nc" id="L101">                        curName = &quot;others&quot;;</span>
+                    }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                    if (isFirst) {</span>
+<span class="fc" id="L104">                        isFirst = false;</span>
+                    } else {
+<span class="fc" id="L106">                        res = res.concat(&quot; and &quot;);</span>
+                    }
+<span class="fc" id="L108">                    res = res.concat(curName);</span>
+                }
+            }
+<span class="fc" id="L111">        } else {</span>
+            // assumption: names separated by space
+
+<span class="fc" id="L114">            String[] splitNames = names.split(&quot; &quot;);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            if (splitNames.length == 0) {</span>
+                // empty names... something was really wrong...
+<span class="nc" id="L117">                return &quot;&quot;;</span>
+            }
+
+<span class="fc" id="L120">            boolean workedOnFirstOrMiddle = false;</span>
+<span class="fc" id="L121">            boolean isFirst = true;</span>
+<span class="fc" id="L122">            int i = 0;</span>
+<span class="fc" id="L123">            res = &quot;&quot;;</span>
+            do {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                if (workedOnFirstOrMiddle) {</span>
+                    // last item was a first or a middle name
+                    // we have to check whether we are on a middle name
+                    // if not, just add the item as last name and add an &quot;and&quot;
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                    if (splitNames[i].contains(&quot;.&quot;)) {</span>
+                        // we found a middle name
+<span class="nc" id="L131">                        res = res.concat(splitNames[i]).concat(&quot; &quot;);</span>
+                    } else {
+                        // last name found
+<span class="fc" id="L134">                        res = res.concat(removeNonLettersAtEnd(splitNames[i]));</span>
+
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">                        if (!splitNames[i].isEmpty() &amp;&amp; Character.isLowerCase(splitNames[i].charAt(0))) {</span>
+                            // it is probably be &quot;van&quot;, &quot;vom&quot;, ...
+                            // we just rely on the fact that these things are written in lower case letters
+                            // do NOT finish name
+<span class="fc" id="L140">                            res = res.concat(&quot; &quot;);</span>
+                        } else {
+                            // finish this name
+<span class="fc" id="L143">                            workedOnFirstOrMiddle = false;</span>
+                        }
+                    }
+                } else {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                    if (!&quot;and&quot;.equalsIgnoreCase(splitNames[i])) {</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                        if (isFirst) {</span>
+<span class="fc" id="L149">                            isFirst = false;</span>
+                        } else {
+<span class="nc" id="L151">                            res = res.concat(&quot; and &quot;);</span>
+                        }
+<span class="pc bpc" id="L153" title="3 of 4 branches missed.">                        if (&quot;et&quot;.equalsIgnoreCase(splitNames[i]) &amp;&amp; (splitNames.length &gt; (i + 1))</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                                &amp;&amp; &quot;al.&quot;.equalsIgnoreCase(splitNames[i + 1])) {</span>
+<span class="nc" id="L155">                            res = res.concat(&quot;others&quot;);</span>
+<span class="nc" id="L156">                            break;</span>
+                        } else {
+<span class="fc" id="L158">                            res = res.concat(splitNames[i]).concat(&quot; &quot;);</span>
+<span class="fc" id="L159">                            workedOnFirstOrMiddle = true;</span>
+                        }
+                    }  // do nothing, just increment i at the end of this iteration
+                }
+<span class="fc" id="L163">                i++;</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            } while (i &lt; splitNames.length);</span>
+        }
+<span class="fc" id="L166">        return res;</span>
+    }
+
+    private String streamlineTitle(String title) {
+<span class="fc" id="L170">        return removeNonLettersAtEnd(title);</span>
+    }
+
+    @Override
+    public boolean isRecognizedFormat(BufferedReader input) throws IOException {
+<span class="fc" id="L175">        return input.readLine().startsWith(&quot;%PDF&quot;);</span>
+    }
+
+    @Override
+    public ParserResult importDatabase(BufferedReader reader) throws IOException {
+<span class="nc" id="L180">        Objects.requireNonNull(reader);</span>
+<span class="nc" id="L181">        throw new UnsupportedOperationException(&quot;PdfContentImporter does not support importDatabase(BufferedReader reader).&quot;</span>
+                + &quot;Instead use importDatabase(Path filePath, Charset defaultEncoding).&quot;);
+    }
+
+    @Override
+    public ParserResult importDatabase(String data) throws IOException {
+<span class="nc" id="L187">        Objects.requireNonNull(data);</span>
+<span class="nc" id="L188">        throw new UnsupportedOperationException(&quot;PdfContentImporter does not support importDatabase(String data).&quot;</span>
+                + &quot;Instead use importDatabase(Path filePath, Charset defaultEncoding).&quot;);
+    }
+
+    @Override
+    public ParserResult importDatabase(Path filePath) {
+<span class="fc" id="L194">        final ArrayList&lt;BibEntry&gt; result = new ArrayList&lt;&gt;(1);</span>
+<span class="fc" id="L195">        try (PDDocument document = new XmpUtilReader().loadWithAutomaticDecryption(filePath)) {</span>
+<span class="fc" id="L196">            String firstPageContents = getFirstPageContents(document);</span>
+<span class="fc" id="L197">            Optional&lt;BibEntry&gt; entry = getEntryFromPDFContent(firstPageContents, OS.NEWLINE);</span>
+<span class="fc" id="L198">            entry.ifPresent(result::add);</span>
+<span class="nc" id="L199">        } catch (EncryptedPdfsNotSupportedException e) {</span>
+<span class="nc" id="L200">            return ParserResult.fromErrorMessage(Localization.lang(&quot;Decryption not supported.&quot;));</span>
+<span class="fc" id="L201">        } catch (IOException exception) {</span>
+<span class="fc" id="L202">            return ParserResult.fromError(exception);</span>
+<span class="fc" id="L203">        }</span>
+
+<span class="fc" id="L205">        result.forEach(entry -&gt; entry.addFile(new LinkedFile(&quot;&quot;, filePath.toAbsolutePath(), &quot;PDF&quot;)));</span>
+<span class="fc" id="L206">        return new ParserResult(result);</span>
+    }
+
+    // make this method package visible so we can test it
+    Optional&lt;BibEntry&gt; getEntryFromPDFContent(String firstpageContents, String lineSeparator) {
+        // idea: split[] contains the different lines
+        // blocks are separated by empty lines
+        // treat each block
+        //   or do special treatment at authors (which are not broken)
+        //   therefore, we do a line-based and not a block-based splitting
+        // i points to the current line
+        // curString (mostly) contains the current block
+        //   the different lines are joined into one and thereby separated by &quot; &quot;
+
+<span class="fc" id="L220">        String firstpageContentsUnifiedLineBreaks = StringUtil.unifyLineBreaks(firstpageContents, lineSeparator);</span>
+
+<span class="fc" id="L222">        lines = firstpageContentsUnifiedLineBreaks.split(lineSeparator);</span>
+
+<span class="fc" id="L224">        lineIndex = 0; // to prevent array index out of bounds exception on second run we need to reset i to zero</span>
+
+<span class="fc" id="L226">        proceedToNextNonEmptyLine();</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (lineIndex &gt;= lines.length) {</span>
+            // PDF could not be parsed or is empty
+            // return empty list
+<span class="nc" id="L230">            return Optional.empty();</span>
+        }
+
+        // we start at the current line
+<span class="fc" id="L234">        curString = lines[lineIndex];</span>
+        // i might get incremented later and curString modified, too
+<span class="fc" id="L236">        lineIndex = lineIndex + 1;</span>
+
+        String author;
+<span class="fc" id="L239">        String editor = null;</span>
+<span class="fc" id="L240">        String abstractT = null;</span>
+<span class="fc" id="L241">        String keywords = null;</span>
+        String title;
+<span class="fc" id="L243">        String conference = null;</span>
+<span class="fc" id="L244">        String DOI = null;</span>
+<span class="fc" id="L245">        String series = null;</span>
+<span class="fc" id="L246">        String volume = null;</span>
+<span class="fc" id="L247">        String number = null;</span>
+<span class="fc" id="L248">        String pages = null;</span>
+        // year is a class variable as the method extractYear() uses it;
+<span class="fc" id="L250">        String publisher = null;</span>
+
+<span class="fc" id="L252">        EntryType type = StandardEntryType.InProceedings;</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (curString.length() &gt; 4) {</span>
+            // special case: possibly conference as first line on the page
+<span class="fc" id="L255">            extractYear();</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            if (curString.contains(&quot;Conference&quot;)) {</span>
+<span class="nc" id="L257">                fillCurStringWithNonEmptyLines();</span>
+<span class="nc" id="L258">                conference = curString;</span>
+<span class="nc" id="L259">                curString = &quot;&quot;;</span>
+            } else {
+                // e.g. Copyright (c) 1998 by the Genetics Society of America
+                // future work: get year using RegEx
+<span class="fc" id="L263">                String lower = curString.toLowerCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">                if (lower.contains(&quot;copyright&quot;)) {</span>
+<span class="nc" id="L265">                    fillCurStringWithNonEmptyLines();</span>
+<span class="nc" id="L266">                    publisher = curString;</span>
+<span class="nc" id="L267">                    curString = &quot;&quot;;</span>
+                }
+            }
+        }
+
+        // start: title
+<span class="fc" id="L273">        fillCurStringWithNonEmptyLines();</span>
+<span class="fc" id="L274">        title = streamlineTitle(curString);</span>
+<span class="fc" id="L275">        curString = &quot;&quot;;</span>
+        // i points to the next non-empty line
+
+        // after title: authors
+<span class="fc" id="L279">        author = null;</span>
+<span class="fc bfc" id="L280" title="All 4 branches covered.">        while ((lineIndex &lt; lines.length) &amp;&amp; !&quot;&quot;.equals(lines[lineIndex])) {</span>
+            // author names are unlikely to be lines among different lines
+            // treat them line by line
+<span class="fc" id="L283">            curString = streamlineNames(lines[lineIndex]);</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            if (author == null) {</span>
+<span class="fc" id="L285">                author = curString;</span>
+            } else {
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                if (!&quot;&quot;.equals(curString)) {</span>
+<span class="fc" id="L288">                    author = author.concat(&quot; and &quot;).concat(curString);</span>
+                }  // if lines[i] is &quot;and&quot; then &quot;&quot; is returned by streamlineNames -&gt; do nothing
+            }
+<span class="fc" id="L291">            lineIndex++;</span>
+        }
+<span class="fc" id="L293">        curString = &quot;&quot;;</span>
+<span class="fc" id="L294">        lineIndex++;</span>
+
+        // then, abstract and keywords follow
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        while (lineIndex &lt; lines.length) {</span>
+<span class="fc" id="L298">            curString = lines[lineIndex];</span>
+<span class="pc bpc" id="L299" title="2 of 4 branches missed.">            if ((curString.length() &gt;= &quot;Abstract&quot;.length()) &amp;&amp; &quot;Abstract&quot;.equalsIgnoreCase(curString.substring(0, &quot;Abstract&quot;.length()))) {</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">                if (curString.length() == &quot;Abstract&quot;.length()) {</span>
+                    // only word &quot;abstract&quot; found -- skip line
+<span class="nc" id="L302">                    curString = &quot;&quot;;</span>
+                } else {
+<span class="nc" id="L304">                    curString = curString.substring(&quot;Abstract&quot;.length() + 1).trim().concat(System.lineSeparator());</span>
+                }
+<span class="nc" id="L306">                lineIndex++;</span>
+                // fillCurStringWithNonEmptyLines() cannot be used as that uses &quot; &quot; as line separator
+                // whereas we need linebreak as separator
+<span class="nc bnc" id="L309" title="All 4 branches missed.">                while ((lineIndex &lt; lines.length) &amp;&amp; !&quot;&quot;.equals(lines[lineIndex])) {</span>
+<span class="nc" id="L310">                    curString = curString.concat(lines[lineIndex]).concat(System.lineSeparator());</span>
+<span class="nc" id="L311">                    lineIndex++;</span>
+                }
+<span class="nc" id="L313">                abstractT = curString.trim();</span>
+<span class="nc" id="L314">                lineIndex++;</span>
+<span class="pc bpc" id="L315" title="2 of 4 branches missed.">            } else if ((curString.length() &gt;= &quot;Keywords&quot;.length()) &amp;&amp; &quot;Keywords&quot;.equalsIgnoreCase(curString.substring(0, &quot;Keywords&quot;.length()))) {</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">                if (curString.length() == &quot;Keywords&quot;.length()) {</span>
+                    // only word &quot;Keywords&quot; found -- skip line
+<span class="nc" id="L318">                    curString = &quot;&quot;;</span>
+                } else {
+<span class="nc" id="L320">                    curString = curString.substring(&quot;Keywords&quot;.length() + 1).trim();</span>
+                }
+<span class="nc" id="L322">                lineIndex++;</span>
+<span class="nc" id="L323">                fillCurStringWithNonEmptyLines();</span>
+<span class="nc" id="L324">                keywords = removeNonLettersAtEnd(curString);</span>
+            } else {
+<span class="fc" id="L326">                String lower = curString.toLowerCase(Locale.ROOT);</span>
+
+<span class="fc" id="L328">                int pos = lower.indexOf(&quot;technical&quot;);</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                if (pos &gt;= 0) {</span>
+<span class="nc" id="L330">                    type = StandardEntryType.TechReport;</span>
+<span class="nc" id="L331">                    pos = curString.trim().lastIndexOf(' ');</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">                    if (pos &gt;= 0) {</span>
+                        // assumption: last character of curString is NOT ' '
+                        //   otherwise pos+1 leads to an out-of-bounds exception
+<span class="nc" id="L335">                        number = curString.substring(pos + 1);</span>
+                    }
+                }
+
+<span class="fc" id="L339">                lineIndex++;</span>
+<span class="fc" id="L340">                proceedToNextNonEmptyLine();</span>
+<span class="fc" id="L341">            }</span>
+        }
+
+<span class="fc" id="L344">        lineIndex = lines.length - 1;</span>
+
+        // last block: DOI, detailed information
+        // sometimes, this information is in the third last block etc...
+        // therefore, read until the beginning of the file
+
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        while (lineIndex &gt;= 0) {</span>
+<span class="fc" id="L351">            readLastBlock();</span>
+            // i now points to the block before or is -1
+            // curString contains the last block, separated by &quot; &quot;
+
+<span class="fc" id="L355">            extractYear();</span>
+
+<span class="fc" id="L357">            int pos = curString.indexOf(&quot;(Eds.)&quot;);</span>
+<span class="fc bfc" id="L358" title="All 4 branches covered.">            if ((pos &gt;= 0) &amp;&amp; (publisher == null)) {</span>
+                // looks like a Springer last line
+                // e.g: A. Persson and J. Stirna (Eds.): PoEM 2009, LNBIP 39, pp. 161-175, 2009.
+<span class="fc" id="L361">                publisher = &quot;Springer&quot;;</span>
+<span class="fc" id="L362">                editor = streamlineNames(curString.substring(0, pos - 1));</span>
+
+<span class="fc" id="L364">                int edslength = &quot;(Eds.)&quot;.length();</span>
+<span class="fc" id="L365">                int posWithEditor = pos + edslength + 2; // +2 because of &quot;:&quot; after (Eds.) and the subsequent space</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">                if (posWithEditor &gt; curString.length()) {</span>
+<span class="fc" id="L367">                    curString = curString.substring(posWithEditor - 2); // we don't have any spaces after Eds so we substract the 2</span>
+                } else {
+<span class="nc" id="L369">                    curString = curString.substring(posWithEditor);</span>
+                }
+<span class="fc" id="L371">                String[] springerSplit = curString.split(&quot;, &quot;);</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                if (springerSplit.length &gt;= 4) {</span>
+<span class="nc" id="L373">                    conference = springerSplit[0];</span>
+
+<span class="nc" id="L375">                    String seriesData = springerSplit[1];</span>
+<span class="nc" id="L376">                    int lastSpace = seriesData.lastIndexOf(' ');</span>
+<span class="nc" id="L377">                    series = seriesData.substring(0, lastSpace);</span>
+<span class="nc" id="L378">                    volume = seriesData.substring(lastSpace + 1);</span>
+
+<span class="nc" id="L380">                    pages = springerSplit[2].substring(4);</span>
+
+<span class="nc bnc" id="L382" title="All 2 branches missed.">                    if (springerSplit[3].length() &gt;= 4) {</span>
+<span class="nc" id="L383">                        year = springerSplit[3].substring(0, 4);</span>
+                    }
+                }
+<span class="fc" id="L386">            } else {</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">                if (DOI == null) {</span>
+<span class="fc" id="L388">                    pos = curString.indexOf(&quot;DOI&quot;);</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">                    if (pos &lt; 0) {</span>
+<span class="fc" id="L390">                        pos = curString.indexOf(StandardField.DOI.getName());</span>
+                    }
+<span class="fc bfc" id="L392" title="All 2 branches covered.">                    if (pos &gt;= 0) {</span>
+<span class="fc" id="L393">                        pos += 3;</span>
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">                        if (curString.length() &gt; pos) {</span>
+<span class="nc" id="L395">                            char delimiter = curString.charAt(pos);</span>
+<span class="nc bnc" id="L396" title="All 4 branches missed.">                            if ((delimiter == ':') || (delimiter == ' ')) {</span>
+<span class="nc" id="L397">                                pos++;</span>
+                            }
+<span class="nc" id="L399">                            int nextSpace = curString.indexOf(' ', pos);</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">                            if (nextSpace &gt; 0) {</span>
+<span class="nc" id="L401">                                DOI = curString.substring(pos, nextSpace);</span>
+                            } else {
+<span class="nc" id="L403">                                DOI = curString.substring(pos);</span>
+                            }
+                        }
+                    }
+                }
+
+<span class="pc bpc" id="L409" title="1 of 4 branches missed.">                if ((publisher == null) &amp;&amp; curString.contains(&quot;IEEE&quot;)) {</span>
+                    // IEEE has the conference things at the end
+<span class="nc" id="L411">                    publisher = &quot;IEEE&quot;;</span>
+
+                    // year is extracted by extractYear
+                    // otherwise, we could it determine as follows:
+                    // String yearStr = curString.substring(curString.length()-4);
+                    // if (isYear(yearStr)) {
+                    //  year = yearStr;
+                    // }
+
+<span class="nc bnc" id="L420" title="All 2 branches missed.">                    if (conference == null) {</span>
+<span class="nc" id="L421">                        pos = curString.indexOf('$');</span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">                        if (pos &gt; 0) {</span>
+                            // we found the price
+                            // before the price, the ISSN is stated
+                            // skip that
+<span class="nc" id="L426">                            pos -= 2;</span>
+<span class="nc bnc" id="L427" title="All 4 branches missed.">                            while ((pos &gt;= 0) &amp;&amp; (curString.charAt(pos) != ' ')) {</span>
+<span class="nc" id="L428">                                pos--;</span>
+                            }
+<span class="nc bnc" id="L430" title="All 2 branches missed.">                            if (pos &gt; 0) {</span>
+<span class="nc" id="L431">                                conference = curString.substring(0, pos);</span>
+                            }
+                        }
+                    }
+                }
+            }
+<span class="fc" id="L437">        }</span>
+
+<span class="fc" id="L439">        BibEntry entry = new BibEntry();</span>
+<span class="fc" id="L440">        entry.setType(type);</span>
+
+        // TODO: institution parsing missing
+
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">        if (author != null) {</span>
+<span class="fc" id="L445">            entry.setField(StandardField.AUTHOR, author);</span>
+        }
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        if (editor != null) {</span>
+<span class="fc" id="L448">            entry.setField(StandardField.EDITOR, editor);</span>
+        }
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">        if (abstractT != null) {</span>
+<span class="nc" id="L451">            entry.setField(StandardField.ABSTRACT, abstractT);</span>
+        }
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">        if (!Strings.isNullOrEmpty(keywords)) {</span>
+<span class="nc" id="L454">            entry.setField(StandardField.KEYWORDS, keywords);</span>
+        }
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">        if (title != null) {</span>
+<span class="fc" id="L457">            entry.setField(StandardField.TITLE, title);</span>
+        }
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">        if (conference != null) {</span>
+<span class="nc" id="L460">            entry.setField(StandardField.BOOKTITLE, conference);</span>
+        }
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">        if (DOI != null) {</span>
+<span class="nc" id="L463">            entry.setField(StandardField.DOI, DOI);</span>
+        }
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">        if (series != null) {</span>
+<span class="nc" id="L466">            entry.setField(StandardField.SERIES, series);</span>
+        }
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        if (volume != null) {</span>
+<span class="nc" id="L469">            entry.setField(StandardField.VOLUME, volume);</span>
+        }
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">        if (number != null) {</span>
+<span class="nc" id="L472">            entry.setField(StandardField.NUMBER, number);</span>
+        }
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">        if (pages != null) {</span>
+<span class="nc" id="L475">            entry.setField(StandardField.PAGES, pages);</span>
+        }
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (year != null) {</span>
+<span class="fc" id="L478">            entry.setField(StandardField.YEAR, year);</span>
+        }
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        if (publisher != null) {</span>
+<span class="fc" id="L481">            entry.setField(StandardField.PUBLISHER, publisher);</span>
+        }
+<span class="fc" id="L483">        return Optional.of(entry);</span>
+    }
+
+    private String getFirstPageContents(PDDocument document) throws IOException {
+<span class="fc" id="L487">        PDFTextStripper stripper = new PDFTextStripper();</span>
+
+<span class="fc" id="L489">        stripper.setStartPage(1);</span>
+<span class="fc" id="L490">        stripper.setEndPage(1);</span>
+<span class="fc" id="L491">        stripper.setSortByPosition(true);</span>
+<span class="fc" id="L492">        stripper.setParagraphEnd(System.lineSeparator());</span>
+<span class="fc" id="L493">        StringWriter writer = new StringWriter();</span>
+<span class="fc" id="L494">        stripper.writeText(document, writer);</span>
+
+<span class="fc" id="L496">        return writer.toString();</span>
+    }
+
+    /**
+     * Extract the year out of curString (if it is not yet defined)
+     */
+    private void extractYear() {
+<span class="fc bfc" id="L503" title="All 2 branches covered.">        if (year != null) {</span>
+<span class="fc" id="L504">            return;</span>
+        }
+
+<span class="fc" id="L507">        Matcher m = YEAR_EXTRACT_PATTERN.matcher(curString);</span>
+<span class="fc bfc" id="L508" title="All 2 branches covered.">        if (m.find()) {</span>
+<span class="fc" id="L509">            year = curString.substring(m.start(), m.end());</span>
+        }
+<span class="fc" id="L511">    }</span>
+
+    /**
+     * PDFTextStripper normally does NOT produce multiple empty lines
+     * (besides at strange PDFs). These strange PDFs are handled here:
+     * proceed to next non-empty line
+     */
+    private void proceedToNextNonEmptyLine() {
+<span class="fc bfc" id="L519" title="All 4 branches covered.">        while ((lineIndex &lt; lines.length) &amp;&amp; lines[lineIndex].trim().isEmpty()) {</span>
+<span class="fc" id="L520">            lineIndex++;</span>
+        }
+<span class="fc" id="L522">    }</span>
+
+    /**
+     * Fill curString with lines until &quot;&quot; is found
+     * No trailing space is added
+     * i is advanced to the next non-empty line (ignoring white space)
+     * &lt;p&gt;
+     * Lines containing only white spaces are ignored,
+     * but NOT considered as &quot;&quot;
+     * &lt;p&gt;
+     * Uses GLOBAL variables lines, curLine, i
+     */
+    private void fillCurStringWithNonEmptyLines() {
+        // ensure that curString does not end with &quot; &quot;
+<span class="fc" id="L536">        curString = curString.trim();</span>
+<span class="pc bpc" id="L537" title="1 of 4 branches missed.">        while ((lineIndex &lt; lines.length) &amp;&amp; !&quot;&quot;.equals(lines[lineIndex])) {</span>
+<span class="fc" id="L538">            String curLine = lines[lineIndex].trim();</span>
+<span class="pc bpc" id="L539" title="1 of 2 branches missed.">            if (!curLine.isEmpty()) {</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">                if (!curString.isEmpty()) {</span>
+                    // insert separating space if necessary
+<span class="fc" id="L542">                    curString = curString.concat(&quot; &quot;);</span>
+                }
+<span class="fc" id="L544">                curString = curString.concat(lines[lineIndex]);</span>
+            }
+<span class="fc" id="L546">            lineIndex++;</span>
+<span class="fc" id="L547">        }</span>
+
+<span class="fc" id="L549">        proceedToNextNonEmptyLine();</span>
+<span class="fc" id="L550">    }</span>
+
+    /**
+     * resets curString
+     * curString now contains the last block (until &quot;&quot; reached)
+     * Trailing space is added
+     * &lt;p&gt;
+     * invariant before/after: i points to line before the last handled block
+     */
+    private void readLastBlock() {
+<span class="pc bpc" id="L560" title="1 of 4 branches missed.">        while ((lineIndex &gt;= 0) &amp;&amp; lines[lineIndex].trim().isEmpty()) {</span>
+<span class="fc" id="L561">            lineIndex--;</span>
+        }
+        // i is now at the end of a block
+
+<span class="fc" id="L565">        int end = lineIndex;</span>
+
+        // find beginning
+<span class="fc bfc" id="L568" title="All 4 branches covered.">        while ((lineIndex &gt;= 0) &amp;&amp; !&quot;&quot;.equals(lines[lineIndex])) {</span>
+<span class="fc" id="L569">            lineIndex--;</span>
+        }
+        // i is now the line before the beginning of the block
+        // this fulfills the invariant
+
+<span class="fc" id="L574">        curString = &quot;&quot;;</span>
+<span class="fc bfc" id="L575" title="All 2 branches covered.">        for (int j = lineIndex + 1; j &lt;= end; j++) {</span>
+<span class="fc" id="L576">            curString = curString.concat(lines[j].trim());</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">            if (j != end) {</span>
+<span class="fc" id="L578">                curString = curString.concat(&quot; &quot;);</span>
+            }
+        }
+<span class="fc" id="L581">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L585">        return &quot;PDFcontent&quot;;</span>
+    }
+
+    @Override
+    public StandardFileType getFileType() {
+<span class="fc" id="L590">        return StandardFileType.PDF;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="fc" id="L595">        return &quot;PdfContentImporter parses data of the first page of the PDF and creates a BibTeX entry. Currently, Springer and IEEE formats are supported.&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

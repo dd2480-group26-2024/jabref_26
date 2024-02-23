@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalFilesEntryLinker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.externalfiles</a> &gt; <span class="el_source">ExternalFilesEntryLinker.java</span></div><h1>ExternalFilesEntryLinker.java</h1><pre class="source lang-java linenums">package org.jabref.gui.externalfiles;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.externalfiletype.ExternalFileType;
+import org.jabref.gui.externalfiletype.ExternalFileTypes;
+import org.jabref.gui.externalfiletype.UnknownExternalFileType;
+import org.jabref.logic.cleanup.MoveFilesCleanup;
+import org.jabref.logic.cleanup.RenamePdfCleanup;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.pdf.search.IndexingTaskManager;
+import org.jabref.logic.pdf.search.PdfIndexerManager;
+import org.jabref.logic.util.io.FileNameCleaner;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.preferences.FilePreferences;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ExternalFilesEntryLinker {
+
+<span class="fc" id="L32">    private static final Logger LOGGER = LoggerFactory.getLogger(ExternalFilesEntryLinker.class);</span>
+
+    private final FilePreferences filePreferences;
+    private final BibDatabaseContext bibDatabaseContext;
+    private final MoveFilesCleanup moveFilesCleanup;
+    private final RenamePdfCleanup renameFilesCleanup;
+    private final DialogService dialogService;
+
+<span class="fc" id="L40">    public ExternalFilesEntryLinker(FilePreferences filePreferences, BibDatabaseContext bibDatabaseContext, DialogService dialogService) {</span>
+<span class="fc" id="L41">        this.filePreferences = filePreferences;</span>
+<span class="fc" id="L42">        this.bibDatabaseContext = bibDatabaseContext;</span>
+<span class="fc" id="L43">        this.moveFilesCleanup = new MoveFilesCleanup(bibDatabaseContext, filePreferences);</span>
+<span class="fc" id="L44">        this.renameFilesCleanup = new RenamePdfCleanup(false, bibDatabaseContext, filePreferences);</span>
+<span class="fc" id="L45">        this.dialogService = dialogService;</span>
+<span class="fc" id="L46">    }</span>
+
+    public Optional&lt;Path&gt; copyFileToFileDir(Path file) {
+<span class="nc" id="L49">        Optional&lt;Path&gt; firstExistingFileDir = bibDatabaseContext.getFirstExistingFileDir(filePreferences);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (firstExistingFileDir.isPresent()) {</span>
+<span class="nc" id="L51">            Path targetFile = firstExistingFileDir.get().resolve(file.getFileName());</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">            if (FileUtil.copyFile(file, targetFile, false)) {</span>
+<span class="nc" id="L53">                return Optional.of(targetFile);</span>
+            }
+        }
+<span class="nc" id="L56">        return Optional.empty();</span>
+    }
+
+    public void renameLinkedFilesToPattern(BibEntry entry) {
+<span class="nc" id="L60">        renameFilesCleanup.cleanup(entry);</span>
+<span class="nc" id="L61">    }</span>
+
+    public void moveLinkedFilesToFileDir(BibEntry entry) {
+<span class="nc" id="L64">        moveFilesCleanup.cleanup(entry);</span>
+<span class="nc" id="L65">    }</span>
+
+    public void addFilesToEntry(BibEntry entry, List&lt;Path&gt; files) {
+<span class="nc" id="L68">        List&lt;Path&gt; validFiles = getValidFileNames(files);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        for (Path file : validFiles) {</span>
+<span class="nc" id="L70">            FileUtil.getFileExtension(file).ifPresent(ext -&gt; {</span>
+<span class="nc" id="L71">                ExternalFileType type = ExternalFileTypes.getExternalFileTypeByExt(ext, filePreferences)</span>
+<span class="nc" id="L72">                                                         .orElse(new UnknownExternalFileType(ext));</span>
+<span class="nc" id="L73">                Path relativePath = FileUtil.relativize(file, bibDatabaseContext.getFileDirectories(filePreferences));</span>
+<span class="nc" id="L74">                LinkedFile linkedfile = new LinkedFile(&quot;&quot;, relativePath, type.getName());</span>
+<span class="nc" id="L75">                entry.addFile(linkedfile);</span>
+<span class="nc" id="L76">            });</span>
+<span class="nc" id="L77">        }</span>
+<span class="nc" id="L78">    }</span>
+
+    public void moveFilesToFileDirRenameAndAddToEntry(BibEntry entry, List&lt;Path&gt; files, IndexingTaskManager indexingTaskManager) {
+<span class="nc" id="L81">        try (AutoCloseable blocker = indexingTaskManager.blockNewTasks()) {</span>
+<span class="nc" id="L82">            addFilesToEntry(entry, files);</span>
+<span class="nc" id="L83">            moveLinkedFilesToFileDir(entry);</span>
+<span class="nc" id="L84">            renameLinkedFilesToPattern(entry);</span>
+<span class="nc" id="L85">        } catch (Exception e) {</span>
+<span class="nc" id="L86">            LOGGER.error(&quot;Could not block IndexingTaskManager&quot;, e);</span>
+<span class="nc" id="L87">        }</span>
+
+        try {
+<span class="nc" id="L90">            indexingTaskManager.addToIndex(PdfIndexerManager.getIndexer(bibDatabaseContext, filePreferences), entry);</span>
+<span class="nc" id="L91">        } catch (IOException e) {</span>
+<span class="nc" id="L92">            LOGGER.error(&quot;Could not access Fulltext-Index&quot;, e);</span>
+<span class="nc" id="L93">        }</span>
+<span class="nc" id="L94">    }</span>
+
+    public void copyFilesToFileDirAndAddToEntry(BibEntry entry, List&lt;Path&gt; files, IndexingTaskManager indexingTaskManager) {
+<span class="nc" id="L97">        try (AutoCloseable blocker = indexingTaskManager.blockNewTasks()) {</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            for (Path file : files) {</span>
+<span class="nc" id="L99">                copyFileToFileDir(file)</span>
+<span class="nc" id="L100">                        .ifPresent(copiedFile -&gt; addFilesToEntry(entry, Collections.singletonList(copiedFile)));</span>
+<span class="nc" id="L101">            }</span>
+<span class="nc" id="L102">            renameLinkedFilesToPattern(entry);</span>
+<span class="nc" id="L103">        } catch (Exception e) {</span>
+<span class="nc" id="L104">            LOGGER.error(&quot;Could not block IndexingTaskManager&quot;, e);</span>
+<span class="nc" id="L105">        }</span>
+
+        try {
+<span class="nc" id="L108">            indexingTaskManager.addToIndex(PdfIndexerManager.getIndexer(bibDatabaseContext, filePreferences), entry);</span>
+<span class="nc" id="L109">        } catch (IOException e) {</span>
+<span class="nc" id="L110">            LOGGER.error(&quot;Could not access fulltext index&quot;, e);</span>
+<span class="nc" id="L111">        }</span>
+<span class="nc" id="L112">    }</span>
+
+    private List&lt;Path&gt; getValidFileNames(List&lt;Path&gt; filesToAdd) {
+<span class="nc" id="L115">        List&lt;Path&gt; validFileNames = new ArrayList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        for (Path fileToAdd : filesToAdd) {</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            if (FileUtil.detectBadFileName(fileToAdd.toString())) {</span>
+<span class="nc" id="L119">                String newFilename = FileNameCleaner.cleanFileName(fileToAdd.getFileName().toString());</span>
+
+<span class="nc" id="L121">                boolean correctButtonPressed = dialogService.showConfirmationDialogAndWait(Localization.lang(&quot;File \&quot;%0\&quot; cannot be added!&quot;, fileToAdd.getFileName()),</span>
+<span class="nc" id="L122">                        Localization.lang(&quot;Illegal characters in the file name detected.\nFile will be renamed to \&quot;%0\&quot; and added.&quot;, newFilename),</span>
+<span class="nc" id="L123">                        Localization.lang(&quot;Rename and add&quot;));</span>
+
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                if (correctButtonPressed) {</span>
+<span class="nc" id="L126">                    Path correctPath = fileToAdd.resolveSibling(newFilename);</span>
+                    try {
+<span class="nc" id="L128">                        Files.move(fileToAdd, correctPath);</span>
+<span class="nc" id="L129">                        validFileNames.add(correctPath);</span>
+<span class="nc" id="L130">                    } catch (IOException ex) {</span>
+<span class="nc" id="L131">                        LOGGER.error(&quot;Error moving file&quot;, ex);</span>
+<span class="nc" id="L132">                        dialogService.showErrorDialogAndWait(ex);</span>
+<span class="nc" id="L133">                    }</span>
+                }
+<span class="nc" id="L135">            } else {</span>
+<span class="nc" id="L136">                validFileNames.add(fileToAdd);</span>
+            }
+<span class="nc" id="L138">        }</span>
+<span class="nc" id="L139">        return validFileNames;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImportCommand.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.importer</a> &gt; <span class="el_source">ImportCommand.java</span></div><h1>ImportCommand.java</h1><pre class="source lang-java linenums">package org.jabref.gui.importer;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.SortedSet;
+
+import javafx.stage.FileChooser;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.gui.util.FileFilterConverter;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.database.DatabaseMerger;
+import org.jabref.logic.importer.ImportException;
+import org.jabref.logic.importer.ImportFormatReader;
+import org.jabref.logic.importer.Importer;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.importer.fileformat.PdfGrobidImporter;
+import org.jabref.logic.importer.fileformat.PdfMergeMetadataImporter;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.UpdateField;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.jabref.gui.actions.ActionHelper.needsDatabase;
+
+/**
+ * Perform an import action
+ */
+public class ImportCommand extends SimpleCommand {
+<span class="nc" id="L46">    private static final Logger LOGGER = LoggerFactory.getLogger(ImportCommand.class);</span>
+
+<span class="nc" id="L48">    public enum ImportMethod { AS_NEW, TO_EXISTING }</span>
+
+    private final LibraryTabContainer tabContainer;
+    private final ImportMethod importMethod;
+
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final TaskExecutor taskExecutor;
+
+    public ImportCommand(LibraryTabContainer tabContainer,
+                         ImportMethod importMethod,
+                         PreferencesService preferencesService,
+                         StateManager stateManager,
+                         FileUpdateMonitor fileUpdateMonitor,
+                         TaskExecutor taskExecutor,
+<span class="nc" id="L64">                         DialogService dialogService) {</span>
+<span class="nc" id="L65">        this.tabContainer = tabContainer;</span>
+<span class="nc" id="L66">        this.importMethod = importMethod;</span>
+<span class="nc" id="L67">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L68">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="nc" id="L69">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L70">        this.dialogService = dialogService;</span>
+
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (importMethod == ImportMethod.TO_EXISTING) {</span>
+<span class="nc" id="L73">            this.executable.bind(needsDatabase(stateManager));</span>
+        }
+<span class="nc" id="L75">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc" id="L79">        ImportFormatReader importFormatReader = new ImportFormatReader(</span>
+<span class="nc" id="L80">                preferencesService.getImporterPreferences(),</span>
+<span class="nc" id="L81">                preferencesService.getImportFormatPreferences(),</span>
+                fileUpdateMonitor);
+<span class="nc" id="L83">        SortedSet&lt;Importer&gt; importers = importFormatReader.getImportFormats();</span>
+
+<span class="nc" id="L85">        FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()</span>
+<span class="nc" id="L86">                .addExtensionFilter(FileFilterConverter.ANY_FILE)</span>
+<span class="nc" id="L87">                .addExtensionFilter(FileFilterConverter.forAllImporters(importers))</span>
+<span class="nc" id="L88">                .addExtensionFilter(FileFilterConverter.importerToExtensionFilter(importers))</span>
+<span class="nc" id="L89">                .withInitialDirectory(preferencesService.getImporterPreferences().getImportWorkingDirectory())</span>
+<span class="nc" id="L90">                .build();</span>
+<span class="nc" id="L91">        dialogService.showFileOpenDialog(fileDialogConfiguration)</span>
+<span class="nc" id="L92">                     .ifPresent(path -&gt; importSingleFile(path, importers, fileDialogConfiguration.getSelectedExtensionFilter()));</span>
+<span class="nc" id="L93">    }</span>
+
+    private void importSingleFile(Path file, SortedSet&lt;Importer&gt; importers, FileChooser.ExtensionFilter selectedExtensionFilter) {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (!Files.exists(file)) {</span>
+<span class="nc" id="L97">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Import&quot;),</span>
+<span class="nc" id="L98">                    Localization.lang(&quot;File not found&quot;) + &quot;: '&quot; + file.getFileName() + &quot;'.&quot;);</span>
+
+<span class="nc" id="L100">            return;</span>
+        }
+
+<span class="nc" id="L103">        Optional&lt;Importer&gt; format = FileFilterConverter.getImporter(selectedExtensionFilter, importers);</span>
+<span class="nc" id="L104">        BackgroundTask&lt;ParserResult&gt; task = BackgroundTask.wrap(</span>
+<span class="nc" id="L105">                () -&gt; doImport(Collections.singletonList(file), format.orElse(null)));</span>
+
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (importMethod == ImportMethod.AS_NEW) {</span>
+<span class="nc" id="L108">            task.onSuccess(parserResult -&gt; {</span>
+<span class="nc" id="L109">                    tabContainer.addTab(parserResult.getDatabaseContext(), true);</span>
+<span class="nc" id="L110">                    dialogService.notify(Localization.lang(&quot;Imported entries&quot;) + &quot;: &quot; + parserResult.getDatabase().getEntries().size());</span>
+<span class="nc" id="L111">                })</span>
+<span class="nc" id="L112">                .onFailure(ex -&gt; {</span>
+<span class="nc" id="L113">                    LOGGER.error(&quot;Error importing&quot;, ex);</span>
+<span class="nc" id="L114">                    dialogService.notify(Localization.lang(&quot;Error importing. See the error log for details.&quot;));</span>
+<span class="nc" id="L115">                })</span>
+<span class="nc" id="L116">                .executeWith(taskExecutor);</span>
+        } else {
+<span class="nc" id="L118">            ImportEntriesDialog dialog = new ImportEntriesDialog(tabContainer.getCurrentLibraryTab().getBibDatabaseContext(), task);</span>
+<span class="nc" id="L119">            dialog.setTitle(Localization.lang(&quot;Import&quot;));</span>
+<span class="nc" id="L120">            dialogService.showCustomDialogAndWait(dialog);</span>
+        }
+
+        // Set last working dir for import
+<span class="nc" id="L124">        preferencesService.getImporterPreferences().setImportWorkingDirectory(file.getParent());</span>
+<span class="nc" id="L125">    }</span>
+
+    /**
+     * @throws IOException of a specified importer
+     */
+    private ParserResult doImport(List&lt;Path&gt; files, Importer importFormat) throws IOException {
+<span class="nc" id="L131">        Optional&lt;Importer&gt; importer = Optional.ofNullable(importFormat);</span>
+        // We import all files and collect their results
+<span class="nc" id="L133">        List&lt;ImportFormatReader.UnknownFormatImport&gt; imports = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L134">        ImportFormatReader importFormatReader = new ImportFormatReader(</span>
+<span class="nc" id="L135">                preferencesService.getImporterPreferences(),</span>
+<span class="nc" id="L136">                preferencesService.getImportFormatPreferences(),</span>
+                fileUpdateMonitor);
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        for (Path filename : files) {</span>
+            try {
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                if (importer.isEmpty()) {</span>
+                    // Unknown format
+<span class="nc" id="L142">                    DefaultTaskExecutor.runAndWaitInJavaFXThread(() -&gt; {</span>
+<span class="nc bnc" id="L143" title="All 4 branches missed.">                        if (FileUtil.isPDFFile(filename) &amp;&amp; GrobidOptInDialogHelper.showAndWaitIfUserIsUndecided(dialogService, preferencesService.getGrobidPreferences())) {</span>
+<span class="nc" id="L144">                            importFormatReader.reset();</span>
+                        }
+<span class="nc" id="L146">                        dialogService.notify(Localization.lang(&quot;Importing file %0 as unknown format&quot;, filename.getFileName().toString()));</span>
+<span class="nc" id="L147">                    });</span>
+                    // This import method never throws an IOException
+<span class="nc" id="L149">                    imports.add(importFormatReader.importUnknownFormat(filename, fileUpdateMonitor));</span>
+                } else {
+<span class="nc" id="L151">                    DefaultTaskExecutor.runAndWaitInJavaFXThread(() -&gt; {</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                        if (((importer.get() instanceof PdfGrobidImporter)</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                                || (importer.get() instanceof PdfMergeMetadataImporter))</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                                &amp;&amp; GrobidOptInDialogHelper.showAndWaitIfUserIsUndecided(dialogService, preferencesService.getGrobidPreferences())) {</span>
+<span class="nc" id="L155">                            importFormatReader.reset();</span>
+                        }
+<span class="nc" id="L157">                        dialogService.notify(Localization.lang(&quot;Importing in %0 format&quot;, importer.get().getName()) + &quot;...&quot;);</span>
+<span class="nc" id="L158">                    });</span>
+                    // Specific importer
+<span class="nc" id="L160">                    ParserResult pr = importer.get().importDatabase(filename);</span>
+<span class="nc" id="L161">                    imports.add(new ImportFormatReader.UnknownFormatImport(importer.get().getName(), pr));</span>
+                }
+<span class="nc" id="L163">            } catch (ImportException ex) {</span>
+<span class="nc" id="L164">                DefaultTaskExecutor.runAndWaitInJavaFXThread(</span>
+<span class="nc" id="L165">                        () -&gt; dialogService.showWarningDialogAndWait(</span>
+<span class="nc" id="L166">                                Localization.lang(&quot;Import error&quot;),</span>
+<span class="nc" id="L167">                                Localization.lang(&quot;Please check your library file for wrong syntax.&quot;)</span>
+                                + &quot;\n\n&quot;
+<span class="nc" id="L169">                                + ex.getLocalizedMessage()));</span>
+<span class="nc" id="L170">            }</span>
+<span class="nc" id="L171">        }</span>
+
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (imports.isEmpty()) {</span>
+<span class="nc" id="L174">            DefaultTaskExecutor.runAndWaitInJavaFXThread(</span>
+<span class="nc" id="L175">                    () -&gt; dialogService.showWarningDialogAndWait(</span>
+<span class="nc" id="L176">                            Localization.lang(&quot;Import error&quot;),</span>
+<span class="nc" id="L177">                            Localization.lang(&quot;No entries found. Please make sure you are using the correct import filter.&quot;)));</span>
+
+<span class="nc" id="L179">            return new ParserResult();</span>
+        }
+
+<span class="nc" id="L182">        return mergeImportResults(imports);</span>
+    }
+
+    /**
+     * TODO: Move this to logic package. Blocked by undo functionality.
+     */
+    public ParserResult mergeImportResults(List&lt;ImportFormatReader.UnknownFormatImport&gt; imports) {
+<span class="nc" id="L189">        BibDatabase resultDatabase = new BibDatabase();</span>
+<span class="nc" id="L190">        ParserResult result = new ParserResult(resultDatabase);</span>
+
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        for (ImportFormatReader.UnknownFormatImport importResult : imports) {</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            if (importResult == null) {</span>
+<span class="nc" id="L194">                continue;</span>
+            }
+<span class="nc" id="L196">            ParserResult parserResult = importResult.parserResult();</span>
+<span class="nc" id="L197">            resultDatabase.insertEntries(parserResult.getDatabase().getEntries());</span>
+
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            if (ImportFormatReader.BIBTEX_FORMAT.equals(importResult.format())) {</span>
+                // additional treatment of BibTeX
+<span class="nc" id="L201">                new DatabaseMerger(preferencesService.getBibEntryPreferences().getKeywordSeparator()).mergeMetaData(</span>
+<span class="nc" id="L202">                        result.getMetaData(),</span>
+<span class="nc" id="L203">                        parserResult.getMetaData(),</span>
+<span class="nc" id="L204">                        importResult.parserResult().getPath().map(path -&gt; path.getFileName().toString()).orElse(&quot;unknown&quot;),</span>
+<span class="nc" id="L205">                        parserResult.getDatabase().getEntries());</span>
+            }
+            // TODO: collect errors into ParserResult, because they are currently ignored (see caller of this method)
+<span class="nc" id="L208">        }</span>
+
+        // set timestamp and owner
+<span class="nc" id="L211">        UpdateField.setAutomaticFields(resultDatabase.getEntries(), preferencesService.getOwnerPreferences(), preferencesService.getTimestampPreferences()); // set timestamp and owner</span>
+
+<span class="nc" id="L213">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

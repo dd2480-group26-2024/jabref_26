@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LibraryResource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.http.server</a> &gt; <span class="el_source">LibraryResource.java</span></div><h1>LibraryResource.java</h1><pre class="source lang-java linenums">package org.jabref.http.server;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.Objects;
+
+import org.jabref.gui.Globals;
+import org.jabref.http.JabrefMediaType;
+import org.jabref.http.dto.BibEntryDTO;
+import org.jabref.logic.citationstyle.JabRefItemDataProvider;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.importer.fileformat.BibtexImporter;
+import org.jabref.logic.util.io.BackupFileUtil;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.util.DummyFileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import com.google.gson.Gson;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.InternalServerErrorException;
+import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Path(&quot;libraries/{id}&quot;)
+<span class="fc" id="L33">public class LibraryResource {</span>
+<span class="fc" id="L34">    public static final Logger LOGGER = LoggerFactory.getLogger(LibraryResource.class);</span>
+
+    @Inject
+    PreferencesService preferences;
+
+    @Inject
+    Gson gson;
+
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getJson(@PathParam(&quot;id&quot;) String id) {
+<span class="nc" id="L45">        ParserResult parserResult = getParserResult(id);</span>
+<span class="nc" id="L46">        List&lt;BibEntryDTO&gt; list = parserResult.getDatabase().getEntries().stream()</span>
+<span class="nc" id="L47">                                             .peek(bibEntry -&gt; bibEntry.getSharedBibEntryData().setSharedID(Objects.hash(bibEntry)))</span>
+<span class="nc" id="L48">                                             .map(entry -&gt; new BibEntryDTO(entry, parserResult.getDatabaseContext().getMode(), preferences.getFieldPreferences(), Globals.entryTypesManager))</span>
+<span class="nc" id="L49">                                             .toList();</span>
+<span class="nc" id="L50">        return gson.toJson(list);</span>
+    }
+
+    @GET
+    @Produces(JabrefMediaType.JSON_CSL_ITEM)
+    public String getClsItemJson(@PathParam(&quot;id&quot;) String id) {
+<span class="fc" id="L56">        ParserResult parserResult = getParserResult(id);</span>
+<span class="fc" id="L57">        JabRefItemDataProvider jabRefItemDataProvider = new JabRefItemDataProvider();</span>
+<span class="fc" id="L58">        jabRefItemDataProvider.setData(parserResult.getDatabaseContext(), new BibEntryTypesManager());</span>
+<span class="fc" id="L59">        return jabRefItemDataProvider.toJson();</span>
+    }
+
+    private ParserResult getParserResult(String id) {
+<span class="fc" id="L63">        java.nio.file.Path library = getLibraryPath(id);</span>
+        ParserResult parserResult;
+        try {
+<span class="fc" id="L66">            parserResult = new BibtexImporter(preferences.getImportFormatPreferences(), new DummyFileUpdateMonitor()).importDatabase(library);</span>
+<span class="nc" id="L67">        } catch (IOException e) {</span>
+<span class="nc" id="L68">            LOGGER.warn(&quot;Could not find open library file {}&quot;, library, e);</span>
+<span class="nc" id="L69">            throw new InternalServerErrorException(&quot;Could not parse library&quot;, e);</span>
+<span class="fc" id="L70">        }</span>
+<span class="fc" id="L71">        return parserResult;</span>
+    }
+
+    @GET
+    @Produces(JabrefMediaType.BIBTEX)
+    public Response getBibtex(@PathParam(&quot;id&quot;) String id) {
+<span class="fc" id="L77">        java.nio.file.Path library = getLibraryPath(id);</span>
+        String libraryAsString;
+        try {
+<span class="fc" id="L80">            libraryAsString = Files.readString(library);</span>
+<span class="nc" id="L81">        } catch (IOException e) {</span>
+<span class="nc" id="L82">            LOGGER.error(&quot;Could not read library {}&quot;, library, e);</span>
+<span class="nc" id="L83">            throw new InternalServerErrorException(&quot;Could not read library &quot; + library, e);</span>
+<span class="fc" id="L84">        }</span>
+<span class="fc" id="L85">        return Response.ok()</span>
+<span class="fc" id="L86">                .entity(libraryAsString)</span>
+<span class="fc" id="L87">                .build();</span>
+    }
+
+    private java.nio.file.Path getLibraryPath(String id) {
+<span class="fc" id="L91">        return preferences.getGuiPreferences().getLastFilesOpened()</span>
+<span class="fc" id="L92">                          .stream()</span>
+<span class="fc" id="L93">                          .filter(p -&gt; (p.getFileName() + &quot;-&quot; + BackupFileUtil.getUniqueFilePrefix(p)).equals(id))</span>
+<span class="fc" id="L94">                          .findAny()</span>
+<span class="fc" id="L95">                          .orElseThrow(NotFoundException::new);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

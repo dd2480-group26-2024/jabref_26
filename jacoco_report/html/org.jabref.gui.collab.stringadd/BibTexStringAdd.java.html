@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibTexStringAdd.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.collab.stringadd</a> &gt; <span class="el_source">BibTexStringAdd.java</span></div><h1>BibTexStringAdd.java</h1><pre class="source lang-java linenums">package org.jabref.gui.collab.stringadd;
+
+import org.jabref.gui.collab.DatabaseChange;
+import org.jabref.gui.collab.DatabaseChangeResolverFactory;
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.gui.undo.UndoableInsertString;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.KeyCollisionException;
+import org.jabref.model.entry.BibtexString;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public final class BibTexStringAdd extends DatabaseChange {
+<span class="nc" id="L16">    private static final Logger LOGGER = LoggerFactory.getLogger(BibTexStringAdd.class);</span>
+
+    private final BibtexString addedString;
+
+    public BibTexStringAdd(BibtexString addedString, BibDatabaseContext databaseContext, DatabaseChangeResolverFactory databaseChangeResolverFactory) {
+<span class="nc" id="L21">        super(databaseContext, databaseChangeResolverFactory);</span>
+<span class="nc" id="L22">        this.addedString = addedString;</span>
+<span class="nc" id="L23">        setChangeName(Localization.lang(&quot;Added string: '%0'&quot;, addedString.getName()));</span>
+<span class="nc" id="L24">    }</span>
+
+    @Override
+    public void applyChange(NamedCompound undoEdit) {
+        try {
+<span class="nc" id="L29">            databaseContext.getDatabase().addString(addedString);</span>
+<span class="nc" id="L30">            undoEdit.addEdit(new UndoableInsertString(databaseContext.getDatabase(), addedString));</span>
+<span class="nc" id="L31">        } catch (KeyCollisionException ex) {</span>
+<span class="nc" id="L32">            LOGGER.warn(&quot;Error: could not add string '{}': {}&quot;, addedString.getName(), ex.getMessage(), ex);</span>
+<span class="nc" id="L33">        }</span>
+<span class="nc" id="L34">    }</span>
+
+    public BibtexString getAddedString() {
+<span class="nc" id="L37">        return addedString;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

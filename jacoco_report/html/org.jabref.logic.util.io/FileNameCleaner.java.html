@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileNameCleaner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.util.io</a> &gt; <span class="el_source">FileNameCleaner.java</span></div><h1>FileNameCleaner.java</h1><pre class="source lang-java linenums">package org.jabref.logic.util.io;
+
+/**
+ * This class is based on http://stackoverflow.com/a/5626340/873282
+ * extended with LEFT CURLY BRACE and RIGHT CURLY BRACE
+ * Replaces illegal characters in given file paths.
+ *
+ * Regarding the maximum length, see {@link FileUtil#getValidFileName(String)}
+ */
+public class FileNameCleaner {
+
+    private FileNameCleaner() {
+    }
+
+    /**
+     * Replaces illegal characters in given fileName by '_'
+     *
+     * @param badFileName the fileName to clean
+     * @return a clean filename
+     */
+    public static String cleanFileName(String badFileName) {
+<span class="fc" id="L22">        StringBuilder cleanName = new StringBuilder(badFileName.length());</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        for (int i = 0; i &lt; badFileName.length(); i++) {</span>
+<span class="fc" id="L24">            char c = badFileName.charAt(i);</span>
+<span class="pc bpc" id="L25" title="1 of 6 branches missed.">            if (FileUtil.isCharLegal(c) &amp;&amp; (c != '/') &amp;&amp; (c != '\\')) {</span>
+<span class="fc" id="L26">                cleanName.append(c);</span>
+            } else {
+<span class="fc" id="L28">                cleanName.append('_');</span>
+            }
+        }
+<span class="fc" id="L31">        return cleanName.toString().trim();</span>
+    }
+
+    /**
+     * Replaces illegal characters in given directoryName by '_'.
+     * Directory name may contain directory separators, e.g. 'deep/in/a/tree'; these are left untouched.
+     *
+     * @param badFileName the fileName to clean
+     * @return a clean filename
+     */
+    public static String cleanDirectoryName(String badFileName) {
+<span class="fc" id="L42">        StringBuilder cleanName = new StringBuilder(badFileName.length());</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for (int i = 0; i &lt; badFileName.length(); i++) {</span>
+<span class="fc" id="L44">            char c = badFileName.charAt(i);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            if (FileUtil.isCharLegal(c)) {</span>
+<span class="fc" id="L46">                cleanName.append(c);</span>
+            } else {
+<span class="fc" id="L48">                cleanName.append('_');</span>
+            }
+        }
+<span class="fc" id="L51">        return cleanName.toString().trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

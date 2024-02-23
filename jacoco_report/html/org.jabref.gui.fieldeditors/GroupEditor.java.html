@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GroupEditor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors</a> &gt; <span class="el_source">GroupEditor.java</span></div><h1>GroupEditor.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors;
+
+import java.util.List;
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.scene.input.TransferMode;
+
+import org.jabref.gui.DragAndDropDataFormats;
+import org.jabref.gui.autocompleter.SuggestionProvider;
+import org.jabref.logic.integrity.FieldCheckers;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.preferences.PreferencesService;
+
+public class GroupEditor extends SimpleEditor {
+
+    private Optional&lt;BibEntry&gt; bibEntry;
+
+    public GroupEditor(final Field field,
+                       final SuggestionProvider&lt;?&gt; suggestionProvider,
+                       final FieldCheckers fieldCheckers,
+                       final PreferencesService preferences,
+                       final boolean isMultiLine,
+                       final UndoManager undoManager) {
+<span class="nc" id="L28">        super(field, suggestionProvider, fieldCheckers, preferences, isMultiLine, undoManager);</span>
+
+<span class="nc" id="L30">        this.setOnDragOver(event -&gt; {</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">            if (event.getDragboard().hasContent(DragAndDropDataFormats.GROUP)) {</span>
+<span class="nc" id="L32">                event.acceptTransferModes(TransferMode.MOVE);</span>
+            }
+<span class="nc" id="L34">            event.consume();</span>
+<span class="nc" id="L35">        });</span>
+
+<span class="nc" id="L37">        this.setOnDragDropped(event -&gt; {</span>
+<span class="nc" id="L38">            boolean success = false;</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">            if (event.getDragboard().hasContent(DragAndDropDataFormats.GROUP)) {</span>
+<span class="nc" id="L40">                List&lt;String&gt; draggedGroups = (List&lt;String&gt;) event.getDragboard().getContent(DragAndDropDataFormats.GROUP);</span>
+<span class="nc bnc" id="L41" title="All 4 branches missed.">                if (bibEntry.isPresent() &amp;&amp; draggedGroups.getFirst() != null) {</span>
+<span class="nc" id="L42">                    String newGroup = bibEntry.map(entry -&gt; entry.getField(StandardField.GROUPS)</span>
+<span class="nc" id="L43">                                                                     .map(oldGroups -&gt; oldGroups + (preferences.getBibEntryPreferences().getKeywordSeparator()) + (draggedGroups.getFirst()))</span>
+<span class="nc" id="L44">                                                                     .orElse(draggedGroups.getFirst()))</span>
+<span class="nc" id="L45">                                                  .orElse(null);</span>
+<span class="nc" id="L46">                    bibEntry.map(entry -&gt; entry.setField(StandardField.GROUPS, newGroup));</span>
+<span class="nc" id="L47">                    success = true;</span>
+                }
+            }
+<span class="nc" id="L50">            event.setDropCompleted(success);</span>
+<span class="nc" id="L51">            event.consume();</span>
+<span class="nc" id="L52">        });</span>
+<span class="nc" id="L53">    }</span>
+
+    @Override
+    public void bindToEntry(BibEntry entry) {
+<span class="nc" id="L57">        super.bindToEntry(entry);</span>
+<span class="nc" id="L58">        this.bibEntry = Optional.of(entry);</span>
+<span class="nc" id="L59">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

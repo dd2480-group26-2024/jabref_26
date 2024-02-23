@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IntegrityCheckDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.integrity</a> &gt; <span class="el_source">IntegrityCheckDialog.java</span></div><h1>IntegrityCheckDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui.integrity;
+
+import java.util.List;
+import java.util.function.Function;
+
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.collections.ListChangeListener;
+import javafx.fxml.FXML;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.input.MouseButton;
+import javafx.stage.Modality;
+
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.logic.integrity.IntegrityMessage;
+import org.jabref.logic.l10n.Localization;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import jakarta.inject.Inject;
+import org.controlsfx.control.table.TableFilter;
+
+public class IntegrityCheckDialog extends BaseDialog&lt;Void&gt; {
+
+    @FXML private TableView&lt;IntegrityMessage&gt; messagesTable;
+    @FXML private TableColumn&lt;IntegrityMessage, String&gt; keyColumn;
+    @FXML private TableColumn&lt;IntegrityMessage, String&gt; fieldColumn;
+    @FXML private TableColumn&lt;IntegrityMessage, String&gt; messageColumn;
+    @FXML private MenuButton keyFilterButton;
+    @FXML private MenuButton fieldFilterButton;
+    @FXML private MenuButton messageFilterButton;
+
+    @Inject private ThemeManager themeManager;
+
+    private final List&lt;IntegrityMessage&gt; messages;
+    private final LibraryTab libraryTab;
+    private IntegrityCheckDialogViewModel viewModel;
+    private TableFilter&lt;IntegrityMessage&gt; tableFilter;
+
+<span class="nc" id="L44">    public IntegrityCheckDialog(List&lt;IntegrityMessage&gt; messages, LibraryTab libraryTab) {</span>
+<span class="nc" id="L45">        this.messages = messages;</span>
+<span class="nc" id="L46">        this.libraryTab = libraryTab;</span>
+<span class="nc" id="L47">        this.setTitle(Localization.lang(&quot;Check integrity&quot;));</span>
+<span class="nc" id="L48">        this.initModality(Modality.NONE);</span>
+
+<span class="nc" id="L50">        ViewLoader.view(this)</span>
+<span class="nc" id="L51">                  .load()</span>
+<span class="nc" id="L52">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L54">        themeManager.updateFontStyle(getDialogPane().getScene());</span>
+<span class="nc" id="L55">    }</span>
+
+    private void onSelectionChanged(ListChangeListener.Change&lt;? extends IntegrityMessage&gt; change) {
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (change.next()) {</span>
+<span class="nc" id="L59">            change.getAddedSubList().stream().findFirst().ifPresent(message -&gt;</span>
+<span class="nc" id="L60">                    libraryTab.editEntryAndFocusField(message.getEntry(), message.getField()));</span>
+        }
+<span class="nc" id="L62">    }</span>
+
+    public IntegrityCheckDialogViewModel getViewModel() {
+<span class="nc" id="L65">        return viewModel;</span>
+    }
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L70">        viewModel = new IntegrityCheckDialogViewModel(messages);</span>
+
+<span class="nc" id="L72">        messagesTable.getSelectionModel().getSelectedItems().addListener(this::onSelectionChanged);</span>
+<span class="nc" id="L73">        messagesTable.setItems(viewModel.getMessages());</span>
+<span class="nc" id="L74">        keyColumn.setCellValueFactory(row -&gt; new ReadOnlyStringWrapper(row.getValue().getEntry().getCitationKey().orElse(&quot;&quot;)));</span>
+<span class="nc" id="L75">        fieldColumn.setCellValueFactory(row -&gt; new ReadOnlyStringWrapper(row.getValue().getField().getDisplayName()));</span>
+<span class="nc" id="L76">        messageColumn.setCellValueFactory(row -&gt; new ReadOnlyStringWrapper(row.getValue().getMessage()));</span>
+
+<span class="nc" id="L78">        new ValueTableCellFactory&lt;IntegrityMessage, String&gt;()</span>
+<span class="nc" id="L79">                .withText(Function.identity())</span>
+<span class="nc" id="L80">                .withTooltip(Function.identity())</span>
+<span class="nc" id="L81">                .install(messageColumn);</span>
+
+<span class="nc" id="L83">        tableFilter = TableFilter.forTableView(messagesTable)</span>
+<span class="nc" id="L84">                                 .apply();</span>
+
+<span class="nc" id="L86">        tableFilter.getColumnFilter(keyColumn).ifPresent(columnFilter -&gt; {</span>
+<span class="nc" id="L87">            ContextMenu keyContextMenu = keyColumn.getContextMenu();</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            if (keyContextMenu != null) {</span>
+<span class="nc" id="L89">                keyFilterButton.setContextMenu(keyContextMenu);</span>
+<span class="nc" id="L90">                keyFilterButton.setOnMouseClicked(event -&gt; {</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                    if (event.getButton() == MouseButton.PRIMARY) {</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                        if (keyContextMenu.isShowing()) {</span>
+<span class="nc" id="L93">                            keyContextMenu.setX(event.getScreenX());</span>
+<span class="nc" id="L94">                            keyContextMenu.setY(event.getScreenY());</span>
+                        } else {
+<span class="nc" id="L96">                            keyContextMenu.show(keyFilterButton, event.getScreenX(), event.getScreenY());</span>
+                        }
+                    }
+<span class="nc" id="L99">                });</span>
+            }
+<span class="nc" id="L101">        });</span>
+
+<span class="nc" id="L103">        tableFilter.getColumnFilter(fieldColumn).ifPresent(columnFilter -&gt; {</span>
+<span class="nc" id="L104">            ContextMenu fieldContextMenu = fieldColumn.getContextMenu();</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (fieldContextMenu != null) {</span>
+<span class="nc" id="L106">                fieldFilterButton.setContextMenu(fieldContextMenu);</span>
+<span class="nc" id="L107">                fieldFilterButton.setOnMouseClicked(event -&gt; {</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">                    if (event.getButton() == MouseButton.PRIMARY) {</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                        if (fieldContextMenu.isShowing()) {</span>
+<span class="nc" id="L110">                            fieldContextMenu.setX(event.getScreenX());</span>
+<span class="nc" id="L111">                            fieldContextMenu.setY(event.getScreenY());</span>
+                        } else {
+<span class="nc" id="L113">                            fieldContextMenu.show(fieldFilterButton, event.getScreenX(), event.getScreenY());</span>
+                        }
+                    }
+<span class="nc" id="L116">                });</span>
+            }
+<span class="nc" id="L118">        });</span>
+
+<span class="nc" id="L120">        tableFilter.getColumnFilter(messageColumn).ifPresent(columnFilter -&gt; {</span>
+<span class="nc" id="L121">            ContextMenu messageContextMenu = messageColumn.getContextMenu();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            if (messageContextMenu != null) {</span>
+<span class="nc" id="L123">                messageFilterButton.setContextMenu(messageContextMenu);</span>
+<span class="nc" id="L124">                messageFilterButton.setOnMouseClicked(event -&gt; {</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                    if (event.getButton() == MouseButton.PRIMARY) {</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                        if (messageContextMenu.isShowing()) {</span>
+<span class="nc" id="L127">                            messageContextMenu.setX(event.getScreenX());</span>
+<span class="nc" id="L128">                            messageContextMenu.setY(event.getScreenY());</span>
+                        } else {
+<span class="nc" id="L130">                            messageContextMenu.show(messageFilterButton, event.getScreenX(), event.getScreenY());</span>
+                        }
+                    }
+<span class="nc" id="L133">                });</span>
+            }
+<span class="nc" id="L135">        });</span>
+<span class="nc" id="L136">    }</span>
+
+    public void clearFilters() {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (tableFilter != null) {</span>
+<span class="nc" id="L140">            tableFilter.resetFilter();</span>
+<span class="nc" id="L141">            messagesTable.getColumns().forEach(column -&gt; {</span>
+<span class="nc" id="L142">                tableFilter.selectAllValues(column);</span>
+<span class="nc" id="L143">                column.setGraphic(null);</span>
+<span class="nc" id="L144">            });</span>
+        }
+<span class="nc" id="L146">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

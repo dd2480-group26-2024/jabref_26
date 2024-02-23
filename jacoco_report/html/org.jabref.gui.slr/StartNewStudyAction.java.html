@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StartNewStudyAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.slr</a> &gt; <span class="el_source">StartNewStudyAction.java</span></div><h1>StartNewStudyAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.slr;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.function.Supplier;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.importer.actions.OpenDatabaseAction;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.crawler.StudyRepository;
+import org.jabref.logic.crawler.StudyYamlParser;
+import org.jabref.logic.git.GitHandler;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.study.Study;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Used to start a new study:
+ * &lt;ol&gt;
+ *     &lt;li&gt;Let the user input meta data for the study.&lt;/li&gt;
+ *     &lt;li&gt;Let JabRef do the crawling afterwards.&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * Needs to inherit {@link ExistingStudySearchAction}, because that action implements the real crawling.
+ *
+ * There is the hook {@link StartNewStudyAction#crawlPreparation(Path)}, which is used by {@link ExistingStudySearchAction#crawl()}.
+ */
+public class StartNewStudyAction extends ExistingStudySearchAction {
+<span class="nc" id="L37">    private static final Logger LOGGER = LoggerFactory.getLogger(StartNewStudyAction.class);</span>
+
+    Study newStudy;
+
+    public StartNewStudyAction(LibraryTabContainer tabContainer,
+                               Supplier&lt;OpenDatabaseAction&gt; openDatabaseActionSupplier,
+                               FileUpdateMonitor fileUpdateMonitor,
+                               TaskExecutor taskExecutor,
+                               PreferencesService preferencesService,
+                               StateManager stateManager,
+                               DialogService dialogService) {
+<span class="nc" id="L48">        super(tabContainer,</span>
+<span class="nc" id="L49">                openDatabaseActionSupplier.get(),</span>
+                dialogService,
+                fileUpdateMonitor,
+                taskExecutor,
+                preferencesService,
+                stateManager,
+                true);
+<span class="nc" id="L56">    }</span>
+
+    @Override
+    protected void crawlPreparation(Path studyRepositoryRoot) throws IOException, GitAPIException {
+<span class="nc" id="L60">        StudyYamlParser studyYAMLParser = new StudyYamlParser();</span>
+<span class="nc" id="L61">        studyYAMLParser.writeStudyYamlFile(newStudy, studyRepositoryRoot.resolve(StudyRepository.STUDY_DEFINITION_FILE_NAME));</span>
+
+        // When execution reaches this point, the user created a new study.
+        // The GitHandler is already called to initialize the repository with one single commit &quot;Initial commit&quot;.
+        // The &quot;Initial commit&quot; should also contain the created YAML.
+        // Thus, we append to that commit.
+<span class="nc" id="L67">        new GitHandler(studyRepositoryRoot).createCommitOnCurrentBranch(&quot;Initial commit&quot;, true);</span>
+<span class="nc" id="L68">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc" id="L72">        Optional&lt;SlrStudyAndDirectory&gt; studyAndDirectory = dialogService.showCustomDialogAndWait(</span>
+<span class="nc" id="L73">                new ManageStudyDefinitionView(preferencesService.getFilePreferences().getWorkingDirectory()));</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (studyAndDirectory.isEmpty()) {</span>
+<span class="nc" id="L75">            return;</span>
+        }
+
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (studyAndDirectory.get().getStudyDirectory().toString().isBlank()) {</span>
+<span class="nc" id="L79">            LOGGER.error(&quot;Study directory is blank&quot;);</span>
+            // This branch probably is never taken
+            // Thus, we re-use existing localization
+<span class="nc" id="L82">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Must not be empty!&quot;));</span>
+<span class="nc" id="L83">            return;</span>
+        }
+<span class="nc" id="L85">        studyDirectory = studyAndDirectory.get().getStudyDirectory();</span>
+
+        // set variable for #setupRepository
+        // setupRepository() is called at crawl()
+<span class="nc" id="L89">        newStudy = studyAndDirectory.get().getStudy();</span>
+
+<span class="nc" id="L91">        crawl();</span>
+<span class="nc" id="L92">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

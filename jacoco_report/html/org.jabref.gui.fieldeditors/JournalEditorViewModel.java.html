@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JournalEditorViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors</a> &gt; <span class="el_source">JournalEditorViewModel.java</span></div><h1>JournalEditorViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.scene.control.Button;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.autocompleter.SuggestionProvider;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.integrity.FieldCheckers;
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.strings.StringUtil;
+
+public class JournalEditorViewModel extends AbstractEditorViewModel {
+    private final JournalAbbreviationRepository journalAbbreviationRepository;
+    private final TaskExecutor taskExecutor;
+    private final DialogService dialogService;
+
+    public JournalEditorViewModel(
+            Field field,
+            SuggestionProvider&lt;?&gt; suggestionProvider,
+            JournalAbbreviationRepository journalAbbreviationRepository,
+            FieldCheckers fieldCheckers,
+            TaskExecutor taskExecutor,
+            DialogService dialogService,
+            UndoManager undoManager) {
+<span class="nc" id="L28">        super(field, suggestionProvider, fieldCheckers, undoManager);</span>
+<span class="nc" id="L29">        this.journalAbbreviationRepository = journalAbbreviationRepository;</span>
+<span class="nc" id="L30">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L31">        this.dialogService = dialogService;</span>
+<span class="nc" id="L32">    }</span>
+
+    public void toggleAbbreviation() {
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        if (StringUtil.isBlank(text.get())) {</span>
+<span class="nc" id="L36">            return;</span>
+        }
+
+        // Ignore brackets when matching abbreviations.
+<span class="nc" id="L40">        final String name = StringUtil.ignoreCurlyBracket(text.get());</span>
+
+<span class="nc" id="L42">        journalAbbreviationRepository.getNextAbbreviation(name).ifPresent(nextAbbreviation -&gt; {</span>
+<span class="nc" id="L43">            text.set(nextAbbreviation);</span>
+            // TODO: Add undo
+            // panel.getUndoManager().addEdit(new UndoableFieldChange(entry, editor.getName(), text, nextAbbreviation));
+<span class="nc" id="L46">        });</span>
+<span class="nc" id="L47">    }</span>
+
+    public void showJournalInfo(Button journalInfoButton) {
+<span class="nc" id="L50">        PopOverUtil.showJournalInfo(journalInfoButton, entry, dialogService, taskExecutor);</span>
+<span class="nc" id="L51">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

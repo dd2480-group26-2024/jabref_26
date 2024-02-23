@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpecialFieldColumn.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.maintable.columns</a> &gt; <span class="el_source">SpecialFieldColumn.java</span></div><h1>SpecialFieldColumn.java</h1><pre class="source lang-java linenums">package org.jabref.gui.maintable.columns;
+
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.scene.Node;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
+
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.gui.maintable.BibEntryTableViewModel;
+import org.jabref.gui.maintable.ColumnPreferences;
+import org.jabref.gui.maintable.MainTableColumnFactory;
+import org.jabref.gui.maintable.MainTableColumnModel;
+import org.jabref.gui.specialfields.SpecialFieldValueViewModel;
+import org.jabref.gui.specialfields.SpecialFieldViewModel;
+import org.jabref.gui.specialfields.SpecialFieldsPreferences;
+import org.jabref.gui.util.OptionalValueTableCellFactory;
+import org.jabref.gui.util.comparator.RankingFieldComparator;
+import org.jabref.gui.util.comparator.SpecialFieldComparator;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.model.entry.field.SpecialFieldValue;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+import org.controlsfx.control.Rating;
+
+/**
+ * A column that displays a SpecialField
+ */
+public class SpecialFieldColumn extends MainTableColumn&lt;Optional&lt;SpecialFieldValueViewModel&gt;&gt; {
+
+    private final PreferencesService preferencesService;
+    private final UndoManager undoManager;
+
+    public SpecialFieldColumn(MainTableColumnModel model, PreferencesService preferencesService, UndoManager undoManager) {
+<span class="nc" id="L43">        super(model);</span>
+<span class="nc" id="L44">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L45">        this.undoManager = undoManager;</span>
+
+<span class="nc" id="L47">        SpecialField specialField = (SpecialField) FieldFactory.parseField(model.getQualifier());</span>
+<span class="nc" id="L48">        SpecialFieldViewModel specialFieldViewModel = new SpecialFieldViewModel(specialField, preferencesService, undoManager);</span>
+
+<span class="nc" id="L50">        Node headerGraphic = specialFieldViewModel.getIcon().getGraphicNode();</span>
+<span class="nc" id="L51">        Tooltip.install(headerGraphic, new Tooltip(specialFieldViewModel.getLocalization()));</span>
+<span class="nc" id="L52">        this.setGraphic(headerGraphic);</span>
+<span class="nc" id="L53">        this.getStyleClass().add(MainTableColumnFactory.STYLE_ICON_COLUMN);</span>
+
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (specialField == SpecialField.RANKING) {</span>
+<span class="nc" id="L56">            MainTableColumnFactory.setExactWidth(this, SpecialFieldsPreferences.COLUMN_RANKING_WIDTH);</span>
+<span class="nc" id="L57">            this.setResizable(false);</span>
+<span class="nc" id="L58">            new OptionalValueTableCellFactory&lt;BibEntryTableViewModel, SpecialFieldValueViewModel&gt;()</span>
+<span class="nc" id="L59">                    .withGraphic(this::createSpecialRating)</span>
+<span class="nc" id="L60">                    .install(this);</span>
+        } else {
+<span class="nc" id="L62">            MainTableColumnFactory.setExactWidth(this, ColumnPreferences.ICON_COLUMN_WIDTH);</span>
+<span class="nc" id="L63">            this.setResizable(false);</span>
+
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (specialField.isSingleValueField()) {</span>
+<span class="nc" id="L66">                new OptionalValueTableCellFactory&lt;BibEntryTableViewModel, SpecialFieldValueViewModel&gt;()</span>
+<span class="nc" id="L67">                        .withGraphic((entry, value) -&gt; createSpecialFieldIcon(value, specialFieldViewModel))</span>
+<span class="nc" id="L68">                        .withOnMouseClickedEvent((entry, value) -&gt; event -&gt; {</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                            if (event.getButton() == MouseButton.PRIMARY) {</span>
+<span class="nc" id="L70">                                specialFieldViewModel.toggle(entry.getEntry());</span>
+                            }
+<span class="nc" id="L72">                        })</span>
+<span class="nc" id="L73">                        .install(this);</span>
+            } else {
+<span class="nc" id="L75">                new OptionalValueTableCellFactory&lt;BibEntryTableViewModel, SpecialFieldValueViewModel&gt;()</span>
+<span class="nc" id="L76">                        .withGraphic((entry, value) -&gt; createSpecialFieldIcon(value, specialFieldViewModel))</span>
+<span class="nc" id="L77">                        .withMenu((entry, value) -&gt; createSpecialFieldMenu(entry.getEntry(), specialFieldViewModel))</span>
+<span class="nc" id="L78">                        .install(this);</span>
+            }
+        }
+
+<span class="nc" id="L82">        this.setCellValueFactory(cellData -&gt; cellData.getValue().getSpecialField(specialField));</span>
+
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (specialField == SpecialField.RANKING) {</span>
+<span class="nc" id="L85">            this.setComparator(new RankingFieldComparator());</span>
+        } else {
+<span class="nc" id="L87">            this.setComparator(new SpecialFieldComparator());</span>
+        }
+
+<span class="nc" id="L90">        this.setSortable(true);</span>
+<span class="nc" id="L91">    }</span>
+
+    private Rating createSpecialRating(BibEntryTableViewModel entry, Optional&lt;SpecialFieldValueViewModel&gt; value) {
+<span class="nc" id="L94">        Rating ranking = new Rating();</span>
+
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (value.isPresent()) {</span>
+<span class="nc" id="L97">            ranking.setRating(value.get().getValue().toRating());</span>
+        } else {
+<span class="nc" id="L99">            ranking.setRating(0);</span>
+        }
+
+<span class="nc" id="L102">        ranking.addEventFilter(MouseEvent.MOUSE_CLICKED, event -&gt; {</span>
+<span class="nc bnc" id="L103" title="All 4 branches missed.">            if (event.getButton().equals(MouseButton.PRIMARY) &amp;&amp; event.getClickCount() == 2) {</span>
+<span class="nc" id="L104">                ranking.setRating(0);</span>
+<span class="nc" id="L105">                event.consume();</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            } else if (event.getButton().equals(MouseButton.SECONDARY)) {</span>
+<span class="nc" id="L107">                event.consume();</span>
+            }
+<span class="nc" id="L109">        });</span>
+
+<span class="nc" id="L111">        EasyBind.subscribe(ranking.ratingProperty(), rating -&gt;</span>
+<span class="nc" id="L112">                new SpecialFieldViewModel(SpecialField.RANKING, preferencesService, undoManager)</span>
+<span class="nc" id="L113">                        .setSpecialFieldValue(entry.getEntry(), SpecialFieldValue.getRating(rating.intValue())));</span>
+
+<span class="nc" id="L115">        return ranking;</span>
+    }
+
+    private ContextMenu createSpecialFieldMenu(BibEntry entry, SpecialFieldViewModel specialField) {
+<span class="nc" id="L119">        ContextMenu contextMenu = new ContextMenu();</span>
+
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        for (SpecialFieldValueViewModel value : specialField.getValues()) {</span>
+<span class="nc" id="L122">            MenuItem menuItem = new MenuItem(value.getMenuString(), value.getIcon().map(JabRefIcon::getGraphicNode).orElse(null));</span>
+<span class="nc" id="L123">            menuItem.setOnAction(event -&gt; specialField.setSpecialFieldValue(entry, value.getValue()));</span>
+<span class="nc" id="L124">            contextMenu.getItems().add(menuItem);</span>
+<span class="nc" id="L125">        }</span>
+
+<span class="nc" id="L127">        return contextMenu;</span>
+    }
+
+    private Node createSpecialFieldIcon(Optional&lt;SpecialFieldValueViewModel&gt; fieldValue, SpecialFieldViewModel specialField) {
+<span class="nc" id="L131">        return fieldValue.flatMap(SpecialFieldValueViewModel::getIcon)</span>
+<span class="nc" id="L132">                         .map(JabRefIcon::getGraphicNode)</span>
+<span class="nc" id="L133">                         .orElseGet(() -&gt; {</span>
+<span class="nc" id="L134">                             Node node = specialField.getEmptyIcon().getGraphicNode();</span>
+<span class="nc" id="L135">                             node.getStyleClass().add(&quot;empty-special-field&quot;);</span>
+<span class="nc" id="L136">                             return node;</span>
+                         });
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

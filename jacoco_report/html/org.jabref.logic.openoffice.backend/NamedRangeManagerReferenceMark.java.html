@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NamedRangeManagerReferenceMark.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice.backend</a> &gt; <span class="el_source">NamedRangeManagerReferenceMark.java</span></div><h1>NamedRangeManagerReferenceMark.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice.backend;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.model.openoffice.backend.NamedRange;
+import org.jabref.model.openoffice.backend.NamedRangeManager;
+import org.jabref.model.openoffice.uno.CreationException;
+import org.jabref.model.openoffice.uno.NoDocumentException;
+import org.jabref.model.openoffice.uno.UnoReferenceMark;
+
+import com.sun.star.lang.WrappedTargetException;
+import com.sun.star.text.XTextCursor;
+import com.sun.star.text.XTextDocument;
+
+<span class="nc" id="L16">public class NamedRangeManagerReferenceMark implements NamedRangeManager {</span>
+
+    @Override
+    public NamedRange createNamedRange(XTextDocument doc,
+                                       String refMarkName,
+                                       XTextCursor position,
+                                       boolean insertSpaceAfter,
+                                       boolean withoutBrackets)
+            throws
+            CreationException {
+<span class="nc" id="L26">        return NamedRangeReferenceMark.create(doc, refMarkName, position, insertSpaceAfter, withoutBrackets);</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getUsedNames(XTextDocument doc)
+            throws
+            NoDocumentException {
+<span class="nc" id="L33">        return UnoReferenceMark.getListOfNames(doc);</span>
+    }
+
+    @Override
+    public Optional&lt;NamedRange&gt; getNamedRangeFromDocument(XTextDocument doc, String refMarkName)
+            throws
+            NoDocumentException,
+            WrappedTargetException {
+<span class="nc" id="L41">        return NamedRangeReferenceMark</span>
+<span class="nc" id="L42">                .getFromDocument(doc, refMarkName)</span>
+<span class="nc" id="L43">                .map(x -&gt; x);</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

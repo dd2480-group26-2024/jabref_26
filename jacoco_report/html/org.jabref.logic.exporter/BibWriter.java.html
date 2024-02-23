@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.exporter</a> &gt; <span class="el_source">BibWriter.java</span></div><h1>BibWriter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.exporter;
+
+import java.io.IOException;
+import java.io.Writer;
+
+import org.jabref.model.strings.StringUtil;
+
+/**
+ * Class to write to a .bib file. Used by {@link BibtexDatabaseWriter}
+ */
+public class BibWriter {
+
+    private final String newLineSeparator;
+    private final Writer writer;
+
+<span class="fc" id="L16">    private boolean precedingNewLineRequired = false;</span>
+<span class="fc" id="L17">    private boolean somethingWasWritten = false;</span>
+<span class="fc" id="L18">    private boolean lastWriteWasNewline = false;</span>
+
+    /**
+     * @param newLineSeparator the string used for a line break
+     */
+<span class="fc" id="L23">    public BibWriter(Writer writer, String newLineSeparator) {</span>
+<span class="fc" id="L24">        this.writer = writer;</span>
+<span class="fc" id="L25">        this.newLineSeparator = newLineSeparator;</span>
+<span class="fc" id="L26">    }</span>
+
+    /**
+     * Writes the given string. The newlines of the given string are converted to the newline set for this class.
+     */
+    public void write(String string) throws IOException {
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (precedingNewLineRequired) {</span>
+<span class="fc" id="L33">            writer.write(newLineSeparator);</span>
+<span class="fc" id="L34">            precedingNewLineRequired = false;</span>
+        }
+<span class="fc" id="L36">        string = StringUtil.unifyLineBreaks(string, newLineSeparator);</span>
+<span class="fc" id="L37">        writer.write(string);</span>
+<span class="fc" id="L38">        lastWriteWasNewline = string.endsWith(newLineSeparator);</span>
+<span class="fc" id="L39">        somethingWasWritten = true;</span>
+<span class="fc" id="L40">    }</span>
+
+    /**
+     * Writes the given string and finishes it with a line break
+     */
+    public void writeLine(String string) throws IOException {
+<span class="fc" id="L46">        this.write(string);</span>
+<span class="fc" id="L47">        this.finishLine();</span>
+<span class="fc" id="L48">    }</span>
+
+    /**
+     * Finishes a line
+     */
+    public void finishLine() throws IOException {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (!this.lastWriteWasNewline) {</span>
+<span class="fc" id="L55">            this.write(newLineSeparator);</span>
+        }
+<span class="fc" id="L57">    }</span>
+
+    /**
+     * Finishes a block
+     */
+    public void finishBlock() throws IOException {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (!somethingWasWritten) {</span>
+<span class="fc" id="L64">            return;</span>
+        }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (!lastWriteWasNewline) {</span>
+<span class="fc" id="L67">            this.finishLine();</span>
+        }
+<span class="fc" id="L69">        this.somethingWasWritten = false;</span>
+<span class="fc" id="L70">        this.precedingNewLineRequired = true;</span>
+<span class="fc" id="L71">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

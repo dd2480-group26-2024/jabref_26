@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldFormatterCleanupsPanelViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.commonfxcontrols</a> &gt; <span class="el_source">FieldFormatterCleanupsPanelViewModel.java</span></div><h1>FieldFormatterCleanupsPanelViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.commonfxcontrols;
+
+import java.util.Comparator;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.transformation.SortedList;
+import javafx.scene.control.SelectionModel;
+
+import org.jabref.gui.Globals;
+import org.jabref.gui.util.NoSelectionModel;
+import org.jabref.logic.cleanup.FieldFormatterCleanup;
+import org.jabref.logic.cleanup.FieldFormatterCleanups;
+import org.jabref.logic.cleanup.Formatter;
+import org.jabref.logic.formatter.Formatters;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+
+public class FieldFormatterCleanupsPanelViewModel {
+
+<span class="nc" id="L26">    private final BooleanProperty cleanupsDisableProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L27">    private final ListProperty&lt;FieldFormatterCleanup&gt; cleanupsListProperty = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L28">    private final ObjectProperty&lt;SelectionModel&lt;FieldFormatterCleanup&gt;&gt; selectedCleanupProperty = new SimpleObjectProperty&lt;&gt;(new NoSelectionModel&lt;&gt;());</span>
+<span class="nc" id="L29">    private final ListProperty&lt;Field&gt; availableFieldsProperty = new SimpleListProperty&lt;&gt;(new SortedList&lt;&gt;(FXCollections.observableArrayList(FieldFactory.getCommonFields()), Comparator.comparing(Field::getDisplayName)));</span>
+<span class="nc" id="L30">    private final ObjectProperty&lt;Field&gt; selectedFieldProperty = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="nc" id="L31">    private final ListProperty&lt;Formatter&gt; availableFormattersProperty = new SimpleListProperty&lt;&gt;(new SortedList&lt;&gt;(FXCollections.observableArrayList(Formatters.getAll()), Comparator.comparing(Formatter::getName)));</span>
+<span class="nc" id="L32">    private final ObjectProperty&lt;Formatter&gt; selectedFormatterProperty = new SimpleObjectProperty&lt;&gt;();</span>
+
+<span class="nc" id="L34">    public FieldFormatterCleanupsPanelViewModel() {</span>
+<span class="nc" id="L35">    }</span>
+
+    public void resetToRecommended() {
+<span class="nc" id="L38">        Globals.stateManager.getActiveDatabase().ifPresent(databaseContext -&gt; {</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">            if (databaseContext.isBiblatexMode()) {</span>
+<span class="nc" id="L40">                cleanupsListProperty.setAll(FieldFormatterCleanups.RECOMMEND_BIBLATEX_ACTIONS);</span>
+            } else {
+<span class="nc" id="L42">                cleanupsListProperty.setAll(FieldFormatterCleanups.RECOMMEND_BIBTEX_ACTIONS);</span>
+            }
+<span class="nc" id="L44">        });</span>
+<span class="nc" id="L45">    }</span>
+
+    public void clearAll() {
+<span class="nc" id="L48">        cleanupsListProperty.clear();</span>
+<span class="nc" id="L49">    }</span>
+
+    public void addCleanup() {
+<span class="nc bnc" id="L52" title="All 4 branches missed.">        if (selectedFieldProperty.getValue() == null || selectedFormatterProperty.getValue() == null) {</span>
+<span class="nc" id="L53">            return;</span>
+        }
+
+<span class="nc" id="L56">        FieldFormatterCleanup cleanup = new FieldFormatterCleanup(</span>
+<span class="nc" id="L57">                selectedFieldProperty.getValue(),</span>
+<span class="nc" id="L58">                selectedFormatterProperty.getValue());</span>
+
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (cleanupsListProperty.stream().noneMatch(item -&gt; item.equals(cleanup))) {</span>
+<span class="nc" id="L61">            cleanupsListProperty.add(cleanup);</span>
+        }
+<span class="nc" id="L63">    }</span>
+
+    public void removeCleanup(FieldFormatterCleanup cleanup) {
+<span class="nc" id="L66">        cleanupsListProperty.remove(cleanup);</span>
+<span class="nc" id="L67">    }</span>
+
+    public BooleanProperty cleanupsDisableProperty() {
+<span class="nc" id="L70">        return cleanupsDisableProperty;</span>
+    }
+
+    public ListProperty&lt;FieldFormatterCleanup&gt; cleanupsListProperty() {
+<span class="nc" id="L74">        return cleanupsListProperty;</span>
+    }
+
+    public ObjectProperty&lt;SelectionModel&lt;FieldFormatterCleanup&gt;&gt; selectedCleanupProperty() {
+<span class="nc" id="L78">        return selectedCleanupProperty;</span>
+    }
+
+    public ListProperty&lt;Field&gt; availableFieldsProperty() {
+<span class="nc" id="L82">        return availableFieldsProperty;</span>
+    }
+
+    public ObjectProperty&lt;Field&gt; selectedFieldProperty() {
+<span class="nc" id="L86">        return selectedFieldProperty;</span>
+    }
+
+    public ListProperty&lt;Formatter&gt; availableFormattersProperty() {
+<span class="nc" id="L90">        return availableFormattersProperty;</span>
+    }
+
+    public ObjectProperty&lt;Formatter&gt; selectedFormatterProperty() {
+<span class="nc" id="L94">        return selectedFormatterProperty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

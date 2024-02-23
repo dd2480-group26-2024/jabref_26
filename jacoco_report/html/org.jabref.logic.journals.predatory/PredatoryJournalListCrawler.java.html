@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PredatoryJournalListCrawler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.journals.predatory</a> &gt; <span class="el_source">PredatoryJournalListCrawler.java</span></div><h1>PredatoryJournalListCrawler.java</h1><pre class="source lang-java linenums">package org.jabref.logic.journals.predatory;
+
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.strings.StringUtil;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Converts (hard-coded) online resources to a set. {@link #loadFromOnlineSources} is the method containing the result.
+ */
+<span class="nc" id="L29">public class PredatoryJournalListCrawler {</span>
+
+<span class="nc" id="L31">    private record PJSource(URL url, Optional&lt;Pattern&gt; elementPattern) {</span>
+        PJSource(String url, String regex) {
+<span class="nc" id="L33">            this(createURL(url), Optional.of(Pattern.compile(regex)));</span>
+<span class="nc" id="L34">        }</span>
+
+        PJSource(String url) {
+<span class="nc" id="L37">            this(createURL(url), Optional.empty());</span>
+<span class="nc" id="L38">        }</span>
+
+        private static URL createURL(String urlString) {
+            try {
+<span class="nc" id="L42">                return new URI(urlString).toURL();</span>
+<span class="nc" id="L43">            } catch (MalformedURLException | URISyntaxException ex) {</span>
+<span class="nc" id="L44">                throw new IllegalArgumentException(&quot;Malformed URL has occurred in PJSource&quot;, ex);</span>
+            }
+        }
+    }
+
+<span class="nc" id="L49">    private static final Logger LOGGER = LoggerFactory.getLogger(PredatoryJournalListCrawler.class);</span>
+<span class="nc" id="L50">    private static final Pattern PATTERN_NAME = Pattern.compile(&quot;(?&lt;=\&quot;&gt;).*?(?=&lt;)&quot;);</span>
+<span class="nc" id="L51">    private static final Pattern PATTERN_URL = Pattern.compile(&quot;http.*?(?=\&quot;)&quot;);</span>
+<span class="nc" id="L52">    private static final Pattern PATTERN_ABBR = Pattern.compile(&quot;(?&lt;=\\()[^ ]*(?=\\))&quot;);</span>
+<span class="nc" id="L53">    private final List&lt;PJSource&gt; predatorySources = List.of(</span>
+            new PJSource(&quot;https://raw.githubusercontent.com/stop-predatory-journals/stop-predatory-journals.github.io/master/_data/journals.csv&quot;),
+            new PJSource(&quot;https://raw.githubusercontent.com/stop-predatory-journals/stop-predatory-journals.github.io/master/_data/publishers.csv&quot;),
+            new PJSource(&quot;https://beallslist.net/&quot;,
+                    &quot;&lt;li&gt;.*?&lt;/li&gt;&quot;),
+            new PJSource(&quot;https://beallslist.net/standalone-journals/&quot;,
+                    &quot;&lt;li&gt;.*?&lt;/li&gt;&quot;),
+            new PJSource(&quot;https://beallslist.net/hijacked-journals/&quot;,
+                    &quot;&lt;tr&gt;.*?&lt;/tr&gt;&quot;)
+    );
+
+<span class="nc" id="L64">    private final List&lt;String&gt; linkElements = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L66">    private final List&lt;PredatoryJournalInformation&gt; predatoryJournalInformation = new ArrayList&lt;&gt;();</span>
+
+    /**
+     * Loads predatory journal information from online resources
+     * This method should be only called once when building JabRef
+     *
+     * @return the set of journal information
+     */
+    public HashSet&lt;PredatoryJournalInformation&gt; loadFromOnlineSources() {
+<span class="nc" id="L75">        predatorySources.forEach(this::crawl);</span>
+<span class="nc" id="L76">        linkElements.forEach(this::clean);</span>
+<span class="nc" id="L77">        return new HashSet&lt;&gt;(predatoryJournalInformation);</span>
+    }
+
+    private void crawl(PJSource source) {
+        try {
+<span class="nc" id="L82">            URLDownload download = new URLDownload(source.url);</span>
+
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            if (!download.canBeReached()) {</span>
+<span class="nc" id="L85">                LOGGER.warn(&quot;Url {} is unreachable&quot;, source.url);</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            } else if (source.url.getPath().contains(&quot;.csv&quot;)) {</span>
+<span class="nc" id="L87">                handleCSV(new InputStreamReader(download.asInputStream()));</span>
+            } else {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                if (source.elementPattern.isPresent()) {</span>
+<span class="nc" id="L90">                    handleHTML(source.elementPattern.get(), download.asString());</span>
+                }
+            }
+<span class="nc" id="L93">        } catch (IOException ex) {</span>
+<span class="nc" id="L94">            LOGGER.error(&quot;Could not crawl source for predatory journals {}&quot;, source.url, ex);</span>
+<span class="nc" id="L95">        }</span>
+<span class="nc" id="L96">    }</span>
+
+    private void handleCSV(Reader reader) throws IOException {
+<span class="nc" id="L99">        CSVFormat format = CSVFormat.EXCEL.builder().setSkipHeaderRecord(true).build();</span>
+<span class="nc" id="L100">        CSVParser csvParser = new CSVParser(reader, format);</span>
+
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        for (CSVRecord csvRecord : csvParser) {</span>
+<span class="nc" id="L103">            String name = csvRecord.get(1);</span>
+<span class="nc" id="L104">            String abbr = csvRecord.get(2);</span>
+<span class="nc" id="L105">            String url = csvRecord.get(0);</span>
+
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (StringUtil.isNullOrEmpty(name)) {</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">                if (!abbr.isEmpty()) {</span>
+<span class="nc" id="L109">                    name = abbr;</span>
+                } else {
+                    continue;
+                }
+            }
+            // changes column order from CSV (source: url, name, abbr)
+<span class="nc" id="L115">            predatoryJournalInformation.add(new PredatoryJournalInformation(decode(name), decode(abbr), url));</span>
+<span class="nc" id="L116">        }</span>
+<span class="nc" id="L117">    }</span>
+
+    private void handleHTML(Pattern pattern, String body) {
+<span class="nc" id="L120">        Matcher matcher = pattern.matcher(body);</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L122">            linkElements.add(matcher.group());</span>
+        }
+<span class="nc" id="L124">    }</span>
+
+    private void clean(String item) {
+<span class="nc" id="L127">        Matcher m_name = PATTERN_NAME.matcher(item);</span>
+<span class="nc" id="L128">        Matcher m_url = PATTERN_URL.matcher(item);</span>
+<span class="nc" id="L129">        Matcher m_abbr = PATTERN_ABBR.matcher(item);</span>
+
+        // using `if` gets only first link in element, `while` gets all, but this may not be desirable
+        // e.g. this way only the hijacked journals are recorded and not the authentic originals
+<span class="nc bnc" id="L133" title="All 4 branches missed.">        if (m_name.find() &amp;&amp; m_url.find()) {</span>
+<span class="nc" id="L134">            String name = m_name.group();</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            if (name != null) {</span>
+<span class="nc" id="L136">                name = name.replace(&quot;\u200B&quot;, &quot;&quot;); // zero width space</span>
+            }
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            String abbr = m_abbr.find() ? m_abbr.group() : &quot;&quot;;</span>
+<span class="nc" id="L139">            String url = m_url.group();</span>
+
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            if (StringUtil.isNullOrEmpty(name)) {</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                if (!abbr.isEmpty()) {</span>
+<span class="nc" id="L143">                    name = abbr;</span>
+                } else {
+<span class="nc" id="L145">                    return;</span>
+                }
+            }
+<span class="nc" id="L148">            predatoryJournalInformation.add(new PredatoryJournalInformation(decode(name), decode(abbr), url));</span>
+        }
+<span class="nc" id="L150">    }</span>
+
+    private String decode(String s) {
+<span class="nc" id="L153">        return Optional.ofNullable(s)</span>
+<span class="nc" id="L154">                       .orElse(&quot;&quot;)</span>
+<span class="nc" id="L155">                       .replace(&quot;,&quot;, &quot;&quot;)</span>
+<span class="nc" id="L156">                       .replace(&quot;&amp;amp;&quot;, &quot;&amp;&quot;)</span>
+<span class="nc" id="L157">                       .replace(&quot;&amp;#8217;&quot;, &quot;'&quot;)</span>
+<span class="nc" id="L158">                       .replace(&quot;&amp;#8211;&quot;, &quot;-&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

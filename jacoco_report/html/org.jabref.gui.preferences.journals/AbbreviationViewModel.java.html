@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbbreviationViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.journals</a> &gt; <span class="el_source">AbbreviationViewModel.java</span></div><h1>AbbreviationViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.journals;
+
+import java.util.Locale;
+import java.util.Objects;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+import org.jabref.logic.journals.Abbreviation;
+
+/**
+ * This class provides a view model for abbreviation objects which can also define placeholder objects of abbreviations.
+ * This is indicated by using the {@code pseudoAbbreviation} property.
+ */
+public class AbbreviationViewModel {
+
+<span class="fc" id="L19">    private final StringProperty name = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L20">    private final StringProperty abbreviation = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L21">    private final StringProperty shortestUniqueAbbreviation = new SimpleStringProperty(&quot;&quot;);</span>
+
+    // Used when a &quot;null&quot; abbreviation object is added
+<span class="fc" id="L24">    private final BooleanProperty pseudoAbbreviation = new SimpleBooleanProperty();</span>
+
+<span class="fc" id="L26">    public AbbreviationViewModel(Abbreviation abbreviationObject) {</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        this.pseudoAbbreviation.set(abbreviationObject == null);</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (abbreviationObject != null) {</span>
+<span class="fc" id="L29">            this.name.setValue(abbreviationObject.getName());</span>
+<span class="fc" id="L30">            this.abbreviation.setValue(abbreviationObject.getAbbreviation());</span>
+
+            // the view model stores the &quot;real&quot; values, not the default fallback
+<span class="fc" id="L33">            String shortestUniqueAbbreviationOfAbbreviation = abbreviationObject.getShortestUniqueAbbreviation();</span>
+<span class="fc" id="L34">            boolean shortestUniqueAbbreviationIsDefaultValue = shortestUniqueAbbreviationOfAbbreviation.equals(abbreviationObject.getAbbreviation());</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            if (shortestUniqueAbbreviationIsDefaultValue) {</span>
+<span class="fc" id="L36">                this.shortestUniqueAbbreviation.set(&quot;&quot;);</span>
+            } else {
+<span class="fc" id="L38">                this.shortestUniqueAbbreviation.setValue(shortestUniqueAbbreviationOfAbbreviation);</span>
+            }
+        }
+<span class="fc" id="L41">    }</span>
+
+    public Abbreviation getAbbreviationObject() {
+<span class="fc" id="L44">        return new Abbreviation(getName(), getAbbreviation(), getShortestUniqueAbbreviation());</span>
+    }
+
+    public String getName() {
+<span class="fc" id="L48">        return name.get();</span>
+    }
+
+    public void setName(String name) {
+<span class="fc" id="L52">        this.name.set(name);</span>
+<span class="fc" id="L53">    }</span>
+
+    public String getAbbreviation() {
+<span class="fc" id="L56">        return abbreviation.get();</span>
+    }
+
+    public void setAbbreviation(String abbreviation) {
+<span class="fc" id="L60">        this.abbreviation.set(abbreviation);</span>
+<span class="fc" id="L61">    }</span>
+
+    public String getShortestUniqueAbbreviation() {
+<span class="fc" id="L64">        return shortestUniqueAbbreviation.get();</span>
+    }
+
+    public void setShortestUniqueAbbreviation(String shortestUniqueAbbreviation) {
+<span class="fc" id="L68">        this.shortestUniqueAbbreviation.set(shortestUniqueAbbreviation);</span>
+<span class="fc" id="L69">    }</span>
+
+    public boolean isPseudoAbbreviation() {
+<span class="fc" id="L72">        return pseudoAbbreviation.get();</span>
+    }
+
+    public StringProperty nameProperty() {
+<span class="nc" id="L76">        return name;</span>
+    }
+
+    public StringProperty abbreviationProperty() {
+<span class="nc" id="L80">        return abbreviation;</span>
+    }
+
+    public StringProperty shortestUniqueAbbreviationProperty() {
+<span class="nc" id="L84">        return shortestUniqueAbbreviation;</span>
+    }
+
+    public BooleanProperty isPseudoAbbreviationProperty() {
+<span class="nc" id="L88">        return pseudoAbbreviation;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L94">            return true;</span>
+        }
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="fc" id="L97">            return false;</span>
+        }
+<span class="fc" id="L99">        AbbreviationViewModel that = (AbbreviationViewModel) o;</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        return getName().equals(that.getName())</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                &amp;&amp; getAbbreviation().equals(that.getAbbreviation())</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                &amp;&amp; getShortestUniqueAbbreviation().equals(that.getShortestUniqueAbbreviation())</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                &amp;&amp; (isPseudoAbbreviation() == that.isPseudoAbbreviation());</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L108">        return Objects.hash(getName(), getAbbreviation(), getShortestUniqueAbbreviation(), isPseudoAbbreviation());</span>
+    }
+
+    public boolean containsCaseIndependent(String searchTerm) {
+<span class="fc" id="L112">        searchTerm = searchTerm.toLowerCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        return this.abbreviation.get().toLowerCase(Locale.ROOT).contains(searchTerm) ||</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                this.name.get().toLowerCase(Locale.ROOT).contains(searchTerm) ||</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                this.shortestUniqueAbbreviation.get().toLowerCase(Locale.ROOT).contains(searchTerm);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

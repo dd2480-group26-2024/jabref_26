@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryTypeView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui</a> &gt; <span class="el_source">EntryTypeView.java</span></div><h1>EntryTypeView.java</h1><pre class="source lang-java linenums">package org.jabref.gui;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import javafx.application.Platform;
+import javafx.event.Event;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TitledPane;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.FlowPane;
+import javafx.stage.Screen;
+
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.ControlHelper;
+import org.jabref.gui.util.IconValidationDecorator;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.importer.IdBasedFetcher;
+import org.jabref.logic.importer.WebFetcher;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntryType;
+import org.jabref.model.entry.types.BiblatexAPAEntryTypeDefinitions;
+import org.jabref.model.entry.types.BiblatexEntryTypeDefinitions;
+import org.jabref.model.entry.types.BiblatexSoftwareEntryTypeDefinitions;
+import org.jabref.model.entry.types.BibtexEntryTypeDefinitions;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.IEEETranEntryTypeDefinitions;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+import jakarta.inject.Inject;
+
+/**
+ * Dialog that prompts the user to choose a type for an entry.
+ */
+public class EntryTypeView extends BaseDialog&lt;EntryType&gt; {
+
+    @Inject private StateManager stateManager;
+    @Inject private TaskExecutor taskExecutor;
+    @Inject private FileUpdateMonitor fileUpdateMonitor;
+
+    @FXML private ButtonType generateButton;
+    @FXML private TextField idTextField;
+    @FXML private ComboBox&lt;IdBasedFetcher&gt; idBasedFetchers;
+    @FXML private FlowPane recommendedEntriesPane;
+    @FXML private FlowPane otherEntriesPane;
+    @FXML private FlowPane customPane;
+    @FXML private TitledPane recommendedEntriesTitlePane;
+    @FXML private TitledPane otherEntriesTitlePane;
+    @FXML private TitledPane customTitlePane;
+
+    private final LibraryTab libraryTab;
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+
+    private EntryType type;
+    private EntryTypeViewModel viewModel;
+<span class="nc" id="L71">    private final ControlsFxVisualizer visualizer = new ControlsFxVisualizer();</span>
+
+<span class="nc" id="L73">    public EntryTypeView(LibraryTab libraryTab, DialogService dialogService, PreferencesService preferences) {</span>
+<span class="nc" id="L74">        this.libraryTab = libraryTab;</span>
+<span class="nc" id="L75">        this.dialogService = dialogService;</span>
+<span class="nc" id="L76">        this.preferencesService = preferences;</span>
+
+<span class="nc" id="L78">        this.setTitle(Localization.lang(&quot;Select entry type&quot;));</span>
+<span class="nc" id="L79">        ViewLoader.view(this)</span>
+<span class="nc" id="L80">                  .load()</span>
+<span class="nc" id="L81">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L83">        ControlHelper.setAction(generateButton, this.getDialogPane(), event -&gt; viewModel.runFetcherWorker());</span>
+<span class="nc" id="L84">        setOnCloseRequest(e -&gt; viewModel.cancelFetcherWorker());</span>
+
+<span class="nc" id="L86">        setResultConverter(button -&gt; {</span>
+            // The buttonType will always be &quot;cancel&quot;, even if we pressed one of the entry type buttons
+<span class="nc" id="L88">            return type;</span>
+        });
+
+<span class="nc" id="L91">        Button btnGenerate = (Button) this.getDialogPane().lookupButton(generateButton);</span>
+<span class="nc" id="L92">        btnGenerate.getStyleClass().add(&quot;customGenerateButton&quot;);</span>
+
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        btnGenerate.textProperty().bind(EasyBind.map(viewModel.searchingProperty(), searching -&gt; searching ? Localization.lang(&quot;Searching...&quot;) : Localization.lang(&quot;Generate&quot;)));</span>
+<span class="nc" id="L95">        btnGenerate.disableProperty().bind(viewModel.idFieldValidationStatus().validProperty().not().or(viewModel.searchingProperty()));</span>
+
+<span class="nc" id="L97">        EasyBind.subscribe(viewModel.searchSuccesfulProperty(), isSuccessful -&gt; {</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (isSuccessful) {</span>
+<span class="nc" id="L99">                setEntryTypeForReturnAndClose(Optional.empty());</span>
+            }
+<span class="nc" id="L101">        });</span>
+<span class="nc" id="L102">    }</span>
+
+    private void addEntriesToPane(FlowPane pane, Collection&lt;? extends BibEntryType&gt; entryTypes) {
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        for (BibEntryType entryType : entryTypes) {</span>
+<span class="nc" id="L106">            Button entryButton = new Button(entryType.getType().getDisplayName());</span>
+<span class="nc" id="L107">            entryButton.setUserData(entryType);</span>
+<span class="nc" id="L108">            entryButton.setOnAction(event -&gt; setEntryTypeForReturnAndClose(Optional.of(entryType)));</span>
+<span class="nc" id="L109">            pane.getChildren().add(entryButton);</span>
+
+<span class="nc" id="L111">            EntryType selectedType = entryType.getType();</span>
+<span class="nc" id="L112">            String description = getDescription(selectedType);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            if (StringUtil.isNotBlank(description)) {</span>
+<span class="nc" id="L114">                Screen currentScreen = Screen.getPrimary();</span>
+<span class="nc" id="L115">                double maxWidth = currentScreen.getBounds().getWidth();</span>
+<span class="nc" id="L116">                Tooltip tooltip = new Tooltip(description);</span>
+<span class="nc" id="L117">                tooltip.setMaxWidth((maxWidth * 2) / 3);</span>
+<span class="nc" id="L118">                tooltip.setWrapText(true);</span>
+<span class="nc" id="L119">                entryButton.setTooltip(tooltip);</span>
+            }
+<span class="nc" id="L121">        }</span>
+<span class="nc" id="L122">    }</span>
+
+    @FXML
+    public void initialize() {
+<span class="nc" id="L126">        visualizer.setDecoration(new IconValidationDecorator());</span>
+<span class="nc" id="L127">        viewModel = new EntryTypeViewModel(</span>
+                preferencesService,
+                libraryTab,
+                dialogService,
+                stateManager,
+                taskExecutor,
+                fileUpdateMonitor);
+
+<span class="nc" id="L135">        idBasedFetchers.itemsProperty().bind(viewModel.fetcherItemsProperty());</span>
+<span class="nc" id="L136">        idTextField.textProperty().bindBidirectional(viewModel.idTextProperty());</span>
+<span class="nc" id="L137">        idBasedFetchers.valueProperty().bindBidirectional(viewModel.selectedItemProperty());</span>
+
+<span class="nc" id="L139">        EasyBind.subscribe(viewModel.getFocusAndSelectAllProperty(), evt -&gt; {</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (evt) {</span>
+<span class="nc" id="L141">                idTextField.requestFocus();</span>
+<span class="nc" id="L142">                idTextField.selectAll();</span>
+            }
+<span class="nc" id="L144">        });</span>
+
+<span class="nc" id="L146">        new ViewModelListCellFactory&lt;IdBasedFetcher&gt;().withText(WebFetcher::getName).install(idBasedFetchers);</span>
+
+        // we set the managed property so that they will only be rendered when they are visble so that the Nodes only take the space when visible
+        // avoids removing and adding from the scence graph
+<span class="nc" id="L150">        recommendedEntriesTitlePane.managedProperty().bind(recommendedEntriesTitlePane.visibleProperty());</span>
+<span class="nc" id="L151">        otherEntriesTitlePane.managedProperty().bind(otherEntriesTitlePane.visibleProperty());</span>
+<span class="nc" id="L152">        customTitlePane.managedProperty().bind(customTitlePane.visibleProperty());</span>
+
+<span class="nc" id="L154">        otherEntriesTitlePane.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -&gt; {</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            if (isNowExpanded) {</span>
+<span class="nc" id="L156">                this.setHeight(this.getHeight() + otherEntriesPane.getHeight());</span>
+            } else {
+<span class="nc" id="L158">                this.setHeight(this.getHeight() - otherEntriesPane.getHeight());</span>
+            }
+<span class="nc" id="L160">        });</span>
+
+<span class="nc" id="L162">        boolean isBiblatexMode = libraryTab.getBibDatabaseContext().isBiblatexMode();</span>
+        List&lt;BibEntryType&gt; recommendedEntries;
+        List&lt;BibEntryType&gt; otherEntries;
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (isBiblatexMode) {</span>
+<span class="nc" id="L166">            recommendedEntries = BiblatexEntryTypeDefinitions.RECOMMENDED;</span>
+<span class="nc" id="L167">            otherEntries = BiblatexEntryTypeDefinitions.ALL</span>
+<span class="nc" id="L168">                .stream()</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                .filter(e -&gt; !recommendedEntries.contains(e))</span>
+<span class="nc" id="L170">                .collect(Collectors.toList());</span>
+<span class="nc" id="L171">            otherEntries.addAll(BiblatexSoftwareEntryTypeDefinitions.ALL);</span>
+<span class="nc" id="L172">            otherEntries.addAll(BiblatexAPAEntryTypeDefinitions.ALL);</span>
+        } else {
+<span class="nc" id="L174">            recommendedEntries = BibtexEntryTypeDefinitions.RECOMMENDED;</span>
+<span class="nc" id="L175">            otherEntries = BibtexEntryTypeDefinitions.ALL</span>
+<span class="nc" id="L176">                .stream()</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                .filter(e -&gt; !recommendedEntries.contains(e))</span>
+<span class="nc" id="L178">                .collect(Collectors.toList());</span>
+<span class="nc" id="L179">            otherEntries.addAll(IEEETranEntryTypeDefinitions.ALL);</span>
+        }
+<span class="nc" id="L181">        addEntriesToPane(recommendedEntriesPane, recommendedEntries);</span>
+<span class="nc" id="L182">        addEntriesToPane(otherEntriesPane, otherEntries);</span>
+
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        BibDatabaseMode customTypeDatabaseMode = isBiblatexMode ? BibDatabaseMode.BIBLATEX : BibDatabaseMode.BIBTEX;</span>
+<span class="nc" id="L185">        List&lt;BibEntryType&gt; customTypes = Globals.entryTypesManager.getAllCustomTypes(customTypeDatabaseMode);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (customTypes.isEmpty()) {</span>
+<span class="nc" id="L187">            customTitlePane.setVisible(false);</span>
+        } else {
+<span class="nc" id="L189">            addEntriesToPane(customPane, customTypes);</span>
+        }
+
+<span class="nc" id="L192">        viewModel.idTextProperty().addListener((obs, oldValue, newValue) -&gt;</span>
+<span class="nc" id="L193">                visualizer.initVisualization(viewModel.idFieldValidationStatus(), idTextField, true));</span>
+
+<span class="nc" id="L195">        Platform.runLater(() -&gt; idTextField.requestFocus());</span>
+<span class="nc" id="L196">    }</span>
+
+    public EntryType getChoice() {
+<span class="nc" id="L199">        return type;</span>
+    }
+
+    @FXML
+    private void runFetcherWorker(Event event) {
+<span class="nc" id="L204">        viewModel.runFetcherWorker();</span>
+<span class="nc" id="L205">    }</span>
+
+    @FXML
+    private void focusTextField(Event event) {
+<span class="nc" id="L209">        idTextField.requestFocus();</span>
+<span class="nc" id="L210">        idTextField.selectAll();</span>
+<span class="nc" id="L211">    }</span>
+
+    private void setEntryTypeForReturnAndClose(Optional&lt;BibEntryType&gt; entryType) {
+<span class="nc" id="L214">        type = entryType.map(BibEntryType::getType).orElse(null);</span>
+<span class="nc" id="L215">        viewModel.stopFetching();</span>
+<span class="nc" id="L216">        this.stateManager.clearSearchQuery();</span>
+<span class="nc" id="L217">        this.close();</span>
+<span class="nc" id="L218">    }</span>
+
+    /**
+     * The description is originating from biblatex manual chapter 2 Biblatex documentation is favored over the bibtex, since bibtex is a subset of biblatex and biblatex is better documented.
+     */
+    public static String getDescription(EntryType selectedType) {
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (selectedType instanceof StandardEntryType entryType) {</span>
+<span class="nc bnc" id="L225" title="All 33 branches missed.">            switch (entryType) {</span>
+                case Article -&gt; {
+<span class="nc" id="L227">                    return Localization.lang(&quot;An article in a journal, magazine, newspaper, or other periodical which forms a self-contained unit with its own title.&quot;);</span>
+                }
+                case Book -&gt; {
+<span class="nc" id="L230">                    return Localization.lang(&quot;A single-volume book with one or more authors where the authors share credit for the work as a whole.&quot;);</span>
+                }
+                case Booklet -&gt; {
+<span class="nc" id="L233">                    return Localization.lang(&quot;A book-like work without a formal publisher or sponsoring institution.&quot;);</span>
+                }
+                case Collection -&gt; {
+<span class="nc" id="L236">                    return Localization.lang(&quot;A single-volume collection with multiple, self-contained contributions by distinct authors which have their own title. The work as a whole has no overall author but it will usually have an editor.&quot;);</span>
+                }
+                case Conference -&gt; {
+<span class="nc" id="L239">                    return Localization.lang(&quot;A legacy alias for \&quot;InProceedings\&quot;.&quot;);</span>
+                }
+                case InBook -&gt; {
+<span class="nc" id="L242">                    return Localization.lang(&quot;A part of a book which forms a self-contained unit with its own title.&quot;);</span>
+                }
+                case InCollection -&gt; {
+<span class="nc" id="L245">                    return Localization.lang(&quot;A contribution to a collection which forms a self-contained unit with a distinct author and title.&quot;);</span>
+                }
+                case InProceedings -&gt; {
+<span class="nc" id="L248">                    return Localization.lang(&quot;An article in a conference proceedings.&quot;);</span>
+                }
+                case Manual -&gt; {
+<span class="nc" id="L251">                    return Localization.lang(&quot;Technical or other documentation, not necessarily in printed form.&quot;);</span>
+                }
+                case MastersThesis -&gt; {
+<span class="nc" id="L254">                    return Localization.lang(&quot;Similar to \&quot;Thesis\&quot; except that the type field is optional and defaults to the localised term  Master's thesis.&quot;);</span>
+                }
+                case Misc -&gt; {
+<span class="nc" id="L257">                    return Localization.lang(&quot;A fallback type for entries which do not fit into any other category.&quot;);</span>
+                }
+                case PhdThesis -&gt; {
+<span class="nc" id="L260">                    return Localization.lang(&quot;Similar to \&quot;Thesis\&quot; except that the type field is optional and defaults to the localised term PhD thesis.&quot;);</span>
+                }
+                case Proceedings -&gt; {
+<span class="nc" id="L263">                    return Localization.lang(&quot;A single-volume conference proceedings. This type is very similar to \&quot;Collection\&quot;.&quot;);</span>
+                }
+                case TechReport -&gt; {
+<span class="nc" id="L266">                    return Localization.lang(&quot;Similar to \&quot;Report\&quot; except that the type field is optional and defaults to the localised term technical report.&quot;);</span>
+                }
+                case Unpublished -&gt; {
+<span class="nc" id="L269">                    return Localization.lang(&quot;A work with an author and a title which has not been formally published, such as a manuscript or the script of a talk.&quot;);</span>
+                }
+                case BookInBook -&gt; {
+<span class="nc" id="L272">                    return Localization.lang(&quot;This type is similar to \&quot;InBook\&quot; but intended for works originally published as a stand-alone book.&quot;);</span>
+                }
+                case InReference -&gt; {
+<span class="nc" id="L275">                    return Localization.lang(&quot;An article in a work of reference. This is a more specific variant of the generic \&quot;InCollection\&quot; entry type.&quot;);</span>
+                }
+                case MvBook -&gt; {
+<span class="nc" id="L278">                    return Localization.lang(&quot;A multi-volume \&quot;Book\&quot;.&quot;);</span>
+                }
+                case MvCollection -&gt; {
+<span class="nc" id="L281">                    return Localization.lang(&quot;A multi-volume \&quot;Collection\&quot;.&quot;);</span>
+                }
+                case MvProceedings -&gt; {
+<span class="nc" id="L284">                    return Localization.lang(&quot;A multi-volume \&quot;Proceedings\&quot; entry.&quot;);</span>
+                }
+                case MvReference -&gt; {
+<span class="nc" id="L287">                    return Localization.lang(&quot;A multi-volume \&quot;Reference\&quot; entry. The standard styles will treat this entry type as an alias for \&quot;MvCollection\&quot;.&quot;);</span>
+                }
+                case Online -&gt; {
+<span class="nc" id="L290">                    return Localization.lang(&quot;This entry type is intended for sources such as web sites which are intrinsically online resources.&quot;);</span>
+                }
+                case Reference -&gt; {
+<span class="nc" id="L293">                    return Localization.lang(&quot;A single-volume work of reference such as an encyclopedia or a dictionary.&quot;);</span>
+                }
+                case Report -&gt; {
+<span class="nc" id="L296">                    return Localization.lang(&quot;A technical report, research report, or white paper published by a university or some other institution.&quot;);</span>
+                }
+                case Set -&gt; {
+<span class="nc" id="L299">                    return Localization.lang(&quot;An entry set is a group of entries which are cited as a single reference and listed as a single item in the bibliography.&quot;);</span>
+                }
+                case SuppBook -&gt; {
+<span class="nc" id="L302">                    return Localization.lang(&quot;Supplemental material in a \&quot;Book\&quot;. This type is provided for elements such as prefaces, introductions, forewords, afterwords, etc. which often have a generic title only.&quot;);</span>
+                }
+                case SuppCollection -&gt; {
+<span class="nc" id="L305">                    return Localization.lang(&quot;Supplemental material in a \&quot;Collection\&quot;.&quot;);</span>
+                }
+                case SuppPeriodical -&gt; {
+<span class="nc" id="L308">                    return Localization.lang(&quot;Supplemental material in a \&quot;Periodical\&quot;. This type may be useful when referring to items such as regular columns, obituaries, letters to the editor, etc. which only have a generic title.&quot;);</span>
+                }
+                case Thesis -&gt; {
+<span class="nc" id="L311">                    return Localization.lang(&quot;A thesis written for an educational institution to satisfy the requirements for a degree.&quot;);</span>
+                }
+                case WWW -&gt; {
+<span class="nc" id="L314">                    return Localization.lang(&quot;An alias for \&quot;Online\&quot;, provided for jurabib compatibility.&quot;);</span>
+                }
+                case Software -&gt; {
+<span class="nc" id="L317">                    return Localization.lang(&quot;Computer software. The standard styles will treat this entry type as an alias for \&quot;Misc\&quot;.&quot;);</span>
+                }
+                case Dataset -&gt; {
+<span class="nc" id="L320">                    return Localization.lang(&quot;A data set or a similar collection of (mostly) raw data.&quot;);</span>
+                }
+                default -&gt; {
+<span class="nc" id="L323">                    return &quot;&quot;;</span>
+                }
+            }
+        } else {
+<span class="nc" id="L327">            return &quot;&quot;;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

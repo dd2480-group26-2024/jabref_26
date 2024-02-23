@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThreeWayMergeView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries.newmergedialog</a> &gt; <span class="el_source">ThreeWayMergeView.java</span></div><h1>ThreeWayMergeView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries.newmergedialog;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.RowConstraints;
+import javafx.scene.layout.VBox;
+import javafx.stage.Screen;
+
+import org.jabref.gui.mergeentries.newmergedialog.fieldsmerger.FieldMergerFactory;
+import org.jabref.gui.mergeentries.newmergedialog.toolbar.ThreeWayMergeToolbar;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldProperty;
+import org.jabref.preferences.PreferencesService;
+
+public class ThreeWayMergeView extends VBox {
+    public static final int GRID_COLUMN_MIN_WIDTH = 250;
+
+<span class="nc" id="L25">    public static final String LEFT_DEFAULT_HEADER = Localization.lang(&quot;Left Entry&quot;);</span>
+<span class="nc" id="L26">    public static final String RIGHT_DEFAULT_HEADER = Localization.lang(&quot;Right Entry&quot;);</span>
+
+<span class="nc" id="L28">    private final ColumnConstraints fieldNameColumnConstraints = new ColumnConstraints(150);</span>
+<span class="nc" id="L29">    private final ColumnConstraints leftEntryColumnConstraints = new ColumnConstraints(GRID_COLUMN_MIN_WIDTH, 256, Double.MAX_VALUE);</span>
+<span class="nc" id="L30">    private final ColumnConstraints rightEntryColumnConstraints = new ColumnConstraints(GRID_COLUMN_MIN_WIDTH, 256, Double.MAX_VALUE);</span>
+<span class="nc" id="L31">    private final ColumnConstraints mergedEntryColumnConstraints = new ColumnConstraints(GRID_COLUMN_MIN_WIDTH, 256, Double.MAX_VALUE);</span>
+    private final ThreeWayMergeToolbar toolbar;
+    private final ThreeWayMergeHeaderView headerView;
+    private final ScrollPane scrollPane;
+    private final GridPane mergeGridPane;
+
+    private final ThreeWayMergeViewModel viewModel;
+<span class="nc" id="L38">    private final List&lt;FieldRowView&gt; fieldRows = new ArrayList&lt;&gt;();</span>
+
+    private final PreferencesService preferencesService;
+
+    private final FieldMergerFactory fieldMergerFactory;
+    private final String keywordSeparator;
+
+<span class="nc" id="L45">    public ThreeWayMergeView(BibEntry leftEntry, BibEntry rightEntry, String leftHeader, String rightHeader, PreferencesService preferencesService) {</span>
+<span class="nc" id="L46">        this.preferencesService = preferencesService;</span>
+
+<span class="nc" id="L48">        getStylesheets().add(ThreeWayMergeView.class.getResource(&quot;ThreeWayMergeView.css&quot;).toExternalForm());</span>
+<span class="nc" id="L49">        viewModel = new ThreeWayMergeViewModel((BibEntry) leftEntry.clone(), (BibEntry) rightEntry.clone(), leftHeader, rightHeader);</span>
+<span class="nc" id="L50">        this.fieldMergerFactory = new FieldMergerFactory(preferencesService.getBibEntryPreferences());</span>
+<span class="nc" id="L51">        this.keywordSeparator = preferencesService.getBibEntryPreferences().getKeywordSeparator().toString();</span>
+
+<span class="nc" id="L53">        mergeGridPane = new GridPane();</span>
+<span class="nc" id="L54">        scrollPane = new ScrollPane();</span>
+<span class="nc" id="L55">        headerView = new ThreeWayMergeHeaderView(leftHeader, rightHeader);</span>
+<span class="nc" id="L56">        toolbar = new ThreeWayMergeToolbar();</span>
+
+<span class="nc" id="L58">        initializeColumnConstraints();</span>
+<span class="nc" id="L59">        initializeMergeGridPane();</span>
+<span class="nc" id="L60">        initializeScrollPane();</span>
+<span class="nc" id="L61">        initializeHeaderView();</span>
+<span class="nc" id="L62">        initializeToolbar();</span>
+
+<span class="nc" id="L64">        this.setPrefHeight(Screen.getPrimary().getBounds().getHeight() * 0.76);</span>
+<span class="nc" id="L65">        this.setPrefWidth(Screen.getPrimary().getBounds().getWidth() * 0.97);</span>
+
+<span class="nc" id="L67">        getChildren().addAll(toolbar, headerView, scrollPane);</span>
+<span class="nc" id="L68">    }</span>
+
+    public ThreeWayMergeView(BibEntry leftEntry, BibEntry rightEntry, PreferencesService preferencesService) {
+<span class="nc" id="L71">        this(leftEntry, rightEntry, LEFT_DEFAULT_HEADER, RIGHT_DEFAULT_HEADER, preferencesService);</span>
+<span class="nc" id="L72">    }</span>
+
+    private void initializeToolbar() {
+<span class="nc" id="L75">        toolbar.setOnSelectLeftEntryValuesButtonClicked(this::selectLeftEntryValues);</span>
+<span class="nc" id="L76">        toolbar.setOnSelectRightEntryValuesButtonClicked(this::selectRightEntryValues);</span>
+
+<span class="nc" id="L78">        toolbar.showDiffProperty().addListener(e -&gt; updateDiff());</span>
+<span class="nc" id="L79">        toolbar.diffViewProperty().addListener(e -&gt; updateDiff());</span>
+<span class="nc" id="L80">        toolbar.diffHighlightingMethodProperty().addListener(e -&gt; updateDiff());</span>
+<span class="nc" id="L81">        toolbar.hideEqualFieldsProperty().addListener(e -&gt; showOrHideEqualFields());</span>
+
+<span class="nc" id="L83">        updateDiff();</span>
+<span class="nc" id="L84">        showOrHideEqualFields();</span>
+<span class="nc" id="L85">    }</span>
+
+    private void showOrHideEqualFields() {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        for (FieldRowView row : fieldRows) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            if (toolbar.shouldHideEqualFields()) {</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                if (row.hasEqualLeftAndRightValues()) {</span>
+<span class="nc" id="L91">                    row.hide();</span>
+                }
+            } else {
+<span class="nc" id="L94">                row.show();</span>
+            }
+<span class="nc" id="L96">        }</span>
+<span class="nc" id="L97">    }</span>
+
+    private void updateDiff() {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (toolbar.shouldShowDiffs()) {</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            for (FieldRowView row : fieldRows) {</span>
+<span class="nc bnc" id="L102" title="All 6 branches missed.">                if (&quot;Groups&quot;.equals(row.getFieldNameCell().getText()) &amp;&amp; (row.getLeftValueCell().getText().contains(keywordSeparator) || row.getRightValueCell().getText().contains(keywordSeparator))) {</span>
+<span class="nc" id="L103">                    row.showDiff(new ShowDiffConfig(toolbar.getDiffView(), new GroupDiffMode(keywordSeparator)));</span>
+                } else {
+<span class="nc" id="L105">                    row.showDiff(new ShowDiffConfig(toolbar.getDiffView(), toolbar.getDiffHighlightingMethod()));</span>
+                }
+<span class="nc" id="L107">            }</span>
+        } else {
+<span class="nc" id="L109">            fieldRows.forEach(FieldRowView::hideDiff);</span>
+        }
+<span class="nc" id="L111">    }</span>
+
+    private void initializeHeaderView() {
+<span class="nc" id="L114">        headerView.getColumnConstraints().addAll(fieldNameColumnConstraints,</span>
+                                                 leftEntryColumnConstraints,
+                                                 rightEntryColumnConstraints,
+                                                 mergedEntryColumnConstraints);
+<span class="nc" id="L118">    }</span>
+
+    private void initializeScrollPane() {
+<span class="nc" id="L121">        scrollPane.setFitToWidth(true);</span>
+<span class="nc" id="L122">        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);</span>
+<span class="nc" id="L123">        scrollPane.setContent(mergeGridPane);</span>
+<span class="nc" id="L124">    }</span>
+
+    private void initializeColumnConstraints() {
+<span class="nc" id="L127">        fieldNameColumnConstraints.setHgrow(Priority.NEVER);</span>
+<span class="nc" id="L128">        leftEntryColumnConstraints.setHgrow(Priority.ALWAYS);</span>
+<span class="nc" id="L129">        rightEntryColumnConstraints.setHgrow(Priority.ALWAYS);</span>
+<span class="nc" id="L130">        mergedEntryColumnConstraints.setHgrow(Priority.ALWAYS);</span>
+<span class="nc" id="L131">    }</span>
+
+    private void initializeMergeGridPane() {
+<span class="nc" id="L134">        mergeGridPane.getColumnConstraints().addAll(fieldNameColumnConstraints, leftEntryColumnConstraints, rightEntryColumnConstraints, mergedEntryColumnConstraints);</span>
+
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        for (int fieldIndex = 0; fieldIndex &lt; viewModel.numberOfVisibleFields(); fieldIndex++) {</span>
+<span class="nc" id="L137">            addRow(fieldIndex);</span>
+
+<span class="nc" id="L139">            mergeGridPane.getRowConstraints().add(new RowConstraints());</span>
+        }
+<span class="nc" id="L141">    }</span>
+
+    private Field getFieldAtIndex(int index) {
+<span class="nc" id="L144">        return viewModel.getVisibleFields().get(index);</span>
+    }
+
+    private void addRow(int fieldIndex) {
+<span class="nc" id="L148">        Field field = getFieldAtIndex(fieldIndex);</span>
+
+        FieldRowView fieldRow;
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (field.getProperties().contains(FieldProperty.PERSON_NAMES)) {</span>
+<span class="nc" id="L152">            fieldRow = new PersonsNameFieldRowView(field, getLeftEntry(), getRightEntry(), getMergedEntry(), fieldMergerFactory, preferencesService, fieldIndex);</span>
+        } else {
+<span class="nc" id="L154">            fieldRow = new FieldRowView(field, getLeftEntry(), getRightEntry(), getMergedEntry(), fieldMergerFactory, preferencesService, fieldIndex);</span>
+        }
+
+<span class="nc" id="L157">        fieldRows.add(fieldIndex, fieldRow);</span>
+
+<span class="nc" id="L159">        mergeGridPane.add(fieldRow.getFieldNameCell(), 0, fieldIndex);</span>
+<span class="nc" id="L160">        mergeGridPane.add(fieldRow.getLeftValueCell(), 1, fieldIndex);</span>
+<span class="nc" id="L161">        mergeGridPane.add(fieldRow.getRightValueCell(), 2, fieldIndex);</span>
+<span class="nc" id="L162">        mergeGridPane.add(fieldRow.getMergedValueCell(), 3, fieldIndex);</span>
+<span class="nc" id="L163">    }</span>
+
+    public BibEntry getMergedEntry() {
+<span class="nc" id="L166">        return viewModel.getMergedEntry();</span>
+    }
+
+    public void setLeftHeader(String leftHeader) {
+<span class="nc" id="L170">        headerView.setLeftHeader(leftHeader);</span>
+<span class="nc" id="L171">    }</span>
+
+    public void setRightHeader(String rightHeader) {
+<span class="nc" id="L174">        headerView.setRightHeader(rightHeader);</span>
+<span class="nc" id="L175">    }</span>
+
+    public void selectLeftEntryValues() {
+<span class="nc" id="L178">        fieldRows.forEach(FieldRowView::selectLeftValue);</span>
+<span class="nc" id="L179">    }</span>
+
+    public void selectRightEntryValues() {
+<span class="nc" id="L182">        fieldRows.forEach(FieldRowView::selectRightValue);</span>
+<span class="nc" id="L183">    }</span>
+
+    public void showDiff(ShowDiffConfig diffConfig) {
+<span class="nc" id="L186">        toolbar.setDiffView(diffConfig.diffView());</span>
+<span class="nc" id="L187">        toolbar.setDiffHighlightingMethod(diffConfig.diffHighlightingMethod());</span>
+<span class="nc" id="L188">        toolbar.setShowDiff(true);</span>
+<span class="nc" id="L189">    }</span>
+
+    public BibEntry getLeftEntry() {
+<span class="nc" id="L192">        return viewModel.getLeftEntry();</span>
+    }
+
+    public BibEntry getRightEntry() {
+<span class="nc" id="L196">        return viewModel.getRightEntry();</span>
+    }
+
+    public void saveConfiguration() {
+<span class="nc" id="L200">        toolbar.saveToolbarConfiguration();</span>
+<span class="nc" id="L201">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

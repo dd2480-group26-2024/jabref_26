@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StandardActions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.actions</a> &gt; <span class="el_source">StandardActions.java</span></div><h1>StandardActions.java</h1><pre class="source lang-java linenums">package org.jabref.gui.actions;
+
+import java.util.Objects;
+import java.util.Optional;
+
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.gui.keyboard.KeyBinding;
+import org.jabref.logic.l10n.Localization;
+
+<span class="fc" id="L11">public enum StandardActions implements Action {</span>
+
+<span class="fc" id="L13">    COPY_MORE(Localization.lang(&quot;Copy&quot;) + &quot;...&quot;),</span>
+<span class="fc" id="L14">    COPY_TITLE(Localization.lang(&quot;Copy title&quot;), KeyBinding.COPY_TITLE),</span>
+<span class="fc" id="L15">    COPY_KEY(Localization.lang(&quot;Copy citation key&quot;), KeyBinding.COPY_CITATION_KEY),</span>
+<span class="fc" id="L16">    COPY_CITE_KEY(Localization.lang(&quot;Copy citation key with configured cite command&quot;), KeyBinding.COPY_CITE_CITATION_KEY),</span>
+<span class="fc" id="L17">    COPY_KEY_AND_TITLE(Localization.lang(&quot;Copy citation key and title&quot;), KeyBinding.COPY_CITATION_KEY_AND_TITLE),</span>
+<span class="fc" id="L18">    COPY_KEY_AND_LINK(Localization.lang(&quot;Copy citation key and link&quot;), KeyBinding.COPY_CITATION_KEY_AND_LINK),</span>
+<span class="fc" id="L19">    COPY_CITATION_HTML(Localization.lang(&quot;Copy citation (html)&quot;), KeyBinding.COPY_PREVIEW),</span>
+<span class="fc" id="L20">    COPY_CITATION_TEXT(Localization.lang(&quot;Copy citation (text)&quot;)),</span>
+<span class="fc" id="L21">    COPY_CITATION_PREVIEW(Localization.lang(&quot;Copy preview&quot;), KeyBinding.COPY_PREVIEW),</span>
+<span class="fc" id="L22">    EXPORT_TO_CLIPBOARD(Localization.lang(&quot;Export to clipboard&quot;), IconTheme.JabRefIcons.EXPORT_TO_CLIPBOARD),</span>
+<span class="fc" id="L23">    EXPORT_SELECTED_TO_CLIPBOARD(Localization.lang(&quot;Export selected entries to clipboard&quot;), IconTheme.JabRefIcons.EXPORT_TO_CLIPBOARD),</span>
+<span class="fc" id="L24">    COPY(Localization.lang(&quot;Copy&quot;), IconTheme.JabRefIcons.COPY, KeyBinding.COPY),</span>
+<span class="fc" id="L25">    PASTE(Localization.lang(&quot;Paste&quot;), IconTheme.JabRefIcons.PASTE, KeyBinding.PASTE),</span>
+<span class="fc" id="L26">    CUT(Localization.lang(&quot;Cut&quot;), IconTheme.JabRefIcons.CUT, KeyBinding.CUT),</span>
+<span class="fc" id="L27">    DELETE(Localization.lang(&quot;Delete&quot;), IconTheme.JabRefIcons.DELETE_ENTRY),</span>
+<span class="fc" id="L28">    DELETE_ENTRY(Localization.lang(&quot;Delete entry&quot;), IconTheme.JabRefIcons.DELETE_ENTRY, KeyBinding.DELETE_ENTRY),</span>
+<span class="fc" id="L29">    SEND(Localization.lang(&quot;Send&quot;), IconTheme.JabRefIcons.EMAIL),</span>
+<span class="fc" id="L30">    SEND_AS_EMAIL(Localization.lang(&quot;As Email&quot;)),</span>
+<span class="fc" id="L31">    SEND_TO_KINDLE(Localization.lang(&quot;To Kindle&quot;)),</span>
+<span class="fc" id="L32">    REBUILD_FULLTEXT_SEARCH_INDEX(Localization.lang(&quot;Rebuild fulltext search index&quot;), IconTheme.JabRefIcons.FILE),</span>
+<span class="fc" id="L33">    REDOWNLOAD_MISSING_FILES(Localization.lang(&quot;Redownload missing files&quot;), IconTheme.JabRefIcons.DOWNLOAD),</span>
+<span class="fc" id="L34">    OPEN_EXTERNAL_FILE(Localization.lang(&quot;Open file&quot;), IconTheme.JabRefIcons.FILE, KeyBinding.OPEN_FILE),</span>
+<span class="fc" id="L35">    OPEN_URL(Localization.lang(&quot;Open URL or DOI&quot;), IconTheme.JabRefIcons.WWW, KeyBinding.OPEN_URL_OR_DOI),</span>
+<span class="fc" id="L36">    SEARCH_SHORTSCIENCE(Localization.lang(&quot;Search ShortScience&quot;)),</span>
+<span class="fc" id="L37">    MERGE_WITH_FETCHED_ENTRY(Localization.lang(&quot;Get bibliographic data from %0&quot;, &quot;DOI/ISBN/...&quot;)),</span>
+<span class="fc" id="L38">    ATTACH_FILE(Localization.lang(&quot;Attach file&quot;), IconTheme.JabRefIcons.ATTACH_FILE),</span>
+<span class="fc" id="L39">    ATTACH_FILE_FROM_URL(Localization.lang(&quot;Attach file from URL&quot;), IconTheme.JabRefIcons.DOWNLOAD_FILE),</span>
+<span class="fc" id="L40">    PRIORITY(Localization.lang(&quot;Priority&quot;), IconTheme.JabRefIcons.PRIORITY),</span>
+<span class="fc" id="L41">    CLEAR_PRIORITY(Localization.lang(&quot;Clear priority&quot;)),</span>
+<span class="fc" id="L42">    PRIORITY_HIGH(Localization.lang(&quot;Set priority to high&quot;), IconTheme.JabRefIcons.PRIORITY_HIGH),</span>
+<span class="fc" id="L43">    PRIORITY_MEDIUM(Localization.lang(&quot;Set priority to medium&quot;), IconTheme.JabRefIcons.PRIORITY_MEDIUM),</span>
+<span class="fc" id="L44">    PRIORITY_LOW(Localization.lang(&quot;Set priority to low&quot;), IconTheme.JabRefIcons.PRIORITY_LOW),</span>
+<span class="fc" id="L45">    QUALITY(Localization.lang(&quot;Quality&quot;), IconTheme.JabRefIcons.QUALITY),</span>
+<span class="fc" id="L46">    QUALITY_ASSURED(Localization.lang(&quot;Toggle quality assured&quot;), IconTheme.JabRefIcons.QUALITY_ASSURED),</span>
+<span class="fc" id="L47">    RANKING(Localization.lang(&quot;Rank&quot;), IconTheme.JabRefIcons.RANKING),</span>
+<span class="fc" id="L48">    CLEAR_RANK(Localization.lang(&quot;Clear rank&quot;)),</span>
+<span class="fc" id="L49">    RANK_1(Localization.lang(&quot;Set rank to one&quot;), IconTheme.JabRefIcons.RANK1),</span>
+<span class="fc" id="L50">    RANK_2(Localization.lang(&quot;Set rank to two&quot;), IconTheme.JabRefIcons.RANK2),</span>
+<span class="fc" id="L51">    RANK_3(Localization.lang(&quot;Set rank to three&quot;), IconTheme.JabRefIcons.RANK3),</span>
+<span class="fc" id="L52">    RANK_4(Localization.lang(&quot;Set rank to four&quot;), IconTheme.JabRefIcons.RANK4),</span>
+<span class="fc" id="L53">    RANK_5(Localization.lang(&quot;Set rank to five&quot;), IconTheme.JabRefIcons.RANK5),</span>
+<span class="fc" id="L54">    PRINTED(Localization.lang(&quot;Printed&quot;), IconTheme.JabRefIcons.PRINTED),</span>
+<span class="fc" id="L55">    TOGGLE_PRINTED(Localization.lang(&quot;Toggle print status&quot;), IconTheme.JabRefIcons.PRINTED),</span>
+<span class="fc" id="L56">    READ_STATUS(Localization.lang(&quot;Read status&quot;), IconTheme.JabRefIcons.READ_STATUS),</span>
+<span class="fc" id="L57">    CLEAR_READ_STATUS(Localization.lang(&quot;Clear read status&quot;), KeyBinding.CLEAR_READ_STATUS),</span>
+<span class="fc" id="L58">    READ(Localization.lang(&quot;Set read status to read&quot;), IconTheme.JabRefIcons.READ_STATUS_READ, KeyBinding.READ),</span>
+<span class="fc" id="L59">    SKIMMED(Localization.lang(&quot;Set read status to skimmed&quot;), IconTheme.JabRefIcons.READ_STATUS_SKIMMED, KeyBinding.SKIMMED),</span>
+<span class="fc" id="L60">    RELEVANCE(Localization.lang(&quot;Relevance&quot;), IconTheme.JabRefIcons.RELEVANCE),</span>
+<span class="fc" id="L61">    RELEVANT(Localization.lang(&quot;Toggle relevance&quot;), IconTheme.JabRefIcons.RELEVANCE),</span>
+<span class="fc" id="L62">    NEW_LIBRARY(Localization.lang(&quot;New library&quot;), IconTheme.JabRefIcons.NEW),</span>
+<span class="fc" id="L63">    OPEN_LIBRARY(Localization.lang(&quot;Open library&quot;), IconTheme.JabRefIcons.OPEN, KeyBinding.OPEN_DATABASE),</span>
+<span class="fc" id="L64">    IMPORT(Localization.lang(&quot;Import&quot;), IconTheme.JabRefIcons.IMPORT),</span>
+<span class="fc" id="L65">    EXPORT(Localization.lang(&quot;Export&quot;), IconTheme.JabRefIcons.EXPORT, KeyBinding.EXPORT),</span>
+<span class="fc" id="L66">    SAVE_LIBRARY(Localization.lang(&quot;Save library&quot;), IconTheme.JabRefIcons.SAVE, KeyBinding.SAVE_DATABASE),</span>
+<span class="fc" id="L67">    SAVE_LIBRARY_AS(Localization.lang(&quot;Save library as...&quot;), KeyBinding.SAVE_DATABASE_AS),</span>
+<span class="fc" id="L68">    SAVE_SELECTED_AS_PLAIN_BIBTEX(Localization.lang(&quot;Save selected as plain BibTeX...&quot;)),</span>
+<span class="fc" id="L69">    SAVE_ALL(Localization.lang(&quot;Save all&quot;), Localization.lang(&quot;Save all open libraries&quot;), IconTheme.JabRefIcons.SAVE_ALL, KeyBinding.SAVE_ALL),</span>
+<span class="fc" id="L70">    IMPORT_INTO_NEW_LIBRARY(Localization.lang(&quot;Import into new library&quot;), KeyBinding.IMPORT_INTO_NEW_DATABASE),</span>
+<span class="fc" id="L71">    IMPORT_INTO_CURRENT_LIBRARY(Localization.lang(&quot;Import into current library&quot;), KeyBinding.IMPORT_INTO_CURRENT_DATABASE),</span>
+<span class="fc" id="L72">    EXPORT_ALL(Localization.lang(&quot;Export all entries&quot;)),</span>
+<span class="fc" id="L73">    REMOTE_DB(Localization.lang(&quot;Shared database&quot;), IconTheme.JabRefIcons.REMOTE_DATABASE),</span>
+<span class="fc" id="L74">    EXPORT_SELECTED(Localization.lang(&quot;Export selected entries&quot;), KeyBinding.EXPORT_SELECTED),</span>
+<span class="fc" id="L75">    CONNECT_TO_SHARED_DB(Localization.lang(&quot;Connect to shared database&quot;), IconTheme.JabRefIcons.CONNECT_DB),</span>
+<span class="fc" id="L76">    PULL_CHANGES_FROM_SHARED_DB(Localization.lang(&quot;Pull changes from shared database&quot;), KeyBinding.PULL_CHANGES_FROM_SHARED_DATABASE),</span>
+<span class="fc" id="L77">    CLOSE_LIBRARY(Localization.lang(&quot;Close library&quot;), Localization.lang(&quot;Close the current library&quot;), IconTheme.JabRefIcons.CLOSE, KeyBinding.CLOSE_DATABASE),</span>
+<span class="fc" id="L78">    CLOSE_OTHER_LIBRARIES(Localization.lang(&quot;Close others&quot;), Localization.lang(&quot;Close other libraries&quot;), IconTheme.JabRefIcons.CLOSE),</span>
+<span class="fc" id="L79">    CLOSE_ALL_LIBRARIES(Localization.lang(&quot;Close all&quot;), Localization.lang(&quot;Close all libraries&quot;), IconTheme.JabRefIcons.CLOSE),</span>
+<span class="fc" id="L80">    QUIT(Localization.lang(&quot;Quit&quot;), Localization.lang(&quot;Quit JabRef&quot;), IconTheme.JabRefIcons.CLOSE_JABREF, KeyBinding.QUIT_JABREF),</span>
+<span class="fc" id="L81">    UNDO(Localization.lang(&quot;Undo&quot;), IconTheme.JabRefIcons.UNDO, KeyBinding.UNDO),</span>
+<span class="fc" id="L82">    REDO(Localization.lang(&quot;Redo&quot;), IconTheme.JabRefIcons.REDO, KeyBinding.REDO),</span>
+<span class="fc" id="L83">    REPLACE_ALL(Localization.lang(&quot;Find and replace&quot;), KeyBinding.REPLACE_STRING),</span>
+<span class="fc" id="L84">    MANAGE_KEYWORDS(Localization.lang(&quot;Manage keywords&quot;)),</span>
+<span class="fc" id="L85">    MASS_SET_FIELDS(Localization.lang(&quot;Manage field names &amp; content&quot;)),</span>
+
+<span class="fc" id="L87">    AUTOMATIC_FIELD_EDITOR(Localization.lang(&quot;Automatic field editor&quot;)),</span>
+<span class="fc" id="L88">    TOGGLE_GROUPS(Localization.lang(&quot;Groups&quot;), IconTheme.JabRefIcons.TOGGLE_GROUPS, KeyBinding.TOGGLE_GROUPS_INTERFACE),</span>
+<span class="fc" id="L89">    TOGGLE_OO(Localization.lang(&quot;OpenOffice/LibreOffice&quot;), IconTheme.JabRefIcons.FILE_OPENOFFICE, KeyBinding.OPEN_OPEN_OFFICE_LIBRE_OFFICE_CONNECTION),</span>
+<span class="fc" id="L90">    TOGGLE_WEB_SEARCH(Localization.lang(&quot;Web search&quot;), Localization.lang(&quot;Toggle web search interface&quot;), IconTheme.JabRefIcons.WWW, KeyBinding.WEB_SEARCH),</span>
+
+<span class="fc" id="L92">    PARSE_LATEX(Localization.lang(&quot;Search for citations in LaTeX files...&quot;), IconTheme.JabRefIcons.LATEX_CITATIONS),</span>
+<span class="fc" id="L93">    NEW_SUB_LIBRARY_FROM_AUX(Localization.lang(&quot;New sublibrary based on AUX file&quot;) + &quot;...&quot;, Localization.lang(&quot;New BibTeX sublibrary&quot;) + Localization.lang(&quot;This feature generates a new library based on which entries are needed in an existing LaTeX document.&quot;), IconTheme.JabRefIcons.NEW),</span>
+<span class="fc" id="L94">    WRITE_METADATA_TO_PDF(Localization.lang(&quot;Write metadata to PDF files&quot;), Localization.lang(&quot;Will write metadata to the PDFs linked from selected entries.&quot;), KeyBinding.WRITE_METADATA_TO_PDF),</span>
+
+<span class="fc" id="L96">    START_NEW_STUDY(Localization.lang(&quot;Start new systematic literature review&quot;)),</span>
+<span class="fc" id="L97">    UPDATE_SEARCH_RESULTS_OF_STUDY(Localization.lang(&quot;Update study search results&quot;)),</span>
+<span class="fc" id="L98">    EDIT_EXISTING_STUDY(Localization.lang(&quot;Manage study definition&quot;)),</span>
+
+<span class="fc" id="L100">    OPEN_DATABASE_FOLDER(Localization.lang(&quot;Reveal in file explorer&quot;)),</span>
+<span class="fc" id="L101">    OPEN_FOLDER(Localization.lang(&quot;Open folder&quot;), Localization.lang(&quot;Open folder&quot;), IconTheme.JabRefIcons.FOLDER, KeyBinding.OPEN_FOLDER),</span>
+<span class="fc" id="L102">    OPEN_FILE(Localization.lang(&quot;Open file&quot;), Localization.lang(&quot;Open file&quot;), IconTheme.JabRefIcons.FILE, KeyBinding.OPEN_FILE),</span>
+<span class="fc" id="L103">    OPEN_CONSOLE(Localization.lang(&quot;Open terminal here&quot;), Localization.lang(&quot;Open terminal here&quot;), IconTheme.JabRefIcons.CONSOLE, KeyBinding.OPEN_CONSOLE),</span>
+<span class="fc" id="L104">    COPY_LINKED_FILES(Localization.lang(&quot;Copy linked files to folder...&quot;)),</span>
+<span class="fc" id="L105">    COPY_DOI(Localization.lang(&quot;Copy DOI&quot;)),</span>
+<span class="fc" id="L106">    COPY_DOI_URL(Localization.lang(&quot;Copy DOI url&quot;)),</span>
+<span class="fc" id="L107">    ABBREVIATE(Localization.lang(&quot;Abbreviate journal names&quot;)),</span>
+<span class="fc" id="L108">    ABBREVIATE_DEFAULT(Localization.lang(&quot;default&quot;), Localization.lang(&quot;Abbreviate journal names of the selected entries (DEFAULT abbreviation)&quot;), KeyBinding.ABBREVIATE),</span>
+<span class="fc" id="L109">    ABBREVIATE_DOTLESS(Localization.lang(&quot;dotless&quot;), Localization.lang(&quot;Abbreviate journal names of the selected entries (DOTLESS abbreviation)&quot;)),</span>
+<span class="fc" id="L110">    ABBREVIATE_SHORTEST_UNIQUE(Localization.lang(&quot;shortest unique&quot;), Localization.lang(&quot;Abbreviate journal names of the selected entries (SHORTEST UNIQUE abbreviation)&quot;)),</span>
+<span class="fc" id="L111">    UNABBREVIATE(Localization.lang(&quot;Unabbreviate journal names&quot;), Localization.lang(&quot;Unabbreviate journal names of the selected entries&quot;), KeyBinding.UNABBREVIATE),</span>
+
+<span class="fc" id="L113">    MANAGE_CUSTOM_EXPORTS(Localization.lang(&quot;Manage custom exports&quot;)),</span>
+<span class="fc" id="L114">    MANAGE_CUSTOM_IMPORTS(Localization.lang(&quot;Manage custom imports&quot;)),</span>
+<span class="fc" id="L115">    CUSTOMIZE_ENTRY_TYPES(Localization.lang(&quot;Customize entry types&quot;)),</span>
+<span class="fc" id="L116">    SETUP_GENERAL_FIELDS(Localization.lang(&quot;Set up general fields&quot;)),</span>
+<span class="fc" id="L117">    MANAGE_PROTECTED_TERMS(Localization.lang(&quot;Manage protected terms&quot;)),</span>
+<span class="fc" id="L118">    CITATION_KEY_PATTERN(Localization.lang(&quot;Citation key patterns&quot;)),</span>
+<span class="fc" id="L119">    SHOW_PREFS(Localization.lang(&quot;Preferences&quot;), IconTheme.JabRefIcons.PREFERENCES),</span>
+<span class="fc" id="L120">    MANAGE_JOURNALS(Localization.lang(&quot;Manage journal abbreviations&quot;)),</span>
+<span class="fc" id="L121">    CUSTOMIZE_KEYBINDING(Localization.lang(&quot;Customize key bindings&quot;), IconTheme.JabRefIcons.KEY_BINDINGS),</span>
+
+<span class="fc" id="L123">    EDIT_ENTRY(Localization.lang(&quot;Open entry editor&quot;), IconTheme.JabRefIcons.EDIT_ENTRY, KeyBinding.EDIT_ENTRY),</span>
+<span class="fc" id="L124">    SHOW_PDF_VIEWER(Localization.lang(&quot;Open document viewer&quot;), IconTheme.JabRefIcons.PDF_FILE),</span>
+<span class="fc" id="L125">    NEXT_PREVIEW_STYLE(Localization.lang(&quot;Next preview style&quot;), KeyBinding.NEXT_PREVIEW_LAYOUT),</span>
+<span class="fc" id="L126">    PREVIOUS_PREVIEW_STYLE(Localization.lang(&quot;Previous preview style&quot;), KeyBinding.PREVIOUS_PREVIEW_LAYOUT),</span>
+<span class="fc" id="L127">    SELECT_ALL(Localization.lang(&quot;Select all&quot;), KeyBinding.SELECT_ALL),</span>
+<span class="fc" id="L128">    UNSELECT_ALL(Localization.lang(&quot;Unselect all&quot;)),</span>
+
+<span class="fc" id="L130">    EXPAND_ALL(Localization.lang(&quot;Expand all&quot;)),</span>
+<span class="fc" id="L131">    COLLAPSE_ALL(Localization.lang(&quot;Collapse all&quot;)),</span>
+
+<span class="fc" id="L133">    NEW_ENTRY(Localization.lang(&quot;New entry&quot;), IconTheme.JabRefIcons.ADD_ENTRY, KeyBinding.NEW_ENTRY),</span>
+<span class="fc" id="L134">    NEW_ARTICLE(Localization.lang(&quot;New article&quot;), IconTheme.JabRefIcons.ADD_ARTICLE),</span>
+<span class="fc" id="L135">    NEW_ENTRY_FROM_PLAIN_TEXT(Localization.lang(&quot;New entry from plain text&quot;), IconTheme.JabRefIcons.NEW_ENTRY_FROM_PLAIN_TEXT, KeyBinding.NEW_ENTRY_FROM_PLAIN_TEXT),</span>
+<span class="fc" id="L136">    LIBRARY_PROPERTIES(Localization.lang(&quot;Library properties&quot;)),</span>
+<span class="fc" id="L137">    FIND_DUPLICATES(Localization.lang(&quot;Find duplicates&quot;), IconTheme.JabRefIcons.FIND_DUPLICATES),</span>
+<span class="fc" id="L138">    MERGE_ENTRIES(Localization.lang(&quot;Merge entries&quot;), IconTheme.JabRefIcons.MERGE_ENTRIES, KeyBinding.MERGE_ENTRIES),</span>
+<span class="fc" id="L139">    RESOLVE_DUPLICATE_KEYS(Localization.lang(&quot;Resolve duplicate citation keys&quot;), Localization.lang(&quot;Find and remove duplicate citation keys&quot;), KeyBinding.RESOLVE_DUPLICATE_CITATION_KEYS),</span>
+<span class="fc" id="L140">    CHECK_INTEGRITY(Localization.lang(&quot;Check integrity&quot;), KeyBinding.CHECK_INTEGRITY),</span>
+<span class="fc" id="L141">    FIND_UNLINKED_FILES(Localization.lang(&quot;Search for unlinked local files&quot;), IconTheme.JabRefIcons.SEARCH, KeyBinding.FIND_UNLINKED_FILES),</span>
+<span class="fc" id="L142">    AUTO_LINK_FILES(Localization.lang(&quot;Automatically set file links&quot;), IconTheme.JabRefIcons.AUTO_FILE_LINK, KeyBinding.AUTOMATICALLY_LINK_FILES),</span>
+<span class="fc" id="L143">    LOOKUP_DOC_IDENTIFIER(Localization.lang(&quot;Search document identifier online&quot;)),</span>
+<span class="fc" id="L144">    LOOKUP_FULLTEXT(Localization.lang(&quot;Search full text documents online&quot;), IconTheme.JabRefIcons.FILE_SEARCH, KeyBinding.DOWNLOAD_FULL_TEXT),</span>
+<span class="fc" id="L145">    GENERATE_CITE_KEY(Localization.lang(&quot;Generate citation key&quot;), IconTheme.JabRefIcons.MAKE_KEY, KeyBinding.AUTOGENERATE_CITATION_KEYS),</span>
+<span class="fc" id="L146">    GENERATE_CITE_KEYS(Localization.lang(&quot;Generate citation keys&quot;), IconTheme.JabRefIcons.MAKE_KEY, KeyBinding.AUTOGENERATE_CITATION_KEYS),</span>
+<span class="fc" id="L147">    DOWNLOAD_FULL_TEXT(Localization.lang(&quot;Search full text documents online&quot;), IconTheme.JabRefIcons.FILE_SEARCH, KeyBinding.DOWNLOAD_FULL_TEXT),</span>
+<span class="fc" id="L148">    CLEANUP_ENTRIES(Localization.lang(&quot;Cleanup entries&quot;), IconTheme.JabRefIcons.CLEANUP_ENTRIES, KeyBinding.CLEANUP),</span>
+<span class="fc" id="L149">    SET_FILE_LINKS(Localization.lang(&quot;Automatically set file links&quot;), KeyBinding.AUTOMATICALLY_LINK_FILES),</span>
+
+<span class="fc" id="L151">    EDIT_FILE_LINK(Localization.lang(&quot;Edit&quot;), IconTheme.JabRefIcons.EDIT, KeyBinding.EDIT_ENTRY),</span>
+<span class="fc" id="L152">    DOWNLOAD_FILE(Localization.lang(&quot;Download file&quot;), IconTheme.JabRefIcons.DOWNLOAD_FILE),</span>
+<span class="fc" id="L153">    REDOWNLOAD_FILE(Localization.lang(&quot;Redownload file&quot;), IconTheme.JabRefIcons.DOWNLOAD_FILE),</span>
+<span class="fc" id="L154">    RENAME_FILE_TO_PATTERN(Localization.lang(&quot;Rename file to defined pattern&quot;), IconTheme.JabRefIcons.AUTO_RENAME),</span>
+<span class="fc" id="L155">    RENAME_FILE_TO_NAME(Localization.lang(&quot;Rename file to a given name&quot;), IconTheme.JabRefIcons.RENAME, KeyBinding.REPLACE_STRING),</span>
+<span class="fc" id="L156">    MOVE_FILE_TO_FOLDER(Localization.lang(&quot;Move file to file directory&quot;), IconTheme.JabRefIcons.MOVE_TO_FOLDER),</span>
+<span class="fc" id="L157">    MOVE_FILE_TO_FOLDER_AND_RENAME(Localization.lang(&quot;Move file to file directory and rename file&quot;)),</span>
+<span class="fc" id="L158">    COPY_FILE_TO_FOLDER(Localization.lang(&quot;Copy linked file to folder...&quot;), IconTheme.JabRefIcons.COPY_TO_FOLDER, KeyBinding.COPY),</span>
+<span class="fc" id="L159">    REMOVE_LINK(Localization.lang(&quot;Remove link&quot;), IconTheme.JabRefIcons.REMOVE_LINK),</span>
+<span class="fc" id="L160">    DELETE_FILE(Localization.lang(&quot;Permanently delete local file&quot;), IconTheme.JabRefIcons.DELETE_FILE, KeyBinding.DELETE_ENTRY),</span>
+
+<span class="fc" id="L162">    HELP(Localization.lang(&quot;Online help&quot;), IconTheme.JabRefIcons.HELP, KeyBinding.HELP),</span>
+<span class="fc" id="L163">    HELP_GROUPS(Localization.lang(&quot;Open Help page&quot;), IconTheme.JabRefIcons.HELP, KeyBinding.HELP),</span>
+<span class="fc" id="L164">    HELP_KEY_PATTERNS(Localization.lang(&quot;Help on key patterns&quot;), IconTheme.JabRefIcons.HELP, KeyBinding.HELP),</span>
+<span class="fc" id="L165">    HELP_REGEX_SEARCH(Localization.lang(&quot;Help on regular expression search&quot;), IconTheme.JabRefIcons.HELP, KeyBinding.HELP),</span>
+<span class="fc" id="L166">    HELP_NAME_FORMATTER(Localization.lang(&quot;Help on Name Formatting&quot;), IconTheme.JabRefIcons.HELP, KeyBinding.HELP),</span>
+<span class="fc" id="L167">    HELP_SPECIAL_FIELDS(Localization.lang(&quot;Help on special fields&quot;), IconTheme.JabRefIcons.HELP, KeyBinding.HELP),</span>
+<span class="fc" id="L168">    HELP_PUSH_TO_APPLICATION(Localization.lang(&quot;Help on external applications&quot;), IconTheme.JabRefIcons.HELP, KeyBinding.HELP),</span>
+<span class="fc" id="L169">    WEB_MENU(Localization.lang(&quot;JabRef resources&quot;)),</span>
+<span class="fc" id="L170">    OPEN_WEBPAGE(Localization.lang(&quot;Website&quot;), Localization.lang(&quot;Opens JabRef's website&quot;), IconTheme.JabRefIcons.HOME),</span>
+<span class="fc" id="L171">    OPEN_FACEBOOK(&quot;Facebook&quot;, Localization.lang(&quot;Opens JabRef's Facebook page&quot;), IconTheme.JabRefIcons.FACEBOOK),</span>
+<span class="fc" id="L172">    OPEN_TWITTER(&quot;Twitter&quot;, Localization.lang(&quot;Opens JabRef's Twitter page&quot;), IconTheme.JabRefIcons.TWITTER),</span>
+<span class="fc" id="L173">    OPEN_BLOG(Localization.lang(&quot;Blog&quot;), Localization.lang(&quot;Opens JabRef's blog&quot;), IconTheme.JabRefIcons.BLOG),</span>
+<span class="fc" id="L174">    OPEN_DEV_VERSION_LINK(Localization.lang(&quot;Development version&quot;), Localization.lang(&quot;Opens a link where the current development version can be downloaded&quot;)),</span>
+<span class="fc" id="L175">    OPEN_CHANGELOG(Localization.lang(&quot;View change log&quot;), Localization.lang(&quot;See what has been changed in the JabRef versions&quot;)),</span>
+<span class="fc" id="L176">    OPEN_GITHUB(&quot;GitHub&quot;, Localization.lang(&quot;Opens JabRef's GitHub page&quot;), IconTheme.JabRefIcons.GITHUB),</span>
+<span class="fc" id="L177">    DONATE(Localization.lang(&quot;Donate to JabRef&quot;), Localization.lang(&quot;Donate to JabRef&quot;), IconTheme.JabRefIcons.DONATE),</span>
+<span class="fc" id="L178">    OPEN_FORUM(Localization.lang(&quot;Online help forum&quot;), Localization.lang(&quot;Online help forum&quot;), IconTheme.JabRefIcons.FORUM),</span>
+<span class="fc" id="L179">    ERROR_CONSOLE(Localization.lang(&quot;View event log&quot;), Localization.lang(&quot;Display all error messages&quot;)),</span>
+<span class="fc" id="L180">    SEARCH_FOR_UPDATES(Localization.lang(&quot;Check for updates&quot;)),</span>
+<span class="fc" id="L181">    ABOUT(Localization.lang(&quot;About JabRef&quot;), Localization.lang(&quot;About JabRef&quot;)),</span>
+
+<span class="fc" id="L183">    EDIT_LIST(Localization.lang(&quot;Edit&quot;), IconTheme.JabRefIcons.EDIT),</span>
+<span class="fc" id="L184">    VIEW_LIST(Localization.lang(&quot;View&quot;), IconTheme.JabRefIcons.FILE),</span>
+<span class="fc" id="L185">    REMOVE_LIST(Localization.lang(&quot;Remove&quot;), IconTheme.JabRefIcons.REMOVE),</span>
+<span class="fc" id="L186">    RELOAD_LIST(Localization.lang(&quot;Reload&quot;), IconTheme.JabRefIcons.REFRESH),</span>
+
+<span class="fc" id="L188">    GROUP_REMOVE(Localization.lang(&quot;Remove group&quot;)),</span>
+<span class="fc" id="L189">    GROUP_REMOVE_KEEP_SUBGROUPS(Localization.lang(&quot;Keep subgroups&quot;)),</span>
+<span class="fc" id="L190">    GROUP_REMOVE_WITH_SUBGROUPS(Localization.lang(&quot;Also remove subgroups&quot;)),</span>
+<span class="fc" id="L191">    GROUP_EDIT(Localization.lang(&quot;Edit group&quot;)),</span>
+<span class="fc" id="L192">    GROUP_SUBGROUP_ADD(Localization.lang(&quot;Add subgroup&quot;)),</span>
+<span class="fc" id="L193">    GROUP_SUBGROUP_REMOVE(Localization.lang(&quot;Remove subgroups&quot;)),</span>
+<span class="fc" id="L194">    GROUP_SUBGROUP_SORT(Localization.lang(&quot;Sort subgroups A-Z&quot;)),</span>
+<span class="fc" id="L195">    GROUP_SUBGROUP_SORT_REVERSE(Localization.lang(&quot;Sort subgroups Z-A&quot;)),</span>
+<span class="fc" id="L196">    GROUP_SUBGROUP_SORT_ENTRIES(Localization.lang(&quot;Sort subgroups by # of entries (Descending)&quot;)),</span>
+<span class="fc" id="L197">    GROUP_SUBGROUP_SORT_ENTRIES_REVERSE(Localization.lang(&quot;Sort subgroups by # of entries (Ascending)&quot;)),</span>
+<span class="fc" id="L198">    GROUP_ENTRIES_ADD(Localization.lang(&quot;Add selected entries to this group&quot;)),</span>
+<span class="fc" id="L199">    GROUP_ENTRIES_REMOVE(Localization.lang(&quot;Remove selected entries from this group&quot;));</span>
+
+    private String text;
+    private final String description;
+    private final Optional&lt;JabRefIcon&gt; icon;
+    private final Optional&lt;KeyBinding&gt; keyBinding;
+
+    StandardActions(String text) {
+<span class="fc" id="L207">        this(text, &quot;&quot;);</span>
+<span class="fc" id="L208">    }</span>
+
+<span class="fc" id="L210">    StandardActions(String text, IconTheme.JabRefIcons icon) {</span>
+<span class="fc" id="L211">        this.text = text;</span>
+<span class="fc" id="L212">        this.description = &quot;&quot;;</span>
+<span class="fc" id="L213">        this.icon = Optional.of(icon);</span>
+<span class="fc" id="L214">        this.keyBinding = Optional.empty();</span>
+<span class="fc" id="L215">    }</span>
+
+<span class="fc" id="L217">    StandardActions(String text, IconTheme.JabRefIcons icon, KeyBinding keyBinding) {</span>
+<span class="fc" id="L218">        this.text = text;</span>
+<span class="fc" id="L219">        this.description = &quot;&quot;;</span>
+<span class="fc" id="L220">        this.icon = Optional.of(icon);</span>
+<span class="fc" id="L221">        this.keyBinding = Optional.of(keyBinding);</span>
+<span class="fc" id="L222">    }</span>
+
+<span class="fc" id="L224">    StandardActions(String text, String description, IconTheme.JabRefIcons icon) {</span>
+<span class="fc" id="L225">        this.text = text;</span>
+<span class="fc" id="L226">        this.description = description;</span>
+<span class="fc" id="L227">        this.icon = Optional.of(icon);</span>
+<span class="fc" id="L228">        this.keyBinding = Optional.empty();</span>
+<span class="fc" id="L229">    }</span>
+
+<span class="fc" id="L231">    StandardActions(String text, String description, IconTheme.JabRefIcons icon, KeyBinding keyBinding) {</span>
+<span class="fc" id="L232">        this.text = text;</span>
+<span class="fc" id="L233">        this.description = description;</span>
+<span class="fc" id="L234">        this.icon = Optional.of(icon);</span>
+<span class="fc" id="L235">        this.keyBinding = Optional.of(keyBinding);</span>
+<span class="fc" id="L236">    }</span>
+
+<span class="fc" id="L238">    StandardActions(String text, KeyBinding keyBinding) {</span>
+<span class="fc" id="L239">        this.text = text;</span>
+<span class="fc" id="L240">        this.description = &quot;&quot;;</span>
+<span class="fc" id="L241">        this.keyBinding = Optional.of(keyBinding);</span>
+<span class="fc" id="L242">        this.icon = Optional.empty();</span>
+<span class="fc" id="L243">    }</span>
+
+<span class="fc" id="L245">    StandardActions(String text, String description) {</span>
+<span class="fc" id="L246">        this.text = text;</span>
+<span class="fc" id="L247">        this.description = description;</span>
+<span class="fc" id="L248">        this.icon = Optional.empty();</span>
+<span class="fc" id="L249">        this.keyBinding = Optional.empty();</span>
+<span class="fc" id="L250">    }</span>
+
+<span class="fc" id="L252">    StandardActions(String text, String description, KeyBinding keyBinding) {</span>
+<span class="fc" id="L253">        this.text = text;</span>
+<span class="fc" id="L254">        this.description = description;</span>
+<span class="fc" id="L255">        this.icon = Optional.empty();</span>
+<span class="fc" id="L256">        this.keyBinding = Optional.of(keyBinding);</span>
+<span class="fc" id="L257">    }</span>
+
+    @Override
+    public Optional&lt;JabRefIcon&gt; getIcon() {
+<span class="nc" id="L261">        return icon;</span>
+    }
+
+    @Override
+    public Optional&lt;KeyBinding&gt; getKeyBinding() {
+<span class="nc" id="L266">        return keyBinding;</span>
+    }
+
+    @Override
+    public String getText() {
+<span class="nc" id="L271">        return text;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="nc" id="L276">        return description;</span>
+    }
+
+    public Action withText(String text) {
+<span class="nc" id="L280">        this.text = Objects.requireNonNull(text);</span>
+<span class="nc" id="L281">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

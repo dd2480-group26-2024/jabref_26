@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MainTableHeaderContextMenu.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.maintable</a> &gt; <span class="el_source">MainTableHeaderContextMenu.java</span></div><h1>MainTableHeaderContextMenu.java</h1><pre class="source lang-java linenums">package org.jabref.gui.maintable;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javafx.collections.ObservableList;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.RadioMenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TableColumn;
+import javafx.scene.layout.StackPane;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.gui.maintable.columns.MainTableColumn;
+import org.jabref.gui.preferences.ShowPreferencesAction;
+import org.jabref.gui.preferences.table.TableTab;
+import org.jabref.logic.l10n.Localization;
+
+public class MainTableHeaderContextMenu extends ContextMenu {
+
+    private static final int OUT_OF_BOUNDS = -1;
+    MainTable mainTable;
+    MainTableColumnFactory factory;
+    private final LibraryTabContainer tabContainer;
+    private final KeyBindingRepository keyBindingRepository;
+    private final DialogService dialogService;
+
+    public MainTableHeaderContextMenu(MainTable mainTable,
+                                      MainTableColumnFactory factory,
+                                      LibraryTabContainer tabContainer,
+                                      KeyBindingRepository keyBindingRepository,
+                                      DialogService dialogService) {
+<span class="nc" id="L38">        super();</span>
+<span class="nc" id="L39">        this.tabContainer = tabContainer;</span>
+<span class="nc" id="L40">        this.mainTable = mainTable;</span>
+<span class="nc" id="L41">        this.factory = factory;</span>
+<span class="nc" id="L42">        this.keyBindingRepository = keyBindingRepository;</span>
+<span class="nc" id="L43">        this.dialogService = dialogService;</span>
+
+<span class="nc" id="L45">        constructItems();</span>
+<span class="nc" id="L46">    }</span>
+
+    /**
+     * Handles showing the menu in the cursors position when right-clicked.
+     */
+    public void show(boolean show) {
+        // TODO: 20/10/2022 unknown bug where issue does not show unless parameter is passed through this method.
+<span class="nc" id="L53">        mainTable.setOnContextMenuRequested(event -&gt; {</span>
+            // Display the menu if header is clicked, otherwise, remove from display.
+<span class="nc bnc" id="L55" title="All 4 branches missed.">            if (!(event.getTarget() instanceof StackPane) &amp;&amp; show) {</span>
+<span class="nc" id="L56">                this.show(mainTable, event.getScreenX(), event.getScreenY());</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            } else if (this.isShowing()) {</span>
+<span class="nc" id="L58">                this.hide();</span>
+            }
+<span class="nc" id="L60">            event.consume();</span>
+<span class="nc" id="L61">        });</span>
+<span class="nc" id="L62">    }</span>
+
+    /**
+     * Constructs the items for the list and places them in the menu.
+     */
+    private void constructItems() {
+        // Reset the right-click menu
+<span class="nc" id="L69">        this.getItems().clear();</span>
+<span class="nc" id="L70">        List&lt;TableColumn&lt;BibEntryTableViewModel, ?&gt;&gt; commonColumns = commonColumns();</span>
+
+        // Populate the menu with currently used fields
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        for (TableColumn&lt;BibEntryTableViewModel, ?&gt; column : mainTable.getColumns()) {</span>
+            // Append only if the column has not already been added (a common column)
+<span class="nc" id="L75">            RightClickMenuItem itemToAdd = createMenuItem(column, true);</span>
+<span class="nc" id="L76">            this.getItems().add(itemToAdd);</span>
+
+            // Remove from remaining common columns pool
+<span class="nc" id="L79">            MainTableColumn&lt;?&gt; searchCol = (MainTableColumn&lt;?&gt;) column;</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (isACommonColumn(searchCol)) {</span>
+<span class="nc" id="L81">                commonColumns.removeIf(tableCol -&gt; ((MainTableColumn&lt;?&gt;) tableCol).getModel().equals(searchCol.getModel()));</span>
+            }
+<span class="nc" id="L83">        }</span>
+
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (!commonColumns.isEmpty()) {</span>
+<span class="nc" id="L86">            this.getItems().add(new SeparatorMenuItem());</span>
+
+            // Append to the menu the current remaining columns in the common columns.
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            for (TableColumn&lt;BibEntryTableViewModel, ?&gt; tableColumn : commonColumns) {</span>
+<span class="nc" id="L90">                RightClickMenuItem itemToAdd = createMenuItem(tableColumn, false);</span>
+<span class="nc" id="L91">                this.getItems().add(itemToAdd);</span>
+<span class="nc" id="L92">            }</span>
+        }
+
+<span class="nc" id="L95">        this.getItems().add(new SeparatorMenuItem());</span>
+<span class="nc" id="L96">        ActionFactory actionfactory = new ActionFactory(this.keyBindingRepository);</span>
+<span class="nc" id="L97">        MenuItem showMoreItem = actionfactory.createMenuItem(</span>
+<span class="nc" id="L98">                StandardActions.SHOW_PREFS.withText(Localization.lang(&quot;More options...&quot;)),</span>
+                new ShowPreferencesAction(tabContainer, TableTab.class, dialogService));
+<span class="nc" id="L100">        this.getItems().add(showMoreItem);</span>
+<span class="nc" id="L101">    }</span>
+
+    /**
+     * Creates an item for the menu constructed with the name/visibility of the table column.
+     */
+    private RightClickMenuItem createMenuItem(TableColumn&lt;BibEntryTableViewModel, ?&gt; column, boolean isDisplaying) {
+        // Gets display name and constructs Radio Menu Item.
+<span class="nc" id="L108">        MainTableColumn&lt;?&gt; tableColumn = (MainTableColumn&lt;?&gt;) column;</span>
+<span class="nc" id="L109">        String displayName = tableColumn.getDisplayName();</span>
+<span class="nc" id="L110">        return new RightClickMenuItem(displayName, tableColumn, isDisplaying);</span>
+    }
+
+    /**
+     * Returns the current position of the inputted column in the table (index).
+     */
+    private int obtainIndexOfColumn(MainTableColumn&lt;?&gt; searchColumn) {
+<span class="nc" id="L117">        ObservableList&lt;TableColumn&lt;BibEntryTableViewModel, ?&gt;&gt; columns = mainTable.getColumns();</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        for (int i = 0; i &lt; columns.size(); i++) {</span>
+<span class="nc" id="L119">            TableColumn&lt;BibEntryTableViewModel, ?&gt; column = columns.get(i);</span>
+<span class="nc" id="L120">            MainTableColumnModel model = ((MainTableColumn&lt;?&gt;) column).getModel();</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">            if (model.equals(searchColumn.getModel())) {</span>
+<span class="nc" id="L122">                return i;</span>
+            }
+        }
+<span class="nc" id="L125">        return OUT_OF_BOUNDS;</span>
+    }
+
+    /**
+     * Adds the column into the MainTable for display.
+     */
+    private void addColumn(MainTableColumn&lt;?&gt; tableColumn, int index) {
+<span class="nc bnc" id="L132" title="All 4 branches missed.">        if ((index &lt;= OUT_OF_BOUNDS) || (index &gt;= mainTable.getColumns().size())) {</span>
+<span class="nc" id="L133">            mainTable.getColumns().add(tableColumn);</span>
+        } else {
+<span class="nc" id="L135">            mainTable.getColumns().add(index, tableColumn);</span>
+        }
+<span class="nc" id="L137">    }</span>
+
+    /**
+     * Removes the column from the MainTable to remove visibility.
+     */
+    private void removeColumn(MainTableColumn&lt;?&gt; tableColumn) {
+<span class="nc" id="L143">        mainTable.getColumns().removeIf(tableCol -&gt; ((MainTableColumn&lt;?&gt;) tableCol).getModel().equals(tableColumn.getModel()));</span>
+<span class="nc" id="L144">    }</span>
+
+    /**
+     * Checks if a column is one of the commonly used columns.
+     */
+    private boolean isACommonColumn(MainTableColumn&lt;?&gt; tableColumn) {
+<span class="nc" id="L150">        return isColumnInList(tableColumn, commonColumns());</span>
+    }
+
+    /**
+     * Determines if a list of TableColumns contains the searched column.
+     */
+    private boolean isColumnInList(MainTableColumn&lt;?&gt; searchColumn, List&lt;TableColumn&lt;BibEntryTableViewModel, ?&gt;&gt; tableColumns) {
+        for (TableColumn&lt;BibEntryTableViewModel, ?&gt; column:
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        tableColumns) {</span>
+<span class="nc" id="L159">            MainTableColumnModel model = ((MainTableColumn&lt;?&gt;) column).getModel();</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            if (model.equals(searchColumn.getModel())) {</span>
+<span class="nc" id="L161">                return true;</span>
+            }
+<span class="nc" id="L163">        }</span>
+<span class="nc" id="L164">        return false;</span>
+    }
+
+    /**
+     * Creates the list of the &quot;commonly used&quot; columns (currently based on the default preferences).
+     */
+    private List&lt;TableColumn&lt;BibEntryTableViewModel, ?&gt;&gt; commonColumns() {
+        // Qualifier strings
+<span class="nc" id="L172">        String entryTypeQualifier = &quot;entrytype&quot;;</span>
+<span class="nc" id="L173">        String authorEditQualifier = &quot;author/editor&quot;;</span>
+<span class="nc" id="L174">        String titleQualifier = &quot;title&quot;;</span>
+<span class="nc" id="L175">        String yearQualifier = &quot;year&quot;;</span>
+<span class="nc" id="L176">        String journalBookQualifier = &quot;journal/booktitle&quot;;</span>
+<span class="nc" id="L177">        String rankQualifier = &quot;ranking&quot;;</span>
+<span class="nc" id="L178">        String readStatusQualifier = &quot;readstatus&quot;;</span>
+<span class="nc" id="L179">        String priorityQualifier = &quot;priority&quot;;</span>
+
+        // Create the MainTableColumn Models from qualifiers + types.
+<span class="nc" id="L182">        List&lt;MainTableColumnModel&gt; commonColumns = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L183">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.GROUPS));</span>
+<span class="nc" id="L184">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.GROUP_ICONS));</span>
+<span class="nc" id="L185">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.FILES));</span>
+<span class="nc" id="L186">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.LINKED_IDENTIFIER));</span>
+<span class="nc" id="L187">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, entryTypeQualifier));</span>
+<span class="nc" id="L188">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, authorEditQualifier));</span>
+<span class="nc" id="L189">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, titleQualifier));</span>
+<span class="nc" id="L190">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, yearQualifier));</span>
+<span class="nc" id="L191">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.NORMALFIELD, journalBookQualifier));</span>
+<span class="nc" id="L192">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.SPECIALFIELD, rankQualifier));</span>
+<span class="nc" id="L193">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.SPECIALFIELD, readStatusQualifier));</span>
+<span class="nc" id="L194">        commonColumns.add(new MainTableColumnModel(MainTableColumnModel.Type.SPECIALFIELD, priorityQualifier));</span>
+
+        // Create the Table Columns from the models using factory methods.
+<span class="nc" id="L197">        List&lt;TableColumn&lt;BibEntryTableViewModel, ?&gt;&gt; commonTableColumns = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        for (MainTableColumnModel columnModel: commonColumns) {</span>
+<span class="nc" id="L199">            TableColumn&lt;BibEntryTableViewModel, ?&gt; tableColumn = factory.createColumn(columnModel);</span>
+<span class="nc" id="L200">            commonTableColumns.add(tableColumn);</span>
+<span class="nc" id="L201">        }</span>
+<span class="nc" id="L202">        return commonTableColumns;</span>
+    }
+
+    /**
+     * RightClickMenuItem: RadioMenuItem holding position in MainTable and its visibility.
+     */
+    private class RightClickMenuItem extends RadioMenuItem {
+        private int index;
+        private boolean visibleInTable;
+
+<span class="nc" id="L212">        RightClickMenuItem(String displayName, MainTableColumn&lt;?&gt; column, boolean isVisible) {</span>
+<span class="nc" id="L213">            super(displayName);</span>
+<span class="nc" id="L214">            setVisibleInTable(isVisible);</span>
+            // Flag item as selected if the item is already in the main table.
+<span class="nc" id="L216">            this.setSelected(isVisible);</span>
+
+<span class="nc" id="L218">            setIndex(OUT_OF_BOUNDS);</span>
+
+            // Set action to toggle visibility from main table when item is clicked
+<span class="nc" id="L221">            this.setOnAction(event -&gt; {</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">                if (isVisibleInTable()) {</span>
+<span class="nc" id="L223">                    setIndex(obtainIndexOfColumn(column));</span>
+<span class="nc" id="L224">                    removeColumn(column);</span>
+                } else {
+<span class="nc" id="L226">                    addColumn(column, this.index);</span>
+<span class="nc" id="L227">                    setIndex(obtainIndexOfColumn(column));</span>
+                }
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                setVisibleInTable(!this.visibleInTable);</span>
+<span class="nc" id="L230">            });</span>
+<span class="nc" id="L231">        }</span>
+
+        public void setIndex(int index) {
+<span class="nc" id="L234">            this.index = index;</span>
+<span class="nc" id="L235">        }</span>
+
+        public void setVisibleInTable(boolean visibleInTable) {
+<span class="nc" id="L238">            this.visibleInTable = visibleInTable;</span>
+<span class="nc" id="L239">        }</span>
+
+        public boolean isVisibleInTable() {
+<span class="nc" id="L242">            return visibleInTable;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

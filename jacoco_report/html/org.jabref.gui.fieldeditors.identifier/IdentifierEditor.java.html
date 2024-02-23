@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IdentifierEditor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors.identifier</a> &gt; <span class="el_source">IdentifierEditor.java</span></div><h1>IdentifierEditor.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors.identifier;
+
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.fxml.FXML;
+import javafx.scene.Parent;
+import javafx.scene.control.Button;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.autocompleter.SuggestionProvider;
+import org.jabref.gui.fieldeditors.EditorTextArea;
+import org.jabref.gui.fieldeditors.EditorValidator;
+import org.jabref.gui.fieldeditors.FieldEditorFX;
+import org.jabref.gui.fieldeditors.contextmenu.DefaultMenu;
+import org.jabref.gui.fieldeditors.contextmenu.EditorMenus;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.integrity.FieldCheckers;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.injection.Injector;
+import com.airhacks.afterburner.views.ViewLoader;
+import jakarta.inject.Inject;
+
+import static org.jabref.model.entry.field.StandardField.DOI;
+import static org.jabref.model.entry.field.StandardField.EPRINT;
+import static org.jabref.model.entry.field.StandardField.ISBN;
+
+<span class="nc" id="L36">public class IdentifierEditor extends HBox implements FieldEditorFX {</span>
+
+    @FXML private BaseIdentifierEditorViewModel&lt;?&gt; viewModel;
+    @FXML private EditorTextArea textArea;
+    @FXML private Button fetchInformationByIdentifierButton;
+    @FXML private Button lookupIdentifierButton;
+
+    @Inject private DialogService dialogService;
+    @Inject private TaskExecutor taskExecutor;
+    @Inject private PreferencesService preferencesService;
+    @Inject private UndoManager undoManager;
+    @Inject private StateManager stateManager;
+
+<span class="nc" id="L49">    private Optional&lt;BibEntry&gt; entry = Optional.empty();</span>
+
+    public IdentifierEditor(Field field,
+                            SuggestionProvider&lt;?&gt; suggestionProvider,
+<span class="nc" id="L53">                            FieldCheckers fieldCheckers) {</span>
+
+        // Viewloader must be called after the viewmodel is loaded,
+        // but we need the injected vars to create the viewmodels.
+<span class="nc" id="L57">        Injector.registerExistingAndInject(this);</span>
+
+<span class="nc bnc" id="L59" title="All 4 branches missed.">        switch (field) {</span>
+            case DOI -&gt;
+<span class="nc" id="L61">                    this.viewModel = new DoiIdentifierEditorViewModel(suggestionProvider, fieldCheckers, dialogService, taskExecutor, preferencesService, undoManager, stateManager);</span>
+            case ISBN -&gt;
+<span class="nc" id="L63">                    this.viewModel = new ISBNIdentifierEditorViewModel(suggestionProvider, fieldCheckers, dialogService, taskExecutor, preferencesService, undoManager, stateManager);</span>
+            case EPRINT -&gt;
+<span class="nc" id="L65">                    this.viewModel = new EprintIdentifierEditorViewModel(suggestionProvider, fieldCheckers, dialogService, taskExecutor, preferencesService, undoManager);</span>
+
+            case null, default -&gt; {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                assert field != null;</span>
+<span class="nc" id="L69">                throw new IllegalStateException(&quot;Unable to instantiate a view model for identifier field editor '%s'&quot;.formatted(field.getDisplayName()));</span>
+            }
+        }
+
+<span class="nc" id="L73">        ViewLoader.view(this)</span>
+<span class="nc" id="L74">                  .root(this)</span>
+<span class="nc" id="L75">                  .load();</span>
+
+<span class="nc" id="L77">        textArea.textProperty().bindBidirectional(viewModel.textProperty());</span>
+
+<span class="nc" id="L79">        fetchInformationByIdentifierButton.setTooltip(</span>
+<span class="nc" id="L80">                new Tooltip(Localization.lang(&quot;Get bibliographic data from %0&quot;, field.getDisplayName())));</span>
+<span class="nc" id="L81">        lookupIdentifierButton.setTooltip(</span>
+<span class="nc" id="L82">                new Tooltip(Localization.lang(&quot;Look up %0&quot;, field.getDisplayName())));</span>
+
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (field.equals(DOI)) {</span>
+<span class="nc" id="L85">            textArea.initContextMenu(EditorMenus.getDOIMenu(textArea, dialogService, preferencesService));</span>
+        } else {
+<span class="nc" id="L87">            textArea.initContextMenu(new DefaultMenu(textArea));</span>
+        }
+
+<span class="nc" id="L90">        new EditorValidator(preferencesService).configureValidation(viewModel.getFieldValidator().getValidationStatus(), textArea);</span>
+<span class="nc" id="L91">    }</span>
+
+    public BaseIdentifierEditorViewModel&lt;?&gt; getViewModel() {
+<span class="nc" id="L94">        return viewModel;</span>
+    }
+
+    @Override
+    public void bindToEntry(BibEntry entry) {
+<span class="nc" id="L99">        this.entry = Optional.of(entry);</span>
+<span class="nc" id="L100">        viewModel.bindToEntry(entry);</span>
+<span class="nc" id="L101">    }</span>
+
+    @Override
+    public Parent getNode() {
+<span class="nc" id="L105">        return this;</span>
+    }
+
+    @FXML
+    private void fetchInformationByIdentifier() {
+<span class="nc" id="L110">        entry.ifPresent(viewModel::fetchBibliographyInformation);</span>
+<span class="nc" id="L111">    }</span>
+
+    @FXML
+    private void lookupIdentifier() {
+<span class="nc" id="L115">        entry.ifPresent(viewModel::lookupIdentifier);</span>
+<span class="nc" id="L116">    }</span>
+
+    @FXML
+    private void openExternalLink() {
+<span class="nc" id="L120">        viewModel.openExternalLink();</span>
+<span class="nc" id="L121">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

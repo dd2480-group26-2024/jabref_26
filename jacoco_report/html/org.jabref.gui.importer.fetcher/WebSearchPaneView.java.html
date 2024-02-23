@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebSearchPaneView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.importer.fetcher</a> &gt; <span class="el_source">WebSearchPaneView.java</span></div><h1>WebSearchPaneView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.importer.fetcher;
+
+import javafx.beans.binding.BooleanExpression;
+import javafx.css.PseudoClass;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+
+import org.jabref.gui.ClipBoardManager;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.help.HelpAction;
+import org.jabref.gui.search.SearchTextField;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.importer.SearchBasedFetcher;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+
+public class WebSearchPaneView extends VBox {
+
+<span class="nc" id="L31">    private static final PseudoClass QUERY_INVALID = PseudoClass.getPseudoClass(&quot;invalid&quot;);</span>
+
+    private final WebSearchPaneViewModel viewModel;
+    private final PreferencesService preferences;
+    private final DialogService dialogService;
+
+<span class="nc" id="L37">    public WebSearchPaneView(PreferencesService preferences, DialogService dialogService, StateManager stateManager) {</span>
+<span class="nc" id="L38">        this.preferences = preferences;</span>
+<span class="nc" id="L39">        this.dialogService = dialogService;</span>
+<span class="nc" id="L40">        this.viewModel = new WebSearchPaneViewModel(preferences, dialogService, stateManager);</span>
+<span class="nc" id="L41">        initialize();</span>
+<span class="nc" id="L42">    }</span>
+
+    private void initialize() {
+<span class="nc" id="L45">        ComboBox&lt;SearchBasedFetcher&gt; fetchers = new ComboBox&lt;&gt;();</span>
+<span class="nc" id="L46">        new ViewModelListCellFactory&lt;SearchBasedFetcher&gt;()</span>
+<span class="nc" id="L47">                .withText(SearchBasedFetcher::getName)</span>
+<span class="nc" id="L48">                .install(fetchers);</span>
+<span class="nc" id="L49">        fetchers.itemsProperty().bind(viewModel.fetchersProperty());</span>
+<span class="nc" id="L50">        fetchers.valueProperty().bindBidirectional(viewModel.selectedFetcherProperty());</span>
+<span class="nc" id="L51">        fetchers.setMaxWidth(Double.POSITIVE_INFINITY);</span>
+
+        // Create help button for currently selected fetcher
+<span class="nc" id="L54">        StackPane helpButtonContainer = new StackPane();</span>
+<span class="nc" id="L55">        ActionFactory factory = new ActionFactory(preferences.getKeyBindingRepository());</span>
+<span class="nc" id="L56">        EasyBind.subscribe(viewModel.selectedFetcherProperty(), fetcher -&gt; {</span>
+<span class="nc bnc" id="L57" title="All 4 branches missed.">            if ((fetcher != null) &amp;&amp; fetcher.getHelpPage().isPresent()) {</span>
+<span class="nc" id="L58">                Button helpButton = factory.createIconButton(StandardActions.HELP, new HelpAction(fetcher.getHelpPage().get(), dialogService, preferences.getFilePreferences()));</span>
+<span class="nc" id="L59">                helpButtonContainer.getChildren().setAll(helpButton);</span>
+<span class="nc" id="L60">            } else {</span>
+<span class="nc" id="L61">                helpButtonContainer.getChildren().clear();</span>
+            }
+<span class="nc" id="L63">        });</span>
+<span class="nc" id="L64">        HBox fetcherContainer = new HBox(fetchers, helpButtonContainer);</span>
+<span class="nc" id="L65">        HBox.setHgrow(fetchers, Priority.ALWAYS);</span>
+
+        // Create text field for query input
+<span class="nc" id="L68">        TextField query = SearchTextField.create();</span>
+<span class="nc" id="L69">        query.getStyleClass().add(&quot;searchBar&quot;);</span>
+
+<span class="nc" id="L71">        viewModel.queryProperty().bind(query.textProperty());</span>
+<span class="nc" id="L72">        EasyBind.subscribe(viewModel.queryValidationStatus().validProperty(),</span>
+                valid -&gt; {
+<span class="nc bnc" id="L74" title="All 4 branches missed.">                    if (!valid &amp;&amp; viewModel.queryValidationStatus().getHighestMessage().isPresent()) {</span>
+<span class="nc" id="L75">                        query.setTooltip(new Tooltip(viewModel.queryValidationStatus().getHighestMessage().get().getMessage()));</span>
+<span class="nc" id="L76">                        query.pseudoClassStateChanged(QUERY_INVALID, true);</span>
+                    } else {
+<span class="nc" id="L78">                        query.setTooltip(null);</span>
+<span class="nc" id="L79">                        query.pseudoClassStateChanged(QUERY_INVALID, false);</span>
+                    }
+<span class="nc" id="L81">                });</span>
+
+        // Allows triggering search on pressing enter
+<span class="nc" id="L84">        query.setOnKeyPressed(event -&gt; {</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if (event.getCode() == KeyCode.ENTER) {</span>
+<span class="nc" id="L86">                viewModel.search();</span>
+            }
+<span class="nc" id="L88">        });</span>
+
+<span class="nc" id="L90">        ClipBoardManager.addX11Support(query);</span>
+
+        // Create button that triggers search
+<span class="nc" id="L93">        BooleanExpression importerEnabled = preferences.getImporterPreferences().importerEnabledProperty();</span>
+<span class="nc" id="L94">        Button search = new Button(Localization.lang(&quot;Search&quot;));</span>
+<span class="nc" id="L95">        search.setDefaultButton(false);</span>
+<span class="nc" id="L96">        search.setOnAction(event -&gt; viewModel.search());</span>
+<span class="nc" id="L97">        search.setMaxWidth(Double.MAX_VALUE);</span>
+<span class="nc" id="L98">        search.disableProperty().bind(importerEnabled.not());</span>
+<span class="nc" id="L99">        getChildren().addAll(fetcherContainer, query, search);</span>
+<span class="nc" id="L100">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

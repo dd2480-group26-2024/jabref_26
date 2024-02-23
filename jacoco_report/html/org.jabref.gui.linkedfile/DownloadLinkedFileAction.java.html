@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DownloadLinkedFileAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.linkedfile</a> &gt; <span class="el_source">DownloadLinkedFileAction.java</span></div><h1>DownloadLinkedFileAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.linkedfile;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Optional;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLSocketFactory;
+
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.ReadOnlyDoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.externalfiletype.ExternalFileType;
+import org.jabref.gui.externalfiletype.ExternalFileTypes;
+import org.jabref.gui.externalfiletype.StandardExternalFileType;
+import org.jabref.gui.fieldeditors.LinkedFilesEditorViewModel;
+import org.jabref.gui.fieldeditors.URLUtil;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.externalfiles.LinkedFileHandler;
+import org.jabref.logic.importer.FetcherClientException;
+import org.jabref.logic.importer.FetcherServerException;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.net.ProgressInputStream;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.logic.util.io.FileNameUniqueness;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.preferences.FilePreferences;
+
+import com.tobiasdiez.easybind.EasyBind;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class DownloadLinkedFileAction extends SimpleCommand {
+
+<span class="fc" id="L49">    private static final Logger LOGGER = LoggerFactory.getLogger(LibraryTab.class);</span>
+
+    private final DialogService dialogService;
+    private final BibEntry entry;
+    private final LinkedFile linkedFile;
+    private final String suggestedName;
+    private final String downloadUrl;
+    private final FilePreferences filePreferences;
+    private final TaskExecutor taskExecutor;
+
+    private final BibDatabaseContext databaseContext;
+
+<span class="fc" id="L61">    private final DoubleProperty downloadProgress = new SimpleDoubleProperty();</span>
+    private final LinkedFileHandler linkedFileHandler;
+
+    public DownloadLinkedFileAction(BibDatabaseContext databaseContext,
+                                    BibEntry entry,
+                                    LinkedFile linkedFile,
+                                    String downloadUrl,
+                                    DialogService dialogService,
+                                    FilePreferences filePreferences,
+                                    TaskExecutor taskExecutor,
+<span class="fc" id="L71">                                    String suggestedName) {</span>
+<span class="fc" id="L72">        this.databaseContext = databaseContext;</span>
+<span class="fc" id="L73">        this.entry = entry;</span>
+<span class="fc" id="L74">        this.linkedFile = linkedFile;</span>
+<span class="fc" id="L75">        this.suggestedName = suggestedName;</span>
+<span class="fc" id="L76">        this.downloadUrl = downloadUrl;</span>
+<span class="fc" id="L77">        this.dialogService = dialogService;</span>
+<span class="fc" id="L78">        this.filePreferences = filePreferences;</span>
+<span class="fc" id="L79">        this.taskExecutor = taskExecutor;</span>
+
+<span class="fc" id="L81">        this.linkedFileHandler = new LinkedFileHandler(linkedFile, entry, databaseContext, filePreferences);</span>
+<span class="fc" id="L82">    }</span>
+
+    public DownloadLinkedFileAction(BibDatabaseContext databaseContext,
+                                    BibEntry entry,
+                                    LinkedFile linkedFile,
+                                    String downloadUrl,
+                                    DialogService dialogService,
+                                    FilePreferences filePreferences,
+                                    TaskExecutor taskExecutor) {
+<span class="fc" id="L91">        this(databaseContext, entry, linkedFile, downloadUrl, dialogService, filePreferences, taskExecutor, &quot;&quot;);</span>
+<span class="fc" id="L92">    }</span>
+
+    @Override
+    public void execute() {
+<span class="fc" id="L96">        LOGGER.info(&quot;Downloading file from &quot; + downloadUrl);</span>
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">        if (downloadUrl.isEmpty() || !LinkedFile.isOnlineLink(downloadUrl)) {</span>
+<span class="nc" id="L98">            throw new UnsupportedOperationException(&quot;In order to download the file, the url has to be an online link&quot;);</span>
+        }
+
+<span class="fc" id="L101">        Optional&lt;Path&gt; targetDirectory = databaseContext.getFirstExistingFileDir(filePreferences);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (targetDirectory.isEmpty()) {</span>
+<span class="nc" id="L103">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Download file&quot;), Localization.lang(&quot;File directory is not set or does not exist!&quot;));</span>
+<span class="nc" id="L104">            return;</span>
+        }
+
+        try {
+<span class="fc" id="L108">            URLDownload urlDownload = new URLDownload(downloadUrl);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (!checkSSLHandshake(urlDownload)) {</span>
+<span class="nc" id="L110">                return;</span>
+            }
+
+<span class="fc" id="L113">            doDownload(targetDirectory.get(), urlDownload);</span>
+<span class="nc" id="L114">        } catch (MalformedURLException exception) {</span>
+<span class="nc" id="L115">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Invalid URL&quot;), exception);</span>
+<span class="fc" id="L116">        }</span>
+<span class="fc" id="L117">    }</span>
+
+    private void doDownload(Path targetDirectory, URLDownload urlDownload) {
+<span class="fc" id="L120">        BackgroundTask&lt;Path&gt; downloadTask = prepareDownloadTask(targetDirectory, urlDownload);</span>
+<span class="fc" id="L121">        downloadProgress.bind(downloadTask.workDonePercentageProperty());</span>
+
+<span class="fc" id="L123">        downloadTask.titleProperty().set(Localization.lang(&quot;Downloading&quot;));</span>
+<span class="fc" id="L124">        entry.getCitationKey().ifPresentOrElse(</span>
+<span class="fc" id="L125">                citationkey -&gt; downloadTask.messageProperty().set(Localization.lang(&quot;Fulltext for %0&quot;, citationkey)),</span>
+<span class="nc" id="L126">                () -&gt; downloadTask.messageProperty().set(Localization.lang(&quot;Fulltext for a new entry&quot;)));</span>
+<span class="fc" id="L127">        downloadTask.showToUser(true);</span>
+
+<span class="pc" id="L129">        downloadTask.onFailure(ex -&gt; onFailure(urlDownload, ex));</span>
+<span class="fc" id="L130">        downloadTask.onSuccess(destination -&gt; onSuccess(targetDirectory, destination));</span>
+
+<span class="fc" id="L132">        taskExecutor.execute(downloadTask);</span>
+<span class="fc" id="L133">    }</span>
+
+    private void onSuccess(Path targetDirectory, Path destination) {
+        boolean isDuplicate;
+        boolean isHtml;
+        try {
+<span class="fc" id="L139">            isDuplicate = FileNameUniqueness.isDuplicatedFile(targetDirectory, destination.getFileName(), dialogService);</span>
+<span class="nc" id="L140">        } catch (</span>
+                IOException e) {
+<span class="nc" id="L142">            LOGGER.error(&quot;FileNameUniqueness.isDuplicatedFile failed&quot;, e);</span>
+<span class="nc" id="L143">            return;</span>
+<span class="fc" id="L144">        }</span>
+
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (isDuplicate) {</span>
+<span class="nc" id="L147">            destination = targetDirectory.resolve(</span>
+<span class="nc" id="L148">                    FileNameUniqueness.eraseDuplicateMarks(destination.getFileName()));</span>
+
+<span class="nc" id="L150">            linkedFile.setLink(FileUtil.relativize(destination,</span>
+<span class="nc" id="L151">                    databaseContext.getFileDirectories(filePreferences)).toString());</span>
+
+<span class="nc" id="L153">            isHtml = linkedFile.getFileType().equals(StandardExternalFileType.URL.getName());</span>
+        } else {
+            // we need to call LinkedFileViewModel#fromFile, because we need to make the path relative to the configured directories
+<span class="fc" id="L156">            LinkedFile newLinkedFile = LinkedFilesEditorViewModel.fromFile(</span>
+                    destination,
+<span class="fc" id="L158">                    databaseContext.getFileDirectories(filePreferences),</span>
+                    filePreferences);
+<span class="pc bpc" id="L160" title="2 of 4 branches missed.">            if (newLinkedFile.getDescription().isEmpty() &amp;&amp; !linkedFile.getDescription().isEmpty()) {</span>
+<span class="nc" id="L161">                newLinkedFile.setDescription((linkedFile.getDescription()));</span>
+            }
+<span class="fc" id="L163">            newLinkedFile.setSourceURL(linkedFile.getLink());</span>
+<span class="fc" id="L164">            entry.replaceDownloadedFile(linkedFile.getLink(), newLinkedFile);</span>
+<span class="fc" id="L165">            isHtml = newLinkedFile.getFileType().equals(StandardExternalFileType.URL.getName());</span>
+        }
+
+        // Notify in bar when the file type is HTML.
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (isHtml) {</span>
+<span class="fc" id="L170">            dialogService.notify(Localization.lang(&quot;Downloaded website as an HTML file.&quot;));</span>
+<span class="fc" id="L171">            LOGGER.debug(&quot;Downloaded website {} as an HTML file at {}&quot;, linkedFile.getLink(), destination);</span>
+        }
+<span class="fc" id="L173">    }</span>
+
+    private void onFailure(URLDownload urlDownload, Exception ex) {
+<span class="nc" id="L176">        LOGGER.error(&quot;Error downloading from URL: &quot; + urlDownload, ex);</span>
+<span class="nc" id="L177">        String fetcherExceptionMessage = ex.getMessage();</span>
+<span class="nc" id="L178">        String failedTitle = Localization.lang(&quot;Failed to download from URL&quot;);</span>
+        int statusCode;
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (ex instanceof FetcherClientException clientException) {</span>
+<span class="nc" id="L181">            statusCode = clientException.getStatusCode();</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (statusCode == 401) {</span>
+<span class="nc" id="L183">                dialogService.showInformationDialogAndWait(failedTitle, Localization.lang(&quot;401 Unauthorized: Access Denied. You are not authorized to access this resource. Please check your credentials and try again. If you believe you should have access, please contact the administrator for assistance.\nURL: %0 \n %1&quot;, urlDownload.getSource(), fetcherExceptionMessage));</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">            } else if (statusCode == 403) {</span>
+<span class="nc" id="L185">                dialogService.showInformationDialogAndWait(failedTitle, Localization.lang(&quot;403 Forbidden: Access Denied. You do not have permission to access this resource. Please contact the administrator for assistance or try a different action.\nURL: %0 \n %1&quot;, urlDownload.getSource(), fetcherExceptionMessage));</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            } else if (statusCode == 404) {</span>
+<span class="nc" id="L187">                dialogService.showInformationDialogAndWait(failedTitle, Localization.lang(&quot;404 Not Found Error: The requested resource could not be found. It seems that the file you are trying to download is not available or has been moved. Please verify the URL and try again. If you believe this is an error, please contact the administrator for further assistance.\nURL: %0 \n %1&quot;, urlDownload.getSource(), fetcherExceptionMessage));</span>
+            }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        } else if (ex instanceof FetcherServerException serverException) {</span>
+<span class="nc" id="L190">            statusCode = serverException.getStatusCode();</span>
+<span class="nc" id="L191">            dialogService.showInformationDialogAndWait(failedTitle,</span>
+<span class="nc" id="L192">                    Localization.lang(&quot;Error downloading from URL. Cause is likely the server side. HTTP Error %0 \n %1 \nURL: %2 \nPlease try again later or contact the server administrator.&quot;, statusCode, fetcherExceptionMessage, urlDownload.getSource()));</span>
+        } else {
+<span class="nc" id="L194">            dialogService.showErrorDialogAndWait(failedTitle, Localization.lang(&quot;Error message: %0 \nURL: %1 \nPlease check the URL and try again.&quot;, fetcherExceptionMessage, urlDownload.getSource()));</span>
+        }
+<span class="nc" id="L196">    }</span>
+
+    private boolean checkSSLHandshake(URLDownload urlDownload) {
+        try {
+<span class="fc" id="L200">            urlDownload.canBeReached();</span>
+<span class="nc" id="L201">        } catch (kong.unirest.UnirestException ex) {</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            if (ex.getCause() instanceof SSLHandshakeException) {</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">                if (dialogService.showConfirmationDialogAndWait(Localization.lang(&quot;Download file&quot;),</span>
+<span class="nc" id="L204">                        Localization.lang(&quot;Unable to find valid certification path to requested target(%0), download anyway?&quot;,</span>
+<span class="nc" id="L205">                                urlDownload.getSource().toString()))) {</span>
+<span class="nc" id="L206">                    return true;</span>
+                } else {
+<span class="nc" id="L208">                    dialogService.notify(Localization.lang(&quot;Download operation canceled.&quot;));</span>
+<span class="nc" id="L209">                    return false;</span>
+                }
+            } else {
+<span class="nc" id="L212">                LOGGER.error(&quot;Error while checking if the file can be downloaded&quot;, ex);</span>
+<span class="nc" id="L213">                dialogService.notify(Localization.lang(&quot;Error downloading&quot;));</span>
+<span class="nc" id="L214">                return false;</span>
+            }
+<span class="fc" id="L216">        }</span>
+<span class="fc" id="L217">        return true;</span>
+    }
+
+    private BackgroundTask&lt;Path&gt; prepareDownloadTask(Path targetDirectory, URLDownload urlDownload) {
+<span class="fc" id="L221">        SSLSocketFactory defaultSSLSocketFactory = HttpsURLConnection.getDefaultSSLSocketFactory();</span>
+<span class="fc" id="L222">        HostnameVerifier defaultHostnameVerifier = HttpsURLConnection.getDefaultHostnameVerifier();</span>
+<span class="fc" id="L223">        return BackgroundTask</span>
+<span class="fc" id="L224">                .wrap(() -&gt; {</span>
+                    String suggestedName;
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">                    if (this.suggestedName.isEmpty()) {</span>
+<span class="fc" id="L227">                        Optional&lt;ExternalFileType&gt; suggestedType = inferFileType(urlDownload);</span>
+<span class="fc" id="L228">                        ExternalFileType externalFileType = suggestedType.orElse(StandardExternalFileType.PDF);</span>
+<span class="fc" id="L229">                        suggestedName = linkedFileHandler.getSuggestedFileName(externalFileType.getExtension());</span>
+<span class="fc" id="L230">                    } else {</span>
+<span class="nc" id="L231">                        suggestedName = this.suggestedName;</span>
+                    }
+<span class="fc" id="L233">                    String fulltextDir = FileUtil.createDirNameFromPattern(databaseContext.getDatabase(), entry, filePreferences.getFileDirectoryPattern());</span>
+<span class="fc" id="L234">                    suggestedName = FileNameUniqueness.getNonOverWritingFileName(targetDirectory.resolve(fulltextDir), suggestedName);</span>
+
+<span class="fc" id="L236">                    return targetDirectory.resolve(fulltextDir).resolve(suggestedName);</span>
+                })
+<span class="fc" id="L238">                .then(destination -&gt; new FileDownloadTask(urlDownload.getSource(), destination))</span>
+<span class="pc" id="L239">                .onFailure(ex -&gt; LOGGER.error(&quot;Error in download&quot;, ex))</span>
+<span class="fc" id="L240">                .onFinished(() -&gt; {</span>
+<span class="fc" id="L241">                    URLDownload.setSSLVerification(defaultSSLSocketFactory, defaultHostnameVerifier);</span>
+<span class="fc" id="L242">                    downloadProgress.unbind();</span>
+<span class="fc" id="L243">                    downloadProgress.set(1);</span>
+<span class="fc" id="L244">                });</span>
+    }
+
+    private Optional&lt;ExternalFileType&gt; inferFileType(URLDownload urlDownload) {
+<span class="fc" id="L248">        Optional&lt;ExternalFileType&gt; suggestedType = inferFileTypeFromMimeType(urlDownload);</span>
+
+        // If we did not find a file type from the MIME type, try based on extension:
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (suggestedType.isEmpty()) {</span>
+<span class="nc" id="L252">            suggestedType = inferFileTypeFromURL(urlDownload.getSource().toExternalForm());</span>
+        }
+<span class="fc" id="L254">        return suggestedType;</span>
+    }
+
+    private Optional&lt;ExternalFileType&gt; inferFileTypeFromMimeType(URLDownload urlDownload) {
+<span class="fc" id="L258">        String mimeType = urlDownload.getMimeType();</span>
+
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        if (mimeType != null) {</span>
+<span class="fc" id="L261">            LOGGER.debug(&quot;MIME Type suggested: &quot; + mimeType);</span>
+<span class="fc" id="L262">            return ExternalFileTypes.getExternalFileTypeByMimeType(mimeType, filePreferences);</span>
+        } else {
+<span class="nc" id="L264">            return Optional.empty();</span>
+        }
+    }
+
+    private Optional&lt;ExternalFileType&gt; inferFileTypeFromURL(String url) {
+<span class="nc" id="L269">        return URLUtil.getSuffix(url, filePreferences)</span>
+<span class="nc" id="L270">                      .flatMap(extension -&gt; ExternalFileTypes.getExternalFileTypeByExt(extension, filePreferences));</span>
+    }
+
+    public ReadOnlyDoubleProperty downloadProgress() {
+<span class="fc" id="L274">        return downloadProgress;</span>
+    }
+
+    private static class FileDownloadTask extends BackgroundTask&lt;Path&gt; {
+        private final URL source;
+        private final Path destination;
+
+<span class="fc" id="L281">        public FileDownloadTask(URL source, Path destination) {</span>
+<span class="fc" id="L282">            this.source = source;</span>
+<span class="fc" id="L283">            this.destination = destination;</span>
+<span class="fc" id="L284">        }</span>
+
+        @Override
+        protected Path call() throws Exception {
+<span class="fc" id="L288">            URLDownload download = new URLDownload(source);</span>
+<span class="fc" id="L289">            try (ProgressInputStream inputStream = download.asInputStream()) {</span>
+<span class="fc" id="L290">                EasyBind.subscribe(</span>
+<span class="fc" id="L291">                        inputStream.totalNumBytesReadProperty(),</span>
+<span class="fc" id="L292">                        bytesRead -&gt; updateProgress(bytesRead.longValue(), inputStream.getMaxNumBytes()));</span>
+                // Make sure directory exists since otherwise copy fails
+<span class="fc" id="L294">                Files.createDirectories(destination.getParent());</span>
+<span class="fc" id="L295">                Files.copy(inputStream, destination, StandardCopyOption.REPLACE_EXISTING);</span>
+            }
+<span class="fc" id="L297">            return destination;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

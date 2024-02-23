@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileFieldParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.util</a> &gt; <span class="el_source">FileFieldParser.java</span></div><h1>FileFieldParser.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.util;
+
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.jabref.model.entry.LinkedFile;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class FileFieldParser {
+<span class="fc" id="L16">    private static final Logger LOGGER = LoggerFactory.getLogger(FileFieldParser.class);</span>
+
+    private final String value;
+
+    private StringBuilder charactersOfCurrentElement;
+
+    private boolean windowsPath;
+
+<span class="fc" id="L24">    public FileFieldParser(String value) {</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L26">            this.value = null;</span>
+        } else {
+<span class="fc" id="L28">            this.value = value.replace(&quot;$\\backslash$&quot;, &quot;\\&quot;);</span>
+        }
+<span class="fc" id="L30">    }</span>
+
+    /**
+     * Converts the string representation of LinkedFileData to a List of LinkedFile
+     *
+     * The syntax of one element is description:path:type
+     * Multiple elements are concatenated with ;
+     *
+     * The main challenges of the implementation are:
+     *
+     * &lt;ul&gt;
+     *     &lt;li&gt;that XML characters might be included (thus one cannot simply split on &quot;;&quot;)&lt;/li&gt;
+     *     &lt;li&gt;some characters might be escaped&lt;/li&gt;
+     *     &lt;li&gt;Windows absolute paths might be included without escaping&lt;/li&gt;
+     * &lt;/ul&gt;
+     */
+    public static List&lt;LinkedFile&gt; parse(String value) {
+        // We need state to have a more clean code. Thus, we instantiate the class and then return the result
+<span class="fc" id="L48">        FileFieldParser fileFieldParser = new FileFieldParser(value);</span>
+<span class="fc" id="L49">        return fileFieldParser.parse();</span>
+    }
+
+    public List&lt;LinkedFile&gt; parse() {
+<span class="fc" id="L53">        List&lt;LinkedFile&gt; files = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L55" title="All 4 branches covered.">        if ((value == null) || value.trim().isEmpty()) {</span>
+<span class="fc" id="L56">            return files;</span>
+        }
+
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (LinkedFile.isOnlineLink(value.trim())) {</span>
+            // needs to be modifiable
+            try {
+<span class="fc" id="L62">                return List.of(new LinkedFile(new URL(value), &quot;&quot;));</span>
+<span class="nc" id="L63">            } catch (MalformedURLException e) {</span>
+<span class="nc" id="L64">                LOGGER.error(&quot;invalid url&quot;, e);</span>
+<span class="nc" id="L65">                return files;</span>
+            }
+        }
+
+        // data of each LinkedFile as split string
+<span class="fc" id="L70">        List&lt;String&gt; linkedFileData = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L72">        resetDataStructuresForNextElement();</span>
+<span class="fc" id="L73">        boolean inXmlChar = false;</span>
+<span class="fc" id="L74">        boolean escaped = false;</span>
+
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L77">            char c = value.charAt(i);</span>
+<span class="fc bfc" id="L78" title="All 4 branches covered.">            if (!escaped &amp;&amp; (c == '\\')) {</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                if (windowsPath) {</span>
+<span class="fc" id="L80">                    charactersOfCurrentElement.append(c);</span>
+<span class="fc" id="L81">                    continue;</span>
+                } else {
+<span class="fc" id="L83">                    escaped = true;</span>
+<span class="fc" id="L84">                    continue;</span>
+                }
+<span class="pc bpc" id="L86" title="1 of 6 branches missed.">            } else if (!escaped &amp;&amp; (c == '&amp;') &amp;&amp; !inXmlChar) {</span>
+                // Check if we are entering an XML special character construct such
+                // as &quot;&amp;#44;&quot;, because we need to know in order to ignore the semicolon.
+<span class="fc" id="L89">                charactersOfCurrentElement.append(c);</span>
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">                if ((value.length() &gt; (i + 1)) &amp;&amp; (value.charAt(i + 1) == '#')) {</span>
+<span class="fc" id="L91">                    inXmlChar = true;</span>
+                }
+<span class="pc bpc" id="L93" title="1 of 6 branches missed.">            } else if (!escaped &amp;&amp; inXmlChar &amp;&amp; (c == ';')) {</span>
+                // Check if we are exiting an XML special character construct:
+<span class="nc" id="L95">                charactersOfCurrentElement.append(c);</span>
+<span class="nc" id="L96">                inXmlChar = false;</span>
+<span class="fc bfc" id="L97" title="All 4 branches covered.">            } else if (!escaped &amp;&amp; (c == ':')) {</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if ((linkedFileData.size() == 1) &amp;&amp; // we already parsed the description</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                        (charactersOfCurrentElement.length() == 1)) { // we parsed one character</span>
+                    // special case of Windows paths
+                    // Example: &quot;:c:\test.pdf:PDF&quot;
+                    // We are at the second : (position 3 in the example) and &quot;just&quot; add it to the current element
+<span class="fc" id="L103">                    charactersOfCurrentElement.append(c);</span>
+<span class="fc" id="L104">                    windowsPath = true;</span>
+                } else {
+                    // We are in the next LinkedFile data element
+<span class="fc" id="L107">                    linkedFileData.add(charactersOfCurrentElement.toString());</span>
+<span class="fc" id="L108">                    resetDataStructuresForNextElement();</span>
+                }
+<span class="pc bpc" id="L110" title="1 of 6 branches missed.">            } else if (!escaped &amp;&amp; (c == ';') &amp;&amp; !inXmlChar) {</span>
+<span class="fc" id="L111">                linkedFileData.add(charactersOfCurrentElement.toString());</span>
+<span class="fc" id="L112">                files.add(convert(linkedFileData));</span>
+
+                // next iteration
+<span class="fc" id="L115">                resetDataStructuresForNextElement();</span>
+            } else {
+<span class="fc" id="L117">                charactersOfCurrentElement.append(c);</span>
+            }
+<span class="fc" id="L119">            escaped = false;</span>
+        }
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (charactersOfCurrentElement.length() &gt; 0) {</span>
+<span class="fc" id="L122">            linkedFileData.add(charactersOfCurrentElement.toString());</span>
+        }
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (!linkedFileData.isEmpty()) {</span>
+<span class="fc" id="L125">            files.add(convert(linkedFileData));</span>
+        }
+<span class="fc" id="L127">        return files;</span>
+    }
+
+    private void resetDataStructuresForNextElement() {
+<span class="fc" id="L131">        charactersOfCurrentElement = new StringBuilder();</span>
+<span class="fc" id="L132">        windowsPath = false;</span>
+<span class="fc" id="L133">    }</span>
+
+    /**
+     * Converts the given textual representation of a LinkedFile object
+     *
+     * SIDE EFFECT: The given entry list is cleared upon completion
+     *
+     * Expected format is: description:link:fileType:sourceURL
+     * fileType is an {@link org.jabref.gui.externalfiletype.ExternalFileType}, which contains a name and a mime type
+     *
+     * @param entry the list of elements in the linked file textual representation
+     * @return a LinkedFile object
+     */
+    static LinkedFile convert(List&lt;String&gt; entry) {
+        // ensure list has at least 3 fields
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        while (entry.size() &lt; 3) {</span>
+<span class="fc" id="L149">            entry.add(&quot;&quot;);</span>
+        }
+
+<span class="fc" id="L152">        LinkedFile field = null;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (LinkedFile.isOnlineLink(entry.get(1))) {</span>
+            try {
+<span class="fc" id="L155">                field = new LinkedFile(entry.getFirst(), new URL(entry.get(1)), entry.get(2));</span>
+<span class="nc" id="L156">            } catch (MalformedURLException e) {</span>
+                // in case the URL is malformed, store it nevertheless
+<span class="nc" id="L158">                field = new LinkedFile(entry.getFirst(), entry.get(1), entry.get(2));</span>
+<span class="pc" id="L159">            }</span>
+        } else {
+<span class="fc" id="L161">            String pathStr = entry.get(1);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (pathStr.contains(&quot;//&quot;)) {</span>
+                // In case the path contains //, we assume it is a malformed URL, not a malformed path.
+                // On linux, the double slash would be converted to a single slash.
+<span class="fc" id="L165">                field = new LinkedFile(entry.getFirst(), pathStr, entry.get(2));</span>
+            } else {
+                try {
+                    // there is no Path.isValidPath(String) method
+<span class="fc" id="L169">                    field = new LinkedFile(entry.getFirst(), Path.of(pathStr), entry.get(2));</span>
+<span class="nc" id="L170">                } catch (InvalidPathException e) {</span>
+                    // Ignored
+<span class="nc" id="L172">                    LOGGER.debug(&quot;Invalid path object, continuing with string&quot;, e);</span>
+<span class="nc" id="L173">                    field = new LinkedFile(entry.getFirst(), pathStr, entry.get(2));</span>
+<span class="fc" id="L174">                }</span>
+            }
+        }
+
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (entry.size() &gt; 3) {</span>
+<span class="fc" id="L179">            field.setSourceURL(entry.get(3));</span>
+        }
+
+        // link is the only mandatory field
+<span class="fc bfc" id="L183" title="All 6 branches covered.">        if (field.getDescription().isEmpty() &amp;&amp; field.getLink().isEmpty() &amp;&amp; !field.getFileType().isEmpty()) {</span>
+<span class="fc" id="L184">            field = new LinkedFile(&quot;&quot;, Path.of(field.getFileType()), &quot;&quot;);</span>
+<span class="fc bfc" id="L185" title="All 6 branches covered.">        } else if (!field.getDescription().isEmpty() &amp;&amp; field.getLink().isEmpty() &amp;&amp; field.getFileType().isEmpty()) {</span>
+<span class="fc" id="L186">            field = new LinkedFile(&quot;&quot;, Path.of(field.getDescription()), &quot;&quot;);</span>
+        }
+<span class="fc" id="L188">        entry.clear();</span>
+<span class="fc" id="L189">        return field;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

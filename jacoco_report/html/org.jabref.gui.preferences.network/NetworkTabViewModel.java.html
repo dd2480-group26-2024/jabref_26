@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NetworkTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.network</a> &gt; <span class="el_source">NetworkTabViewModel.java</span></div><h1>NetworkTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.network;
+
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ReadOnlyBooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
+import javafx.stage.FileChooser;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.net.ProxyPreferences;
+import org.jabref.logic.net.ProxyRegisterer;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.logic.net.ssl.SSLCertificate;
+import org.jabref.logic.net.ssl.TrustStoreManager;
+import org.jabref.logic.util.OS;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.preferences.InternalPreferences;
+import org.jabref.preferences.PreferencesService;
+
+import de.saxsys.mvvmfx.utils.validation.CompositeValidator;
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+import kong.unirest.UnirestException;
+
+public class NetworkTabViewModel implements PreferenceTabViewModel {
+<span class="nc" id="L44">    private final BooleanProperty versionCheckProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L45">    private final BooleanProperty proxyUseProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L46">    private final StringProperty proxyHostnameProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L47">    private final StringProperty proxyPortProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L48">    private final BooleanProperty proxyUseAuthenticationProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L49">    private final StringProperty proxyUsernameProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L50">    private final StringProperty proxyPasswordProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L51">    private final BooleanProperty proxyPersistPasswordProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L52">    private final BooleanProperty passwordPersistAvailable = new SimpleBooleanProperty();</span>
+<span class="nc" id="L53">    private final ListProperty&lt;CustomCertificateViewModel&gt; customCertificateListProperty = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+
+    private final Validator proxyHostnameValidator;
+    private final Validator proxyPortValidator;
+    private final Validator proxyUsernameValidator;
+    private final Validator proxyPasswordValidator;
+
+    private final DialogService dialogService;
+    private final PreferencesService preferences;
+
+
+    private final ProxyPreferences proxyPreferences;
+    private final ProxyPreferences backupProxyPreferences;
+    private final InternalPreferences internalPreferences;
+
+    private final TrustStoreManager trustStoreManager;
+
+<span class="nc" id="L70">    private final AtomicBoolean sslCertificatesChanged = new AtomicBoolean(false);</span>
+
+    public NetworkTabViewModel(DialogService dialogService,
+<span class="nc" id="L73">                               PreferencesService preferences) {</span>
+<span class="nc" id="L74">        this.dialogService = dialogService;</span>
+<span class="nc" id="L75">        this.preferences = preferences;</span>
+<span class="nc" id="L76">        this.proxyPreferences = preferences.getProxyPreferences();</span>
+<span class="nc" id="L77">        this.internalPreferences = preferences.getInternalPreferences();</span>
+
+<span class="nc" id="L79">        backupProxyPreferences = new ProxyPreferences(</span>
+<span class="nc" id="L80">                proxyPreferences.shouldUseProxy(),</span>
+<span class="nc" id="L81">                proxyPreferences.getHostname(),</span>
+<span class="nc" id="L82">                proxyPreferences.getPort(),</span>
+<span class="nc" id="L83">                proxyPreferences.shouldUseAuthentication(),</span>
+<span class="nc" id="L84">                proxyPreferences.getUsername(),</span>
+<span class="nc" id="L85">                proxyPreferences.getPassword(),</span>
+<span class="nc" id="L86">                proxyPreferences.shouldPersistPassword());</span>
+
+<span class="nc" id="L88">        proxyHostnameValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                proxyHostnameProperty,
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                input -&gt; !StringUtil.isNullOrEmpty(input),</span>
+<span class="nc" id="L91">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L92">                        Localization.lang(&quot;Network&quot;),</span>
+<span class="nc" id="L93">                        Localization.lang(&quot;Proxy configuration&quot;),</span>
+<span class="nc" id="L94">                        Localization.lang(&quot;Please specify a hostname&quot;))));</span>
+
+<span class="nc" id="L96">        proxyPortValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                proxyPortProperty,
+<span class="nc" id="L98">                input -&gt; getPortAsInt(input).isPresent(),</span>
+<span class="nc" id="L99">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L100">                        Localization.lang(&quot;Network&quot;),</span>
+<span class="nc" id="L101">                        Localization.lang(&quot;Proxy configuration&quot;),</span>
+<span class="nc" id="L102">                        Localization.lang(&quot;Please specify a port&quot;))));</span>
+
+<span class="nc" id="L104">        proxyUsernameValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                proxyUsernameProperty,
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                input -&gt; !StringUtil.isNullOrEmpty(input),</span>
+<span class="nc" id="L107">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L108">                        Localization.lang(&quot;Network&quot;),</span>
+<span class="nc" id="L109">                        Localization.lang(&quot;Proxy configuration&quot;),</span>
+<span class="nc" id="L110">                        Localization.lang(&quot;Please specify a username&quot;))));</span>
+
+<span class="nc" id="L112">        proxyPasswordValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                proxyPasswordProperty,
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                input -&gt; !input.isBlank(),</span>
+<span class="nc" id="L115">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L116">                        Localization.lang(&quot;Network&quot;),</span>
+<span class="nc" id="L117">                        Localization.lang(&quot;Proxy configuration&quot;),</span>
+<span class="nc" id="L118">                        Localization.lang(&quot;Please specify a password&quot;))));</span>
+
+<span class="nc" id="L120">        this.trustStoreManager = new TrustStoreManager(Path.of(preferences.getSSLPreferences().getTruststorePath()));</span>
+<span class="nc" id="L121">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L125">        versionCheckProperty.setValue(internalPreferences.isVersionCheckEnabled());</span>
+
+<span class="nc" id="L127">        setProxyValues();</span>
+<span class="nc" id="L128">        setSSLValues();</span>
+<span class="nc" id="L129">    }</span>
+
+    private void setProxyValues() {
+<span class="nc" id="L132">        proxyUseProperty.setValue(proxyPreferences.shouldUseProxy());</span>
+<span class="nc" id="L133">        proxyHostnameProperty.setValue(proxyPreferences.getHostname());</span>
+<span class="nc" id="L134">        proxyPortProperty.setValue(proxyPreferences.getPort());</span>
+<span class="nc" id="L135">        proxyUseAuthenticationProperty.setValue(proxyPreferences.shouldUseAuthentication());</span>
+<span class="nc" id="L136">        proxyUsernameProperty.setValue(proxyPreferences.getUsername());</span>
+<span class="nc" id="L137">        proxyPasswordProperty.setValue(proxyPreferences.getPassword());</span>
+<span class="nc" id="L138">        proxyPersistPasswordProperty.setValue(proxyPreferences.shouldPersistPassword());</span>
+<span class="nc" id="L139">        passwordPersistAvailable.setValue(OS.isKeyringAvailable());</span>
+<span class="nc" id="L140">    }</span>
+
+    private void setSSLValues() {
+<span class="nc" id="L143">        customCertificateListProperty.clear();</span>
+<span class="nc" id="L144">        trustStoreManager.getCustomCertificates().forEach(cert -&gt; customCertificateListProperty.add(CustomCertificateViewModel.fromSSLCertificate(cert)));</span>
+<span class="nc" id="L145">        customCertificateListProperty.addListener((ListChangeListener&lt;CustomCertificateViewModel&gt;) c -&gt; {</span>
+<span class="nc" id="L146">            sslCertificatesChanged.set(true);</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            while (c.next()) {</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                if (c.wasAdded()) {</span>
+<span class="nc" id="L149">                    CustomCertificateViewModel certificate = c.getAddedSubList().get(0);</span>
+<span class="nc" id="L150">                    certificate.getPath().ifPresent(path -&gt; trustStoreManager</span>
+<span class="nc" id="L151">                            .addCertificate(formatCustomAlias(certificate.getThumbprint()), Path.of(path)));</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                } else if (c.wasRemoved()) {</span>
+<span class="nc" id="L153">                    CustomCertificateViewModel certificate = c.getRemoved().get(0);</span>
+<span class="nc" id="L154">                    trustStoreManager.deleteCertificate(formatCustomAlias(certificate.getThumbprint()));</span>
+<span class="nc" id="L155">                }</span>
+            }
+<span class="nc" id="L157">        });</span>
+<span class="nc" id="L158">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L162">        proxyPreferences.setUseProxy(proxyUseProperty.getValue());</span>
+<span class="nc" id="L163">        proxyPreferences.setHostname(proxyHostnameProperty.getValue().trim());</span>
+<span class="nc" id="L164">        proxyPreferences.setPort(proxyPortProperty.getValue().trim());</span>
+<span class="nc" id="L165">        proxyPreferences.setUseAuthentication(proxyUseAuthenticationProperty.getValue());</span>
+<span class="nc" id="L166">        proxyPreferences.setUsername(proxyUsernameProperty.getValue().trim());</span>
+<span class="nc" id="L167">        proxyPreferences.setPersistPassword(proxyPersistPasswordProperty.getValue()); // Set before the password to actually persist</span>
+<span class="nc" id="L168">        proxyPreferences.setPassword(proxyPasswordProperty.getValue());</span>
+<span class="nc" id="L169">        ProxyRegisterer.register(proxyPreferences);</span>
+
+<span class="nc" id="L171">        trustStoreManager.flush();</span>
+<span class="nc" id="L172">    }</span>
+
+    private Optional&lt;Integer&gt; getPortAsInt(String value) {
+        try {
+<span class="nc" id="L176">            return Optional.of(Integer.parseInt(value));</span>
+<span class="nc" id="L177">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L178">            return Optional.empty();</span>
+        }
+    }
+
+    public ValidationStatus proxyHostnameValidationStatus() {
+<span class="nc" id="L183">        return proxyHostnameValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus proxyPortValidationStatus() {
+<span class="nc" id="L187">        return proxyPortValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus proxyUsernameValidationStatus() {
+<span class="nc" id="L191">        return proxyUsernameValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus proxyPasswordValidationStatus() {
+<span class="nc" id="L195">        return proxyPasswordValidator.getValidationStatus();</span>
+    }
+
+    @Override
+    public boolean validateSettings() {
+<span class="nc" id="L200">        CompositeValidator validator = new CompositeValidator();</span>
+
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (proxyUseProperty.getValue()) {</span>
+<span class="nc" id="L203">            validator.addValidators(proxyHostnameValidator);</span>
+<span class="nc" id="L204">            validator.addValidators(proxyPortValidator);</span>
+
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (proxyUseAuthenticationProperty.getValue()) {</span>
+<span class="nc" id="L207">                validator.addValidators(proxyUsernameValidator);</span>
+<span class="nc" id="L208">                validator.addValidators(proxyPasswordValidator);</span>
+            }
+        }
+
+<span class="nc" id="L212">        ValidationStatus validationStatus = validator.getValidationStatus();</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (!validationStatus.isValid()) {</span>
+<span class="nc" id="L214">            validationStatus.getHighestMessage().ifPresent(message -&gt;</span>
+<span class="nc" id="L215">                    dialogService.showErrorDialogAndWait(message.getMessage()));</span>
+<span class="nc" id="L216">            return false;</span>
+        }
+<span class="nc" id="L218">        return true;</span>
+    }
+
+    /**
+     * Check the connection by using the given url. Used for validating the http proxy. The checking result will be appear when request finished. The checking result could be either success or fail, if fail, the cause will be displayed.
+     */
+    public void checkConnection() {
+<span class="nc" id="L225">        final String connectionSuccessText = Localization.lang(&quot;Connection successful!&quot;);</span>
+<span class="nc" id="L226">        final String connectionFailedText = Localization.lang(&quot;Connection failed!&quot;);</span>
+<span class="nc" id="L227">        final String dialogTitle = Localization.lang(&quot;Check Proxy Setting&quot;);</span>
+
+<span class="nc" id="L229">        final String testUrl = &quot;http://jabref.org&quot;;</span>
+
+<span class="nc" id="L231">        ProxyRegisterer.register(new ProxyPreferences(</span>
+<span class="nc" id="L232">                proxyUseProperty.getValue(),</span>
+<span class="nc" id="L233">                proxyHostnameProperty.getValue().trim(),</span>
+<span class="nc" id="L234">                proxyPortProperty.getValue().trim(),</span>
+<span class="nc" id="L235">                proxyUseAuthenticationProperty.getValue(),</span>
+<span class="nc" id="L236">                proxyUsernameProperty.getValue().trim(),</span>
+<span class="nc" id="L237">                proxyPasswordProperty.getValue(),</span>
+<span class="nc" id="L238">                proxyPersistPasswordProperty.getValue()</span>
+        ));
+
+        URLDownload urlDownload;
+        try {
+<span class="nc" id="L243">            urlDownload = new URLDownload(testUrl);</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">            if (urlDownload.canBeReached()) {</span>
+<span class="nc" id="L245">                dialogService.showInformationDialogAndWait(dialogTitle, connectionSuccessText);</span>
+            } else {
+<span class="nc" id="L247">                dialogService.showErrorDialogAndWait(dialogTitle, connectionFailedText);</span>
+            }
+<span class="nc" id="L249">        } catch (MalformedURLException e) {</span>
+            // Why would that happen? Because one of developers inserted a failing url in testUrl...
+<span class="nc" id="L251">        } catch (UnirestException e) {</span>
+<span class="nc" id="L252">            dialogService.showErrorDialogAndWait(dialogTitle, connectionFailedText);</span>
+<span class="nc" id="L253">        }</span>
+
+<span class="nc" id="L255">        ProxyRegisterer.register(backupProxyPreferences);</span>
+<span class="nc" id="L256">    }</span>
+
+    @Override
+    public List&lt;String&gt; getRestartWarnings() {
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        if (sslCertificatesChanged.get()) {</span>
+<span class="nc" id="L261">            return List.of(Localization.lang(&quot;SSL configuration changed&quot;));</span>
+        } else {
+<span class="nc" id="L263">            return Collections.emptyList();</span>
+        }
+    }
+
+    public BooleanProperty versionCheckProperty() {
+<span class="nc" id="L268">        return versionCheckProperty;</span>
+    }
+
+    public BooleanProperty proxyUseProperty() {
+<span class="nc" id="L272">        return proxyUseProperty;</span>
+    }
+
+    public StringProperty proxyHostnameProperty() {
+<span class="nc" id="L276">        return proxyHostnameProperty;</span>
+    }
+
+    public StringProperty proxyPortProperty() {
+<span class="nc" id="L280">        return proxyPortProperty;</span>
+    }
+
+    public BooleanProperty proxyUseAuthenticationProperty() {
+<span class="nc" id="L284">        return proxyUseAuthenticationProperty;</span>
+    }
+
+    public StringProperty proxyUsernameProperty() {
+<span class="nc" id="L288">        return proxyUsernameProperty;</span>
+    }
+
+    public StringProperty proxyPasswordProperty() {
+<span class="nc" id="L292">        return proxyPasswordProperty;</span>
+    }
+
+    public BooleanProperty proxyPersistPasswordProperty() {
+<span class="nc" id="L296">        return proxyPersistPasswordProperty;</span>
+    }
+
+    public ReadOnlyBooleanProperty passwordPersistAvailable() {
+<span class="nc" id="L300">        return passwordPersistAvailable;</span>
+    }
+
+    public ListProperty&lt;CustomCertificateViewModel&gt; customCertificateListProperty() {
+<span class="nc" id="L304">        return customCertificateListProperty;</span>
+    }
+
+    public void addCertificateFile() {
+<span class="nc" id="L308">        FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()</span>
+<span class="nc" id="L309">                .addExtensionFilter(new FileChooser.ExtensionFilter(Localization.lang(&quot;SSL certificate file&quot;), &quot;*.crt&quot;, &quot;*.cer&quot;))</span>
+<span class="nc" id="L310">                .withDefaultExtension(Localization.lang(&quot;SSL certificate file&quot;), StandardFileType.CER)</span>
+<span class="nc" id="L311">                .withInitialDirectory(preferences.getFilePreferences().getWorkingDirectory())</span>
+<span class="nc" id="L312">                .build();</span>
+
+<span class="nc" id="L314">        dialogService.showFileOpenDialog(fileDialogConfiguration).ifPresent(certPath -&gt; SSLCertificate.fromPath(certPath).ifPresent(sslCertificate -&gt; {</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">            if (!trustStoreManager.certificateExists(formatCustomAlias(sslCertificate.getSHA256Thumbprint()))) {</span>
+<span class="nc" id="L316">                customCertificateListProperty.add(CustomCertificateViewModel.fromSSLCertificate(sslCertificate)</span>
+<span class="nc" id="L317">                                                                            .setPath(certPath.toAbsolutePath().toString()));</span>
+            } else {
+<span class="nc" id="L319">                dialogService.showWarningDialogAndWait(Localization.lang(&quot;Duplicate Certificates&quot;), Localization.lang(&quot;You already added this certificate&quot;));</span>
+            }
+<span class="nc" id="L321">        }));</span>
+<span class="nc" id="L322">    }</span>
+
+    private String formatCustomAlias(String thumbprint) {
+<span class="nc" id="L325">        return &quot;%s[custom]&quot;.formatted(thumbprint);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

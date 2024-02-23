@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExportToClipboardAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.exporter</a> &gt; <span class="el_source">ExportToClipboardAction.java</span></div><h1>ExportToClipboardAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.exporter;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import javafx.scene.input.ClipboardContent;
+
+import org.jabref.gui.ClipBoardManager;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.Globals;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.exporter.Exporter;
+import org.jabref.logic.exporter.ExporterFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.FileType;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ExportToClipboardAction extends SimpleCommand {
+
+<span class="fc" id="L36">    private static final Logger LOGGER = LoggerFactory.getLogger(ExportToClipboardAction.class);</span>
+
+    // Only text based exporters can be used
+<span class="fc" id="L39">    private static final Set&lt;FileType&gt; SUPPORTED_FILETYPES = Set.of(</span>
+            StandardFileType.TXT,
+            StandardFileType.RTF,
+            StandardFileType.RDF,
+            StandardFileType.XML,
+            StandardFileType.HTML,
+            StandardFileType.CSV,
+            StandardFileType.RIS);
+
+    private final DialogService dialogService;
+<span class="fc" id="L49">    private final List&lt;BibEntry&gt; entries = new ArrayList&lt;&gt;();</span>
+    private final ClipBoardManager clipBoardManager;
+    private final TaskExecutor taskExecutor;
+    private final PreferencesService preferences;
+    private final StateManager stateManager;
+
+    public ExportToClipboardAction(DialogService dialogService,
+                                   StateManager stateManager,
+                                   ClipBoardManager clipBoardManager,
+                                   TaskExecutor taskExecutor,
+<span class="fc" id="L59">                                   PreferencesService preferencesService) {</span>
+<span class="fc" id="L60">        this.dialogService = dialogService;</span>
+<span class="fc" id="L61">        this.clipBoardManager = clipBoardManager;</span>
+<span class="fc" id="L62">        this.taskExecutor = taskExecutor;</span>
+<span class="fc" id="L63">        this.preferences = preferencesService;</span>
+<span class="fc" id="L64">        this.stateManager = stateManager;</span>
+
+<span class="fc" id="L66">        this.executable.bind(ActionHelper.needsEntriesSelected(stateManager));</span>
+<span class="fc" id="L67">    }</span>
+
+    @Override
+    public void execute() {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (stateManager.getSelectedEntries().isEmpty()) {</span>
+<span class="fc" id="L72">            dialogService.notify(Localization.lang(&quot;This operation requires one or more entries to be selected.&quot;));</span>
+<span class="fc" id="L73">            return;</span>
+        }
+
+<span class="fc" id="L76">        ExporterFactory exporterFactory = ExporterFactory.create(</span>
+                preferences,
+                Globals.entryTypesManager);
+<span class="fc" id="L79">        List&lt;Exporter&gt; exporters = exporterFactory.getExporters().stream()</span>
+<span class="fc" id="L80">                                                  .sorted(Comparator.comparing(Exporter::getName))</span>
+<span class="fc" id="L81">                                                  .filter(exporter -&gt; SUPPORTED_FILETYPES.contains(exporter.getFileType()))</span>
+<span class="fc" id="L82">                                                  .collect(Collectors.toList());</span>
+
+        // Find default choice, if any
+<span class="fc" id="L85">        Exporter defaultChoice = exporters.stream()</span>
+<span class="fc" id="L86">                                          .filter(exporter -&gt; exporter.getName().equals(preferences.getExportPreferences().getLastExportExtension()))</span>
+<span class="fc" id="L87">                                          .findAny()</span>
+<span class="fc" id="L88">                                          .orElse(null);</span>
+
+<span class="fc" id="L90">        Optional&lt;Exporter&gt; selectedExporter = dialogService.showChoiceDialogAndWait(</span>
+<span class="fc" id="L91">                Localization.lang(&quot;Export&quot;), Localization.lang(&quot;Select export format&quot;),</span>
+<span class="fc" id="L92">                Localization.lang(&quot;Export&quot;), defaultChoice, exporters);</span>
+
+<span class="fc" id="L94">        selectedExporter.ifPresent(exporter -&gt; BackgroundTask.wrap(() -&gt; exportToClipboard(exporter))</span>
+<span class="fc" id="L95">                                                             .onSuccess(this::setContentToClipboard)</span>
+<span class="fc" id="L96">                                                             .onFailure(ex -&gt; {</span>
+<span class="nc" id="L97">                                                                 LOGGER.error(&quot;Error exporting to clipboard&quot;, ex);</span>
+<span class="nc" id="L98">                                                                 dialogService.showErrorDialogAndWait(&quot;Error exporting to clipboard&quot;, ex);</span>
+<span class="nc" id="L99">                                                             })</span>
+<span class="fc" id="L100">                                                             .executeWith(taskExecutor));</span>
+<span class="fc" id="L101">    }</span>
+
+    private ExportResult exportToClipboard(Exporter exporter) throws Exception {
+<span class="fc" id="L104">        List&lt;Path&gt; fileDirForDatabase = stateManager.getActiveDatabase()</span>
+<span class="fc" id="L105">                                                    .map(db -&gt; db.getFileDirectories(preferences.getFilePreferences()))</span>
+<span class="fc" id="L106">                                                    .orElse(List.of(preferences.getFilePreferences().getWorkingDirectory()));</span>
+
+        // Add chosen export type to last used preference, to become default
+<span class="fc" id="L109">        preferences.getExportPreferences().setLastExportExtension(exporter.getName());</span>
+
+<span class="fc" id="L111">        Path tmp = null;</span>
+        try {
+            // To simplify the exporter API we simply do a normal export to a temporary
+            // file, and read the contents afterwards:
+<span class="fc" id="L115">            tmp = Files.createTempFile(&quot;jabrefCb&quot;, &quot;.tmp&quot;);</span>
+
+<span class="fc" id="L117">            entries.addAll(stateManager.getSelectedEntries());</span>
+
+            // Write to file:
+<span class="fc" id="L120">            exporter.export(stateManager.getActiveDatabase().get(), tmp, entries, fileDirForDatabase, Globals.journalAbbreviationRepository);</span>
+            // Read the file and put the contents on the clipboard:
+
+<span class="fc" id="L123">            return new ExportResult(Files.readString(tmp), exporter.getFileType());</span>
+        } finally {
+            // Clean up:
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">            if ((tmp != null) &amp;&amp; Files.exists(tmp)) {</span>
+                try {
+<span class="fc" id="L128">                    Files.delete(tmp);</span>
+<span class="nc" id="L129">                } catch (IOException e) {</span>
+<span class="nc" id="L130">                    LOGGER.info(&quot;Cannot delete temporary clipboard file&quot;, e);</span>
+<span class="fc" id="L131">                }</span>
+            }
+        }
+    }
+
+    private void setContentToClipboard(ExportResult result) {
+<span class="fc" id="L137">        ClipboardContent clipboardContent = new ClipboardContent();</span>
+<span class="fc" id="L138">        List&lt;String&gt; extensions = result.fileType.getExtensions();</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (extensions.contains(&quot;html&quot;)) {</span>
+<span class="fc" id="L140">            clipboardContent.putHtml(result.content);</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        } else if (extensions.contains(&quot;rtf&quot;)) {</span>
+<span class="nc" id="L142">            clipboardContent.putRtf(result.content);</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        } else if (extensions.contains(&quot;rdf&quot;)) {</span>
+<span class="nc" id="L144">            clipboardContent.putRtf(result.content);</span>
+        }
+<span class="fc" id="L146">        clipboardContent.putString(result.content);</span>
+<span class="fc" id="L147">        this.clipBoardManager.setContent(clipboardContent);</span>
+
+<span class="fc" id="L149">        dialogService.notify(Localization.lang(&quot;Entries exported to clipboard&quot;) + &quot;: &quot; + entries.size());</span>
+<span class="fc" id="L150">    }</span>
+
+<span class="fc" id="L152">    private record ExportResult(String content, FileType fileType) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

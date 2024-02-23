@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EscapeAmpersandsFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.formatter.bibtexfields</a> &gt; <span class="el_source">EscapeAmpersandsFormatter.java</span></div><h1>EscapeAmpersandsFormatter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.formatter.bibtexfields;
+
+import java.util.Objects;
+
+import org.jabref.logic.cleanup.Formatter;
+import org.jabref.logic.l10n.Localization;
+
+<span class="fc" id="L8">public class EscapeAmpersandsFormatter extends Formatter {</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L12">        return Localization.lang(&quot;Escape ampersands&quot;);</span>
+    }
+
+    @Override
+    public String getKey() {
+<span class="fc" id="L17">        return &quot;escapeAmpersands&quot;;</span>
+    }
+
+    @Override
+    public String format(String value) {
+<span class="fc" id="L22">        Objects.requireNonNull(value);</span>
+
+<span class="fc" id="L24">        StringBuilder result = new StringBuilder();</span>
+
+<span class="fc" id="L26">        boolean escape = false;</span>
+<span class="fc" id="L27">        boolean inCommandName = false;</span>
+<span class="fc" id="L28">        boolean inCommand = false;</span>
+<span class="fc" id="L29">        boolean inCommandOption = false;</span>
+<span class="fc" id="L30">        int nestedEnvironments = 0;</span>
+<span class="fc" id="L31">        StringBuilder commandName = new StringBuilder();</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L33">            char c = value.charAt(i);</span>
+
+            // Track whether we are in a LaTeX command of some sort.
+<span class="fc bfc" id="L36" title="All 6 branches covered.">            if (Character.isLetter(c) &amp;&amp; (escape || inCommandName)) {</span>
+<span class="fc" id="L37">                inCommandName = true;</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                if (!inCommandOption) {</span>
+<span class="fc" id="L39">                    commandName.append(c);</span>
+                }
+<span class="pc bpc" id="L41" title="1 of 6 branches missed.">            } else if (Character.isWhitespace(c) &amp;&amp; (inCommand || inCommandOption)) {</span>
+                // Whitespace
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            } else if (inCommandName) {</span>
+                // This means the command name is ended.
+                // Perhaps the beginning of an argument:
+<span class="fc bfc" id="L46" title="All 2 branches covered.">                if (c == '[') {</span>
+<span class="fc" id="L47">                    inCommandOption = true;</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">                } else if (inCommandOption &amp;&amp; (c == ']')) {</span>
+                    // Or the end of an argument:
+<span class="nc" id="L50">                    inCommandOption = false;</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">                } else if (!inCommandOption &amp;&amp; (c == '{')) {</span>
+<span class="fc" id="L52">                    inCommandName = false;</span>
+<span class="fc" id="L53">                    inCommand = true;</span>
+                } else {
+                    // Or simply the end of this command alltogether:
+<span class="fc" id="L56">                    commandName.delete(0, commandName.length());</span>
+<span class="fc" id="L57">                    inCommandName = false;</span>
+                }
+            }
+            // If we are in a command body, see if it has ended:
+<span class="fc bfc" id="L61" title="All 4 branches covered.">            if (inCommand &amp;&amp; (c == '}')) {</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                if (&quot;begin&quot;.contentEquals(commandName)) {</span>
+<span class="nc" id="L63">                    nestedEnvironments++;</span>
+                }
+<span class="pc bpc" id="L65" title="3 of 4 branches missed.">                if ((nestedEnvironments &gt; 0) &amp;&amp; &quot;end&quot;.contentEquals(commandName)) {</span>
+<span class="nc" id="L66">                    nestedEnvironments--;</span>
+                }
+
+<span class="fc" id="L69">                commandName.delete(0, commandName.length());</span>
+<span class="fc" id="L70">                inCommand = false;</span>
+            }
+
+            // We add a backslash before any ampersand characters, with one exception: if
+            // we are inside an \\url{...} command, we should write it as it is. Maybe.
+<span class="pc bpc" id="L75" title="4 of 10 branches missed.">            if ((c == '&amp;') &amp;&amp; !escape &amp;&amp; !(inCommand &amp;&amp; &quot;url&quot;.contentEquals(commandName))</span>
+                    &amp;&amp; (nestedEnvironments == 0)) {
+<span class="fc" id="L77">                result.append(&quot;\\&amp;&quot;);</span>
+            } else {
+<span class="fc" id="L79">                result.append(c);</span>
+            }
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            escape = c == '\\';</span>
+        }
+<span class="fc" id="L83">        return result.toString();</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="fc" id="L88">        return Localization.lang(&quot;Escape ampersands&quot;);</span>
+    }
+
+    @Override
+    public String getExampleInput() {
+<span class="fc" id="L93">        return &quot;Text &amp; with &amp;ampersands&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

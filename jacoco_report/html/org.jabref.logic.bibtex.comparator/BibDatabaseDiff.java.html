@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibDatabaseDiff.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.bibtex.comparator</a> &gt; <span class="el_source">BibDatabaseDiff.java</span></div><h1>BibDatabaseDiff.java</h1><pre class="source lang-java linenums">package org.jabref.logic.bibtex.comparator;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+import org.jabref.logic.database.DuplicateCheck;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.field.StandardField;
+
+public class BibDatabaseDiff {
+
+    private static final double MATCH_THRESHOLD = 0.4;
+    private final MetaDataDiff metaDataDiff;
+    private final PreambleDiff preambleDiff;
+    private final List&lt;BibStringDiff&gt; bibStringDiffs;
+    private final List&lt;BibEntryDiff&gt; entryDiffs;
+
+<span class="fc" id="L24">    private BibDatabaseDiff(BibDatabaseContext originalDatabase, BibDatabaseContext newDatabase, boolean includeEmptyEntries) {</span>
+<span class="fc" id="L25">        metaDataDiff = MetaDataDiff.compare(originalDatabase.getMetaData(), newDatabase.getMetaData()).orElse(null);</span>
+<span class="fc" id="L26">        preambleDiff = PreambleDiff.compare(originalDatabase, newDatabase).orElse(null);</span>
+<span class="fc" id="L27">        bibStringDiffs = BibStringDiff.compare(originalDatabase.getDatabase(), newDatabase.getDatabase());</span>
+
+        // Sort both databases according to a common sort key.
+<span class="fc" id="L30">        EntryComparator comparator = getEntryComparator();</span>
+<span class="fc" id="L31">        List&lt;BibEntry&gt; originalEntriesSorted = originalDatabase.getDatabase().getEntriesSorted(comparator);</span>
+<span class="fc" id="L32">        List&lt;BibEntry&gt; newEntriesSorted = newDatabase.getDatabase().getEntriesSorted(comparator);</span>
+
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (!includeEmptyEntries) {</span>
+<span class="fc" id="L35">            originalEntriesSorted.removeIf(BibEntry::isEmpty);</span>
+<span class="fc" id="L36">            newEntriesSorted.removeIf(BibEntry::isEmpty);</span>
+        }
+
+<span class="fc" id="L39">        entryDiffs = compareEntries(originalEntriesSorted, newEntriesSorted, originalDatabase.getMode());</span>
+<span class="fc" id="L40">    }</span>
+
+    private static EntryComparator getEntryComparator() {
+<span class="fc" id="L43">        EntryComparator comparator = new EntryComparator(false, true, StandardField.TITLE);</span>
+<span class="fc" id="L44">        comparator = new EntryComparator(false, true, StandardField.AUTHOR, comparator);</span>
+<span class="fc" id="L45">        comparator = new EntryComparator(false, true, StandardField.YEAR, comparator);</span>
+<span class="fc" id="L46">        return comparator;</span>
+    }
+
+    private static List&lt;BibEntryDiff&gt; compareEntries(List&lt;BibEntry&gt; originalEntries, List&lt;BibEntry&gt; newEntries, BibDatabaseMode mode) {
+<span class="fc" id="L50">        List&lt;BibEntryDiff&gt; differences = new ArrayList&lt;&gt;();</span>
+
+        // Create a HashSet where we can put references to entries in the new
+        // database that we have matched. This is to avoid matching them twice.
+<span class="fc" id="L54">        Set&lt;Integer&gt; used = new HashSet&lt;&gt;(newEntries.size());</span>
+<span class="fc" id="L55">        Set&lt;BibEntry&gt; notMatched = new HashSet&lt;&gt;(originalEntries.size());</span>
+
+        // Loop through the entries of the original database, looking for exact matches in the new one.
+        // We must finish scanning for exact matches before looking for near matches, to avoid an exact
+        // match being &quot;stolen&quot; from another entry.
+        mainLoop:
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (BibEntry originalEntry : originalEntries) {</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            for (int i = 0; i &lt; newEntries.size(); i++) {</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                if (!used.contains(i)) {</span>
+<span class="fc" id="L64">                    double score = DuplicateCheck.compareEntriesStrictly(originalEntry, newEntries.get(i));</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                    if (score &gt; 1) {</span>
+<span class="fc" id="L66">                        used.add(i);</span>
+<span class="fc" id="L67">                        continue mainLoop;</span>
+                    }
+                }
+            }
+
+            // No? Add this entry to the list of non-matched entries.
+<span class="fc" id="L73">            notMatched.add(originalEntry);</span>
+<span class="fc" id="L74">        }</span>
+
+        // Now we've found all exact matches, look through the remaining entries, looking for close matches.
+<span class="fc" id="L77">        DuplicateCheck duplicateCheck = new DuplicateCheck(new BibEntryTypesManager());</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (BibEntry originalEntry : notMatched) {</span>
+            // These two variables will keep track of which entry most closely matches the one we're looking at.
+<span class="fc" id="L80">            double bestMatch = 0;</span>
+<span class="fc" id="L81">            int bestMatchIndex = 0;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            for (int i = 0; i &lt; newEntries.size(); i++) {</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                if (!used.contains(i)) {</span>
+<span class="fc" id="L84">                    double score = DuplicateCheck.compareEntriesStrictly(originalEntry, newEntries.get(i));</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                    if (score &gt; bestMatch) {</span>
+<span class="fc" id="L86">                        bestMatch = score;</span>
+<span class="fc" id="L87">                        bestMatchIndex = i;</span>
+                    }
+                }
+            }
+
+<span class="fc" id="L92">            BibEntry bestEntry = newEntries.get(bestMatchIndex);</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (bestMatch &gt; MATCH_THRESHOLD</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                    || hasEqualCitationKey(originalEntry, bestEntry)</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                    || duplicateCheck.isDuplicate(originalEntry, bestEntry, mode)) {</span>
+<span class="fc" id="L96">                used.add(bestMatchIndex);</span>
+<span class="fc" id="L97">                differences.add(new BibEntryDiff(originalEntry, newEntries.get(bestMatchIndex)));</span>
+            } else {
+<span class="fc" id="L99">                differences.add(new BibEntryDiff(originalEntry, null));</span>
+            }
+<span class="fc" id="L101">        }</span>
+
+        // Finally, look if there are still untouched entries in the new database. These may have been added.
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (int i = 0; i &lt; newEntries.size(); i++) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (!used.contains(i)) {</span>
+<span class="fc" id="L106">                differences.add(new BibEntryDiff(null, newEntries.get(i)));</span>
+            }
+        }
+
+<span class="fc" id="L110">        return differences;</span>
+    }
+
+    private static boolean hasEqualCitationKey(BibEntry oneEntry, BibEntry twoEntry) {
+<span class="pc bpc" id="L114" title="2 of 6 branches missed.">        return oneEntry.hasCitationKey() &amp;&amp; twoEntry.hasCitationKey() &amp;&amp; oneEntry.getCitationKey().equals(twoEntry.getCitationKey());</span>
+    }
+
+    public static BibDatabaseDiff compare(BibDatabaseContext base, BibDatabaseContext changed) {
+<span class="fc" id="L118">        return new BibDatabaseDiff(base, changed, false);</span>
+    }
+
+    public Optional&lt;MetaDataDiff&gt; getMetaDataDifferences() {
+<span class="fc" id="L122">        return Optional.ofNullable(metaDataDiff);</span>
+    }
+
+    public Optional&lt;PreambleDiff&gt; getPreambleDifferences() {
+<span class="fc" id="L126">        return Optional.ofNullable(preambleDiff);</span>
+    }
+
+    public List&lt;BibStringDiff&gt; getBibStringDifferences() {
+<span class="fc" id="L130">        return bibStringDiffs;</span>
+    }
+
+    public List&lt;BibEntryDiff&gt; getEntryDifferences() {
+<span class="fc" id="L134">        return entryDiffs;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

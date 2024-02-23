@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UndoableInsertEntries.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.undo</a> &gt; <span class="el_source">UndoableInsertEntries.java</span></div><h1>UndoableInsertEntries.java</h1><pre class="source lang-java linenums">package org.jabref.gui.undo;
+
+import java.util.Collections;
+import java.util.List;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.strings.StringUtil;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class represents the removal of entries. The constructor needs
+ * references to the database, entries, and a boolean marked true if the undo
+ * is from a call to paste().
+ */
+public class UndoableInsertEntries extends AbstractUndoableJabRefEdit {
+
+<span class="nc" id="L21">    private static final Logger LOGGER = LoggerFactory.getLogger(UndoableInsertEntries.class);</span>
+    private final BibDatabase database;
+    private final List&lt;BibEntry&gt; entries;
+    private final boolean paste;
+
+    public UndoableInsertEntries(BibDatabase database, BibEntry entry) {
+<span class="nc" id="L27">        this(database, Collections.singletonList(entry));</span>
+<span class="nc" id="L28">    }</span>
+
+    public UndoableInsertEntries(BibDatabase database, List&lt;BibEntry&gt; entries) {
+<span class="nc" id="L31">        this(database, entries, false);</span>
+<span class="nc" id="L32">    }</span>
+
+<span class="nc" id="L34">    public UndoableInsertEntries(BibDatabase database, List&lt;BibEntry&gt; entries, boolean paste) {</span>
+<span class="nc" id="L35">        this.database = database;</span>
+<span class="nc" id="L36">        this.entries = entries;</span>
+<span class="nc" id="L37">        this.paste = paste;</span>
+<span class="nc" id="L38">    }</span>
+
+    @Override
+    public String getPresentationName() {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (paste) {</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            if (entries.size() &gt; 1) {</span>
+<span class="nc" id="L44">                return Localization.lang(&quot;paste entries&quot;);</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">            } else if (entries.size() == 1) {</span>
+<span class="nc" id="L46">                return Localization.lang(&quot;paste entry %0&quot;,</span>
+<span class="nc" id="L47">                        StringUtil.boldHTML(entries.getFirst().getCitationKey().orElse(Localization.lang(&quot;undefined&quot;))));</span>
+            } else {
+<span class="nc" id="L49">                return null;</span>
+            }
+        } else {
+<span class="nc bnc" id="L52" title="All 2 branches missed.">            if (entries.size() &gt; 1) {</span>
+<span class="nc" id="L53">                return Localization.lang(&quot;insert entries&quot;);</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">            } else if (entries.size() == 1) {</span>
+<span class="nc" id="L55">                return Localization.lang(&quot;insert entry %0&quot;,</span>
+<span class="nc" id="L56">                        StringUtil.boldHTML(entries.getFirst().getCitationKey().orElse(Localization.lang(&quot;undefined&quot;))));</span>
+            } else {
+<span class="nc" id="L58">                return null;</span>
+            }
+        }
+    }
+
+    @Override
+    public void undo() {
+<span class="nc" id="L65">        super.undo();</span>
+
+        try {
+<span class="nc" id="L68">            database.removeEntries(entries);</span>
+<span class="nc" id="L69">        } catch (Throwable ex) {</span>
+<span class="nc" id="L70">            LOGGER.warn(&quot;Problem undoing `insert entries`&quot;, ex);</span>
+<span class="nc" id="L71">        }</span>
+<span class="nc" id="L72">    }</span>
+
+    @Override
+    public void redo() {
+<span class="nc" id="L76">        super.redo();</span>
+<span class="nc" id="L77">        database.insertEntries(entries);</span>
+<span class="nc" id="L78">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DBMSType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.shared</a> &gt; <span class="el_source">DBMSType.java</span></div><h1>DBMSType.java</h1><pre class="source lang-java linenums">package org.jabref.logic.shared;
+
+import java.util.Arrays;
+import java.util.Optional;
+
+/**
+ * Enumerates all supported database systems (DBMS) by JabRef.
+ */
+<span class="fc" id="L9">public enum DBMSType {</span>
+<span class="fc" id="L10">    POSTGRESQL(&quot;PostgreSQL&quot;, &quot;org.postgresql.Driver&quot;, &quot;jdbc:postgresql://%s:%d/%s&quot;, 5432),</span>
+<span class="fc" id="L11">    MYSQL(&quot;MySQL&quot;, &quot;org.mariadb.jdbc.Driver&quot;, &quot;jdbc:mariadb://%s:%d/%s&quot;, 3306),</span>
+<span class="fc" id="L12">    ORACLE(&quot;Oracle&quot;, &quot;oracle.jdbc.driver.OracleDriver&quot;, &quot;jdbc:oracle:thin:@%s:%d/%s&quot;, 1521);</span>
+
+    private final String type;
+    private final String driverPath;
+    private final String urlPattern;
+    private final int defaultPort;
+
+<span class="fc" id="L19">    private DBMSType(String type, String driverPath, String urlPattern, int defaultPort) {</span>
+<span class="fc" id="L20">        this.type = type;</span>
+<span class="fc" id="L21">        this.driverPath = driverPath;</span>
+<span class="fc" id="L22">        this.urlPattern = urlPattern;</span>
+<span class="fc" id="L23">        this.defaultPort = defaultPort;</span>
+<span class="fc" id="L24">    }</span>
+
+    public static Optional&lt;DBMSType&gt; fromString(String typeName) {
+<span class="fc" id="L27">        return Arrays.stream(DBMSType.values()).filter(dbmsType -&gt; dbmsType.type.equalsIgnoreCase(typeName)).findAny();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L32">        return this.type;</span>
+    }
+
+    /**
+     * @return Java Class path for establishing JDBC connection.
+     */
+    public String getDriverClassPath() throws Error {
+<span class="fc" id="L39">        return this.driverPath;</span>
+    }
+
+    /**
+     * @return prepared connection URL for appropriate system.
+     */
+    public String getUrl(String host, int port, String database) {
+<span class="fc" id="L46">        return urlPattern.formatted(host, port, database);</span>
+    }
+
+    /**
+     * Retrieves the port number dependent on the type of the database system.
+     */
+    public int getDefaultPort() {
+<span class="fc" id="L53">        return this.defaultPort;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

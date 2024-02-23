@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GroupsSidePaneComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.sidepane</a> &gt; <span class="el_source">GroupsSidePaneComponent.java</span></div><h1>GroupsSidePaneComponent.java</h1><pre class="source lang-java linenums">package org.jabref.gui.sidepane;
+
+import javafx.scene.control.Button;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.groups.GroupModeViewModel;
+import org.jabref.gui.groups.GroupViewMode;
+import org.jabref.gui.groups.GroupsPreferences;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.logic.l10n.Localization;
+
+import com.tobiasdiez.easybind.EasyBind;
+
+public class GroupsSidePaneComponent extends SidePaneComponent {
+    private final GroupsPreferences groupsPreferences;
+    private final DialogService dialogService;
+<span class="nc" id="L18">    private final Button intersectionUnionToggle = IconTheme.JabRefIcons.GROUP_INTERSECTION.asButton();</span>
+
+    public GroupsSidePaneComponent(SimpleCommand closeCommand,
+                                   SimpleCommand moveUpCommand,
+                                   SimpleCommand moveDownCommand,
+                                   SidePaneContentFactory contentFactory,
+                                   GroupsPreferences groupsPreferences,
+                                   DialogService dialogService) {
+<span class="nc" id="L26">        super(SidePaneType.GROUPS, closeCommand, moveUpCommand, moveDownCommand, contentFactory);</span>
+<span class="nc" id="L27">        this.groupsPreferences = groupsPreferences;</span>
+<span class="nc" id="L28">        this.dialogService = dialogService;</span>
+<span class="nc" id="L29">        setupIntersectionUnionToggle();</span>
+
+<span class="nc" id="L31">        EasyBind.subscribe(groupsPreferences.groupViewModeProperty(), mode -&gt; {</span>
+<span class="nc" id="L32">            GroupModeViewModel modeViewModel = new GroupModeViewModel(mode);</span>
+<span class="nc" id="L33">            intersectionUnionToggle.setGraphic(modeViewModel.getUnionIntersectionGraphic());</span>
+<span class="nc" id="L34">            intersectionUnionToggle.setTooltip(modeViewModel.getUnionIntersectionTooltip());</span>
+<span class="nc" id="L35">        });</span>
+<span class="nc" id="L36">    }</span>
+
+    private void setupIntersectionUnionToggle() {
+<span class="nc" id="L39">        addExtraButtonToHeader(intersectionUnionToggle, 0);</span>
+<span class="nc" id="L40">        intersectionUnionToggle.setOnAction(event -&gt; new ToggleUnionIntersectionAction().execute());</span>
+<span class="nc" id="L41">    }</span>
+
+<span class="nc" id="L43">    private class ToggleUnionIntersectionAction extends SimpleCommand {</span>
+
+        @Override
+        public void execute() {
+<span class="nc" id="L47">            GroupViewMode mode = groupsPreferences.getGroupViewMode();</span>
+
+<span class="nc bnc" id="L49" title="All 2 branches missed.">            if (mode == GroupViewMode.UNION) {</span>
+<span class="nc" id="L50">                groupsPreferences.setGroupViewMode(GroupViewMode.INTERSECTION);</span>
+<span class="nc" id="L51">                dialogService.notify(Localization.lang(&quot;Group view mode set to intersection&quot;));</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">            } else if (mode == GroupViewMode.INTERSECTION) {</span>
+<span class="nc" id="L53">                groupsPreferences.setGroupViewMode(GroupViewMode.UNION);</span>
+<span class="nc" id="L54">                dialogService.notify(Localization.lang(&quot;Group view mode set to union&quot;));</span>
+            }
+<span class="nc" id="L56">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

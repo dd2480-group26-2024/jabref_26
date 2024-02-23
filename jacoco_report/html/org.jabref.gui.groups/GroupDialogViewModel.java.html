@@ -1,0 +1,642 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GroupDialogViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.groups</a> &gt; <span class="el_source">GroupDialogViewModel.java</span></div><h1>GroupDialogViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.groups;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.event.Event;
+import javafx.scene.control.ButtonType;
+import javafx.scene.paint.Color;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.logic.auxparser.DefaultAuxParser;
+import org.jabref.logic.groups.DefaultGroupsFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.Keyword;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.groups.AbstractGroup;
+import org.jabref.model.groups.AutomaticGroup;
+import org.jabref.model.groups.AutomaticKeywordGroup;
+import org.jabref.model.groups.AutomaticPersonsGroup;
+import org.jabref.model.groups.ExplicitGroup;
+import org.jabref.model.groups.GroupHierarchyType;
+import org.jabref.model.groups.GroupTreeNode;
+import org.jabref.model.groups.RegexKeywordGroup;
+import org.jabref.model.groups.SearchGroup;
+import org.jabref.model.groups.TexGroup;
+import org.jabref.model.groups.WordKeywordGroup;
+import org.jabref.model.metadata.MetaData;
+import org.jabref.model.search.rules.SearchRules;
+import org.jabref.model.search.rules.SearchRules.SearchFlags;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import de.saxsys.mvvmfx.utils.validation.CompositeValidator;
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+import org.jspecify.annotations.Nullable;
+
+public class GroupDialogViewModel {
+    // Basic Settings
+<span class="fc" id="L65">    private final StringProperty nameProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L66">    private final StringProperty descriptionProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L67">    private final StringProperty iconProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L68">    private final BooleanProperty colorUseProperty = new SimpleBooleanProperty();</span>
+<span class="fc" id="L69">    private final ObjectProperty&lt;Color&gt; colorProperty = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="fc" id="L70">    private final ListProperty&lt;GroupHierarchyType&gt; groupHierarchyListProperty = new SimpleListProperty&lt;&gt;();</span>
+<span class="fc" id="L71">    private final ObjectProperty&lt;GroupHierarchyType&gt; groupHierarchySelectedProperty = new SimpleObjectProperty&lt;&gt;();</span>
+
+    // Type
+<span class="fc" id="L74">    private final BooleanProperty typeExplicitProperty = new SimpleBooleanProperty();</span>
+<span class="fc" id="L75">    private final BooleanProperty typeKeywordsProperty = new SimpleBooleanProperty();</span>
+<span class="fc" id="L76">    private final BooleanProperty typeSearchProperty = new SimpleBooleanProperty();</span>
+<span class="fc" id="L77">    private final BooleanProperty typeAutoProperty = new SimpleBooleanProperty();</span>
+<span class="fc" id="L78">    private final BooleanProperty typeTexProperty = new SimpleBooleanProperty();</span>
+
+    // Option Groups
+<span class="fc" id="L81">    private final StringProperty keywordGroupSearchTermProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L82">    private final StringProperty keywordGroupSearchFieldProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L83">    private final BooleanProperty keywordGroupCaseSensitiveProperty = new SimpleBooleanProperty();</span>
+<span class="fc" id="L84">    private final BooleanProperty keywordGroupRegexProperty = new SimpleBooleanProperty();</span>
+
+<span class="fc" id="L86">    private final StringProperty searchGroupSearchTermProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L87">    private final ObjectProperty&lt;EnumSet&lt;SearchFlags&gt;&gt; searchFlagsProperty = new SimpleObjectProperty&lt;&gt;(EnumSet.noneOf(SearchFlags.class));</span>
+
+<span class="fc" id="L89">    private final BooleanProperty autoGroupKeywordsOptionProperty = new SimpleBooleanProperty();</span>
+<span class="fc" id="L90">    private final StringProperty autoGroupKeywordsFieldProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L91">    private final StringProperty autoGroupKeywordsDelimiterProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L92">    private final StringProperty autoGroupKeywordsHierarchicalDelimiterProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L93">    private final BooleanProperty autoGroupPersonsOptionProperty = new SimpleBooleanProperty();</span>
+<span class="fc" id="L94">    private final StringProperty autoGroupPersonsFieldProperty = new SimpleStringProperty(&quot;&quot;);</span>
+
+<span class="fc" id="L96">    private final StringProperty texGroupFilePathProperty = new SimpleStringProperty(&quot;&quot;);</span>
+
+    private Validator nameValidator;
+    private Validator nameContainsDelimiterValidator;
+    private Validator sameNameValidator;
+    private Validator keywordRegexValidator;
+    private Validator keywordFieldEmptyValidator;
+    private Validator keywordSearchTermEmptyValidator;
+    private Validator searchRegexValidator;
+    private Validator searchSearchTermEmptyValidator;
+    private Validator texGroupFilePathValidator;
+    private CompositeValidator validator;
+
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+    private final BibDatabaseContext currentDatabase;
+    private final AbstractGroup editedGroup;
+    private final GroupTreeNode parentNode;
+    private final FileUpdateMonitor fileUpdateMonitor;
+
+    public GroupDialogViewModel(DialogService dialogService,
+                                BibDatabaseContext currentDatabase,
+                                PreferencesService preferencesService,
+                                @Nullable AbstractGroup editedGroup,
+                                @Nullable GroupTreeNode parentNode,
+<span class="fc" id="L121">                                FileUpdateMonitor fileUpdateMonitor) {</span>
+<span class="fc" id="L122">        this.dialogService = dialogService;</span>
+<span class="fc" id="L123">        this.preferencesService = preferencesService;</span>
+<span class="fc" id="L124">        this.currentDatabase = currentDatabase;</span>
+<span class="fc" id="L125">        this.editedGroup = editedGroup;</span>
+<span class="fc" id="L126">        this.parentNode = parentNode;</span>
+<span class="fc" id="L127">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+
+<span class="fc" id="L129">        setupValidation();</span>
+<span class="fc" id="L130">        setValues();</span>
+<span class="fc" id="L131">    }</span>
+
+    private void setupValidation() {
+<span class="fc" id="L134">        validator = new CompositeValidator();</span>
+
+<span class="fc" id="L136">        nameValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                nameProperty,
+                StringUtil::isNotBlank,
+<span class="fc" id="L139">                ValidationMessage.error(Localization.lang(&quot;Please enter a name for the group.&quot;)));</span>
+
+<span class="fc" id="L141">        nameContainsDelimiterValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                nameProperty,
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                name -&gt; !name.contains(Character.toString(preferencesService.getBibEntryPreferences().getKeywordSeparator())),</span>
+<span class="fc" id="L144">                ValidationMessage.warning(</span>
+<span class="fc" id="L145">                        Localization.lang(</span>
+                                &quot;The group name contains the keyword separator \&quot;%0\&quot; and thus probably does not work as expected.&quot;,
+<span class="fc" id="L147">                                Character.toString(preferencesService.getBibEntryPreferences().getKeywordSeparator())</span>
+                        )));
+
+<span class="fc" id="L150">        sameNameValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                nameProperty,
+                name -&gt; {
+<span class="fc" id="L153">                    Optional&lt;GroupTreeNode&gt; rootGroup = currentDatabase.getMetaData().getGroups();</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                    if (rootGroup.isPresent()) {</span>
+<span class="nc" id="L155">                        int groupsWithSameName = rootGroup.get().findChildrenSatisfying(group -&gt; group.getName().equals(name)).size();</span>
+<span class="nc bnc" id="L156" title="All 4 branches missed.">                        if ((editedGroup == null) &amp;&amp; (groupsWithSameName &gt; 0)) {</span>
+                            // New group but there is already one group with the same name
+<span class="nc" id="L158">                            return false;</span>
+                        }
+
+                        // Edit group, changed name to something that is already present
+<span class="nc bnc" id="L162" title="All 6 branches missed.">                        return (editedGroup == null) || editedGroup.getName().equals(name) || (groupsWithSameName &lt;= 0);</span>
+                    }
+<span class="fc" id="L164">                    return true;</span>
+                },
+<span class="fc" id="L166">                ValidationMessage.warning(</span>
+<span class="fc" id="L167">                        Localization.lang(&quot;There already exists a group with the same name.\nIf you use it, it will inherit all entries from this other group.&quot;)</span>
+                )
+        );
+
+<span class="fc" id="L171">        keywordRegexValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                keywordGroupSearchTermProperty,
+                input -&gt; {
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                    if (!keywordGroupRegexProperty.getValue()) {</span>
+<span class="fc" id="L175">                        return true;</span>
+                    }
+
+<span class="nc bnc" id="L178" title="All 2 branches missed.">                    if (StringUtil.isNullOrEmpty(input)) {</span>
+<span class="nc" id="L179">                        return false;</span>
+                    }
+
+                    try {
+<span class="nc" id="L183">                        Pattern.compile(input);</span>
+<span class="nc" id="L184">                        return true;</span>
+<span class="nc" id="L185">                    } catch (PatternSyntaxException ignored) {</span>
+<span class="nc" id="L186">                        return false;</span>
+                    }
+                },
+<span class="fc" id="L189">                ValidationMessage.error(&quot;%s &gt; %n %s %n %n %s&quot;.formatted(</span>
+<span class="fc" id="L190">                        Localization.lang(&quot;Searching for a keyword&quot;),</span>
+<span class="fc" id="L191">                        Localization.lang(&quot;Keywords&quot;),</span>
+<span class="fc" id="L192">                        Localization.lang(&quot;Invalid regular expression.&quot;))));</span>
+
+<span class="fc" id="L194">        keywordFieldEmptyValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                keywordGroupSearchFieldProperty,
+                StringUtil::isNotBlank,
+<span class="fc" id="L197">                ValidationMessage.error(Localization.lang(&quot;Please enter a field name to search for a keyword.&quot;)));</span>
+
+<span class="fc" id="L199">        keywordSearchTermEmptyValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                keywordGroupSearchTermProperty,
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                input -&gt; !StringUtil.isNullOrEmpty(input),</span>
+<span class="fc" id="L202">                ValidationMessage.error(&quot;%s &gt; %n %s %n %n %s&quot;.formatted(</span>
+<span class="fc" id="L203">                        Localization.lang(&quot;Searching for a keyword&quot;),</span>
+<span class="fc" id="L204">                        Localization.lang(&quot;Keywords&quot;),</span>
+<span class="fc" id="L205">                        Localization.lang(&quot;Search term is empty.&quot;)</span>
+                )));
+
+<span class="fc" id="L208">        searchRegexValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                searchGroupSearchTermProperty,
+                input -&gt; {
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                    if (!searchFlagsProperty.getValue().contains(SearchRules.SearchFlags.CASE_SENSITIVE)) {</span>
+<span class="fc" id="L212">                        return true;</span>
+                    }
+
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                    if (StringUtil.isNullOrEmpty(input)) {</span>
+<span class="nc" id="L216">                        return false;</span>
+                    }
+
+                    try {
+<span class="nc" id="L220">                        Pattern.compile(input);</span>
+<span class="nc" id="L221">                        return true;</span>
+<span class="nc" id="L222">                    } catch (PatternSyntaxException e) {</span>
+                        // Ignored
+<span class="nc" id="L224">                        return false;</span>
+                    }
+                },
+<span class="fc" id="L227">                ValidationMessage.error(&quot;%s &gt; %n %s&quot;.formatted(</span>
+<span class="fc" id="L228">                        Localization.lang(&quot;Free search expression&quot;),</span>
+<span class="fc" id="L229">                        Localization.lang(&quot;Invalid regular expression.&quot;))));</span>
+
+<span class="fc" id="L231">        searchSearchTermEmptyValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                searchGroupSearchTermProperty,
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                input -&gt; !StringUtil.isNullOrEmpty(input),</span>
+<span class="fc" id="L234">                ValidationMessage.error(&quot;%s &gt; %n %s&quot;.formatted(</span>
+<span class="fc" id="L235">                        Localization.lang(&quot;Free search expression&quot;),</span>
+<span class="fc" id="L236">                        Localization.lang(&quot;Search term is empty.&quot;))));</span>
+
+<span class="fc" id="L238">        texGroupFilePathValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                texGroupFilePathProperty,
+                input -&gt; {
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                    if (StringUtil.isBlank(input)) {</span>
+<span class="fc" id="L242">                        return false;</span>
+                    } else {
+<span class="fc" id="L244">                        Path inputPath = getAbsoluteTexGroupPath(input);</span>
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">                        if (!inputPath.isAbsolute() || !Files.isRegularFile(inputPath)) {</span>
+<span class="fc" id="L246">                            return false;</span>
+                        }
+<span class="fc" id="L248">                        return FileUtil.getFileExtension(input)</span>
+<span class="fc" id="L249">                                .map(extension -&gt; extension.equalsIgnoreCase(&quot;aux&quot;))</span>
+<span class="fc" id="L250">                                .orElse(false);</span>
+                    }
+                },
+<span class="fc" id="L253">                ValidationMessage.error(Localization.lang(&quot;Please provide a valid aux file.&quot;)));</span>
+
+<span class="fc" id="L255">        typeSearchProperty.addListener((obs, _oldValue, isSelected) -&gt; {</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            if (isSelected) {</span>
+<span class="nc" id="L257">                validator.addValidators(searchRegexValidator, searchSearchTermEmptyValidator);</span>
+            } else {
+<span class="nc" id="L259">                validator.removeValidators(searchRegexValidator, searchSearchTermEmptyValidator);</span>
+            }
+<span class="nc" id="L261">        });</span>
+
+<span class="fc" id="L263">        typeKeywordsProperty.addListener((obs, _oldValue, isSelected) -&gt; {</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (isSelected) {</span>
+<span class="nc" id="L265">                validator.addValidators(keywordFieldEmptyValidator, keywordRegexValidator, keywordSearchTermEmptyValidator);</span>
+            } else {
+<span class="nc" id="L267">                validator.removeValidators(keywordFieldEmptyValidator, keywordRegexValidator, keywordSearchTermEmptyValidator);</span>
+            }
+<span class="nc" id="L269">        });</span>
+
+<span class="fc" id="L271">        typeTexProperty.addListener((obs, oldValue, isSelected) -&gt; {</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">            if (isSelected) {</span>
+<span class="nc" id="L273">                validator.addValidators(texGroupFilePathValidator);</span>
+            } else {
+<span class="nc" id="L275">                validator.removeValidators(texGroupFilePathValidator);</span>
+            }
+<span class="nc" id="L277">        });</span>
+
+<span class="fc" id="L279">        validator.addValidators(nameValidator,</span>
+                nameContainsDelimiterValidator,
+                sameNameValidator);
+<span class="fc" id="L282">    }</span>
+
+    /**
+     * Gets the absolute path relative to the LatexFileDirectory, if given a relative path
+     *
+     * @param input the user input path
+     * @return an absolute path if LatexFileDirectory exists; otherwise, returns input
+     */
+    private Path getAbsoluteTexGroupPath(String input) {
+<span class="fc" id="L291">        Optional&lt;Path&gt; latexFileDirectory = currentDatabase.getMetaData().getLatexFileDirectory(preferencesService.getFilePreferences().getUserAndHost());</span>
+<span class="fc" id="L292">        return latexFileDirectory.map(path -&gt; path.resolve(input)).orElse(Path.of(input));</span>
+    }
+
+    public void validationHandler(Event event) {
+<span class="nc" id="L296">        ValidationStatus validationStatus = validator.getValidationStatus();</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">        if (validationStatus.getHighestMessage().isPresent()) {</span>
+<span class="nc" id="L298">            dialogService.showErrorDialogAndWait(validationStatus.getHighestMessage().get().getMessage());</span>
+            // consume the event to prevent the dialog to close
+<span class="nc" id="L300">            event.consume();</span>
+        }
+<span class="nc" id="L302">    }</span>
+
+    public AbstractGroup resultConverter(ButtonType button) {
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        if (button != ButtonType.OK) {</span>
+<span class="nc" id="L306">            return null;</span>
+        }
+
+<span class="nc" id="L309">        AbstractGroup resultingGroup = null;</span>
+        try {
+<span class="nc" id="L311">            String groupName = nameProperty.getValue().trim();</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">            if (typeExplicitProperty.getValue()) {</span>
+<span class="nc" id="L313">                resultingGroup = new ExplicitGroup(</span>
+                        groupName,
+<span class="nc" id="L315">                        groupHierarchySelectedProperty.getValue(),</span>
+<span class="nc" id="L316">                        preferencesService.getBibEntryPreferences().getKeywordSeparator());</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">            } else if (typeKeywordsProperty.getValue()) {</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                if (keywordGroupRegexProperty.getValue()) {</span>
+<span class="nc" id="L319">                    resultingGroup = new RegexKeywordGroup(</span>
+                            groupName,
+<span class="nc" id="L321">                            groupHierarchySelectedProperty.getValue(),</span>
+<span class="nc" id="L322">                            FieldFactory.parseField(keywordGroupSearchFieldProperty.getValue().trim()),</span>
+<span class="nc" id="L323">                            keywordGroupSearchTermProperty.getValue().trim(),</span>
+<span class="nc" id="L324">                            keywordGroupCaseSensitiveProperty.getValue());</span>
+                } else {
+<span class="nc" id="L326">                    resultingGroup = new WordKeywordGroup(</span>
+                            groupName,
+<span class="nc" id="L328">                            groupHierarchySelectedProperty.getValue(),</span>
+<span class="nc" id="L329">                            FieldFactory.parseField(keywordGroupSearchFieldProperty.getValue().trim()),</span>
+<span class="nc" id="L330">                            keywordGroupSearchTermProperty.getValue().trim(),</span>
+<span class="nc" id="L331">                            keywordGroupCaseSensitiveProperty.getValue(),</span>
+<span class="nc" id="L332">                            preferencesService.getBibEntryPreferences().getKeywordSeparator(),</span>
+                            false);
+                }
+<span class="nc bnc" id="L335" title="All 2 branches missed.">            } else if (typeSearchProperty.getValue()) {</span>
+<span class="nc" id="L336">                resultingGroup = new SearchGroup(</span>
+                        groupName,
+<span class="nc" id="L338">                        groupHierarchySelectedProperty.getValue(),</span>
+<span class="nc" id="L339">                        searchGroupSearchTermProperty.getValue().trim(),</span>
+<span class="nc" id="L340">                        searchFlagsProperty.getValue());</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">            } else if (typeAutoProperty.getValue()) {</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                if (autoGroupKeywordsOptionProperty.getValue()) {</span>
+                    // Set default value for delimiters: ',' for base and '&gt;' for hierarchical
+<span class="nc" id="L344">                    char delimiter = ',';</span>
+<span class="nc" id="L345">                    char hierarDelimiter = Keyword.DEFAULT_HIERARCHICAL_DELIMITER;</span>
+<span class="nc" id="L346">                    autoGroupKeywordsOptionProperty.setValue(Boolean.TRUE);</span>
+                    // Modify values for delimiters if user provided customized values
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                    if (!autoGroupKeywordsDelimiterProperty.getValue().isEmpty()) {</span>
+<span class="nc" id="L349">                        delimiter = autoGroupKeywordsDelimiterProperty.getValue().charAt(0);</span>
+                    }
+<span class="nc bnc" id="L351" title="All 2 branches missed.">                    if (!autoGroupKeywordsHierarchicalDelimiterProperty.getValue().isEmpty()) {</span>
+<span class="nc" id="L352">                        hierarDelimiter = autoGroupKeywordsHierarchicalDelimiterProperty.getValue().charAt(0);</span>
+                    }
+<span class="nc" id="L354">                    resultingGroup = new AutomaticKeywordGroup(</span>
+                            groupName,
+<span class="nc" id="L356">                            groupHierarchySelectedProperty.getValue(),</span>
+<span class="nc" id="L357">                            FieldFactory.parseField(autoGroupKeywordsFieldProperty.getValue().trim()),</span>
+<span class="nc" id="L358">                            delimiter,</span>
+<span class="nc" id="L359">                            hierarDelimiter);</span>
+<span class="nc" id="L360">                } else {</span>
+<span class="nc" id="L361">                    resultingGroup = new AutomaticPersonsGroup(</span>
+                            groupName,
+<span class="nc" id="L363">                            groupHierarchySelectedProperty.getValue(),</span>
+<span class="nc" id="L364">                            FieldFactory.parseField(autoGroupPersonsFieldProperty.getValue().trim()));</span>
+                }
+<span class="nc bnc" id="L366" title="All 2 branches missed.">            } else if (typeTexProperty.getValue()) {</span>
+<span class="nc" id="L367">                resultingGroup = TexGroup.create(</span>
+                        groupName,
+<span class="nc" id="L369">                        groupHierarchySelectedProperty.getValue(),</span>
+<span class="nc" id="L370">                        Path.of(texGroupFilePathProperty.getValue().trim()),</span>
+                        new DefaultAuxParser(new BibDatabase()),
+                        fileUpdateMonitor,
+<span class="nc" id="L373">                        currentDatabase.getMetaData());</span>
+            }
+
+<span class="nc bnc" id="L376" title="All 2 branches missed.">            if (resultingGroup != null) {</span>
+<span class="nc" id="L377">                preferencesService.getGroupsPreferences().setDefaultHierarchicalContext(groupHierarchySelectedProperty.getValue());</span>
+
+<span class="nc bnc" id="L379" title="All 2 branches missed.">                resultingGroup.setColor(colorUseProperty.getValue() ? colorProperty.getValue() : null);</span>
+<span class="nc" id="L380">                resultingGroup.setDescription(descriptionProperty.getValue());</span>
+<span class="nc" id="L381">                resultingGroup.setIconName(iconProperty.getValue());</span>
+<span class="nc" id="L382">                return resultingGroup;</span>
+            }
+
+<span class="nc" id="L385">            return null;</span>
+<span class="nc" id="L386">        } catch (IllegalArgumentException | IOException exception) {</span>
+<span class="nc" id="L387">            dialogService.showErrorDialogAndWait(exception.getLocalizedMessage(), exception);</span>
+<span class="nc" id="L388">            return null;</span>
+        }
+    }
+
+    public void setValues() {
+<span class="fc" id="L393">        groupHierarchyListProperty.setValue(FXCollections.observableArrayList(GroupHierarchyType.values()));</span>
+
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        if (editedGroup == null) {</span>
+            // creating new group -&gt; defaults!
+            // TODO: Create default group (via org.jabref.logic.groups.DefaultGroupsFactory) and use values
+
+<span class="fc" id="L399">            colorUseProperty.setValue(false);</span>
+<span class="fc" id="L400">            colorProperty.setValue(determineColor());</span>
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">            if (parentNode != null) {</span>
+<span class="nc" id="L402">                parentNode.getGroup()</span>
+<span class="nc" id="L403">                          .getIconName()</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                          .filter(iconName -&gt; !iconName.equals(DefaultGroupsFactory.ALL_ENTRIES_GROUP_DEFAULT_ICON))</span>
+<span class="nc" id="L405">                          .ifPresent(iconProperty::setValue);</span>
+<span class="nc" id="L406">                parentNode.getGroup().getColor().ifPresent(color -&gt; colorUseProperty.setValue(true));</span>
+            }
+<span class="fc" id="L408">            typeExplicitProperty.setValue(true);</span>
+<span class="fc" id="L409">            groupHierarchySelectedProperty.setValue(preferencesService.getGroupsPreferences().getDefaultHierarchicalContext());</span>
+<span class="fc" id="L410">            autoGroupKeywordsOptionProperty.setValue(Boolean.TRUE);</span>
+        } else {
+<span class="fc" id="L412">            nameProperty.setValue(editedGroup.getName());</span>
+<span class="fc" id="L413">            colorUseProperty.setValue(editedGroup.getColor().isPresent());</span>
+<span class="fc" id="L414">            colorProperty.setValue(editedGroup.getColor().orElse(IconTheme.getDefaultGroupColor()));</span>
+<span class="fc" id="L415">            descriptionProperty.setValue(editedGroup.getDescription().orElse(&quot;&quot;));</span>
+<span class="fc" id="L416">            iconProperty.setValue(editedGroup.getIconName().orElse(&quot;&quot;));</span>
+<span class="fc" id="L417">            groupHierarchySelectedProperty.setValue(editedGroup.getHierarchicalContext());</span>
+
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            if (editedGroup.getClass() == WordKeywordGroup.class) {</span>
+<span class="nc" id="L420">                typeKeywordsProperty.setValue(true);</span>
+
+<span class="nc" id="L422">                WordKeywordGroup group = (WordKeywordGroup) editedGroup;</span>
+<span class="nc" id="L423">                keywordGroupSearchFieldProperty.setValue(group.getSearchField().getName());</span>
+<span class="nc" id="L424">                keywordGroupSearchTermProperty.setValue(group.getSearchExpression());</span>
+<span class="nc" id="L425">                keywordGroupCaseSensitiveProperty.setValue(group.isCaseSensitive());</span>
+<span class="nc" id="L426">                keywordGroupRegexProperty.setValue(false);</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">            } else if (editedGroup.getClass() == RegexKeywordGroup.class) {</span>
+<span class="nc" id="L428">                typeKeywordsProperty.setValue(true);</span>
+
+<span class="nc" id="L430">                RegexKeywordGroup group = (RegexKeywordGroup) editedGroup;</span>
+<span class="nc" id="L431">                keywordGroupSearchFieldProperty.setValue(group.getSearchField().getName());</span>
+<span class="nc" id="L432">                keywordGroupSearchTermProperty.setValue(group.getSearchExpression());</span>
+<span class="nc" id="L433">                keywordGroupCaseSensitiveProperty.setValue(group.isCaseSensitive());</span>
+<span class="nc" id="L434">                keywordGroupRegexProperty.setValue(true);</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">            } else if (editedGroup.getClass() == SearchGroup.class) {</span>
+<span class="nc" id="L436">                typeSearchProperty.setValue(true);</span>
+
+<span class="nc" id="L438">                SearchGroup group = (SearchGroup) editedGroup;</span>
+<span class="nc" id="L439">                searchGroupSearchTermProperty.setValue(group.getSearchExpression());</span>
+<span class="nc" id="L440">                searchFlagsProperty.setValue(group.getSearchFlags());</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">            } else if (editedGroup.getClass() == ExplicitGroup.class) {</span>
+<span class="nc" id="L442">                typeExplicitProperty.setValue(true);</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">            } else if (editedGroup instanceof AutomaticGroup) {</span>
+<span class="nc" id="L444">                typeAutoProperty.setValue(true);</span>
+
+<span class="nc bnc" id="L446" title="All 2 branches missed.">                if (editedGroup.getClass() == AutomaticKeywordGroup.class) {</span>
+<span class="nc" id="L447">                    AutomaticKeywordGroup group = (AutomaticKeywordGroup) editedGroup;</span>
+<span class="nc" id="L448">                    autoGroupKeywordsOptionProperty.setValue(Boolean.TRUE);</span>
+<span class="nc" id="L449">                    autoGroupKeywordsDelimiterProperty.setValue(group.getKeywordDelimiter().toString());</span>
+<span class="nc" id="L450">                    autoGroupKeywordsHierarchicalDelimiterProperty.setValue(group.getKeywordHierarchicalDelimiter().toString());</span>
+<span class="nc" id="L451">                    autoGroupKeywordsFieldProperty.setValue(group.getField().getName());</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">                } else if (editedGroup.getClass() == AutomaticPersonsGroup.class) {</span>
+<span class="nc" id="L453">                    AutomaticPersonsGroup group = (AutomaticPersonsGroup) editedGroup;</span>
+<span class="nc" id="L454">                    autoGroupPersonsOptionProperty.setValue(Boolean.TRUE);</span>
+<span class="nc" id="L455">                    autoGroupPersonsFieldProperty.setValue(group.getField().getName());</span>
+<span class="nc" id="L456">                }</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">            } else if (editedGroup.getClass() == TexGroup.class) {</span>
+<span class="nc" id="L458">                typeTexProperty.setValue(true);</span>
+
+<span class="nc" id="L460">                TexGroup group = (TexGroup) editedGroup;</span>
+<span class="nc" id="L461">                texGroupFilePathProperty.setValue(group.getFilePath().toString());</span>
+            }
+        }
+<span class="fc" id="L464">    }</span>
+
+    private Color determineColor() {
+        Color color;
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        if (parentNode == null) {</span>
+<span class="fc" id="L469">            color = GroupColorPicker.generateColor(List.of());</span>
+        } else {
+<span class="nc" id="L471">            List&lt;Color&gt; colorsOfSiblings = parentNode.getChildren().stream().map(child -&gt; child.getGroup().getColor())</span>
+<span class="nc" id="L472">                                                     .flatMap(Optional::stream)</span>
+<span class="nc" id="L473">                                                     .toList();</span>
+<span class="nc" id="L474">            Optional&lt;Color&gt; parentColor = parentNode.getGroup().getColor();</span>
+<span class="nc" id="L475">            color = parentColor.map(value -&gt; GroupColorPicker.generateColor(colorsOfSiblings, value))</span>
+<span class="nc" id="L476">                               .orElseGet(() -&gt; GroupColorPicker.generateColor(colorsOfSiblings));</span>
+        }
+<span class="fc" id="L478">        return color;</span>
+    }
+
+    public void texGroupBrowse() {
+<span class="nc" id="L482">        FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()</span>
+<span class="nc" id="L483">                .addExtensionFilter(StandardFileType.AUX)</span>
+<span class="nc" id="L484">                .withDefaultExtension(StandardFileType.AUX)</span>
+<span class="nc" id="L485">                .withInitialDirectory(currentDatabase.getMetaData()</span>
+<span class="nc" id="L486">                                                     .getLatexFileDirectory(preferencesService.getFilePreferences().getUserAndHost())</span>
+<span class="nc" id="L487">                                                     .orElse(FileUtil.getInitialDirectory(currentDatabase, preferencesService.getFilePreferences().getWorkingDirectory()))).build();</span>
+<span class="nc" id="L488">        dialogService.showFileOpenDialog(fileDialogConfiguration)</span>
+<span class="nc" id="L489">                     .ifPresent(file -&gt; texGroupFilePathProperty.setValue(</span>
+<span class="nc" id="L490">                             FileUtil.relativize(file.toAbsolutePath(), getFileDirectoriesAsPaths()).toString()</span>
+                     ));
+<span class="nc" id="L492">    }</span>
+
+    private List&lt;Path&gt; getFileDirectoriesAsPaths() {
+<span class="nc" id="L495">        List&lt;Path&gt; fileDirs = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L496">        MetaData metaData = currentDatabase.getMetaData();</span>
+<span class="nc" id="L497">        metaData.getLatexFileDirectory(preferencesService.getFilePreferences().getUserAndHost()).ifPresent(fileDirs::add);</span>
+
+<span class="nc" id="L499">        return fileDirs;</span>
+    }
+
+    public ValidationStatus validationStatus() {
+<span class="nc" id="L503">        return validator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus nameValidationStatus() {
+<span class="nc" id="L507">        return nameValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus nameContainsDelimiterValidationStatus() {
+<span class="nc" id="L511">        return nameContainsDelimiterValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus sameNameValidationStatus() {
+<span class="nc" id="L515">        return sameNameValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus searchRegexValidationStatus() {
+<span class="nc" id="L519">        return searchRegexValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus searchSearchTermEmptyValidationStatus() {
+<span class="nc" id="L523">        return searchSearchTermEmptyValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus keywordRegexValidationStatus() {
+<span class="nc" id="L527">        return keywordRegexValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus keywordFieldEmptyValidationStatus() {
+<span class="nc" id="L531">        return keywordFieldEmptyValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus keywordSearchTermEmptyValidationStatus() {
+<span class="nc" id="L535">        return keywordSearchTermEmptyValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus texGroupFilePathValidatonStatus() {
+<span class="fc" id="L539">        return texGroupFilePathValidator.getValidationStatus();</span>
+    }
+
+    public StringProperty nameProperty() {
+<span class="nc" id="L543">        return nameProperty;</span>
+    }
+
+    public StringProperty descriptionProperty() {
+<span class="nc" id="L547">        return descriptionProperty;</span>
+    }
+
+    public StringProperty iconProperty() {
+<span class="nc" id="L551">        return iconProperty;</span>
+    }
+
+    public BooleanProperty colorUseProperty() {
+<span class="nc" id="L555">        return colorUseProperty;</span>
+    }
+
+    public ObjectProperty&lt;Color&gt; colorFieldProperty() {
+<span class="nc" id="L559">        return colorProperty;</span>
+    }
+
+    public ListProperty&lt;GroupHierarchyType&gt; groupHierarchyListProperty() {
+<span class="nc" id="L563">        return groupHierarchyListProperty;</span>
+    }
+
+    public ObjectProperty&lt;GroupHierarchyType&gt; groupHierarchySelectedProperty() {
+<span class="fc" id="L567">        return groupHierarchySelectedProperty;</span>
+    }
+
+    public BooleanProperty typeExplicitProperty() {
+<span class="nc" id="L571">        return typeExplicitProperty;</span>
+    }
+
+    public BooleanProperty typeKeywordsProperty() {
+<span class="nc" id="L575">        return typeKeywordsProperty;</span>
+    }
+
+    public BooleanProperty typeSearchProperty() {
+<span class="nc" id="L579">        return typeSearchProperty;</span>
+    }
+
+    public BooleanProperty typeAutoProperty() {
+<span class="nc" id="L583">        return typeAutoProperty;</span>
+    }
+
+    public BooleanProperty typeTexProperty() {
+<span class="nc" id="L587">        return typeTexProperty;</span>
+    }
+
+    public StringProperty keywordGroupSearchTermProperty() {
+<span class="nc" id="L591">        return keywordGroupSearchTermProperty;</span>
+    }
+
+    public StringProperty keywordGroupSearchFieldProperty() {
+<span class="nc" id="L595">        return keywordGroupSearchFieldProperty;</span>
+    }
+
+    public BooleanProperty keywordGroupCaseSensitiveProperty() {
+<span class="nc" id="L599">        return keywordGroupCaseSensitiveProperty;</span>
+    }
+
+    public BooleanProperty keywordGroupRegexProperty() {
+<span class="nc" id="L603">        return keywordGroupRegexProperty;</span>
+    }
+
+    public StringProperty searchGroupSearchTermProperty() {
+<span class="nc" id="L607">        return searchGroupSearchTermProperty;</span>
+    }
+
+    public ObjectProperty&lt;EnumSet&lt;SearchFlags&gt;&gt; searchFlagsProperty() {
+<span class="nc" id="L611">        return searchFlagsProperty;</span>
+    }
+
+    public BooleanProperty autoGroupKeywordsOptionProperty() {
+<span class="nc" id="L615">        return autoGroupKeywordsOptionProperty;</span>
+    }
+
+    public StringProperty autoGroupKeywordsFieldProperty() {
+<span class="nc" id="L619">        return autoGroupKeywordsFieldProperty;</span>
+    }
+
+    public StringProperty autoGroupKeywordsDeliminatorProperty() {
+<span class="nc" id="L623">        return autoGroupKeywordsDelimiterProperty;</span>
+    }
+
+    public StringProperty autoGroupKeywordsHierarchicalDeliminatorProperty() {
+<span class="nc" id="L627">        return autoGroupKeywordsHierarchicalDelimiterProperty;</span>
+    }
+
+    public BooleanProperty autoGroupPersonsOptionProperty() {
+<span class="nc" id="L631">        return autoGroupPersonsOptionProperty;</span>
+    }
+
+    public StringProperty autoGroupPersonsFieldProperty() {
+<span class="nc" id="L635">        return autoGroupPersonsFieldProperty;</span>
+    }
+
+    public StringProperty texGroupFilePathProperty() {
+<span class="fc" id="L639">        return texGroupFilePathProperty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

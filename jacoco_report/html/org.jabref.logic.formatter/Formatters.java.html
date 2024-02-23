@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Formatters.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.formatter</a> &gt; <span class="el_source">Formatters.java</span></div><h1>Formatters.java</h1><pre class="source lang-java linenums">package org.jabref.logic.formatter;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.cleanup.Formatter;
+import org.jabref.logic.formatter.bibtexfields.CleanupUrlFormatter;
+import org.jabref.logic.formatter.bibtexfields.ClearFormatter;
+import org.jabref.logic.formatter.bibtexfields.EscapeAmpersandsFormatter;
+import org.jabref.logic.formatter.bibtexfields.EscapeDollarSignFormatter;
+import org.jabref.logic.formatter.bibtexfields.EscapeUnderscoresFormatter;
+import org.jabref.logic.formatter.bibtexfields.HtmlToLatexFormatter;
+import org.jabref.logic.formatter.bibtexfields.HtmlToUnicodeFormatter;
+import org.jabref.logic.formatter.bibtexfields.LatexCleanupFormatter;
+import org.jabref.logic.formatter.bibtexfields.NormalizeDateFormatter;
+import org.jabref.logic.formatter.bibtexfields.NormalizeMonthFormatter;
+import org.jabref.logic.formatter.bibtexfields.NormalizeNamesFormatter;
+import org.jabref.logic.formatter.bibtexfields.NormalizePagesFormatter;
+import org.jabref.logic.formatter.bibtexfields.OrdinalsToSuperscriptFormatter;
+import org.jabref.logic.formatter.bibtexfields.RegexFormatter;
+import org.jabref.logic.formatter.bibtexfields.RemoveBracesFormatter;
+import org.jabref.logic.formatter.bibtexfields.ShortenDOIFormatter;
+import org.jabref.logic.formatter.bibtexfields.UnicodeToLatexFormatter;
+import org.jabref.logic.formatter.bibtexfields.UnitsToLatexFormatter;
+import org.jabref.logic.formatter.casechanger.CapitalizeFormatter;
+import org.jabref.logic.formatter.casechanger.LowerCaseFormatter;
+import org.jabref.logic.formatter.casechanger.SentenceCaseFormatter;
+import org.jabref.logic.formatter.casechanger.TitleCaseFormatter;
+import org.jabref.logic.formatter.casechanger.UnprotectTermsFormatter;
+import org.jabref.logic.formatter.casechanger.UpperCaseFormatter;
+import org.jabref.logic.formatter.minifier.MinifyNameListFormatter;
+import org.jabref.logic.formatter.minifier.TruncateFormatter;
+import org.jabref.logic.layout.format.LatexToUnicodeFormatter;
+import org.jabref.logic.layout.format.ReplaceUnicodeLigaturesFormatter;
+
+public class Formatters {
+<span class="fc" id="L43">    private static final Pattern TRUNCATE_PATTERN = Pattern.compile(&quot;\\Atruncate\\d+\\z&quot;);</span>
+
+    private static Map&lt;String, Formatter&gt; keyToFormatterMap;
+
+    static {
+<span class="fc" id="L48">        keyToFormatterMap = getAll().stream().collect(Collectors.toMap(Formatter::getKey, f -&gt; f));</span>
+<span class="fc" id="L49">    }</span>
+
+    private Formatters() {
+    }
+
+    public static List&lt;Formatter&gt; getConverters() {
+<span class="fc" id="L55">        return Arrays.asList(</span>
+                new HtmlToLatexFormatter(),
+                new HtmlToUnicodeFormatter(),
+                new LatexToUnicodeFormatter(),
+                new UnicodeToLatexFormatter()
+        );
+    }
+
+    public static List&lt;Formatter&gt; getCaseChangers() {
+<span class="fc" id="L64">        return Arrays.asList(</span>
+                new CapitalizeFormatter(),
+                new LowerCaseFormatter(),
+                new SentenceCaseFormatter(),
+                new TitleCaseFormatter(),
+                new UpperCaseFormatter()
+        );
+    }
+
+    public static List&lt;Formatter&gt; getOthers() {
+<span class="fc" id="L74">        return Arrays.asList(</span>
+                new ClearFormatter(),
+                new CleanupUrlFormatter(),
+                new LatexCleanupFormatter(),
+                new MinifyNameListFormatter(),
+                new NormalizeDateFormatter(),
+                new NormalizeMonthFormatter(),
+                new NormalizeNamesFormatter(),
+                new NormalizePagesFormatter(),
+                new OrdinalsToSuperscriptFormatter(),
+                new RemoveBracesFormatter(),
+                new UnitsToLatexFormatter(),
+                new EscapeUnderscoresFormatter(),
+                new EscapeAmpersandsFormatter(),
+                new EscapeDollarSignFormatter(),
+                new ShortenDOIFormatter(),
+                new ReplaceUnicodeLigaturesFormatter(),
+                new UnprotectTermsFormatter()
+        );
+    }
+
+    public static List&lt;Formatter&gt; getAll() {
+<span class="fc" id="L96">        List&lt;Formatter&gt; all = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L97">        all.addAll(getConverters());</span>
+<span class="fc" id="L98">        all.addAll(getCaseChangers());</span>
+<span class="fc" id="L99">        all.addAll(getOthers());</span>
+<span class="fc" id="L100">        return all;</span>
+    }
+
+    public static Optional&lt;Formatter&gt; getFormatterForKey(String name) {
+<span class="fc" id="L104">        Objects.requireNonNull(name);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        return keyToFormatterMap.containsKey(name) ? Optional.of(keyToFormatterMap.get(name)) : Optional.empty();</span>
+    }
+
+    public static Optional&lt;Formatter&gt; getFormatterForModifier(String modifier) {
+<span class="fc" id="L109">        Objects.requireNonNull(modifier);</span>
+
+<span class="fc bfc" id="L111" title="All 6 branches covered.">        switch (modifier) {</span>
+            case &quot;lower&quot;:
+<span class="fc" id="L113">                return Optional.of(new LowerCaseFormatter());</span>
+            case &quot;upper&quot;:
+<span class="fc" id="L115">                return Optional.of(new UpperCaseFormatter());</span>
+            case &quot;capitalize&quot;:
+<span class="fc" id="L117">                return Optional.of(new CapitalizeFormatter());</span>
+            case &quot;titlecase&quot;:
+<span class="fc" id="L119">                return Optional.of(new TitleCaseFormatter());</span>
+            case &quot;sentencecase&quot;:
+<span class="fc" id="L121">                return Optional.of(new SentenceCaseFormatter());</span>
+        }
+
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (modifier.startsWith(RegexFormatter.KEY)) {</span>
+<span class="fc" id="L125">            String regex = modifier.substring(RegexFormatter.KEY.length());</span>
+<span class="fc" id="L126">            return Optional.of(new RegexFormatter(regex));</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        } else if (TRUNCATE_PATTERN.matcher(modifier).matches()) {</span>
+<span class="fc" id="L128">            int truncateAfter = Integer.parseInt(modifier.substring(8));</span>
+<span class="fc" id="L129">            return Optional.of(new TruncateFormatter(truncateAfter));</span>
+        } else {
+<span class="fc" id="L131">            return getFormatterForKey(modifier);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

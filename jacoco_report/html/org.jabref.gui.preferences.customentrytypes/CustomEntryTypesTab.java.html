@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomEntryTypesTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.customentrytypes</a> &gt; <span class="el_source">CustomEntryTypesTab.java</span></div><h1>CustomEntryTypesTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.customentrytypes;
+
+import javafx.application.Platform;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.collections.ObservableList;
+import javafx.fxml.FXML;
+import javafx.scene.Group;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.cell.CheckBoxTableCell;
+import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.input.TransferMode;
+
+import org.jabref.gui.DragAndDropDataFormats;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.gui.util.ControlHelper;
+import org.jabref.gui.util.CustomLocalDragboard;
+import org.jabref.gui.util.FieldsUtil;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.gui.util.ViewModelTableRowFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.field.Field;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+import jakarta.inject.Inject;
+
+public class CustomEntryTypesTab extends AbstractPreferenceTabView&lt;CustomEntryTypesTabViewModel&gt; implements PreferencesTab {
+
+    @FXML private TableView&lt;EntryTypeViewModel&gt; entryTypesTable;
+    @FXML private TableColumn&lt;EntryTypeViewModel, String&gt; entryTypColumn;
+    @FXML private TableColumn&lt;EntryTypeViewModel, String&gt; entryTypeActionsColumn;
+    @FXML private TextField addNewEntryType;
+    @FXML private TableView&lt;FieldViewModel&gt; fields;
+    @FXML private TableColumn&lt;FieldViewModel, String&gt; fieldNameColumn;
+    @FXML private TableColumn&lt;FieldViewModel, Boolean&gt; fieldTypeColumn;
+    @FXML private TableColumn&lt;FieldViewModel, String&gt; fieldTypeActionColumn;
+    @FXML private TableColumn&lt;FieldViewModel, Boolean&gt; fieldTypeMultilineColumn;
+    @FXML private ComboBox&lt;Field&gt; addNewField;
+    @FXML private Button addNewEntryTypeButton;
+    @FXML private Button addNewFieldButton;
+
+    @Inject private StateManager stateManager;
+
+<span class="nc" id="L61">    private final ControlsFxVisualizer visualizer = new ControlsFxVisualizer();</span>
+
+    private CustomLocalDragboard localDragboard;
+
+<span class="nc" id="L65">    public CustomEntryTypesTab() {</span>
+<span class="nc" id="L66">        ViewLoader.view(this)</span>
+<span class="nc" id="L67">                  .root(this)</span>
+<span class="nc" id="L68">                  .load();</span>
+<span class="nc" id="L69">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L73">        return Localization.lang(&quot;Entry types&quot;);</span>
+    }
+
+    public void initialize() {
+<span class="nc" id="L77">        BibDatabaseMode mode = stateManager.getActiveDatabase().map(BibDatabaseContext::getMode)</span>
+<span class="nc" id="L78">                                           .orElse(preferencesService.getLibraryPreferences().getDefaultBibDatabaseMode());</span>
+<span class="nc" id="L79">        BibEntryTypesManager entryTypesRepository = preferencesService.getCustomEntryTypesRepository();</span>
+
+<span class="nc" id="L81">        this.viewModel = new CustomEntryTypesTabViewModel(mode, entryTypesRepository, dialogService, preferencesService);</span>
+
+        // As the state manager gets injected it's not available in the constructor
+<span class="nc" id="L84">        this.localDragboard = stateManager.getLocalDragboard();</span>
+
+<span class="nc" id="L86">        setupEntryTypesTable();</span>
+<span class="nc" id="L87">        setupFieldsTable();</span>
+
+<span class="nc" id="L89">        addNewEntryTypeButton.disableProperty().bind(viewModel.entryTypeValidationStatus().validProperty().not());</span>
+<span class="nc" id="L90">        addNewFieldButton.disableProperty().bind(viewModel.fieldValidationStatus().validProperty().not());</span>
+
+<span class="nc" id="L92">        Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L93">            visualizer.initVisualization(viewModel.entryTypeValidationStatus(), addNewEntryType, true);</span>
+<span class="nc" id="L94">            visualizer.initVisualization(viewModel.fieldValidationStatus(), addNewField, true);</span>
+<span class="nc" id="L95">        });</span>
+<span class="nc" id="L96">    }</span>
+
+    private void setupEntryTypesTable() {
+        // Table View must be editable, otherwise the change of the Radiobuttons does not propagate the commit event
+<span class="nc" id="L100">        fields.setEditable(true);</span>
+<span class="nc" id="L101">        entryTypColumn.setCellValueFactory(cellData -&gt; new ReadOnlyStringWrapper(cellData.getValue().entryType().get().getType().getDisplayName()));</span>
+<span class="nc" id="L102">        entryTypesTable.setItems(viewModel.entryTypes());</span>
+<span class="nc" id="L103">        entryTypesTable.getSelectionModel().selectFirst();</span>
+
+<span class="nc" id="L105">        entryTypeActionsColumn.setSortable(false);</span>
+<span class="nc" id="L106">        entryTypeActionsColumn.setReorderable(false);</span>
+<span class="nc" id="L107">        entryTypeActionsColumn.setCellValueFactory(cellData -&gt; new ReadOnlyStringWrapper(cellData.getValue().entryType().get().getType().getDisplayName()));</span>
+<span class="nc" id="L108">        new ValueTableCellFactory&lt;EntryTypeViewModel, String&gt;()</span>
+<span class="nc" id="L109">                .withGraphic((type, name) -&gt; {</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">                    if (type instanceof CustomEntryTypeViewModel) {</span>
+<span class="nc" id="L111">                        return IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode();</span>
+                    } else {
+<span class="nc" id="L113">                        return null;</span>
+                    }
+                })
+<span class="nc" id="L116">                .withTooltip((type, name) -&gt; {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                    if (type instanceof CustomEntryTypeViewModel) {</span>
+<span class="nc" id="L118">                        return Localization.lang(&quot;Remove entry type&quot;) + &quot; &quot; + name;</span>
+                    } else {
+<span class="nc" id="L120">                        return null;</span>
+                    }
+                })
+<span class="nc" id="L123">                .withOnMouseClickedEvent((type, name) -&gt; {</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                    if (type instanceof CustomEntryTypeViewModel) {</span>
+<span class="nc" id="L125">                        return evt -&gt; viewModel.removeEntryType(entryTypesTable.getSelectionModel().getSelectedItem());</span>
+                    } else {
+<span class="nc" id="L127">                        return evt -&gt; {</span>
+<span class="nc" id="L128">                        };</span>
+                    }
+                })
+<span class="nc" id="L131">                .install(entryTypeActionsColumn);</span>
+
+<span class="nc" id="L133">        viewModel.selectedEntryTypeProperty().bind(entryTypesTable.getSelectionModel().selectedItemProperty());</span>
+<span class="nc" id="L134">        viewModel.entryTypeToAddProperty().bindBidirectional(addNewEntryType.textProperty());</span>
+
+<span class="nc" id="L136">        EasyBind.subscribe(viewModel.selectedEntryTypeProperty(), type -&gt; {</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (type != null) {</span>
+<span class="nc" id="L138">                var items = type.fields();</span>
+<span class="nc" id="L139">                fields.setItems(items);</span>
+<span class="nc" id="L140">            } else {</span>
+<span class="nc" id="L141">                fields.setItems(null);</span>
+            }
+<span class="nc" id="L143">        });</span>
+<span class="nc" id="L144">    }</span>
+
+    private void setupFieldsTable() {
+<span class="nc" id="L147">        fieldNameColumn.setCellValueFactory(item -&gt; item.getValue().displayNameProperty());</span>
+<span class="nc" id="L148">        fieldNameColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+<span class="nc" id="L149">        fieldNameColumn.setEditable(true);</span>
+<span class="nc" id="L150">        fieldNameColumn.setOnEditCommit((TableColumn.CellEditEvent&lt;FieldViewModel, String&gt; event) -&gt; {</span>
+<span class="nc" id="L151">            String newDisplayName = event.getNewValue();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (newDisplayName.isBlank()) {</span>
+<span class="nc" id="L153">                dialogService.notify(Localization.lang(&quot;Name cannot be empty&quot;));</span>
+<span class="nc" id="L154">                event.getTableView().edit(-1, null);</span>
+<span class="nc" id="L155">                event.getTableView().refresh();</span>
+<span class="nc" id="L156">                return;</span>
+            }
+
+<span class="nc" id="L159">            FieldViewModel fieldViewModel = event.getRowValue();</span>
+<span class="nc" id="L160">            String currentDisplayName = fieldViewModel.displayNameProperty().getValue();</span>
+<span class="nc" id="L161">            EntryTypeViewModel selectedEntryType = viewModel.selectedEntryTypeProperty().get();</span>
+<span class="nc" id="L162">            ObservableList&lt;FieldViewModel&gt; entryFields = selectedEntryType.fields();</span>
+            // The first predicate will check if the user input the original field name or doesn't edit anything after double click
+<span class="nc bnc" id="L164" title="All 4 branches missed.">            boolean fieldExists = !newDisplayName.equals(currentDisplayName) &amp;&amp; viewModel.displayNameExists(newDisplayName);</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (fieldExists) {</span>
+<span class="nc" id="L166">                dialogService.notify(Localization.lang(&quot;Unable to change field name. \&quot;%0\&quot; already in use.&quot;, newDisplayName));</span>
+<span class="nc" id="L167">                event.getTableView().edit(-1, null);</span>
+            } else {
+<span class="nc" id="L169">                fieldViewModel.displayNameProperty().setValue(newDisplayName);</span>
+            }
+<span class="nc" id="L171">            event.getTableView().refresh();</span>
+<span class="nc" id="L172">        });</span>
+
+<span class="nc" id="L174">        fieldTypeColumn.setCellFactory(CheckBoxTableCell.forTableColumn(fieldTypeColumn));</span>
+<span class="nc" id="L175">        fieldTypeColumn.setCellValueFactory(item -&gt; item.getValue().requiredProperty());</span>
+<span class="nc" id="L176">        makeRotatedColumnHeader(fieldTypeColumn, Localization.lang(&quot;Required&quot;));</span>
+
+<span class="nc" id="L178">        fieldTypeMultilineColumn.setCellFactory(CheckBoxTableCell.forTableColumn(fieldTypeMultilineColumn));</span>
+<span class="nc" id="L179">        fieldTypeMultilineColumn.setCellValueFactory(item -&gt; item.getValue().multilineProperty());</span>
+<span class="nc" id="L180">        makeRotatedColumnHeader(fieldTypeMultilineColumn, Localization.lang(&quot;Multiline&quot;));</span>
+
+<span class="nc" id="L182">        fieldTypeActionColumn.setSortable(false);</span>
+<span class="nc" id="L183">        fieldTypeActionColumn.setReorderable(false);</span>
+<span class="nc" id="L184">        fieldTypeActionColumn.setEditable(false);</span>
+<span class="nc" id="L185">        fieldTypeActionColumn.setCellValueFactory(cellData -&gt; cellData.getValue().displayNameProperty());</span>
+
+<span class="nc" id="L187">        new ValueTableCellFactory&lt;FieldViewModel, String&gt;()</span>
+<span class="nc" id="L188">                .withGraphic(item -&gt; IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode())</span>
+<span class="nc" id="L189">                .withTooltip(name -&gt; Localization.lang(&quot;Remove field %0 from currently selected entry type&quot;, name))</span>
+<span class="nc" id="L190">                .withOnMouseClickedEvent(item -&gt; evt -&gt; viewModel.removeField(fields.getSelectionModel().getSelectedItem()))</span>
+<span class="nc" id="L191">                .install(fieldTypeActionColumn);</span>
+
+<span class="nc" id="L193">        new ViewModelTableRowFactory&lt;FieldViewModel&gt;()</span>
+<span class="nc" id="L194">                .setOnDragDetected(this::handleOnDragDetected)</span>
+<span class="nc" id="L195">                .setOnDragDropped(this::handleOnDragDropped)</span>
+<span class="nc" id="L196">                .setOnDragOver(this::handleOnDragOver)</span>
+<span class="nc" id="L197">                .setOnDragExited(this::handleOnDragExited)</span>
+<span class="nc" id="L198">                .install(fields);</span>
+
+<span class="nc" id="L200">        addNewField.setItems(viewModel.fieldsForAdding());</span>
+<span class="nc" id="L201">        addNewField.setConverter(FieldsUtil.FIELD_STRING_CONVERTER);</span>
+
+<span class="nc" id="L203">        viewModel.newFieldToAddProperty().bindBidirectional(addNewField.valueProperty());</span>
+        // The valueProperty() of addNewField ComboBox needs to be updated by typing text in the ComboBox textfield,
+        // since the enabled/disabled state of addNewFieldButton won't update otherwise
+<span class="nc" id="L206">        EasyBind.subscribe(addNewField.getEditor().textProperty(), text -&gt; addNewField.setValue(FieldsUtil.FIELD_STRING_CONVERTER.fromString(text)));</span>
+<span class="nc" id="L207">    }</span>
+
+    private void makeRotatedColumnHeader(TableColumn&lt;?, ?&gt; column, String text) {
+<span class="nc" id="L210">        Label label = new Label();</span>
+<span class="nc" id="L211">        label.setText(text);</span>
+<span class="nc" id="L212">        label.setRotate(-90);</span>
+<span class="nc" id="L213">        label.setMinWidth(80);</span>
+<span class="nc" id="L214">        column.setGraphic(new Group(label));</span>
+<span class="nc" id="L215">        column.getStyleClass().add(&quot;rotated&quot;);</span>
+<span class="nc" id="L216">    }</span>
+
+    private void handleOnDragOver(TableRow&lt;FieldViewModel&gt; row, FieldViewModel originalItem, DragEvent
+            event) {
+<span class="nc bnc" id="L220" title="All 4 branches missed.">        if ((event.getGestureSource() != originalItem) &amp;&amp; event.getDragboard().hasContent(DragAndDropDataFormats.FIELD)) {</span>
+<span class="nc" id="L221">            event.acceptTransferModes(TransferMode.MOVE);</span>
+<span class="nc" id="L222">            ControlHelper.setDroppingPseudoClasses(row, event);</span>
+        }
+<span class="nc" id="L224">    }</span>
+
+    private void handleOnDragDetected(TableRow&lt;FieldViewModel&gt; row, FieldViewModel fieldViewModel, MouseEvent
+            event) {
+<span class="nc" id="L228">        row.startFullDrag();</span>
+<span class="nc" id="L229">        FieldViewModel field = fields.getSelectionModel().getSelectedItem();</span>
+
+<span class="nc" id="L231">        ClipboardContent content = new ClipboardContent();</span>
+<span class="nc" id="L232">        Dragboard dragboard = fields.startDragAndDrop(TransferMode.MOVE);</span>
+<span class="nc" id="L233">        content.put(DragAndDropDataFormats.FIELD, &quot;&quot;);</span>
+<span class="nc" id="L234">        localDragboard.putValue(FieldViewModel.class, field);</span>
+<span class="nc" id="L235">        dragboard.setContent(content);</span>
+<span class="nc" id="L236">        event.consume();</span>
+<span class="nc" id="L237">    }</span>
+
+    private void handleOnDragDropped(TableRow&lt;FieldViewModel&gt; row, FieldViewModel originalItem, DragEvent event) {
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (localDragboard.hasType(FieldViewModel.class)) {</span>
+<span class="nc" id="L241">            FieldViewModel field = localDragboard.getValue(FieldViewModel.class);</span>
+<span class="nc" id="L242">            fields.getItems().remove(field);</span>
+
+<span class="nc bnc" id="L244" title="All 2 branches missed.">            if (row.isEmpty()) {</span>
+<span class="nc" id="L245">                fields.getItems().add(field);</span>
+            } else {
+                // decide based on drop position whether to add the element before or after
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                int offset = event.getY() &gt; (row.getHeight() / 2) ? 1 : 0;</span>
+<span class="nc" id="L249">                fields.getItems().add(row.getIndex() + offset, field);</span>
+            }
+        }
+<span class="nc" id="L252">        event.setDropCompleted(true);</span>
+<span class="nc" id="L253">        event.consume();</span>
+<span class="nc" id="L254">    }</span>
+
+    private void handleOnDragExited(TableRow&lt;FieldViewModel&gt; row, FieldViewModel fieldViewModel, DragEvent dragEvent) {
+<span class="nc" id="L257">        ControlHelper.removeDroppingPseudoClasses(row);</span>
+<span class="nc" id="L258">    }</span>
+
+    @FXML
+    void addEntryType() {
+<span class="nc" id="L262">        EntryTypeViewModel newlyAdded = viewModel.addNewCustomEntryType();</span>
+<span class="nc" id="L263">        this.entryTypesTable.getSelectionModel().select(newlyAdded);</span>
+<span class="nc" id="L264">        this.entryTypesTable.scrollTo(newlyAdded);</span>
+<span class="nc" id="L265">    }</span>
+
+    @FXML
+    void addNewField() {
+<span class="nc" id="L269">        viewModel.addNewField();</span>
+<span class="nc" id="L270">    }</span>
+
+    @FXML
+    void resetEntryTypes() {
+<span class="nc" id="L274">        boolean reset = dialogService.showConfirmationDialogAndWait(</span>
+<span class="nc" id="L275">                Localization.lang(&quot;Reset entry types and fields to defaults&quot;),</span>
+<span class="nc" id="L276">                Localization.lang(&quot;This will reset all entry types to their default values and remove all custom entry types&quot;),</span>
+<span class="nc" id="L277">                Localization.lang(&quot;Reset to default&quot;));</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        if (reset) {</span>
+<span class="nc" id="L279">            viewModel.resetAllCustomEntryTypes();</span>
+<span class="nc" id="L280">            fields.getSelectionModel().clearSelection();</span>
+<span class="nc" id="L281">            entryTypesTable.getSelectionModel().clearSelection();</span>
+<span class="nc" id="L282">            viewModel.setValues();</span>
+<span class="nc" id="L283">            entryTypesTable.refresh();</span>
+        }
+<span class="nc" id="L285">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

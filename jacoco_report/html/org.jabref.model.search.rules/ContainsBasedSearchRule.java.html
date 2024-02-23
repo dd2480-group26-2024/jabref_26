@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContainsBasedSearchRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.search.rules</a> &gt; <span class="el_source">ContainsBasedSearchRule.java</span></div><h1>ContainsBasedSearchRule.java</h1><pre class="source lang-java linenums">package org.jabref.model.search.rules;
+
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+
+import org.jabref.architecture.AllowedToUseLogic;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.search.rules.SearchRules.SearchFlags;
+import org.jabref.model.strings.StringUtil;
+
+/**
+ * Search rule for a search based on String.contains()
+ */
+@AllowedToUseLogic(&quot;Because access to the lucene index is needed&quot;)
+public class ContainsBasedSearchRule extends FullTextSearchRule {
+
+    public ContainsBasedSearchRule(EnumSet&lt;SearchFlags&gt; searchFlags) {
+<span class="fc" id="L21">        super(searchFlags);</span>
+<span class="fc" id="L22">    }</span>
+
+    @Override
+    public boolean validateSearchStrings(String query) {
+<span class="fc" id="L26">        return true;</span>
+    }
+
+    @Override
+    public boolean applyRule(String query, BibEntry bibEntry) {
+<span class="fc" id="L31">        String searchString = query;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (!searchFlags.contains(SearchRules.SearchFlags.CASE_SENSITIVE)) {</span>
+<span class="fc" id="L33">            searchString = searchString.toLowerCase(Locale.ROOT);</span>
+        }
+
+<span class="fc" id="L36">        List&lt;String&gt; unmatchedWords = new SentenceAnalyzer(searchString).getWords();</span>
+
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (Field fieldKey : bibEntry.getFields()) {</span>
+<span class="fc" id="L39">            String formattedFieldContent = StringUtil.stripAccents(bibEntry.getFieldLatexFree(fieldKey).get());</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            if (!searchFlags.contains(SearchRules.SearchFlags.CASE_SENSITIVE)) {</span>
+<span class="fc" id="L41">                formattedFieldContent = formattedFieldContent.toLowerCase(Locale.ROOT);</span>
+            }
+
+<span class="fc" id="L44">            Iterator&lt;String&gt; unmatchedWordsIterator = unmatchedWords.iterator();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            while (unmatchedWordsIterator.hasNext()) {</span>
+<span class="fc" id="L46">                String word = StringUtil.stripAccents(unmatchedWordsIterator.next());</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                if (formattedFieldContent.contains(word)) {</span>
+<span class="fc" id="L48">                    unmatchedWordsIterator.remove();</span>
+                }
+<span class="fc" id="L50">            }</span>
+
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (unmatchedWords.isEmpty()) {</span>
+<span class="fc" id="L53">                return true;</span>
+            }
+<span class="fc" id="L55">        }</span>
+
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (!searchFlags.contains(SearchRules.SearchFlags.FULLTEXT)) {</span>
+<span class="fc" id="L58">            return false;</span>
+        }
+
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        return getFulltextResults(query, bibEntry).numSearchResults() &gt; 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

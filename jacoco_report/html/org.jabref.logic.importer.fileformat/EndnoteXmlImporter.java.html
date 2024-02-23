@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EndnoteXmlImporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fileformat</a> &gt; <span class="el_source">EndnoteXmlImporter.java</span></div><h1>EndnoteXmlImporter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fileformat;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.events.XMLEvent;
+
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.Importer;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.KeywordList;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.IEEETranEntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+
+import com.google.common.base.Joiner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Importer for the Endnote XML format.
+ * &lt;p&gt;
+ * Based on dtd scheme downloaded from Article #122577 in http://kbportal.thomson.com.
+ */
+public class EndnoteXmlImporter extends Importer implements Parser {
+
+<span class="fc" id="L51">    private static final Logger LOGGER = LoggerFactory.getLogger(EndnoteXmlImporter.class);</span>
+    private final ImportFormatPreferences preferences;
+    private final XMLInputFactory xmlInputFactory;
+
+<span class="fc" id="L55">    public EndnoteXmlImporter(ImportFormatPreferences preferences) {</span>
+<span class="fc" id="L56">        this.preferences = preferences;</span>
+<span class="fc" id="L57">        xmlInputFactory = XMLInputFactory.newInstance();</span>
+        // prevent xxe (https://rules.sonarsource.com/java/RSPEC-2755)
+        // not suported by aalto-xml
+        // xmlInputFactory.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, &quot;&quot;);
+        // required for reading Unicode characters such as &amp;#xf6;
+<span class="fc" id="L62">        xmlInputFactory.setProperty(XMLInputFactory.IS_COALESCING, true);</span>
+<span class="fc" id="L63">    }</span>
+
+    private static String join(List&lt;String&gt; list, String string) {
+<span class="fc" id="L66">        return Joiner.on(string).join(list);</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="nc" id="L71">        return &quot;EndNote XML&quot;;</span>
+    }
+
+    @Override
+    public StandardFileType getFileType() {
+<span class="nc" id="L76">        return StandardFileType.XML;</span>
+    }
+
+    @Override
+    public String getId() {
+<span class="fc" id="L81">        return &quot;endnote&quot;;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="nc" id="L86">        return &quot;Importer for the EndNote XML format.&quot;;</span>
+    }
+
+    @Override
+    public boolean isRecognizedFormat(BufferedReader reader) throws IOException {
+        String str;
+<span class="fc" id="L92">        int i = 0;</span>
+<span class="fc bfc" id="L93" title="All 4 branches covered.">        while (((str = reader.readLine()) != null) &amp;&amp; (i &lt; 50)) {</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (str.toLowerCase(Locale.ENGLISH).contains(&quot;&lt;records&gt;&quot;)) {</span>
+<span class="fc" id="L95">                return true;</span>
+            }
+
+<span class="fc" id="L98">            i++;</span>
+        }
+<span class="fc" id="L100">        return false;</span>
+    }
+
+    @Override
+    public ParserResult importDatabase(BufferedReader input) throws IOException {
+<span class="fc" id="L105">        Objects.requireNonNull(input);</span>
+
+<span class="fc" id="L107">        List&lt;BibEntry&gt; bibItems = new ArrayList&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L110">            XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(input);</span>
+
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            while (reader.hasNext()) {</span>
+<span class="fc" id="L113">                reader.next();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L115">                    String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                    if (&quot;record&quot;.equals(elementName)) {</span>
+<span class="fc" id="L117">                         parseRecord(reader, bibItems, elementName);</span>
+                    }
+<span class="fc" id="L119">                }</span>
+            }
+<span class="nc" id="L121">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L122">            LOGGER.debug(&quot;could not parse document&quot;, e);</span>
+<span class="nc" id="L123">            return ParserResult.fromError(e);</span>
+<span class="fc" id="L124">        }</span>
+<span class="fc" id="L125">        return new ParserResult(bibItems);</span>
+    }
+
+    private void parseRecord(XMLStreamReader reader, List&lt;BibEntry&gt; bibItems, String startElement)
+        throws XMLStreamException {
+
+<span class="fc" id="L131">        Map&lt;Field, String&gt; fields = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L132">        EntryType entryType = StandardEntryType.Article;</span>
+
+<span class="fc" id="L134">        KeywordList keywordList = new KeywordList();</span>
+<span class="fc" id="L135">        List&lt;LinkedFile&gt; linkedFiles = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L138">            reader.next();</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L140">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L141" title="All 16 branches covered.">                switch (elementName) {</span>
+                    case &quot;ref-type&quot; -&gt; {
+<span class="fc" id="L143">                        String type = reader.getAttributeValue(null, &quot;name&quot;);</span>
+<span class="fc" id="L144">                        entryType = convertRefNameToType(type);</span>
+<span class="fc" id="L145">                    }</span>
+                    case &quot;contributors&quot; -&gt; {
+<span class="fc" id="L147">                        handleAuthorList(reader, fields, elementName);</span>
+<span class="fc" id="L148">                    }</span>
+                    case &quot;titles&quot; -&gt; {
+<span class="fc" id="L150">                        handleTitles(reader, fields, elementName);</span>
+<span class="fc" id="L151">                    }</span>
+                    case &quot;pages&quot; -&gt; {
+<span class="fc" id="L153">                        parseStyleContent(reader, fields, StandardField.PAGES, elementName);</span>
+<span class="fc" id="L154">                    }</span>
+                    case &quot;volume&quot; -&gt; {
+<span class="fc" id="L156">                        parseStyleContent(reader, fields, StandardField.VOLUME, elementName);</span>
+<span class="fc" id="L157">                    }</span>
+                    case &quot;number&quot; -&gt; {
+<span class="fc" id="L159">                        parseStyleContent(reader, fields, StandardField.NUMBER, elementName);</span>
+<span class="fc" id="L160">                    }</span>
+                    case &quot;dates&quot; -&gt; {
+<span class="fc" id="L162">                        parseYear(reader, fields);</span>
+<span class="fc" id="L163">                    }</span>
+                    case &quot;notes&quot; -&gt; {
+<span class="fc" id="L165">                        parseStyleContent(reader, fields, StandardField.NOTE, elementName);</span>
+<span class="fc" id="L166">                    }</span>
+                    case &quot;urls&quot; -&gt; {
+<span class="fc" id="L168">                       handleUrlList(reader, fields, linkedFiles);</span>
+<span class="fc" id="L169">                    }</span>
+                    case &quot;keywords&quot; -&gt; {
+<span class="fc" id="L171">                        handleKeywordsList(reader, keywordList, elementName);</span>
+<span class="fc" id="L172">                    }</span>
+                    case &quot;abstract&quot; -&gt; {
+<span class="fc" id="L174">                        parseStyleContent(reader, fields, StandardField.ABSTRACT, elementName);</span>
+<span class="fc" id="L175">                    }</span>
+                    case &quot;isbn&quot; -&gt; {
+<span class="fc" id="L177">                        parseStyleContent(reader, fields, StandardField.ISBN, elementName);</span>
+<span class="fc" id="L178">                    }</span>
+                    case &quot;electronic-resource-num&quot; -&gt; {
+<span class="fc" id="L180">                        parseStyleContent(reader, fields, StandardField.DOI, elementName);</span>
+<span class="fc" id="L181">                    }</span>
+                    case &quot;publisher&quot; -&gt; {
+<span class="fc" id="L183">                        parseStyleContent(reader, fields, StandardField.PUBLISHER, elementName);</span>
+<span class="fc" id="L184">                    }</span>
+                    case &quot;label&quot; -&gt; {
+<span class="fc" id="L186">                        parseStyleContent(reader, fields, new UnknownField(&quot;endnote-label&quot;), elementName);</span>
+                    }
+                }
+            }
+<span class="fc bfc" id="L190" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L191">                break;</span>
+            }
+        }
+
+<span class="fc" id="L195">        BibEntry entry = new BibEntry(entryType);</span>
+<span class="fc" id="L196">        entry.putKeywords(keywordList, preferences.bibEntryPreferences().getKeywordSeparator());</span>
+
+<span class="fc" id="L198">        entry.setField(fields);</span>
+<span class="fc" id="L199">        entry.setFiles(linkedFiles);</span>
+<span class="fc" id="L200">        bibItems.add(entry);</span>
+<span class="fc" id="L201">    }</span>
+
+    private static EntryType convertRefNameToType(String refName) {
+<span class="pc bpc" id="L204" title="3 of 6 branches missed.">        return switch (refName.toLowerCase().trim()) {</span>
+<span class="nc" id="L205">            case &quot;artwork&quot;, &quot;generic&quot; -&gt; StandardEntryType.Misc;</span>
+<span class="nc" id="L206">            case &quot;electronic article&quot; -&gt; IEEETranEntryType.Electronic;</span>
+<span class="nc" id="L207">            case &quot;book section&quot; -&gt; StandardEntryType.InBook;</span>
+<span class="fc" id="L208">            case &quot;book&quot; -&gt; StandardEntryType.Book;</span>
+<span class="fc" id="L209">            case &quot;report&quot; -&gt; StandardEntryType.Report;</span>
+            // case &quot;journal article&quot; -&gt; StandardEntryType.Article;
+<span class="fc" id="L211">            default -&gt; StandardEntryType.Article;</span>
+        };
+    }
+
+    private void handleAuthorList(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement) throws XMLStreamException {
+<span class="fc" id="L216">        List&lt;String&gt; authorNames = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L219">            reader.next();</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L221">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                switch (elementName) {</span>
+                    case &quot;author&quot; -&gt; {
+<span class="fc" id="L224">                        parseAuthor(reader, authorNames);</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L229" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L230">                break;</span>
+            }
+        }
+<span class="fc" id="L233">        fields.put(StandardField.AUTHOR, join(authorNames, &quot; and &quot;));</span>
+<span class="fc" id="L234">    }</span>
+
+    private void parseAuthor(XMLStreamReader reader, List&lt;String&gt; authorNames) throws XMLStreamException {
+
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L239">            reader.next();</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L241">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">                switch (elementName) {</span>
+                    case &quot;style&quot; -&gt; {
+<span class="fc" id="L244">                        reader.next();</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L246">                            authorNames.add(reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L252" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; &quot;author&quot;.equals(reader.getName().getLocalPart())) {</span>
+<span class="fc" id="L253">                break;</span>
+            }
+        }
+<span class="fc" id="L256">    }</span>
+
+    private void parseStyleContent(XMLStreamReader reader, Map&lt;Field, String&gt; fields, Field field, String elementName) throws XMLStreamException {
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L260">            reader.next();</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L262">                String tag = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">                if (&quot;style&quot;.equals(tag)) {</span>
+<span class="fc" id="L264">                    reader.next();</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                    if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc bfc" id="L266" title="All 6 branches covered.">                        if (&quot;abstract&quot;.equals(elementName) || &quot;electronic-resource-num&quot;.equals(elementName) || &quot;notes&quot;.equals(elementName)) {</span>
+<span class="fc" id="L267">                            putIfValueNotNull(fields, field, reader.getText().trim());</span>
+<span class="fc bfc" id="L268" title="All 4 branches covered.">                        } else if (&quot;isbn&quot;.equals(elementName) || &quot;secondary-title&quot;.equals(elementName)) {</span>
+<span class="fc" id="L269">                            putIfValueNotNull(fields, field, clean(reader.getText()));</span>
+                        } else {
+<span class="fc" id="L271">                            putIfValueNotNull(fields, field, reader.getText());</span>
+                        }
+                    }
+                }
+            }
+<span class="fc bfc" id="L276" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(elementName)) {</span>
+<span class="fc" id="L277">                break;</span>
+            }
+        }
+<span class="fc" id="L280">    }</span>
+
+    private void parseYear(XMLStreamReader reader, Map&lt;Field, String&gt; fields) throws XMLStreamException {
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L284">            reader.next();</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L286">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                switch (elementName) {</span>
+                    case &quot;style&quot; -&gt; {
+<span class="fc" id="L289">                        reader.next();</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L291">                            putIfValueNotNull(fields, StandardField.YEAR, reader.getText());</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L297" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; &quot;year&quot;.equals(reader.getName().getLocalPart())) {</span>
+<span class="fc" id="L298">                break;</span>
+            }
+        }
+<span class="fc" id="L301">    }</span>
+
+    private void handleKeywordsList(XMLStreamReader reader, KeywordList keywordList, String startElement) throws XMLStreamException {
+
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L306">            reader.next();</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L308">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">                switch (elementName) {</span>
+                    case &quot;keyword&quot; -&gt; {
+<span class="fc" id="L311">                        parseKeyword(reader, keywordList);</span>
+                    }
+                }
+            }
+<span class="fc bfc" id="L315" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L316">                break;</span>
+            }
+        }
+<span class="fc" id="L319">    }</span>
+
+    private void parseKeyword(XMLStreamReader reader, KeywordList keywordList) throws XMLStreamException {
+
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L324">            reader.next();</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L326">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                switch (elementName) {</span>
+                    case &quot;style&quot; -&gt; {
+<span class="fc" id="L329">                        reader.next();</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                        if (isCharacterXMLEvent(reader)) {</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">                            if (reader.getText() != null) {</span>
+<span class="fc" id="L332">                                keywordList.add(reader.getText());</span>
+                            }
+                        }
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L339" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; &quot;keyword&quot;.equals(reader.getName().getLocalPart())) {</span>
+<span class="fc" id="L340">                break;</span>
+            }
+        }
+<span class="fc" id="L343">    }</span>
+
+    private void handleTitles(XMLStreamReader reader, Map&lt;Field, String&gt; fields, String startElement) throws XMLStreamException {
+
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L348">            reader.next();</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L350">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L351" title="All 3 branches covered.">                switch (elementName) {</span>
+                    case &quot;title&quot; -&gt; {
+<span class="fc" id="L353">                        List&lt;String&gt; titleStyleContent = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">                        while (reader.hasNext()) {</span>
+<span class="fc" id="L355">                            reader.next();</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">                            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L357">                                String tag = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">                                if (&quot;style&quot;.equals(tag)) {</span>
+<span class="fc" id="L359">                                    reader.next();</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">                                    if (isCharacterXMLEvent(reader)) {</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">                                        if (reader.getText() != null) {</span>
+<span class="fc" id="L362">                                            titleStyleContent.add((reader.getText()));</span>
+                                        }
+                                    }
+                                }
+                            }
+<span class="fc bfc" id="L367" title="All 4 branches covered.">                            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(elementName)) {</span>
+<span class="fc" id="L368">                                break;</span>
+                            }
+                        }
+<span class="fc" id="L371">                        putIfValueNotNull(fields, StandardField.TITLE, clean(join(titleStyleContent, &quot;&quot;)));</span>
+<span class="fc" id="L372">                    }</span>
+                    case &quot;secondary-title&quot; -&gt; {
+<span class="fc" id="L374">                        parseStyleContent(reader, fields, StandardField.JOURNAL, elementName);</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L379" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; reader.getName().getLocalPart().equals(startElement)) {</span>
+<span class="fc" id="L380">                break;</span>
+            }
+        }
+<span class="fc" id="L383">    }</span>
+
+    private void handleUrlList(XMLStreamReader reader, Map&lt;Field, String&gt; fields, List&lt;LinkedFile&gt; linkedFiles) throws XMLStreamException {
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L387">            reader.next();</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L389">                String elementName = reader.getName().getLocalPart();</span>
+<span class="pc bpc" id="L390" title="1 of 3 branches missed.">                switch (elementName) {</span>
+                    case &quot;related-urls&quot; -&gt; {
+<span class="fc" id="L392">                        parseRelatedUrls(reader, fields);</span>
+<span class="fc" id="L393">                    }</span>
+                    case &quot;pdf-urls&quot; -&gt; {
+<span class="fc" id="L395">                        parsePdfUrls(reader, fields, linkedFiles);</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L400" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; &quot;urls&quot;.equals(reader.getName().getLocalPart())) {</span>
+<span class="fc" id="L401">                break;</span>
+            }
+        }
+<span class="fc" id="L404">    }</span>
+
+    private void parseRelatedUrls(XMLStreamReader reader, Map&lt;Field, String&gt; fields) throws XMLStreamException {
+
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L409">            reader.next();</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L411">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">                if (&quot;style&quot;.equals(elementName)) {</span>
+<span class="fc" id="L413">                    reader.next();</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                    if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L415">                        putIfValueNotNull(fields, StandardField.URL, reader.getText());</span>
+                    }
+                }
+<span class="fc bfc" id="L418" title="All 2 branches covered.">            } else if (isCharacterXMLEvent(reader)) {</span>
+<span class="fc" id="L419">                String value = clean(reader.getText());</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">                if (value.length() &gt; 0) {</span>
+<span class="fc" id="L421">                    putIfValueNotNull(fields, StandardField.URL, clean(value));</span>
+                }
+            }
+
+<span class="fc bfc" id="L425" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; &quot;related-urls&quot;.equals(reader.getName().getLocalPart())) {</span>
+<span class="fc" id="L426">                break;</span>
+            }
+        }
+<span class="fc" id="L429">    }</span>
+
+    private void parsePdfUrls(XMLStreamReader reader, Map&lt;Field, String&gt; fields, List&lt;LinkedFile&gt; linkedFiles) throws XMLStreamException {
+
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">        while (reader.hasNext()) {</span>
+<span class="fc" id="L434">            reader.next();</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">            if (isStartXMLEvent(reader)) {</span>
+<span class="fc" id="L436">                String elementName = reader.getName().getLocalPart();</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">                if (&quot;url&quot;.equals(elementName)) {</span>
+<span class="fc" id="L438">                    reader.next();</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">                    if (isStartXMLEvent(reader)) {</span>
+<span class="nc" id="L440">                        String tagName = reader.getName().getLocalPart();</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">                        if (&quot;style&quot;.equals(tagName)) {</span>
+<span class="nc" id="L442">                            reader.next();</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">                            if (isCharacterXMLEvent(reader)) {</span>
+                                try {
+<span class="nc" id="L445">                                    linkedFiles.add(new LinkedFile(new URL(reader.getText()), &quot;PDF&quot;));</span>
+<span class="nc" id="L446">                                } catch (</span>
+                                        MalformedURLException e) {
+<span class="nc" id="L448">                                    LOGGER.info(&quot;Unable to parse {}&quot;, reader.getText());</span>
+<span class="nc" id="L449">                                }</span>
+                            }
+                        }
+                    }
+                }
+            }
+<span class="fc bfc" id="L455" title="All 2 branches covered.">            if (isCharacterXMLEvent(reader)) {</span>
+                try {
+<span class="fc" id="L457">                    linkedFiles.add(new LinkedFile(new URL(reader.getText()), &quot;PDF&quot;));</span>
+<span class="fc" id="L458">                } catch (</span>
+                        MalformedURLException e) {
+<span class="fc" id="L460">                    LOGGER.info(&quot;Unable to parse {}&quot;, reader.getText());</span>
+<span class="fc" id="L461">                }</span>
+            }
+<span class="fc bfc" id="L463" title="All 4 branches covered.">            if (isEndXMLEvent(reader) &amp;&amp; &quot;pdf-urls&quot;.equals(reader.getName().getLocalPart())) {</span>
+<span class="fc" id="L464">                break;</span>
+            }
+        }
+<span class="fc" id="L467">    }</span>
+
+    private String clean(String input) {
+<span class="fc" id="L470">        return StringUtil.unifyLineBreaks(input, &quot; &quot;)</span>
+<span class="fc" id="L471">                         .trim()</span>
+<span class="fc" id="L472">                         .replaceAll(&quot; +&quot;, &quot; &quot;);</span>
+    }
+
+    private void putIfValueNotNull(Map&lt;Field, String&gt; fields, Field field, String value) {
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        if (value != null) {</span>
+<span class="fc" id="L477">            fields.put(field, value);</span>
+        }
+<span class="fc" id="L479">    }</span>
+
+    private boolean isCharacterXMLEvent(XMLStreamReader reader) {
+<span class="fc bfc" id="L482" title="All 2 branches covered.">        return reader.getEventType() == XMLEvent.CHARACTERS;</span>
+    }
+
+    private boolean isStartXMLEvent(XMLStreamReader reader) {
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        return reader.getEventType() == XMLEvent.START_ELEMENT;</span>
+    }
+
+    private boolean isEndXMLEvent(XMLStreamReader reader) {
+<span class="fc bfc" id="L490" title="All 2 branches covered.">        return reader.getEventType() == XMLEvent.END_ELEMENT;</span>
+    }
+
+    @Override
+    public List&lt;BibEntry&gt; parseEntries(InputStream inputStream) throws ParseException {
+        try {
+<span class="nc" id="L496">            return importDatabase(</span>
+<span class="nc" id="L497">                    new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))).getDatabase().getEntries();</span>
+<span class="nc" id="L498">        } catch (IOException e) {</span>
+<span class="nc" id="L499">            LOGGER.error(e.getLocalizedMessage(), e);</span>
+        }
+<span class="nc" id="L501">        return Collections.emptyList();</span>
+    }
+}
+
+
+
+
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

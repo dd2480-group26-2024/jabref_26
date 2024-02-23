@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OptionalFieldsTabBase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor</a> &gt; <span class="el_source">OptionalFieldsTabBase.java</span></div><h1>OptionalFieldsTabBase.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor;
+
+import java.util.LinkedHashSet;
+import java.util.Optional;
+import java.util.SequencedSet;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.scene.control.Tooltip;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.autocompleter.SuggestionProviders;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.pdf.search.IndexingTaskManager;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryType;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.field.Field;
+import org.jabref.preferences.PreferencesService;
+
+public class OptionalFieldsTabBase extends FieldsEditorTab {
+    private final BibEntryTypesManager entryTypesManager;
+    private final boolean isPrimaryOptionalFields;
+
+    public OptionalFieldsTabBase(String title,
+                                 boolean isPrimaryOptionalFields,
+                                 BibDatabaseContext databaseContext,
+                                 SuggestionProviders suggestionProviders,
+                                 UndoManager undoManager,
+                                 DialogService dialogService,
+                                 PreferencesService preferences,
+                                 StateManager stateManager,
+                                 ThemeManager themeManager,
+                                 IndexingTaskManager indexingTaskManager,
+                                 BibEntryTypesManager entryTypesManager,
+                                 TaskExecutor taskExecutor,
+                                 JournalAbbreviationRepository journalAbbreviationRepository) {
+<span class="nc" id="L45">        super(true,</span>
+                databaseContext,
+                suggestionProviders,
+                undoManager,
+                dialogService,
+                preferences,
+                stateManager,
+                themeManager,
+                taskExecutor,
+                journalAbbreviationRepository,
+                indexingTaskManager);
+<span class="nc" id="L56">        this.entryTypesManager = entryTypesManager;</span>
+<span class="nc" id="L57">        this.isPrimaryOptionalFields = isPrimaryOptionalFields;</span>
+<span class="nc" id="L58">        setText(title);</span>
+<span class="nc" id="L59">        setTooltip(new Tooltip(Localization.lang(&quot;Show optional fields&quot;)));</span>
+<span class="nc" id="L60">        setGraphic(IconTheme.JabRefIcons.OPTIONAL.getGraphicNode());</span>
+<span class="nc" id="L61">    }</span>
+
+    @Override
+    protected SequencedSet&lt;Field&gt; determineFieldsToShow(BibEntry entry) {
+<span class="nc" id="L65">        BibDatabaseMode mode = databaseContext.getMode();</span>
+<span class="nc" id="L66">        Optional&lt;BibEntryType&gt; entryType = entryTypesManager.enrich(entry.getType(), mode);</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (entryType.isPresent()) {</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            if (isPrimaryOptionalFields) {</span>
+<span class="nc" id="L69">                return entryType.get().getPrimaryOptionalFields();</span>
+            } else {
+<span class="nc" id="L71">                return entryType.get().getSecondaryOptionalNotDeprecatedFields(mode);</span>
+            }
+        } else {
+            // Entry type unknown -&gt; treat all fields as required (thus no optional fields)
+<span class="nc" id="L75">            return new LinkedHashSet&lt;&gt;();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

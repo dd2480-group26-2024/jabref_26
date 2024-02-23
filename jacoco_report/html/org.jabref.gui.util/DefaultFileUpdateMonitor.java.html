@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultFileUpdateMonitor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">DefaultFileUpdateMonitor.java</span></div><h1>DefaultFileUpdateMonitor.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import java.io.IOException;
+import java.nio.file.ClosedWatchServiceException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.jabref.logic.JabRefException;
+import org.jabref.logic.WatchServiceUnavailableException;
+import org.jabref.model.util.FileUpdateListener;
+import org.jabref.model.util.FileUpdateMonitor;
+
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class monitors a set of files for changes. Upon detecting a change it notifies the registered {@link
+ * FileUpdateListener}s.
+ * &lt;p&gt;
+ * Implementation based on &lt;a href=&quot;https://stackoverflow.com/questions/16251273/can-i-watch-for-single-file-change-with-watchservice-not-the-whole-directory&quot;&gt;https://stackoverflow.com/questions/16251273/can-i-watch-for-single-file-change-with-watchservice-not-the-whole-directory&lt;/a&gt;.
+ */
+<span class="fc" id="L31">public class DefaultFileUpdateMonitor implements Runnable, FileUpdateMonitor {</span>
+
+<span class="fc" id="L33">    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultFileUpdateMonitor.class);</span>
+
+<span class="fc" id="L35">    private final Multimap&lt;Path, FileUpdateListener&gt; listeners = ArrayListMultimap.create(20, 4);</span>
+    private volatile WatchService watcher;
+<span class="fc" id="L37">    private final AtomicBoolean notShutdown = new AtomicBoolean(true);</span>
+<span class="fc" id="L38">    private final AtomicReference&lt;Optional&lt;JabRefException&gt;&gt; filesystemMonitorFailure = new AtomicReference&lt;&gt;(Optional.empty());</span>
+
+    @Override
+    public void run() {
+<span class="fc" id="L42">        try (WatchService watcher = FileSystems.getDefault().newWatchService()) {</span>
+<span class="fc" id="L43">            this.watcher = watcher;</span>
+<span class="fc" id="L44">            filesystemMonitorFailure.set(Optional.empty());</span>
+
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            while (notShutdown.get()) {</span>
+                WatchKey key;
+                try {
+<span class="fc" id="L49">                    key = watcher.take();</span>
+<span class="fc" id="L50">                } catch (InterruptedException | ClosedWatchServiceException e) {</span>
+<span class="fc" id="L51">                    return;</span>
+<span class="fc" id="L52">                }</span>
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                for (WatchEvent&lt;?&gt; event : key.pollEvents()) {</span>
+<span class="fc" id="L55">                    WatchEvent.Kind&lt;?&gt; kind = event.kind();</span>
+
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                    if (kind == StandardWatchEventKinds.OVERFLOW) {</span>
+<span class="nc" id="L58">                        Thread.yield();</span>
+<span class="nc" id="L59">                        continue;</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">                    } else if (kind == StandardWatchEventKinds.ENTRY_CREATE || kind == StandardWatchEventKinds.ENTRY_MODIFY) {</span>
+                        // We only handle &quot;ENTRY_CREATE&quot; and &quot;ENTRY_MODIFY&quot; here, so the context is always a Path
+                        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L63">                        WatchEvent&lt;Path&gt; ev = (WatchEvent&lt;Path&gt;) event;</span>
+<span class="fc" id="L64">                        Path path = ((Path) key.watchable()).resolve(ev.context());</span>
+<span class="fc" id="L65">                        notifyAboutChange(path);</span>
+                    }
+<span class="fc" id="L67">                    key.reset();</span>
+<span class="fc" id="L68">                }</span>
+<span class="fc" id="L69">                Thread.yield();</span>
+<span class="fc" id="L70">            }</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        } catch (IOException e) {</span>
+<span class="nc" id="L72">            JabRefException exception = new WatchServiceUnavailableException(</span>
+<span class="nc" id="L73">                    e.getMessage(), e.getLocalizedMessage(), e.getCause());</span>
+<span class="nc" id="L74">            filesystemMonitorFailure.set(Optional.of(exception));</span>
+<span class="nc" id="L75">            LOGGER.warn(&quot;Error during watching&quot;, e);</span>
+<span class="nc" id="L76">        }</span>
+<span class="nc" id="L77">    }</span>
+
+    @Override
+    public boolean isActive() {
+<span class="fc" id="L81">        return filesystemMonitorFailure.get().isEmpty();</span>
+    }
+
+    private void notifyAboutChange(Path path) {
+<span class="fc" id="L85">        listeners.get(path).forEach(FileUpdateListener::fileUpdated);</span>
+<span class="fc" id="L86">    }</span>
+
+    @Override
+    public void addListenerForFile(Path file, FileUpdateListener listener) throws IOException {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (isActive()) {</span>
+            // We can't watch files directly, so monitor their parent directory for updates
+<span class="fc" id="L92">            Path directory = file.toAbsolutePath().getParent();</span>
+<span class="fc" id="L93">            directory.register(watcher, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_MODIFY);</span>
+<span class="fc" id="L94">            listeners.put(file, listener);</span>
+<span class="fc" id="L95">        } else {</span>
+<span class="nc" id="L96">            LOGGER.warn(&quot;Not adding listener {} to file {} because the file update monitor isn't active&quot;, listener, file);</span>
+        }
+<span class="fc" id="L98">    }</span>
+
+    @Override
+    public void removeListener(Path path, FileUpdateListener listener) {
+<span class="nc" id="L102">        listeners.remove(path, listener);</span>
+<span class="nc" id="L103">    }</span>
+
+    @Override
+    public void shutdown() {
+        try {
+<span class="fc" id="L108">            notShutdown.set(false);</span>
+<span class="fc" id="L109">            WatchService watcher = this.watcher;</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (watcher != null) {</span>
+<span class="fc" id="L111">                watcher.close();</span>
+            }
+<span class="nc" id="L113">        } catch (IOException e) {</span>
+<span class="nc" id="L114">            LOGGER.error(&quot;error closing watcher&quot;, e);</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CffImporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fileformat</a> &gt; <span class="el_source">CffImporter.java</span></div><h1>CffImporter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fileformat;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.importer.Importer;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.BiblatexSoftwareField;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.entry.types.StandardEntryType;
+
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+
+<span class="fc" id="L28">public class CffImporter extends Importer {</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L32">        return &quot;CFF&quot;;</span>
+    }
+
+    @Override
+    public StandardFileType getFileType() {
+<span class="fc" id="L37">        return StandardFileType.CFF;</span>
+    }
+
+    @Override
+    public String getId() {
+<span class="fc" id="L42">        return &quot;cff&quot;;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="fc" id="L47">        return &quot;Importer for the CFF format. Is only used to cite software, one entry per file.&quot;;</span>
+    }
+
+    // POJO classes for yaml data
+    private static class CffFormat {
+<span class="fc" id="L52">        private final HashMap&lt;String, String&gt; values = new HashMap&lt;&gt;();</span>
+
+        @JsonProperty(&quot;authors&quot;)
+        private List&lt;CffAuthor&gt; authors;
+
+        @JsonProperty(&quot;identifiers&quot;)
+        private List&lt;CffIdentifier&gt; ids;
+
+<span class="fc" id="L60">        public CffFormat() {</span>
+<span class="fc" id="L61">        }</span>
+
+        @JsonAnySetter
+        private void setValues(String key, String value) {
+<span class="fc" id="L65">            values.put(key, value);</span>
+<span class="fc" id="L66">        }</span>
+    }
+
+    private static class CffAuthor {
+<span class="fc" id="L70">        private final HashMap&lt;String, String&gt; values = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L72">        public CffAuthor() {</span>
+<span class="fc" id="L73">        }</span>
+
+        @JsonAnySetter
+        private void setValues(String key, String value) {
+<span class="fc" id="L77">            values.put(key, value);</span>
+<span class="fc" id="L78">        }</span>
+    }
+
+    private static class CffIdentifier {
+        @JsonProperty(&quot;type&quot;)
+        private String type;
+        @JsonProperty(&quot;value&quot;)
+        private String value;
+
+<span class="fc" id="L87">        public CffIdentifier() {</span>
+<span class="fc" id="L88">        }</span>
+    }
+
+    @Override
+    public ParserResult importDatabase(BufferedReader reader) throws IOException {
+<span class="fc" id="L93">        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());</span>
+<span class="fc" id="L94">        CffFormat citation = mapper.readValue(reader, CffFormat.class);</span>
+<span class="fc" id="L95">        HashMap&lt;Field, String&gt; entryMap = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L96">        StandardEntryType entryType = StandardEntryType.Software;</span>
+
+        // Map CFF fields to JabRef Fields
+<span class="fc" id="L99">        HashMap&lt;String, Field&gt; fieldMap = getFieldMappings();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; property : citation.values.entrySet()) {</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (fieldMap.containsKey(property.getKey())) {</span>
+<span class="fc" id="L102">                entryMap.put(fieldMap.get(property.getKey()), property.getValue());</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            } else if (&quot;type&quot;.equals(property.getKey())) {</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                if (&quot;dataset&quot;.equals(property.getValue())) {</span>
+<span class="fc" id="L105">                    entryType = StandardEntryType.Dataset;</span>
+                }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            } else if (getUnmappedFields().contains(property.getKey())) {</span>
+<span class="fc" id="L108">                entryMap.put(new UnknownField(property.getKey()), property.getValue());</span>
+            }
+<span class="fc" id="L110">        }</span>
+
+        // Translate CFF author format to JabRef author format
+<span class="fc" id="L113">        String authorStr = citation.authors.stream()</span>
+<span class="fc" id="L114">                        .map(author -&gt; author.values)</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                        .map(vals -&gt; vals.get(&quot;name&quot;) != null ?</span>
+<span class="nc" id="L116">                                new Author(vals.get(&quot;name&quot;), &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;) :</span>
+<span class="fc" id="L117">                                new Author(vals.get(&quot;given-names&quot;), null, vals.get(&quot;name-particle&quot;),</span>
+<span class="fc" id="L118">                                        vals.get(&quot;family-names&quot;), vals.get(&quot;name-suffix&quot;)))</span>
+<span class="fc" id="L119">                        .collect(AuthorList.collect())</span>
+<span class="fc" id="L120">                        .getAsFirstLastNamesWithAnd();</span>
+<span class="fc" id="L121">        entryMap.put(StandardField.AUTHOR, authorStr);</span>
+
+        // Select DOI to keep
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">        if ((entryMap.get(StandardField.DOI) == null) &amp;&amp; (citation.ids != null)) {</span>
+<span class="fc" id="L125">            List&lt;CffIdentifier&gt; doiIds = citation.ids.stream()</span>
+<span class="fc" id="L126">                            .filter(id -&gt; &quot;doi&quot;.equals(id.type))</span>
+<span class="fc" id="L127">                            .collect(Collectors.toList());</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (doiIds.size() == 1) {</span>
+<span class="fc" id="L129">                entryMap.put(StandardField.DOI, doiIds.getFirst().value);</span>
+            }
+        }
+
+        // Select SWHID to keep
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (citation.ids != null) {</span>
+<span class="fc" id="L135">            List&lt;String&gt; swhIds = citation.ids.stream()</span>
+<span class="fc" id="L136">                                           .filter(id -&gt; &quot;swh&quot;.equals(id.type))</span>
+<span class="fc" id="L137">                                           .map(id -&gt; id.value)</span>
+<span class="fc" id="L138">                                           .collect(Collectors.toList());</span>
+
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (swhIds.size() == 1) {</span>
+<span class="fc" id="L141">                entryMap.put(BiblatexSoftwareField.SWHID, swhIds.getFirst());</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            } else if (swhIds.size() &gt; 1) {</span>
+<span class="fc" id="L143">                List&lt;String&gt; relSwhIds = swhIds.stream()</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                                               .filter(id -&gt; id.split(&quot;:&quot;).length &gt; 3) // quick filter for invalid swhids</span>
+<span class="fc" id="L145">                                               .filter(id -&gt; &quot;rel&quot;.equals(id.split(&quot;:&quot;)[2]))</span>
+<span class="fc" id="L146">                                               .collect(Collectors.toList());</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                if (relSwhIds.size() == 1) {</span>
+<span class="fc" id="L148">                    entryMap.put(BiblatexSoftwareField.SWHID, relSwhIds.getFirst());</span>
+                }
+            }
+        }
+
+<span class="fc" id="L153">        BibEntry entry = new BibEntry(entryType);</span>
+<span class="fc" id="L154">        entry.setField(entryMap);</span>
+
+<span class="fc" id="L156">        List&lt;BibEntry&gt; entriesList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L157">        entriesList.add(entry);</span>
+
+<span class="fc" id="L159">        return new ParserResult(entriesList);</span>
+    }
+
+    @Override
+    public boolean isRecognizedFormat(BufferedReader reader) throws IOException {
+
+<span class="fc" id="L165">        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());</span>
+        CffFormat citation;
+
+        try {
+<span class="fc" id="L169">            citation = mapper.readValue(reader, CffFormat.class);</span>
+<span class="pc bpc" id="L170" title="1 of 4 branches missed.">            return (citation != null) &amp;&amp; (citation.values.get(&quot;title&quot;) != null);</span>
+<span class="fc" id="L171">        } catch (IOException e) {</span>
+<span class="fc" id="L172">            return false;</span>
+        }
+    }
+
+    private HashMap&lt;String, Field&gt; getFieldMappings() {
+<span class="fc" id="L177">        HashMap&lt;String, Field&gt; fieldMappings = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L178">        fieldMappings.put(&quot;title&quot;, StandardField.TITLE);</span>
+<span class="fc" id="L179">        fieldMappings.put(&quot;version&quot;, StandardField.VERSION);</span>
+<span class="fc" id="L180">        fieldMappings.put(&quot;doi&quot;, StandardField.DOI);</span>
+<span class="fc" id="L181">        fieldMappings.put(&quot;license&quot;, BiblatexSoftwareField.LICENSE);</span>
+<span class="fc" id="L182">        fieldMappings.put(&quot;repository&quot;, BiblatexSoftwareField.REPOSITORY);</span>
+<span class="fc" id="L183">        fieldMappings.put(&quot;url&quot;, StandardField.URL);</span>
+<span class="fc" id="L184">        fieldMappings.put(&quot;abstract&quot;, StandardField.ABSTRACT);</span>
+<span class="fc" id="L185">        fieldMappings.put(&quot;message&quot;, StandardField.COMMENT);</span>
+<span class="fc" id="L186">        fieldMappings.put(&quot;date-released&quot;, StandardField.DATE);</span>
+<span class="fc" id="L187">        fieldMappings.put(&quot;keywords&quot;, StandardField.KEYWORDS);</span>
+<span class="fc" id="L188">        return fieldMappings;</span>
+    }
+
+    private List&lt;String&gt; getUnmappedFields() {
+<span class="fc" id="L192">        List&lt;String&gt; fields = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L194">        fields.add(&quot;commit&quot;);</span>
+<span class="fc" id="L195">        fields.add(&quot;license-url&quot;);</span>
+<span class="fc" id="L196">        fields.add(&quot;repository-code&quot;);</span>
+<span class="fc" id="L197">        fields.add(&quot;repository-artifact&quot;);</span>
+
+<span class="fc" id="L199">        return fields;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,1162 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JabRefFrame.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui</a> &gt; <span class="el_source">JabRefFrame.java</span></div><h1>JabRefFrame.java</h1><pre class="source lang-java linenums">package org.jabref.gui;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.TimerTask;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
+import javafx.application.Platform;
+import javafx.beans.InvalidationListener;
+import javafx.beans.Observable;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.binding.StringBinding;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableBooleanValue;
+import javafx.collections.transformation.FilteredList;
+import javafx.event.Event;
+import javafx.scene.Node;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.control.skin.TabPaneSkin;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.TransferMode;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.desktop.JabRefDesktop;
+import org.jabref.gui.importer.ImportEntriesDialog;
+import org.jabref.gui.importer.NewEntryAction;
+import org.jabref.gui.importer.ParserResultWarningDialog;
+import org.jabref.gui.importer.actions.OpenDatabaseAction;
+import org.jabref.gui.keyboard.KeyBinding;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.gui.libraryproperties.LibraryPropertiesAction;
+import org.jabref.gui.menus.FileHistoryMenu;
+import org.jabref.gui.push.PushToApplicationCommand;
+import org.jabref.gui.search.GlobalSearchBar;
+import org.jabref.gui.sidepane.SidePane;
+import org.jabref.gui.sidepane.SidePaneType;
+import org.jabref.gui.undo.CountingUndoManager;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.UiCommand;
+import org.jabref.logic.importer.ImportCleanup;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.shared.DatabaseNotSupportedException;
+import org.jabref.logic.shared.exception.InvalidDBMSConnectionPropertiesException;
+import org.jabref.logic.shared.exception.NotASharedDatabaseException;
+import org.jabref.logic.undo.AddUndoableActionEvent;
+import org.jabref.logic.undo.UndoChangeEvent;
+import org.jabref.logic.undo.UndoRedoEvent;
+import org.jabref.logic.util.OS;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.groups.GroupTreeNode;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+import org.jabref.preferences.TelemetryPreferences;
+
+import com.google.common.eventbus.Subscribe;
+import com.tobiasdiez.easybind.EasyBind;
+import com.tobiasdiez.easybind.EasyObservableList;
+import com.tobiasdiez.easybind.Subscription;
+import org.fxmisc.richtext.CodeArea;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Represents the inner frame of the JabRef window
+ */
+public class JabRefFrame extends BorderPane implements LibraryTabContainer {
+
+    public static final String FRAME_TITLE = &quot;JabRef&quot;;
+
+<span class="nc" id="L99">    private static final Logger LOGGER = LoggerFactory.getLogger(JabRefFrame.class);</span>
+
+<span class="nc" id="L101">    private final SplitPane splitPane = new SplitPane();</span>
+    private final PreferencesService prefs;
+    private final GlobalSearchBar globalSearchBar;
+
+    private final FileHistoryMenu fileHistory;
+
+    @SuppressWarnings({&quot;FieldCanBeLocal&quot;}) private EasyObservableList&lt;BibDatabaseContext&gt; openDatabaseList;
+
+    private final Stage mainStage;
+    private final StateManager stateManager;
+    private final CountingUndoManager undoManager;
+    private final DialogService dialogService;
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final BibEntryTypesManager entryTypesManager;
+    private final PushToApplicationCommand pushToApplicationCommand;
+    private SidePane sidePane;
+    private TabPane tabbedPane;
+
+    private Subscription dividerSubscription;
+    private BooleanBinding loadingBinding;
+    private Subscription loadingSubscription;
+
+    private final TaskExecutor taskExecutor;
+
+    public JabRefFrame(Stage mainStage,
+                       DialogService dialogService,
+                       FileUpdateMonitor fileUpdateMonitor,
+<span class="nc" id="L128">                       PreferencesService preferencesService) {</span>
+<span class="nc" id="L129">        this.mainStage = mainStage;</span>
+<span class="nc" id="L130">        this.dialogService = dialogService;</span>
+<span class="nc" id="L131">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="nc" id="L132">        this.prefs = preferencesService;</span>
+
+<span class="nc" id="L134">        this.stateManager = Globals.stateManager;</span>
+<span class="nc" id="L135">        this.undoManager = Globals.undoManager;</span>
+<span class="nc" id="L136">        this.entryTypesManager = Globals.entryTypesManager;</span>
+<span class="nc" id="L137">        this.taskExecutor = Globals.TASK_EXECUTOR;</span>
+
+<span class="nc" id="L139">        this.globalSearchBar = new GlobalSearchBar(this, stateManager, prefs, undoManager, dialogService);</span>
+<span class="nc" id="L140">        this.pushToApplicationCommand = new PushToApplicationCommand(stateManager, dialogService, prefs, taskExecutor);</span>
+<span class="nc" id="L141">        this.fileHistory = new FileHistoryMenu(prefs.getGuiPreferences().getFileHistory(), dialogService, getOpenDatabaseAction());</span>
+
+<span class="nc" id="L143">        this.setOnKeyTyped(key -&gt; {</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (this.fileHistory.isShowing()) {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                if (this.fileHistory.openFileByKey(key)) {</span>
+<span class="nc" id="L146">                    this.fileHistory.getParentMenu().hide();</span>
+                }
+            }
+<span class="nc" id="L149">        });</span>
+
+<span class="nc" id="L151">        init();</span>
+<span class="nc" id="L152">    }</span>
+
+    private void initDragAndDrop() {
+<span class="nc" id="L155">        Tab dndIndicator = new Tab(Localization.lang(&quot;Open files...&quot;), null);</span>
+<span class="nc" id="L156">        dndIndicator.getStyleClass().add(&quot;drop&quot;);</span>
+
+<span class="nc" id="L158">        EasyBind.subscribe(tabbedPane.skinProperty(), skin -&gt; {</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            if (!(skin instanceof TabPaneSkin)) {</span>
+<span class="nc" id="L160">                return;</span>
+            }
+            // Add drag and drop listeners to JabRefFrame
+<span class="nc" id="L163">            this.getScene().setOnDragOver(event -&gt; onSceneDragOver(event, dndIndicator));</span>
+<span class="nc" id="L164">            this.getScene().setOnDragEntered(event -&gt; {</span>
+                // It is necessary to setOnDragOver for newly opened tabs
+                // drag'n'drop on tabs covered dnd on tabbedPane, so dnd on tabs should contain all dnds on tabbedPane
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                for (Node destinationTabNode : tabbedPane.lookupAll(&quot;.tab&quot;)) {</span>
+<span class="nc" id="L168">                    destinationTabNode.setOnDragOver(tabDragEvent -&gt; onTabDragOver(event, tabDragEvent, dndIndicator));</span>
+<span class="nc" id="L169">                    destinationTabNode.setOnDragExited(event1 -&gt; tabbedPane.getTabs().remove(dndIndicator));</span>
+<span class="nc" id="L170">                    destinationTabNode.setOnDragDropped(tabDragEvent -&gt; onTabDragDropped(destinationTabNode, tabDragEvent, dndIndicator));</span>
+<span class="nc" id="L171">                }</span>
+<span class="nc" id="L172">                event.consume();</span>
+<span class="nc" id="L173">            });</span>
+<span class="nc" id="L174">            this.getScene().setOnDragExited(event -&gt; tabbedPane.getTabs().remove(dndIndicator));</span>
+<span class="nc" id="L175">            this.getScene().setOnDragDropped(event -&gt; onSceneDragDropped(event, dndIndicator));</span>
+<span class="nc" id="L176">        });</span>
+<span class="nc" id="L177">    }</span>
+
+    private void onTabDragDropped(Node destinationTabNode, DragEvent tabDragEvent, Tab dndIndicator) {
+<span class="nc" id="L180">        Dragboard dragboard = tabDragEvent.getDragboard();</span>
+
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (DragAndDropHelper.hasBibFiles(dragboard)) {</span>
+<span class="nc" id="L183">            tabbedPane.getTabs().remove(dndIndicator);</span>
+<span class="nc" id="L184">            List&lt;Path&gt; bibFiles = DragAndDropHelper.getBibFiles(dragboard);</span>
+<span class="nc" id="L185">            OpenDatabaseAction openDatabaseAction = this.getOpenDatabaseAction();</span>
+<span class="nc" id="L186">            openDatabaseAction.openFiles(bibFiles);</span>
+<span class="nc" id="L187">            tabDragEvent.setDropCompleted(true);</span>
+<span class="nc" id="L188">            tabDragEvent.consume();</span>
+<span class="nc" id="L189">        } else {</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            for (Tab libraryTab : tabbedPane.getTabs()) {</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                if (libraryTab.getId().equals(destinationTabNode.getId()) &amp;&amp;</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                        !tabbedPane.getSelectionModel().getSelectedItem().equals(libraryTab)) {</span>
+<span class="nc" id="L193">                    LibraryTab destinationLibraryTab = (LibraryTab) libraryTab;</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                    if (DragAndDropHelper.hasGroups(dragboard)) {</span>
+<span class="nc" id="L195">                        List&lt;String&gt; groupPathToSources = DragAndDropHelper.getGroups(dragboard);</span>
+
+<span class="nc" id="L197">                        copyRootNode(destinationLibraryTab);</span>
+
+<span class="nc" id="L199">                        GroupTreeNode destinationLibraryGroupRoot = destinationLibraryTab</span>
+<span class="nc" id="L200">                                .getBibDatabaseContext()</span>
+<span class="nc" id="L201">                                .getMetaData()</span>
+<span class="nc" id="L202">                                .getGroups().get();</span>
+
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                        for (String pathToSource : groupPathToSources) {</span>
+<span class="nc" id="L205">                            GroupTreeNode groupTreeNodeToCopy = getCurrentLibraryTab()</span>
+<span class="nc" id="L206">                                    .getBibDatabaseContext()</span>
+<span class="nc" id="L207">                                    .getMetaData()</span>
+<span class="nc" id="L208">                                    .getGroups()</span>
+<span class="nc" id="L209">                                    .get()</span>
+<span class="nc" id="L210">                                    .getChildByPath(pathToSource)</span>
+<span class="nc" id="L211">                                    .get();</span>
+<span class="nc" id="L212">                            copyGroupTreeNode((LibraryTab) libraryTab, destinationLibraryGroupRoot, groupTreeNodeToCopy);</span>
+<span class="nc" id="L213">                        }</span>
+<span class="nc" id="L214">                        return;</span>
+                    }
+<span class="nc" id="L216">                    destinationLibraryTab.dropEntry(stateManager.getLocalDragboard().getBibEntries());</span>
+                }
+<span class="nc" id="L218">            }</span>
+<span class="nc" id="L219">            tabDragEvent.consume();</span>
+        }
+<span class="nc" id="L221">    }</span>
+
+    private void onTabDragOver(DragEvent event, DragEvent tabDragEvent, Tab dndIndicator) {
+<span class="nc bnc" id="L224" title="All 4 branches missed.">        if (DragAndDropHelper.hasBibFiles(tabDragEvent.getDragboard()) || DragAndDropHelper.hasGroups(tabDragEvent.getDragboard())) {</span>
+<span class="nc" id="L225">            tabDragEvent.acceptTransferModes(TransferMode.ANY);</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (!tabbedPane.getTabs().contains(dndIndicator)) {</span>
+<span class="nc" id="L227">                tabbedPane.getTabs().add(dndIndicator);</span>
+            }
+<span class="nc" id="L229">            event.consume();</span>
+        } else {
+<span class="nc" id="L231">            tabbedPane.getTabs().remove(dndIndicator);</span>
+        }
+
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (tabDragEvent.getDragboard().hasContent(DragAndDropDataFormats.ENTRIES)) {</span>
+<span class="nc" id="L235">            tabDragEvent.acceptTransferModes(TransferMode.COPY);</span>
+<span class="nc" id="L236">            tabDragEvent.consume();</span>
+        }
+<span class="nc" id="L238">    }</span>
+
+    private void onSceneDragOver(DragEvent event, Tab dndIndicator) {
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (DragAndDropHelper.hasBibFiles(event.getDragboard())) {</span>
+<span class="nc" id="L242">            event.acceptTransferModes(TransferMode.ANY);</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            if (!tabbedPane.getTabs().contains(dndIndicator)) {</span>
+<span class="nc" id="L244">                tabbedPane.getTabs().add(dndIndicator);</span>
+            }
+<span class="nc" id="L246">            event.consume();</span>
+        } else {
+<span class="nc" id="L248">            tabbedPane.getTabs().remove(dndIndicator);</span>
+        }
+        // Accept drag entries from MainTable
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        if (event.getDragboard().hasContent(DragAndDropDataFormats.ENTRIES)) {</span>
+<span class="nc" id="L252">            event.acceptTransferModes(TransferMode.COPY);</span>
+<span class="nc" id="L253">            event.consume();</span>
+        }
+<span class="nc" id="L255">    }</span>
+
+    private void onSceneDragDropped(DragEvent event, Tab dndIndicator) {
+<span class="nc" id="L258">        tabbedPane.getTabs().remove(dndIndicator);</span>
+<span class="nc" id="L259">        List&lt;Path&gt; bibFiles = DragAndDropHelper.getBibFiles(event.getDragboard());</span>
+<span class="nc" id="L260">        OpenDatabaseAction openDatabaseAction = this.getOpenDatabaseAction();</span>
+<span class="nc" id="L261">        openDatabaseAction.openFiles(bibFiles);</span>
+<span class="nc" id="L262">        event.setDropCompleted(true);</span>
+<span class="nc" id="L263">        event.consume();</span>
+<span class="nc" id="L264">    }</span>
+
+    private void initKeyBindings() {
+<span class="nc" id="L267">        addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; {</span>
+<span class="nc" id="L268">            Optional&lt;KeyBinding&gt; keyBinding = Globals.getKeyPrefs().mapToKeyBinding(event);</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            if (keyBinding.isPresent()) {</span>
+<span class="nc bnc" id="L270" title="All 16 branches missed.">                switch (keyBinding.get()) {</span>
+                    case FOCUS_ENTRY_TABLE:
+<span class="nc" id="L272">                        getCurrentLibraryTab().getMainTable().requestFocus();</span>
+<span class="nc" id="L273">                        event.consume();</span>
+<span class="nc" id="L274">                        break;</span>
+                    case FOCUS_GROUP_LIST:
+<span class="nc" id="L276">                        sidePane.getSidePaneComponent(SidePaneType.GROUPS).requestFocus();</span>
+<span class="nc" id="L277">                        event.consume();</span>
+<span class="nc" id="L278">                    break;</span>
+                    case NEXT_LIBRARY:
+<span class="nc" id="L280">                        tabbedPane.getSelectionModel().selectNext();</span>
+<span class="nc" id="L281">                        event.consume();</span>
+<span class="nc" id="L282">                        break;</span>
+                    case PREVIOUS_LIBRARY:
+<span class="nc" id="L284">                        tabbedPane.getSelectionModel().selectPrevious();</span>
+<span class="nc" id="L285">                        event.consume();</span>
+<span class="nc" id="L286">                        break;</span>
+                    case SEARCH:
+<span class="nc" id="L288">                        globalSearchBar.focus();</span>
+<span class="nc" id="L289">                        break;</span>
+                    case NEW_ARTICLE:
+<span class="nc" id="L291">                        new NewEntryAction(this::getCurrentLibraryTab, StandardEntryType.Article, dialogService, prefs, stateManager).execute();</span>
+<span class="nc" id="L292">                        break;</span>
+                    case NEW_BOOK:
+<span class="nc" id="L294">                        new NewEntryAction(this::getCurrentLibraryTab, StandardEntryType.Book, dialogService, prefs, stateManager).execute();</span>
+<span class="nc" id="L295">                        break;</span>
+                    case NEW_INBOOK:
+<span class="nc" id="L297">                        new NewEntryAction(this::getCurrentLibraryTab, StandardEntryType.InBook, dialogService, prefs, stateManager).execute();</span>
+<span class="nc" id="L298">                        break;</span>
+                    case NEW_MASTERSTHESIS:
+<span class="nc" id="L300">                        new NewEntryAction(this::getCurrentLibraryTab, StandardEntryType.MastersThesis, dialogService, prefs, stateManager).execute();</span>
+<span class="nc" id="L301">                        break;</span>
+                    case NEW_PHDTHESIS:
+<span class="nc" id="L303">                        new NewEntryAction(this::getCurrentLibraryTab, StandardEntryType.PhdThesis, dialogService, prefs, stateManager).execute();</span>
+<span class="nc" id="L304">                        break;</span>
+                    case NEW_PROCEEDINGS:
+<span class="nc" id="L306">                        new NewEntryAction(this::getCurrentLibraryTab, StandardEntryType.Proceedings, dialogService, prefs, stateManager).execute();</span>
+<span class="nc" id="L307">                        break;</span>
+                    case NEW_TECHREPORT:
+<span class="nc" id="L309">                        new NewEntryAction(this::getCurrentLibraryTab, StandardEntryType.TechReport, dialogService, prefs, stateManager).execute();</span>
+<span class="nc" id="L310">                        break;</span>
+                    case NEW_UNPUBLISHED:
+<span class="nc" id="L312">                        new NewEntryAction(this::getCurrentLibraryTab, StandardEntryType.Unpublished, dialogService, prefs, stateManager).execute();</span>
+<span class="nc" id="L313">                        break;</span>
+                    case NEW_INPROCEEDINGS:
+<span class="nc" id="L315">                        new NewEntryAction(this::getCurrentLibraryTab, StandardEntryType.InProceedings, dialogService, prefs, stateManager).execute();</span>
+<span class="nc" id="L316">                        break;</span>
+                    case PASTE:
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                        if (OS.OS_X) { // Workaround for a jdk issue that executes paste twice when using cmd+v in a TextField</span>
+                            // Extra workaround for CodeArea, which does not inherit from TextInputControl
+<span class="nc bnc" id="L320" title="All 4 branches missed.">                            if (!(stateManager.getFocusOwner().isPresent() &amp;&amp; (stateManager.getFocusOwner().get() instanceof CodeArea))) {</span>
+<span class="nc" id="L321">                                event.consume();</span>
+<span class="nc" id="L322">                                break;</span>
+                            }
+                            break;
+                        }
+                        break;
+                    default:
+                }
+            }
+<span class="nc" id="L330">        });</span>
+<span class="nc" id="L331">    }</span>
+
+    private void initShowTrackingNotification() {
+<span class="nc bnc" id="L334" title="All 2 branches missed.">        if (prefs.getTelemetryPreferences().shouldAskToCollectTelemetry()) {</span>
+<span class="nc" id="L335">            JabRefExecutorService.INSTANCE.submit(new TimerTask() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L338">                    DefaultTaskExecutor.runInJavaFXThread(JabRefFrame.this::showTrackingNotification);</span>
+<span class="nc" id="L339">                }</span>
+            }, 60000); // run in one minute
+        }
+<span class="nc" id="L342">    }</span>
+
+    private void showTrackingNotification() {
+<span class="nc" id="L345">        TelemetryPreferences telemetryPreferences = prefs.getTelemetryPreferences();</span>
+<span class="nc" id="L346">        boolean shouldCollect = telemetryPreferences.shouldCollectTelemetry();</span>
+
+<span class="nc bnc" id="L348" title="All 2 branches missed.">        if (!telemetryPreferences.shouldCollectTelemetry()) {</span>
+<span class="nc" id="L349">            shouldCollect = dialogService.showConfirmationDialogAndWait(</span>
+<span class="nc" id="L350">                    Localization.lang(&quot;Telemetry: Help make JabRef better&quot;),</span>
+<span class="nc" id="L351">                    Localization.lang(&quot;To improve the user experience, we would like to collect anonymous statistics on the features you use. We will only record what features you access and how often you do it. We will neither collect any personal data nor the content of bibliographic items. If you choose to allow data collection, you can later disable it via File -&gt; Preferences -&gt; General.&quot;),</span>
+<span class="nc" id="L352">                    Localization.lang(&quot;Share anonymous statistics&quot;),</span>
+<span class="nc" id="L353">                    Localization.lang(&quot;Don't share&quot;));</span>
+        }
+
+<span class="nc" id="L356">        telemetryPreferences.setCollectTelemetry(shouldCollect);</span>
+<span class="nc" id="L357">        telemetryPreferences.setAskToCollectTelemetry(false);</span>
+<span class="nc" id="L358">    }</span>
+
+    private void storeLastOpenedFiles(List&lt;Path&gt; filenames, Path focusedDatabase) {
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (prefs.getWorkspacePreferences().shouldOpenLastEdited()) {</span>
+            // Here we store the names of all current files. If there is no current file, we remove any
+            // previously stored filename.
+<span class="nc bnc" id="L364" title="All 2 branches missed.">            if (filenames.isEmpty()) {</span>
+<span class="nc" id="L365">                prefs.getGuiPreferences().getLastFilesOpened().clear();</span>
+            } else {
+<span class="nc" id="L367">                prefs.getGuiPreferences().setLastFilesOpened(filenames);</span>
+<span class="nc" id="L368">                prefs.getGuiPreferences().setLastFocusedFile(focusedDatabase);</span>
+            }
+        }
+<span class="nc" id="L371">    }</span>
+
+    /**
+     * Quit JabRef
+     *
+     * @return true if the user chose to quit; false otherwise
+     */
+    public boolean close() {
+        // Ask if the user really wants to close, if there are still background tasks running
+        // The background tasks may make changes themselves that need saving.
+<span class="nc bnc" id="L381" title="All 2 branches missed.">        if (stateManager.getAnyTasksThatWillNotBeRecoveredRunning().getValue()) {</span>
+<span class="nc" id="L382">            Optional&lt;ButtonType&gt; shouldClose = dialogService.showBackgroundProgressDialogAndWait(</span>
+<span class="nc" id="L383">                    Localization.lang(&quot;Please wait...&quot;),</span>
+<span class="nc" id="L384">                    Localization.lang(&quot;Waiting for background tasks to finish. Quit anyway?&quot;),</span>
+                    stateManager);
+<span class="nc bnc" id="L386" title="All 4 branches missed.">            if (!(shouldClose.isPresent() &amp;&amp; (shouldClose.get() == ButtonType.YES))) {</span>
+<span class="nc" id="L387">                return false;</span>
+            }
+        }
+
+        // Read the opened and focused databases before closing them
+<span class="nc" id="L392">        List&lt;Path&gt; openedLibraries = getLibraryTabs().stream()</span>
+<span class="nc" id="L393">                                                     .map(LibraryTab::getBibDatabaseContext)</span>
+<span class="nc" id="L394">                                                     .map(BibDatabaseContext::getDatabasePath)</span>
+<span class="nc" id="L395">                                                     .flatMap(Optional::stream)</span>
+<span class="nc" id="L396">                                                     .toList();</span>
+<span class="nc" id="L397">        Path focusedLibraries = Optional.ofNullable(getCurrentLibraryTab())</span>
+<span class="nc" id="L398">                                        .map(LibraryTab::getBibDatabaseContext)</span>
+<span class="nc" id="L399">                                        .flatMap(BibDatabaseContext::getDatabasePath)</span>
+<span class="nc" id="L400">                                        .orElse(null);</span>
+
+        // Then ask if the user really wants to close, if the library has not been saved since last save.
+<span class="nc bnc" id="L403" title="All 2 branches missed.">        if (!closeTabs()) {</span>
+<span class="nc" id="L404">            return false;</span>
+        }
+
+<span class="nc" id="L407">        storeLastOpenedFiles(openedLibraries, focusedLibraries); // store only if successfully having closed the libraries</span>
+
+<span class="nc" id="L409">        ProcessingLibraryDialog processingLibraryDialog = new ProcessingLibraryDialog(dialogService);</span>
+<span class="nc" id="L410">        processingLibraryDialog.showAndWait(getLibraryTabs());</span>
+
+<span class="nc" id="L412">        return true;</span>
+    }
+
+    /**
+     * outprints the Data from the Screen (only in debug mode)
+     *
+     * @param mainStage JabRefs stage
+     */
+    private void debugLogWindowState(Stage mainStage) {
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        if (LOGGER.isDebugEnabled()) {</span>
+<span class="nc" id="L422">            String debugLogString = &quot;SCREEN DATA:&quot; +</span>
+<span class="nc" id="L423">                    &quot;mainStage.WINDOW_MAXIMISED: &quot; + mainStage.isMaximized() + &quot;\n&quot; +</span>
+<span class="nc" id="L424">                    &quot;mainStage.POS_X: &quot; + mainStage.getX() + &quot;\n&quot; +</span>
+<span class="nc" id="L425">                    &quot;mainStage.POS_Y: &quot; + mainStage.getY() + &quot;\n&quot; +</span>
+<span class="nc" id="L426">                    &quot;mainStage.SIZE_X: &quot; + mainStage.getWidth() + &quot;\n&quot; +</span>
+<span class="nc" id="L427">                    &quot;mainStages.SIZE_Y: &quot; + mainStage.getHeight() + &quot;\n&quot;;</span>
+<span class="nc" id="L428">            LOGGER.debug(debugLogString);</span>
+        }
+<span class="nc" id="L430">    }</span>
+
+    private void initLayout() {
+<span class="nc" id="L433">        setId(&quot;frame&quot;);</span>
+
+<span class="nc" id="L435">        MainToolBar mainToolBar = new MainToolBar(</span>
+                this,
+                pushToApplicationCommand,
+                globalSearchBar,
+                dialogService,
+                stateManager,
+                prefs,
+                fileUpdateMonitor,
+                taskExecutor,
+                entryTypesManager,
+                undoManager);
+
+<span class="nc" id="L447">        MainMenu mainMenu = new MainMenu(</span>
+                this,
+                sidePane,
+                pushToApplicationCommand,
+                prefs,
+                stateManager,
+                fileUpdateMonitor,
+                taskExecutor,
+                dialogService,
+                Globals.journalAbbreviationRepository,
+                Globals.predatoryJournalRepository,
+                entryTypesManager,
+                undoManager,
+<span class="nc" id="L460">                Globals.getClipboardManager());</span>
+
+<span class="nc" id="L462">        VBox head = new VBox(mainMenu, mainToolBar);</span>
+<span class="nc" id="L463">        head.setSpacing(0d);</span>
+<span class="nc" id="L464">        setTop(head);</span>
+
+<span class="nc" id="L466">        splitPane.getItems().addAll(tabbedPane);</span>
+<span class="nc" id="L467">        SplitPane.setResizableWithParent(sidePane, false);</span>
+
+<span class="nc" id="L469">        sidePane.getChildren().addListener((InvalidationListener) c -&gt; updateSidePane());</span>
+<span class="nc" id="L470">        updateSidePane();</span>
+
+        // We need to wait with setting the divider since it gets reset a few times during the initial set-up
+<span class="nc" id="L473">        mainStage.showingProperty().addListener(new InvalidationListener() {</span>
+            @Override
+            public void invalidated(Observable observable) {
+<span class="nc bnc" id="L476" title="All 2 branches missed.">                if (mainStage.isShowing()) {</span>
+<span class="nc" id="L477">                    Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L478">                        setDividerPosition();</span>
+<span class="nc" id="L479">                        observable.removeListener(this);</span>
+<span class="nc" id="L480">                    });</span>
+                }
+<span class="nc" id="L482">            }</span>
+        });
+
+<span class="nc" id="L485">        setCenter(splitPane);</span>
+<span class="nc" id="L486">    }</span>
+
+    private void updateSidePane() {
+<span class="nc bnc" id="L489" title="All 2 branches missed.">        if (sidePane.getChildren().isEmpty()) {</span>
+<span class="nc bnc" id="L490" title="All 2 branches missed.">            if (dividerSubscription != null) {</span>
+<span class="nc" id="L491">                dividerSubscription.unsubscribe();</span>
+            }
+<span class="nc" id="L493">            splitPane.getItems().remove(sidePane);</span>
+        } else {
+<span class="nc bnc" id="L495" title="All 2 branches missed.">            if (!splitPane.getItems().contains(sidePane)) {</span>
+<span class="nc" id="L496">                splitPane.getItems().addFirst(sidePane);</span>
+<span class="nc" id="L497">                setDividerPosition();</span>
+            }
+        }
+<span class="nc" id="L500">    }</span>
+
+    private void setDividerPosition() {
+<span class="nc bnc" id="L503" title="All 4 branches missed.">        if (mainStage.isShowing() &amp;&amp; !sidePane.getChildren().isEmpty()) {</span>
+<span class="nc" id="L504">            splitPane.setDividerPositions(prefs.getGuiPreferences().getSidePaneWidth() / splitPane.getWidth());</span>
+<span class="nc" id="L505">            dividerSubscription = EasyBind.subscribe(sidePane.widthProperty(), width -&gt; prefs.getGuiPreferences().setSidePaneWidth(width.doubleValue()));</span>
+        }
+<span class="nc" id="L507">    }</span>
+
+    /**
+     * Returns a list of all LibraryTabs in this frame.
+     */
+    public List&lt;LibraryTab&gt; getLibraryTabs() {
+<span class="nc" id="L513">        return tabbedPane.getTabs().stream()</span>
+<span class="nc" id="L514">                         .filter(LibraryTab.class::isInstance)</span>
+<span class="nc" id="L515">                         .map(LibraryTab.class::cast)</span>
+<span class="nc" id="L516">                         .collect(Collectors.toList());</span>
+    }
+
+    @Deprecated
+    public void showLibraryTabAt(int i) {
+<span class="nc" id="L521">        tabbedPane.getSelectionModel().select(i);</span>
+<span class="nc" id="L522">    }</span>
+
+    public void showLibraryTab(LibraryTab libraryTab) {
+<span class="nc" id="L525">        tabbedPane.getSelectionModel().select(libraryTab);</span>
+<span class="nc" id="L526">    }</span>
+
+    public void init() {
+<span class="nc" id="L529">        sidePane = new SidePane(</span>
+                this,
+                prefs,
+                Globals.journalAbbreviationRepository,
+                taskExecutor,
+                dialogService,
+                stateManager,
+                fileUpdateMonitor,
+                entryTypesManager,
+                undoManager);
+<span class="nc" id="L539">        tabbedPane = new TabPane();</span>
+<span class="nc" id="L540">        tabbedPane.setTabDragPolicy(TabPane.TabDragPolicy.REORDER);</span>
+
+<span class="nc" id="L542">        initLayout();</span>
+<span class="nc" id="L543">        initKeyBindings();</span>
+<span class="nc" id="L544">        initDragAndDrop();</span>
+
+        // Bind global state
+<span class="nc" id="L547">        FilteredList&lt;Tab&gt; filteredTabs = new FilteredList&lt;&gt;(tabbedPane.getTabs());</span>
+<span class="nc" id="L548">        filteredTabs.setPredicate(LibraryTab.class::isInstance);</span>
+
+        // This variable cannot be inlined, since otherwise the list created by EasyBind is being garbage collected
+<span class="nc" id="L551">        openDatabaseList = EasyBind.map(filteredTabs, tab -&gt; ((LibraryTab) tab).getBibDatabaseContext());</span>
+<span class="nc" id="L552">        EasyBind.bindContent(stateManager.getOpenDatabases(), openDatabaseList);</span>
+
+        // the binding for stateManager.activeDatabaseProperty() is at org.jabref.gui.LibraryTab.onDatabaseLoadingSucceed
+
+        // Subscribe to the search
+<span class="nc" id="L557">        EasyBind.subscribe(stateManager.activeSearchQueryProperty(),</span>
+                query -&gt; {
+<span class="nc bnc" id="L559" title="All 2 branches missed.">                    if (prefs.getSearchPreferences().shouldKeepSearchString()) {</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">                        for (LibraryTab tab : getLibraryTabs()) {</span>
+<span class="nc" id="L561">                            tab.setCurrentSearchQuery(query);</span>
+<span class="nc" id="L562">                        }</span>
+                    } else {
+<span class="nc bnc" id="L564" title="All 2 branches missed.">                        if (getCurrentLibraryTab() != null) {</span>
+<span class="nc" id="L565">                            getCurrentLibraryTab().setCurrentSearchQuery(query);</span>
+                        }
+                    }
+<span class="nc" id="L568">                });</span>
+
+        // Wait for the scene to be created, otherwise focusOwnerProperty is not provided
+<span class="nc" id="L571">        Platform.runLater(() -&gt; stateManager.focusOwnerProperty().bind(</span>
+<span class="nc" id="L572">                EasyBind.map(mainStage.getScene().focusOwnerProperty(), Optional::ofNullable)));</span>
+
+<span class="nc" id="L574">        EasyBind.subscribe(tabbedPane.getSelectionModel().selectedItemProperty(), selectedTab -&gt; {</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">            if (selectedTab instanceof LibraryTab libraryTab) {</span>
+<span class="nc" id="L576">                stateManager.setActiveDatabase(libraryTab.getBibDatabaseContext());</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">            } else if (selectedTab == null) {</span>
+                // All databases are closed
+<span class="nc" id="L579">                stateManager.setActiveDatabase(null);</span>
+            }
+<span class="nc" id="L581">        });</span>
+
+        /*
+         * The following state listener makes sure focus is registered with the
+         * correct database when the user switches tabs. Without this,
+         * cut/paste/copy operations would sometimes occur in the wrong tab.
+         */
+<span class="nc" id="L588">        EasyBind.subscribe(tabbedPane.getSelectionModel().selectedItemProperty(), tab -&gt; {</span>
+<span class="nc bnc" id="L589" title="All 2 branches missed.">            if (!(tab instanceof LibraryTab libraryTab)) {</span>
+<span class="nc" id="L590">                stateManager.setSelectedEntries(Collections.emptyList());</span>
+<span class="nc" id="L591">                mainStage.titleProperty().unbind();</span>
+<span class="nc" id="L592">                mainStage.setTitle(FRAME_TITLE);</span>
+<span class="nc" id="L593">                return;</span>
+            }
+
+            // Poor-mans binding to global state
+<span class="nc" id="L597">            stateManager.setSelectedEntries(libraryTab.getSelectedEntries());</span>
+
+            // Update active search query when switching between databases
+<span class="nc bnc" id="L600" title="All 6 branches missed.">            if (prefs.getSearchPreferences().shouldKeepSearchString() &amp;&amp; libraryTab.getCurrentSearchQuery().isEmpty() &amp;&amp; stateManager.activeSearchQueryProperty().get().isPresent()) {</span>
+                // apply search query also when opening a new library and keep search string is activated
+<span class="nc" id="L602">                libraryTab.setCurrentSearchQuery(stateManager.activeSearchQueryProperty().get());</span>
+            } else {
+<span class="nc" id="L604">                stateManager.activeSearchQueryProperty().set(libraryTab.getCurrentSearchQuery());</span>
+            }
+
+            // Update search autocompleter with information for the correct database:
+<span class="nc" id="L608">            globalSearchBar.setAutoCompleter(libraryTab.getAutoCompleter());</span>
+
+<span class="nc" id="L610">            libraryTab.getUndoManager().postUndoRedoEvent();</span>
+<span class="nc" id="L611">            libraryTab.getMainTable().requestFocus();</span>
+
+            // Set window title - copy tab title
+<span class="nc" id="L614">            StringBinding windowTitle = Bindings.createStringBinding(</span>
+<span class="nc" id="L615">                    () -&gt; libraryTab.textProperty().getValue() + &quot; \u2013 &quot; + FRAME_TITLE,</span>
+<span class="nc" id="L616">                    libraryTab.textProperty());</span>
+<span class="nc" id="L617">            mainStage.titleProperty().bind(windowTitle);</span>
+<span class="nc" id="L618">        });</span>
+<span class="nc" id="L619">        initShowTrackingNotification();</span>
+<span class="nc" id="L620">    }</span>
+
+    /**
+     * Returns the currently viewed BasePanel.
+     */
+    public LibraryTab getCurrentLibraryTab() {
+<span class="nc bnc" id="L626" title="All 4 branches missed.">        if ((tabbedPane == null) || (tabbedPane.getSelectionModel().getSelectedItem() == null)) {</span>
+<span class="nc" id="L627">            return null;</span>
+        }
+<span class="nc" id="L629">        return (LibraryTab) tabbedPane.getSelectionModel().getSelectedItem();</span>
+    }
+
+    private ContextMenu createTabContextMenuFor(LibraryTab tab, KeyBindingRepository keyBindingRepository) {
+<span class="nc" id="L633">        ContextMenu contextMenu = new ContextMenu();</span>
+<span class="nc" id="L634">        ActionFactory factory = new ActionFactory(keyBindingRepository);</span>
+
+<span class="nc" id="L636">        contextMenu.getItems().addAll(</span>
+<span class="nc" id="L637">                factory.createMenuItem(StandardActions.LIBRARY_PROPERTIES, new LibraryPropertiesAction(tab::getBibDatabaseContext, stateManager)),</span>
+<span class="nc" id="L638">                factory.createMenuItem(StandardActions.OPEN_DATABASE_FOLDER, new OpenDatabaseFolder(tab::getBibDatabaseContext)),</span>
+<span class="nc" id="L639">                factory.createMenuItem(StandardActions.OPEN_CONSOLE, new OpenConsoleAction(tab::getBibDatabaseContext, stateManager, prefs, dialogService)),</span>
+                new SeparatorMenuItem(),
+<span class="nc" id="L641">                factory.createMenuItem(StandardActions.CLOSE_LIBRARY, new CloseDatabaseAction(this, tab)),</span>
+<span class="nc" id="L642">                factory.createMenuItem(StandardActions.CLOSE_OTHER_LIBRARIES, new CloseOthersDatabaseAction(tab)),</span>
+<span class="nc" id="L643">                factory.createMenuItem(StandardActions.CLOSE_ALL_LIBRARIES, new CloseAllDatabaseAction()));</span>
+
+<span class="nc" id="L645">        return contextMenu;</span>
+    }
+
+    public void addTab(LibraryTab libraryTab, boolean raisePanel) {
+<span class="nc bnc" id="L649" title="All 2 branches missed.">        assert libraryTab != null;</span>
+<span class="nc" id="L650">        tabbedPane.getTabs().add(libraryTab);</span>
+<span class="nc bnc" id="L651" title="All 2 branches missed.">        if (raisePanel) {</span>
+<span class="nc" id="L652">            tabbedPane.getSelectionModel().select(libraryTab);</span>
+<span class="nc" id="L653">            tabbedPane.requestFocus();</span>
+        }
+
+<span class="nc" id="L656">        libraryTab.setContextMenu(createTabContextMenuFor(libraryTab, Globals.getKeyPrefs()));</span>
+
+<span class="nc" id="L658">        libraryTab.getUndoManager().registerListener(new UndoRedoEventManager());</span>
+<span class="nc" id="L659">    }</span>
+
+    /**
+     * Opens a new tab with existing data.
+     * Asynchronous loading is done at {@link LibraryTab#createLibraryTab}.
+     * Similar method: {@link OpenDatabaseAction#openTheFile(Path)}
+     */
+    public void addTab(BibDatabaseContext databaseContext, boolean raisePanel) {
+<span class="nc" id="L667">        Objects.requireNonNull(databaseContext);</span>
+<span class="nc" id="L668">        LibraryTab libraryTab = LibraryTab.createLibraryTab(</span>
+                databaseContext,
+                this,
+                dialogService,
+                prefs,
+                stateManager,
+                fileUpdateMonitor,
+                entryTypesManager,
+                undoManager,
+                taskExecutor);
+<span class="nc" id="L678">        addTab(libraryTab, raisePanel);</span>
+<span class="nc" id="L679">    }</span>
+
+    /**
+     * Should be called when a user asks JabRef at the command line
+     * i) to import a file or
+     * ii) to open a .bib file
+     */
+    public void addTab(ParserResult parserResult, boolean raisePanel) {
+<span class="nc bnc" id="L687" title="All 2 branches missed.">        if (parserResult.toOpenTab()) {</span>
+<span class="nc" id="L688">            LOGGER.trace(&quot;Adding the entries to the open tab.&quot;);</span>
+<span class="nc" id="L689">            LibraryTab libraryTab = getCurrentLibraryTab();</span>
+<span class="nc bnc" id="L690" title="All 2 branches missed.">            if (libraryTab == null) {</span>
+<span class="nc" id="L691">                LOGGER.debug(&quot;No open tab found to add entries to. Creating a new tab.&quot;);</span>
+<span class="nc" id="L692">                addTab(parserResult.getDatabaseContext(), raisePanel);</span>
+            } else {
+<span class="nc" id="L694">                addImportedEntries(libraryTab, parserResult);</span>
+            }
+<span class="nc" id="L696">        } else {</span>
+            // only add tab if library is not already open
+<span class="nc" id="L698">            Optional&lt;LibraryTab&gt; libraryTab = getLibraryTabs().stream()</span>
+<span class="nc" id="L699">                                                              .filter(p -&gt; p.getBibDatabaseContext()</span>
+<span class="nc" id="L700">                                                                            .getDatabasePath()</span>
+<span class="nc" id="L701">                                                                            .equals(parserResult.getPath()))</span>
+<span class="nc" id="L702">                                                              .findFirst();</span>
+
+<span class="nc bnc" id="L704" title="All 2 branches missed.">            if (libraryTab.isPresent()) {</span>
+<span class="nc" id="L705">                tabbedPane.getSelectionModel().select(libraryTab.get());</span>
+            } else {
+                // On this place, a tab is added after loading using the command line
+                // This takes a different execution path than loading a library using the GUI
+<span class="nc" id="L709">                addTab(parserResult.getDatabaseContext(), raisePanel);</span>
+            }
+        }
+<span class="nc" id="L712">    }</span>
+
+    /**
+     * Opens the import inspection dialog to let the user decide which of the given entries to import.
+     *
+     * @param panel        The BasePanel to add to.
+     * @param parserResult The entries to add.
+     */
+    private void addImportedEntries(final LibraryTab panel, final ParserResult parserResult) {
+<span class="nc" id="L721">        BackgroundTask&lt;ParserResult&gt; task = BackgroundTask.wrap(() -&gt; parserResult);</span>
+<span class="nc" id="L722">        ImportCleanup cleanup = ImportCleanup.targeting(panel.getBibDatabaseContext().getMode());</span>
+<span class="nc" id="L723">        cleanup.doPostCleanup(parserResult.getDatabase().getEntries());</span>
+<span class="nc" id="L724">        ImportEntriesDialog dialog = new ImportEntriesDialog(panel.getBibDatabaseContext(), task);</span>
+<span class="nc" id="L725">        dialog.setTitle(Localization.lang(&quot;Import&quot;));</span>
+<span class="nc" id="L726">        dialogService.showCustomDialogAndWait(dialog);</span>
+<span class="nc" id="L727">    }</span>
+
+    public boolean closeTab(LibraryTab libraryTab) {
+<span class="nc bnc" id="L730" title="All 2 branches missed.">        if (libraryTab.requestClose()) {</span>
+<span class="nc" id="L731">            tabbedPane.getTabs().remove(libraryTab);</span>
+<span class="nc" id="L732">            Event.fireEvent(libraryTab, new Event(this, libraryTab, Tab.CLOSED_EVENT));</span>
+<span class="nc" id="L733">            return true;</span>
+        }
+<span class="nc" id="L735">        return false;</span>
+    }
+
+    private boolean closeTabs() {
+        // Ask before closing any tab, if any tab has changes
+<span class="nc bnc" id="L740" title="All 2 branches missed.">        for (LibraryTab libraryTab : getLibraryTabs()) {</span>
+<span class="nc bnc" id="L741" title="All 2 branches missed.">            if (!libraryTab.requestClose()) {</span>
+<span class="nc" id="L742">                return false;</span>
+            }
+<span class="nc" id="L744">        }</span>
+
+        // Close after checking for changes and saving all databases
+<span class="nc bnc" id="L747" title="All 2 branches missed.">        for (LibraryTab libraryTab : getLibraryTabs()) {</span>
+<span class="nc" id="L748">            tabbedPane.getTabs().remove(libraryTab);</span>
+<span class="nc" id="L749">            Event.fireEvent(libraryTab, new Event(this, libraryTab, Tab.CLOSED_EVENT));</span>
+<span class="nc" id="L750">        }</span>
+<span class="nc" id="L751">        return true;</span>
+    }
+
+    public boolean closeCurrentTab() {
+<span class="nc" id="L755">        return closeTab(getCurrentLibraryTab());</span>
+    }
+
+    public OpenDatabaseAction getOpenDatabaseAction() {
+<span class="nc" id="L759">        return new OpenDatabaseAction(</span>
+                this,
+                prefs,
+                dialogService,
+                stateManager,
+                fileUpdateMonitor,
+                entryTypesManager,
+                undoManager,
+                taskExecutor);
+    }
+
+    private void copyGroupTreeNode(LibraryTab destinationLibraryTab, GroupTreeNode parent, GroupTreeNode groupTreeNodeToCopy) {
+<span class="nc" id="L771">        List&lt;BibEntry&gt; allEntries = getCurrentLibraryTab()</span>
+<span class="nc" id="L772">                .getBibDatabaseContext()</span>
+<span class="nc" id="L773">                .getEntries();</span>
+        // add groupTreeNodeToCopy to the parent-- in the first run that will the source/main GroupTreeNode
+<span class="nc" id="L775">        GroupTreeNode copiedNode = parent.addSubgroup(groupTreeNodeToCopy.copyNode().getGroup());</span>
+        // add all entries of a groupTreeNode to the new library.
+<span class="nc" id="L777">        destinationLibraryTab.dropEntry(groupTreeNodeToCopy.getEntriesInGroup(allEntries));</span>
+        // List of all children of groupTreeNodeToCopy
+<span class="nc" id="L779">        List&lt;GroupTreeNode&gt; children = groupTreeNodeToCopy.getChildren();</span>
+
+<span class="nc bnc" id="L781" title="All 2 branches missed.">        if (!children.isEmpty()) {</span>
+            // use recursion to add all subgroups of the original groupTreeNodeToCopy
+<span class="nc bnc" id="L783" title="All 2 branches missed.">            for (GroupTreeNode child : children) {</span>
+<span class="nc" id="L784">                copyGroupTreeNode(destinationLibraryTab, copiedNode, child);</span>
+<span class="nc" id="L785">            }</span>
+        }
+<span class="nc" id="L787">    }</span>
+
+    private void copyRootNode(LibraryTab destinationLibraryTab) {
+<span class="nc bnc" id="L790" title="All 2 branches missed.">        if (destinationLibraryTab.getBibDatabaseContext().getMetaData().getGroups().isPresent()) {</span>
+<span class="nc" id="L791">            return;</span>
+        }
+        // a root (all entries) GroupTreeNode
+<span class="nc" id="L794">        GroupTreeNode currentLibraryGroupRoot = getCurrentLibraryTab().getBibDatabaseContext()</span>
+<span class="nc" id="L795">                                                                      .getMetaData()</span>
+<span class="nc" id="L796">                                                                      .getGroups()</span>
+<span class="nc" id="L797">                                                                      .get()</span>
+<span class="nc" id="L798">                                                                      .copyNode();</span>
+
+        // add currentLibraryGroupRoot to the Library if it does not have a root.
+<span class="nc" id="L801">        destinationLibraryTab.getBibDatabaseContext()</span>
+<span class="nc" id="L802">                             .getMetaData()</span>
+<span class="nc" id="L803">                             .setGroups(currentLibraryGroupRoot);</span>
+<span class="nc" id="L804">    }</span>
+
+    /**
+     * Refreshes the ui after preferences changes
+     */
+    public void refresh() {
+<span class="nc" id="L810">        globalSearchBar.updateHintVisibility();</span>
+<span class="nc" id="L811">        getLibraryTabs().forEach(LibraryTab::setupMainPanel);</span>
+<span class="nc" id="L812">        getLibraryTabs().forEach(tab -&gt; tab.getMainTable().getTableModel().resetFieldFormatter());</span>
+<span class="nc" id="L813">    }</span>
+
+    void openDatabases(List&lt;ParserResult&gt; parserResults) {
+<span class="nc" id="L816">        final List&lt;ParserResult&gt; failed = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L817">        final List&lt;ParserResult&gt; toOpenTab = new ArrayList&lt;&gt;();</span>
+
+        // Remove invalid databases
+<span class="nc" id="L820">        List&lt;ParserResult&gt; invalidDatabases = parserResults.stream()</span>
+<span class="nc" id="L821">                                                           .filter(ParserResult::isInvalid)</span>
+<span class="nc" id="L822">                                                           .toList();</span>
+<span class="nc" id="L823">        failed.addAll(invalidDatabases);</span>
+<span class="nc" id="L824">        parserResults.removeAll(invalidDatabases);</span>
+
+        // passed file (we take the first one) should be focused
+<span class="nc" id="L827">        Path focusedFile = parserResults.stream()</span>
+<span class="nc" id="L828">                                        .findFirst()</span>
+<span class="nc" id="L829">                                        .flatMap(ParserResult::getPath)</span>
+<span class="nc" id="L830">                                        .orElse(prefs.getGuiPreferences()</span>
+<span class="nc" id="L831">                                                     .getLastFocusedFile())</span>
+<span class="nc" id="L832">                                        .toAbsolutePath();</span>
+
+        // Add all bibDatabases databases to the frame:
+<span class="nc" id="L835">        boolean first = false;</span>
+<span class="nc bnc" id="L836" title="All 2 branches missed.">        for (ParserResult parserResult : parserResults) {</span>
+            // Define focused tab
+<span class="nc bnc" id="L838" title="All 2 branches missed.">            if (parserResult.getPath().filter(path -&gt; path.toAbsolutePath().equals(focusedFile)).isPresent()) {</span>
+<span class="nc" id="L839">                first = true;</span>
+            }
+
+<span class="nc bnc" id="L842" title="All 2 branches missed.">            if (parserResult.getDatabase().isShared()) {</span>
+                try {
+<span class="nc" id="L844">                    OpenDatabaseAction.openSharedDatabase(</span>
+                            parserResult,
+                            this,
+                            dialogService,
+                            prefs,
+                            Globals.stateManager,
+                            Globals.entryTypesManager,
+                            fileUpdateMonitor,
+                            undoManager,
+                            Globals.TASK_EXECUTOR);
+<span class="nc" id="L854">                } catch (</span>
+                        SQLException |
+                        DatabaseNotSupportedException |
+                        InvalidDBMSConnectionPropertiesException |
+                        NotASharedDatabaseException e) {
+<span class="nc" id="L859">                    LOGGER.error(&quot;Connection error&quot;, e);</span>
+<span class="nc" id="L860">                    dialogService.showErrorDialogAndWait(</span>
+<span class="nc" id="L861">                            Localization.lang(&quot;Connection error&quot;),</span>
+<span class="nc" id="L862">                            Localization.lang(&quot;A local copy will be opened.&quot;),</span>
+                            e);
+<span class="nc" id="L864">                    toOpenTab.add(parserResult);</span>
+<span class="nc" id="L865">                }</span>
+<span class="nc bnc" id="L866" title="All 2 branches missed.">            } else if (parserResult.toOpenTab()) {</span>
+                // things to be appended to an opened tab should be done after opening all tabs
+                // add them to the list
+<span class="nc" id="L869">                toOpenTab.add(parserResult);</span>
+            } else {
+<span class="nc" id="L871">                addTab(parserResult, first);</span>
+<span class="nc" id="L872">                first = false;</span>
+            }
+<span class="nc" id="L874">        }</span>
+
+        // finally add things to the currently opened tab
+<span class="nc bnc" id="L877" title="All 2 branches missed.">        for (ParserResult parserResult : toOpenTab) {</span>
+<span class="nc" id="L878">            addTab(parserResult, first);</span>
+<span class="nc" id="L879">            first = false;</span>
+<span class="nc" id="L880">        }</span>
+
+<span class="nc bnc" id="L882" title="All 2 branches missed.">        for (ParserResult pr : failed) {</span>
+<span class="nc" id="L883">            String message = Localization.lang(&quot;Error opening file '%0'&quot;,</span>
+<span class="nc" id="L884">                    pr.getPath().map(Path::toString).orElse(&quot;(File name unknown)&quot;)) + &quot;\n&quot; +</span>
+<span class="nc" id="L885">                    pr.getErrorMessage();</span>
+<span class="nc" id="L886">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Error opening file&quot;), message);</span>
+<span class="nc" id="L887">        }</span>
+
+        // Display warnings, if any
+<span class="nc bnc" id="L890" title="All 2 branches missed.">        for (int tabNumber = 0; tabNumber &lt; parserResults.size(); tabNumber++) {</span>
+            // ToDo: Method needs to be rewritten, because the index of the parser result and of the libraryTab may not
+            //  be identical, if there are also other tabs opened, that are not libraryTabs. Currently there are none,
+            //  therefore for now this ok.
+<span class="nc" id="L894">            ParserResult pr = parserResults.get(tabNumber);</span>
+<span class="nc bnc" id="L895" title="All 2 branches missed.">            if (pr.hasWarnings()) {</span>
+<span class="nc" id="L896">                ParserResultWarningDialog.showParserResultWarningDialog(pr, dialogService);</span>
+<span class="nc" id="L897">                showLibraryTabAt(tabNumber);</span>
+            }
+        }
+
+        // After adding the databases, go through each and see if
+        // any post open actions need to be done. For instance, checking
+        // if we found new entry types that can be imported, or checking
+        // if the database contents should be modified due to new features
+        // in this version of JabRef.
+<span class="nc" id="L906">        parserResults.forEach(pr -&gt; OpenDatabaseAction.performPostOpenActions(pr, dialogService));</span>
+
+<span class="nc" id="L908">        LOGGER.debug(&quot;Finished adding panels&quot;);</span>
+<span class="nc" id="L909">    }</span>
+
+    public void openLastEditedDatabases() {
+<span class="nc" id="L912">        List&lt;Path&gt; lastFiles = prefs.getGuiPreferences().getLastFilesOpened();</span>
+<span class="nc bnc" id="L913" title="All 2 branches missed.">        if (lastFiles.isEmpty()) {</span>
+<span class="nc" id="L914">            return;</span>
+        }
+
+<span class="nc" id="L917">        getOpenDatabaseAction().openFiles(lastFiles);</span>
+<span class="nc" id="L918">    }</span>
+
+    public FileHistoryMenu getFileHistory() {
+<span class="nc" id="L921">        return fileHistory;</span>
+    }
+
+    public Stage getMainStage() {
+<span class="nc" id="L925">        return mainStage;</span>
+    }
+
+    /**
+     * Handles commands submitted by the command line or by the remote host to be executed in the ui
+     * Needs to run in a certain order. E.g. databases have to be loaded before selecting an entry.
+     *
+     * @param uiCommands to be handled
+     */
+    public void handleUiCommands(List&lt;UiCommand&gt; uiCommands) {
+<span class="nc" id="L935">        LOGGER.debug(&quot;Handling UI commands {}&quot;, uiCommands);</span>
+<span class="nc bnc" id="L936" title="All 2 branches missed.">        if (uiCommands.isEmpty()) {</span>
+<span class="nc" id="L937">            return;</span>
+        }
+
+        // Handle blank workspace
+<span class="nc" id="L941">        boolean blank = uiCommands.stream().anyMatch(UiCommand.BlankWorkspace.class::isInstance);</span>
+
+        // Handle OpenDatabases
+<span class="nc bnc" id="L944" title="All 2 branches missed.">        if (!blank) {</span>
+<span class="nc" id="L945">            uiCommands.stream()</span>
+<span class="nc" id="L946">                    .filter(UiCommand.OpenDatabases.class::isInstance)</span>
+<span class="nc" id="L947">                    .map(UiCommand.OpenDatabases.class::cast)</span>
+<span class="nc" id="L948">                    .forEach(command -&gt; openDatabases(command.parserResults()));</span>
+        }
+
+        // Handle jumpToEntry
+<span class="nc" id="L952">        uiCommands.stream()</span>
+<span class="nc" id="L953">                  .filter(UiCommand.JumpToEntryKey.class::isInstance)</span>
+<span class="nc" id="L954">                  .map(UiCommand.JumpToEntryKey.class::cast)</span>
+<span class="nc" id="L955">                  .map(UiCommand.JumpToEntryKey::citationKey)</span>
+<span class="nc" id="L956">                  .filter(Objects::nonNull)</span>
+<span class="nc" id="L957">                  .findAny().ifPresent(entryKey -&gt; {</span>
+<span class="nc" id="L958">                      LOGGER.debug(&quot;Jump to entry {} requested&quot;, entryKey);</span>
+                      // tabs must be present and contents async loaded for an entry to be selected
+<span class="nc" id="L960">                      waitForLoadingFinished(() -&gt; jumpToEntry(entryKey));</span>
+<span class="nc" id="L961">                  });</span>
+<span class="nc" id="L962">    }</span>
+
+    private void jumpToEntry(String entryKey) {
+        // check current library tab first
+<span class="nc" id="L966">        LibraryTab currentLibraryTab = getCurrentLibraryTab();</span>
+<span class="nc" id="L967">        List&lt;LibraryTab&gt; sortedTabs = getLibraryTabs().stream()</span>
+<span class="nc bnc" id="L968" title="All 2 branches missed.">                                                .sorted(Comparator.comparing(tab -&gt; tab != currentLibraryTab))</span>
+<span class="nc" id="L969">                                                .toList();</span>
+<span class="nc bnc" id="L970" title="All 2 branches missed.">        for (LibraryTab libraryTab : sortedTabs) {</span>
+<span class="nc" id="L971">            Optional&lt;BibEntry&gt; bibEntry = libraryTab.getDatabase()</span>
+<span class="nc" id="L972">                                                    .getEntries().stream()</span>
+<span class="nc" id="L973">                                                    .filter(entry -&gt; entry.getCitationKey().orElse(&quot;&quot;)</span>
+<span class="nc" id="L974">                                                                          .equals(entryKey))</span>
+<span class="nc" id="L975">                                                    .findAny();</span>
+<span class="nc bnc" id="L976" title="All 2 branches missed.">            if (bibEntry.isPresent()) {</span>
+<span class="nc" id="L977">                LOGGER.debug(&quot;Found entry {} in library tab {}&quot;, entryKey, libraryTab);</span>
+<span class="nc" id="L978">                libraryTab.clearAndSelect(bibEntry.get());</span>
+<span class="nc" id="L979">                showLibraryTab(libraryTab);</span>
+<span class="nc" id="L980">                break;</span>
+            }
+<span class="nc" id="L982">        }</span>
+
+<span class="nc" id="L984">        LOGGER.trace(&quot;End of loop&quot;);</span>
+
+<span class="nc bnc" id="L986" title="All 2 branches missed.">        if (stateManager.getSelectedEntries().isEmpty()) {</span>
+<span class="nc" id="L987">            dialogService.notify(Localization.lang(&quot;Citation key '%0' to select not found in open libraries.&quot;, entryKey));</span>
+        }
+<span class="nc" id="L989">    }</span>
+
+    private void waitForLoadingFinished(Runnable runnable) {
+<span class="nc" id="L992">        LOGGER.trace(&quot;Waiting for all tabs being loaded&quot;);</span>
+
+<span class="nc" id="L994">        CompletableFuture&lt;Void&gt; future = new CompletableFuture&lt;&gt;();</span>
+
+<span class="nc" id="L996">        List&lt;ObservableBooleanValue&gt; loadings = getLibraryTabs().stream().map(LibraryTab::getLoading)</span>
+<span class="nc" id="L997">                                                                .collect(Collectors.toList());</span>
+
+        // Create a listener for each observable
+<span class="nc" id="L1000">        ChangeListener&lt;Boolean&gt; listener = (observable, oldValue, newValue) -&gt; {</span>
+<span class="nc bnc" id="L1001" title="All 2 branches missed.">            assert newValue = false;</span>
+<span class="nc bnc" id="L1002" title="All 2 branches missed.">            if (observable != null) {</span>
+<span class="nc" id="L1003">                loadings.remove(observable);</span>
+            }
+<span class="nc bnc" id="L1005" title="All 2 branches missed.">            if (LOGGER.isTraceEnabled()) {</span>
+<span class="nc" id="L1006">                LOGGER.trace(&quot;Count of loading tabs: {}&quot;, loadings.size());</span>
+<span class="nc" id="L1007">                LOGGER.trace(&quot;Count of loading tabs really true: {}&quot;, loadings.stream().filter(ObservableBooleanValue::get).count());</span>
+            }
+<span class="nc bnc" id="L1009" title="All 2 branches missed.">            for (ObservableBooleanValue obs : loadings) {</span>
+<span class="nc bnc" id="L1010" title="All 2 branches missed.">                if (obs.get()) {</span>
+                    // Exit the listener if any of the observables is still true
+<span class="nc" id="L1012">                    return;</span>
+                }
+<span class="nc" id="L1014">            }</span>
+            // All observables are false, complete the future
+<span class="nc" id="L1016">            LOGGER.trace(&quot;Future completed&quot;);</span>
+<span class="nc" id="L1017">            future.complete(null);</span>
+<span class="nc" id="L1018">        };</span>
+
+<span class="nc bnc" id="L1020" title="All 2 branches missed.">        for (ObservableBooleanValue obs : loadings) {</span>
+<span class="nc" id="L1021">            obs.addListener(listener);</span>
+<span class="nc" id="L1022">        }</span>
+
+<span class="nc" id="L1024">        LOGGER.trace(&quot;Fire once&quot;);</span>
+        // Due to concurrency, it might be that the observables are already false, so we trigger one evaluation
+<span class="nc" id="L1026">        listener.changed(null, null, false);</span>
+<span class="nc" id="L1027">        LOGGER.trace(&quot;Waiting for state changes...&quot;);</span>
+
+<span class="nc" id="L1029">        future.thenRun(() -&gt; {</span>
+<span class="nc" id="L1030">            LOGGER.debug(&quot;All tabs loaded. Jumping to entry.&quot;);</span>
+<span class="nc bnc" id="L1031" title="All 2 branches missed.">            for (ObservableBooleanValue obs : loadings) {</span>
+<span class="nc" id="L1032">                obs.removeListener(listener);</span>
+<span class="nc" id="L1033">            }</span>
+<span class="nc" id="L1034">            runnable.run();</span>
+<span class="nc" id="L1035">        });</span>
+<span class="nc" id="L1036">    }</span>
+
+    /**
+     * The action concerned with closing the window.
+     */
+    static protected class CloseAction extends SimpleCommand {
+
+        private final JabRefFrame frame;
+
+<span class="nc" id="L1045">        public CloseAction(JabRefFrame frame) {</span>
+<span class="nc" id="L1046">            this.frame = frame;</span>
+<span class="nc" id="L1047">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc bnc" id="L1051" title="All 2 branches missed.">            if (frame.close()) {</span>
+<span class="nc" id="L1052">                frame.mainStage.close();</span>
+            }
+<span class="nc" id="L1054">        }</span>
+    }
+
+    static protected class CloseDatabaseAction extends SimpleCommand {
+
+        private final LibraryTabContainer tabContainer;
+        private final LibraryTab libraryTab;
+
+<span class="nc" id="L1062">        public CloseDatabaseAction(LibraryTabContainer tabContainer, LibraryTab libraryTab) {</span>
+<span class="nc" id="L1063">            this.tabContainer = tabContainer;</span>
+<span class="nc" id="L1064">            this.libraryTab = libraryTab;</span>
+<span class="nc" id="L1065">        }</span>
+
+        /**
+         * Using this constructor will result in executing the command on the currently open library tab
+         */
+        public CloseDatabaseAction(LibraryTabContainer tabContainer) {
+<span class="nc" id="L1071">            this(tabContainer, null);</span>
+<span class="nc" id="L1072">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc" id="L1076">            Platform.runLater(() -&gt; {</span>
+<span class="nc bnc" id="L1077" title="All 2 branches missed.">                if (libraryTab == null) {</span>
+<span class="nc" id="L1078">                    tabContainer.closeCurrentTab();</span>
+                } else {
+<span class="nc" id="L1080">                    tabContainer.closeTab(libraryTab);</span>
+                }
+<span class="nc" id="L1082">            });</span>
+<span class="nc" id="L1083">        }</span>
+    }
+
+    private class CloseOthersDatabaseAction extends SimpleCommand {
+
+        private final LibraryTab libraryTab;
+
+<span class="nc" id="L1090">        public CloseOthersDatabaseAction(LibraryTab libraryTab) {</span>
+<span class="nc" id="L1091">            this.libraryTab = libraryTab;</span>
+<span class="nc" id="L1092">            this.executable.bind(ActionHelper.isOpenMultiDatabase(tabbedPane));</span>
+<span class="nc" id="L1093">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc" id="L1097">            LibraryTab toKeepLibraryTab = Optional.of(libraryTab).get();</span>
+<span class="nc bnc" id="L1098" title="All 2 branches missed.">            for (Tab tab : tabbedPane.getTabs()) {</span>
+<span class="nc" id="L1099">                LibraryTab libraryTab = (LibraryTab) tab;</span>
+<span class="nc bnc" id="L1100" title="All 2 branches missed.">                if (libraryTab != toKeepLibraryTab) {</span>
+<span class="nc" id="L1101">                    Platform.runLater(() -&gt; closeTab(libraryTab));</span>
+                }
+<span class="nc" id="L1103">            }</span>
+<span class="nc" id="L1104">        }</span>
+    }
+
+<span class="nc" id="L1107">    private class CloseAllDatabaseAction extends SimpleCommand {</span>
+
+        @Override
+        public void execute() {
+<span class="nc bnc" id="L1111" title="All 2 branches missed.">            for (Tab tab : tabbedPane.getTabs()) {</span>
+<span class="nc" id="L1112">                Platform.runLater(() -&gt; closeTab((LibraryTab) tab));</span>
+<span class="nc" id="L1113">            }</span>
+<span class="nc" id="L1114">        }</span>
+    }
+
+    private class OpenDatabaseFolder extends SimpleCommand {
+
+        private final Supplier&lt;BibDatabaseContext&gt; databaseContext;
+
+<span class="nc" id="L1121">        public OpenDatabaseFolder(Supplier&lt;BibDatabaseContext&gt; databaseContext) {</span>
+<span class="nc" id="L1122">            this.databaseContext = databaseContext;</span>
+<span class="nc" id="L1123">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc" id="L1127">            Optional.of(databaseContext.get()).flatMap(BibDatabaseContext::getDatabasePath).ifPresent(path -&gt; {</span>
+                try {
+<span class="nc" id="L1129">                    JabRefDesktop.openFolderAndSelectFile(path, prefs.getExternalApplicationsPreferences(), dialogService);</span>
+<span class="nc" id="L1130">                } catch (IOException e) {</span>
+<span class="nc" id="L1131">                    LOGGER.info(&quot;Could not open folder&quot;, e);</span>
+<span class="nc" id="L1132">                }</span>
+<span class="nc" id="L1133">            });</span>
+<span class="nc" id="L1134">        }</span>
+    }
+
+<span class="nc" id="L1137">    private class UndoRedoEventManager {</span>
+
+        @Subscribe
+        public void listen(UndoRedoEvent event) {
+<span class="nc" id="L1141">            updateTexts(event);</span>
+<span class="nc" id="L1142">            JabRefFrame.this.getCurrentLibraryTab().updateEntryEditorIfShowing();</span>
+<span class="nc" id="L1143">        }</span>
+
+        @Subscribe
+        public void listen(AddUndoableActionEvent event) {
+<span class="nc" id="L1147">            updateTexts(event);</span>
+<span class="nc" id="L1148">        }</span>
+
+        private void updateTexts(UndoChangeEvent event) {
+            /* TODO
+            SwingUtilities.invokeLater(() -&gt; {
+                undo.putValue(Action.SHORT_DESCRIPTION, event.getUndoDescription());
+                undo.setEnabled(event.isCanUndo());
+                redo.putValue(Action.SHORT_DESCRIPTION, event.getRedoDescription());
+                redo.setEnabled(event.isCanRedo());
+            });
+            */
+<span class="nc" id="L1159">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

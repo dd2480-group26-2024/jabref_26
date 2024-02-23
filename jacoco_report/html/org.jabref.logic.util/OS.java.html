@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OS.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.util</a> &gt; <span class="el_source">OS.java</span></div><h1>OS.java</h1><pre class="source lang-java linenums">package org.jabref.logic.util;
+
+import java.util.Locale;
+
+import org.jabref.gui.desktop.os.DefaultDesktop;
+import org.jabref.gui.desktop.os.Linux;
+import org.jabref.gui.desktop.os.NativeDesktop;
+import org.jabref.gui.desktop.os.OSX;
+import org.jabref.gui.desktop.os.Windows;
+
+import com.github.javakeyring.BackendNotSupportedException;
+import com.github.javakeyring.Keyring;
+import com.github.javakeyring.PasswordAccessException;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Operating system (OS) detection
+ *
+ * For OS-specific actions see {@link org.jabref.gui.desktop.JabRefDesktop} and {@link org.jabref.gui.desktop.os.NativeDesktop}.
+ */
+public class OS {
+    // No LOGGER may be initialized directly
+    // Otherwise, org.jabref.Launcher.addLogToDisk will fail, because tinylog's properties are frozen
+
+<span class="fc" id="L25">    public static final String NEWLINE = System.lineSeparator();</span>
+
+    public static final String APP_DIR_APP_NAME = &quot;jabref&quot;;
+    public static final String APP_DIR_APP_AUTHOR = &quot;org.jabref&quot;;
+
+    // https://commons.apache.org/proper/commons-lang/javadocs/api-2.6/org/apache/commons/lang/SystemUtils.html
+<span class="fc" id="L31">    private static final String OS_NAME = System.getProperty(&quot;os.name&quot;, &quot;unknown&quot;).toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L32">    public static final boolean LINUX = OS_NAME.startsWith(&quot;linux&quot;);</span>
+<span class="fc" id="L33">    public static final boolean WINDOWS = OS_NAME.startsWith(&quot;win&quot;);</span>
+
+<span class="fc" id="L35">    public static final boolean OS_X = OS_NAME.startsWith(&quot;mac&quot;);</span>
+
+    private OS() {
+    }
+
+    public static NativeDesktop getNativeDesktop() {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (WINDOWS) {</span>
+<span class="fc" id="L42">            return new Windows();</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        } else if (OS_X) {</span>
+<span class="nc" id="L44">            return new OSX();</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        } else if (LINUX) {</span>
+<span class="nc" id="L46">            return new Linux();</span>
+        }
+<span class="nc" id="L48">        return new DefaultDesktop();</span>
+    }
+
+    public static boolean isKeyringAvailable() {
+<span class="nc" id="L52">        try (Keyring keyring = Keyring.create()) {</span>
+<span class="nc" id="L53">            keyring.setPassword(&quot;JabRef&quot;, &quot;keyringTest&quot;, &quot;keyringTest&quot;);</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">            if (!&quot;keyringTest&quot;.equals(keyring.getPassword(&quot;JabRef&quot;, &quot;keyringTest&quot;))) {</span>
+<span class="nc" id="L55">                return false;</span>
+            }
+<span class="nc" id="L57">            keyring.deletePassword(&quot;JabRef&quot;, &quot;keyringTest&quot;);</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        } catch (BackendNotSupportedException ex) {</span>
+<span class="nc" id="L59">            LoggerFactory.getLogger(OS.class).warn(&quot;Credential store not supported.&quot;);</span>
+<span class="nc" id="L60">            return false;</span>
+<span class="nc" id="L61">        } catch (PasswordAccessException ex) {</span>
+<span class="nc" id="L62">            LoggerFactory.getLogger(OS.class).warn(&quot;Password storage in credential store failed.&quot;);</span>
+<span class="nc" id="L63">            return false;</span>
+<span class="nc" id="L64">        } catch (Exception ex) {</span>
+<span class="nc" id="L65">            LoggerFactory.getLogger(OS.class).warn(&quot;Connection to credential store failed&quot;);</span>
+<span class="nc" id="L66">            return false;</span>
+<span class="nc" id="L67">        }</span>
+<span class="nc" id="L68">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

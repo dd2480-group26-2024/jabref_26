@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Study.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.study</a> &gt; <span class="el_source">Study.java</span></div><h1>Study.java</h1><pre class="source lang-java linenums">package org.jabref.model.study;
+
+import java.util.List;
+import java.util.Objects;
+
+import org.jabref.logic.crawler.StudyYamlParser;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+
+/**
+ * This class represents a scientific study.
+ *
+ * This class defines all aspects of a scientific study relevant to the application. It is a proxy for the file based study definition.
+ *
+ * The file is parsed using by {@link StudyYamlParser}
+ */
+@JsonPropertyOrder({&quot;authors&quot;, &quot;title&quot;, &quot;research-questions&quot;, &quot;queries&quot;, &quot;databases&quot;})
+// The user might add arbitrary content to the YAML
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class Study {
+    private List&lt;String&gt; authors;
+
+    private String title;
+
+    @JsonProperty(&quot;research-questions&quot;)
+    private List&lt;String&gt; researchQuestions;
+
+    private List&lt;StudyQuery&gt; queries;
+
+    private List&lt;StudyDatabase&gt; databases;
+
+<span class="fc" id="L34">    public Study(List&lt;String&gt; authors, String title, List&lt;String&gt; researchQuestions, List&lt;StudyQuery&gt; queryEntries, List&lt;StudyDatabase&gt; databases) {</span>
+<span class="fc" id="L35">        this.authors = authors;</span>
+<span class="fc" id="L36">        this.title = title;</span>
+<span class="fc" id="L37">        this.researchQuestions = researchQuestions;</span>
+<span class="fc" id="L38">        this.queries = queryEntries;</span>
+<span class="fc" id="L39">        this.databases = databases;</span>
+<span class="fc" id="L40">    }</span>
+
+    /**
+     * Used for Jackson deserialization
+     */
+    private Study() {
+    }
+
+    public List&lt;String&gt; getAuthors() {
+<span class="fc" id="L49">        return authors;</span>
+    }
+
+    public void setAuthors(List&lt;String&gt; authors) {
+<span class="fc" id="L53">        this.authors = authors;</span>
+<span class="fc" id="L54">    }</span>
+
+    public List&lt;StudyQuery&gt; getQueries() {
+<span class="fc" id="L57">        return queries;</span>
+    }
+
+    public void setQueries(List&lt;StudyQuery&gt; queries) {
+<span class="fc" id="L61">        this.queries = queries;</span>
+<span class="fc" id="L62">    }</span>
+
+    public List&lt;StudyDatabase&gt; getDatabases() {
+<span class="fc" id="L65">        return databases;</span>
+    }
+
+    public void setDatabases(List&lt;StudyDatabase&gt; databases) {
+<span class="fc" id="L69">        this.databases = databases;</span>
+<span class="fc" id="L70">    }</span>
+
+    public String getTitle() {
+<span class="fc" id="L73">        return title;</span>
+    }
+
+    public void setTitle(String title) {
+<span class="fc" id="L77">        this.title = title;</span>
+<span class="fc" id="L78">    }</span>
+
+    public List&lt;String&gt; getResearchQuestions() {
+<span class="fc" id="L81">        return researchQuestions;</span>
+    }
+
+    public void setResearchQuestions(List&lt;String&gt; researchQuestions) {
+<span class="fc" id="L85">        this.researchQuestions = researchQuestions;</span>
+<span class="fc" id="L86">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L90">        return &quot;Study{&quot; +</span>
+                &quot;authors=&quot; + authors +
+                &quot;, studyName='&quot; + title + '\'' +
+                &quot;, researchQuestions=&quot; + researchQuestions +
+                &quot;, queries=&quot; + queries +
+                &quot;, libraries=&quot; + databases +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (this == other) {</span>
+<span class="nc" id="L102">            return true;</span>
+        }
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (other == null || getClass() != other.getClass()) {</span>
+<span class="nc" id="L105">            return false;</span>
+        }
+
+<span class="fc" id="L108">        Study otherStudy = (Study) other;</span>
+
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        return Objects.equals(authors, otherStudy.authors) &amp;&amp;</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                Objects.equals(title, otherStudy.title) &amp;&amp;</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                Objects.equals(researchQuestions, otherStudy.researchQuestions) &amp;&amp;</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                Objects.equals(queries, otherStudy.queries) &amp;&amp;</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                Objects.equals(databases, otherStudy.databases);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L119">        return Objects.hashCode(this);</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CopyFilesAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.copyfiles</a> &gt; <span class="el_source">CopyFilesAction.java</span></div><h1>CopyFilesAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.copyfiles;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+
+import javafx.concurrent.Task;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.util.DirectoryDialogConfiguration;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.PreferencesService;
+
+import static org.jabref.gui.actions.ActionHelper.needsDatabase;
+import static org.jabref.gui.actions.ActionHelper.needsEntriesSelected;
+
+public class CopyFilesAction extends SimpleCommand {
+
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+    private final StateManager stateManager;
+    private final TaskExecutor taskExecutor;
+
+    public CopyFilesAction(DialogService dialogService,
+                           PreferencesService preferencesService,
+                           StateManager stateManager,
+<span class="nc" id="L32">                           TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L33">        this.dialogService = dialogService;</span>
+<span class="nc" id="L34">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L35">        this.stateManager = stateManager;</span>
+<span class="nc" id="L36">        this.taskExecutor = taskExecutor;</span>
+
+<span class="nc" id="L38">        this.executable.bind(needsDatabase(stateManager).and(needsEntriesSelected(stateManager)));</span>
+<span class="nc" id="L39">    }</span>
+
+    private void showDialog(List&lt;CopyFilesResultItemViewModel&gt; data) {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (data.isEmpty()) {</span>
+<span class="nc" id="L43">            dialogService.showInformationDialogAndWait(Localization.lang(&quot;Copy linked files to folder...&quot;), Localization.lang(&quot;No linked files found for export.&quot;));</span>
+<span class="nc" id="L44">            return;</span>
+        }
+<span class="nc" id="L46">        dialogService.showCustomDialogAndWait(new CopyFilesDialogView(new CopyFilesResultListDependency(data)));</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc" id="L51">        BibDatabaseContext database = stateManager.getActiveDatabase().orElseThrow(() -&gt; new NullPointerException(&quot;Database null&quot;));</span>
+<span class="nc" id="L52">        List&lt;BibEntry&gt; entries = stateManager.getSelectedEntries();</span>
+
+<span class="nc" id="L54">        DirectoryDialogConfiguration dirDialogConfiguration = new DirectoryDialogConfiguration.Builder()</span>
+<span class="nc" id="L55">                .withInitialDirectory(preferencesService.getExportPreferences().getExportWorkingDirectory())</span>
+<span class="nc" id="L56">                .build();</span>
+<span class="nc" id="L57">        Optional&lt;Path&gt; exportPath = dialogService.showDirectorySelectionDialog(dirDialogConfiguration);</span>
+<span class="nc" id="L58">        exportPath.ifPresent(path -&gt; {</span>
+<span class="nc" id="L59">            Task&lt;List&lt;CopyFilesResultItemViewModel&gt;&gt; exportTask = new CopyFilesTask(database, entries, path, preferencesService);</span>
+<span class="nc" id="L60">            dialogService.showProgressDialog(</span>
+<span class="nc" id="L61">                    Localization.lang(&quot;Copy linked files to folder...&quot;),</span>
+<span class="nc" id="L62">                    Localization.lang(&quot;Copy linked files to folder...&quot;),</span>
+                    exportTask);
+<span class="nc" id="L64">            taskExecutor.execute(exportTask);</span>
+<span class="nc" id="L65">            exportTask.setOnSucceeded(e -&gt; showDialog(exportTask.getValue()));</span>
+<span class="nc" id="L66">        });</span>
+<span class="nc" id="L67">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

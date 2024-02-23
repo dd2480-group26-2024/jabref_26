@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OOProcessAuthorYearMarkers.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice.style</a> &gt; <span class="el_source">OOProcessAuthorYearMarkers.java</span></div><h1>OOProcessAuthorYearMarkers.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice.style;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import org.jabref.model.openoffice.ootext.OOText;
+import org.jabref.model.openoffice.style.Citation;
+import org.jabref.model.openoffice.style.CitationGroup;
+import org.jabref.model.openoffice.style.CitationGroups;
+import org.jabref.model.openoffice.style.CitationMarkerEntry;
+import org.jabref.model.openoffice.style.CitationType;
+import org.jabref.model.openoffice.style.CitedKey;
+import org.jabref.model.openoffice.style.CitedKeys;
+import org.jabref.model.openoffice.style.NonUniqueCitationMarker;
+import org.jabref.model.openoffice.util.OOListUtil;
+
+<span class="nc" id="L22">class OOProcessAuthorYearMarkers {</span>
+
+    private OOProcessAuthorYearMarkers() {
+    }
+
+    /**
+     *  Fills {@code sortedCitedKeys//normCitMarker}
+     */
+    private static void createNormalizedCitationMarkers(CitedKeys sortedCitedKeys, OOBibStyle style) {
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        for (CitedKey ck : sortedCitedKeys.values()) {</span>
+<span class="nc" id="L32">            ck.setNormalizedCitationMarker(Optional.of(style.getNormalizedCitationMarker(ck)));</span>
+<span class="nc" id="L33">        }</span>
+<span class="nc" id="L34">    }</span>
+
+    /**
+     *  For each cited source make the citation keys unique by setting
+     *  the uniqueLetter fields to letters (&quot;a&quot;, &quot;b&quot;) or Optional.empty()
+     *
+     * precondition: sortedCitedKeys already has normalized citation markers.
+     * precondition: sortedCitedKeys is sorted (according to the order we want the letters to be assigned)
+     *
+     * Expects to see data for all cited sources here.
+     * Clears uniqueLetters before filling.
+     *
+     * On return: Each citedKey in sortedCitedKeys has uniqueLetter set as needed.
+     *            The same values are copied to the corresponding citations in citationGroups.
+     *
+     *  Depends on: style, citations and their order.
+     */
+    private static void createUniqueLetters(CitedKeys sortedCitedKeys, CitationGroups citationGroups) {
+        // The entries in the clashingKeys lists preserve
+        // firstAppearance order from sortedCitedKeys.values().
+        //
+        // The index of the citationKey in this order will decide
+        // which unique letter it receives.
+        //
+<span class="nc" id="L58">        Map&lt;String, List&lt;String&gt;&gt; normCitMarkerToClachingKeys = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        for (CitedKey citedKey : sortedCitedKeys.values()) {</span>
+<span class="nc" id="L60">            String normCitMarker = OOText.toString(citedKey.getNormalizedCitationMarker().get());</span>
+<span class="nc" id="L61">            String citationKey = citedKey.citationKey;</span>
+
+<span class="nc" id="L63">            List&lt;String&gt; clashingKeys = normCitMarkerToClachingKeys.putIfAbsent(normCitMarker, new ArrayList&lt;&gt;(1));</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            if (clashingKeys == null) {</span>
+<span class="nc" id="L65">                clashingKeys = normCitMarkerToClachingKeys.get(normCitMarker);</span>
+            }
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            if (!clashingKeys.contains(citationKey)) {</span>
+                // First appearance of citationKey, add to list.
+<span class="nc" id="L69">                clashingKeys.add(citationKey);</span>
+            }
+<span class="nc" id="L71">        }</span>
+
+        // Clear old uniqueLetter values.
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        for (CitedKey citedKey : sortedCitedKeys.values()) {</span>
+<span class="nc" id="L75">            citedKey.setUniqueLetter(Optional.empty());</span>
+<span class="nc" id="L76">        }</span>
+
+        // For sets of citation keys figthing for a normCitMarker
+        // add unique letters to the year.
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        for (List&lt;String&gt; clashingKeys : normCitMarkerToClachingKeys.values()) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            if (clashingKeys.size() &lt;= 1) {</span>
+<span class="nc" id="L82">                continue; // No fight, no letters.</span>
+            }
+            // Multiple citation keys: they get their letters
+            // according to their order in clashingKeys.
+<span class="nc" id="L86">            int nextUniqueLetter = 'a';</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            for (String citationKey : clashingKeys) {</span>
+<span class="nc" id="L88">                String uniqueLetter = String.valueOf((char) nextUniqueLetter);</span>
+<span class="nc" id="L89">                sortedCitedKeys.get(citationKey).setUniqueLetter(Optional.of(uniqueLetter));</span>
+<span class="nc" id="L90">                nextUniqueLetter++;</span>
+<span class="nc" id="L91">            }</span>
+<span class="nc" id="L92">        }</span>
+<span class="nc" id="L93">        sortedCitedKeys.distributeUniqueLetters(citationGroups);</span>
+<span class="nc" id="L94">    }</span>
+
+    /* ***************************************
+     *
+     *     Calculate presentation of citation groups
+     *     (create citMarkers)
+     *
+     * **************************************/
+
+    /**
+     * Set isFirstAppearanceOfSource in each citation.
+     *
+     * Preconditions: globalOrder, localOrder
+     */
+    private static void setIsFirstAppearanceOfSourceInCitations(CitationGroups citationGroups) {
+<span class="nc" id="L109">        Set&lt;String&gt; seenBefore = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        for (CitationGroup group : citationGroups.getCitationGroupsInGlobalOrder()) {</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            for (Citation cit : group.getCitationsInLocalOrder()) {</span>
+<span class="nc" id="L112">                String currentKey = cit.citationKey;</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                if (!seenBefore.contains(currentKey)) {</span>
+<span class="nc" id="L114">                    cit.setIsFirstAppearanceOfSource(true);</span>
+<span class="nc" id="L115">                    seenBefore.add(currentKey);</span>
+                } else {
+<span class="nc" id="L117">                    cit.setIsFirstAppearanceOfSource(false);</span>
+                }
+<span class="nc" id="L119">            }</span>
+<span class="nc" id="L120">        }</span>
+<span class="nc" id="L121">    }</span>
+
+    /**
+     * Produce citMarkers for normal
+     * (!isCitationKeyCiteMarkers &amp;amp;&amp;amp; !isNumberEntries) styles.
+     *
+     * @param style              Bibliography style.
+     */
+    static void produceCitationMarkers(CitationGroups citationGroups, OOBibStyle style) {
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        assert !style.isCitationKeyCiteMarkers();</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        assert !style.isNumberEntries();</span>
+        // Citations in (Au1, Au2 2000) form
+
+<span class="nc" id="L134">        CitedKeys citedKeys = citationGroups.getCitedKeysSortedInOrderOfAppearance();</span>
+
+<span class="nc" id="L136">        createNormalizedCitationMarkers(citedKeys, style);</span>
+<span class="nc" id="L137">        createUniqueLetters(citedKeys, citationGroups);</span>
+<span class="nc" id="L138">        citationGroups.createPlainBibliographySortedByComparator(OOProcess.AUTHOR_YEAR_TITLE_COMPARATOR);</span>
+
+        // Mark first appearance of each citationKey
+<span class="nc" id="L141">        setIsFirstAppearanceOfSourceInCitations(citationGroups);</span>
+
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        for (CitationGroup group : citationGroups.getCitationGroupsInGlobalOrder()) {</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            final boolean inParenthesis = group.citationType == CitationType.AUTHORYEAR_PAR;</span>
+<span class="nc" id="L145">            final NonUniqueCitationMarker strictlyUnique = NonUniqueCitationMarker.THROWS;</span>
+
+<span class="nc" id="L147">            List&lt;Citation&gt; cits = group.getCitationsInLocalOrder();</span>
+<span class="nc" id="L148">            List&lt;CitationMarkerEntry&gt; citationMarkerEntries = OOListUtil.map(cits, e -&gt; e);</span>
+<span class="nc" id="L149">            OOText citMarker = style.createCitationMarker(citationMarkerEntries,</span>
+                                                          inParenthesis,
+                                                          strictlyUnique);
+<span class="nc" id="L152">            group.setCitationMarker(Optional.of(citMarker));</span>
+<span class="nc" id="L153">        }</span>
+<span class="nc" id="L154">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

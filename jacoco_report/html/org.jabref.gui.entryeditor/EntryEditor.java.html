@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryEditor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor</a> &gt; <span class="el_source">EntryEditor.java</span></div><h1>EntryEditor.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor;
+
+import java.io.File;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.stream.Collectors;
+
+import javafx.fxml.FXML;
+import javafx.geometry.Side;
+import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.input.DataFormat;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.TransferMode;
+import javafx.scene.layout.BorderPane;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.citationkeypattern.GenerateCitationKeySingleAction;
+import org.jabref.gui.cleanup.CleanupSingleAction;
+import org.jabref.gui.entryeditor.citationrelationtab.CitationRelationsTab;
+import org.jabref.gui.entryeditor.fileannotationtab.FileAnnotationTab;
+import org.jabref.gui.entryeditor.fileannotationtab.FulltextSearchResultsTab;
+import org.jabref.gui.externalfiles.ExternalFilesEntryLinker;
+import org.jabref.gui.help.HelpAction;
+import org.jabref.gui.importer.GrobidOptInDialogHelper;
+import org.jabref.gui.keyboard.KeyBinding;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.gui.menus.ChangeEntryTypeMenu;
+import org.jabref.gui.mergeentries.FetchAndMergeEntry;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.undo.CountingUndoManager;
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.bibtex.TypedBibEntry;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.importer.EntryBasedFetcher;
+import org.jabref.logic.importer.WebFetchers;
+import org.jabref.logic.importer.fileformat.PdfMergeMetadataImporter;
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import com.tobiasdiez.easybind.Subscription;
+import jakarta.inject.Inject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * GUI component that allows editing of the fields of a BibEntry (i.e. the one that shows up, when you double click on
+ * an entry in the table)
+ * &lt;p&gt;
+ * It hosts the tabs (required, general, optional) and the buttons to the left.
+ * &lt;p&gt;
+ * EntryEditor also registers itself to the event bus, receiving events whenever a field of the entry changes, enabling
+ * the text fields to update themselves if the change is made from somewhere else.
+ */
+public class EntryEditor extends BorderPane {
+
+<span class="nc" id="L79">    private static final Logger LOGGER = LoggerFactory.getLogger(EntryEditor.class);</span>
+
+    private final LibraryTab libraryTab;
+    private final BibDatabaseContext databaseContext;
+    private final EntryEditorPreferences entryEditorPreferences;
+    private final ExternalFilesEntryLinker fileLinker;
+    /*
+    * Tabs which can apply filter, but seems non-sense
+    * */
+    private final List&lt;EntryEditorTab&gt; tabs;
+    private Subscription typeSubscription;
+    /*
+    * A reference to the entry this editor works on.
+    * */
+    private BibEntry entry;
+    private SourceTab sourceTab;
+
+    /*
+    * tabs to be showed in GUI
+    * */
+    @FXML private TabPane tabbed;
+
+    @FXML private Button typeChangeButton;
+    @FXML private Button fetcherButton;
+    @FXML private Label typeLabel;
+    @Inject private DialogService dialogService;
+    @Inject private TaskExecutor taskExecutor;
+    @Inject private PreferencesService preferencesService;
+    @Inject private StateManager stateManager;
+    @Inject private ThemeManager themeManager;
+    @Inject private FileUpdateMonitor fileMonitor;
+    @Inject private CountingUndoManager undoManager;
+    @Inject private BibEntryTypesManager bibEntryTypesManager;
+    @Inject private KeyBindingRepository keyBindingRepository;
+    @Inject private JournalAbbreviationRepository journalAbbreviationRepository;
+
+<span class="nc" id="L115">    private final List&lt;EntryEditorTab&gt; entryEditorTabs = new LinkedList&lt;&gt;();</span>
+
+<span class="nc" id="L117">    public EntryEditor(LibraryTab libraryTab) {</span>
+<span class="nc" id="L118">        this.libraryTab = libraryTab;</span>
+<span class="nc" id="L119">        this.databaseContext = libraryTab.getBibDatabaseContext();</span>
+
+<span class="nc" id="L121">        ViewLoader.view(this)</span>
+<span class="nc" id="L122">                  .root(this)</span>
+<span class="nc" id="L123">                  .load();</span>
+
+<span class="nc" id="L125">        this.entryEditorPreferences = preferencesService.getEntryEditorPreferences();</span>
+<span class="nc" id="L126">        this.fileLinker = new ExternalFilesEntryLinker(preferencesService.getFilePreferences(), databaseContext, dialogService);</span>
+
+<span class="nc" id="L128">        EasyBind.subscribe(tabbed.getSelectionModel().selectedItemProperty(), tab -&gt; {</span>
+<span class="nc" id="L129">            EntryEditorTab activeTab = (EntryEditorTab) tab;</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            if (activeTab != null) {</span>
+<span class="nc" id="L131">                activeTab.notifyAboutFocus(entry);</span>
+            }
+<span class="nc" id="L133">        });</span>
+
+<span class="nc" id="L135">        setupKeyBindings();</span>
+
+<span class="nc" id="L137">        this.tabs = createTabs();</span>
+
+<span class="nc" id="L139">        this.setOnDragOver(event -&gt; {</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (event.getDragboard().hasFiles()) {</span>
+<span class="nc" id="L141">                event.acceptTransferModes(TransferMode.COPY, TransferMode.MOVE, TransferMode.LINK);</span>
+            }
+<span class="nc" id="L143">            event.consume();</span>
+<span class="nc" id="L144">        });</span>
+
+<span class="nc" id="L146">        this.setOnDragDropped(event -&gt; {</span>
+<span class="nc" id="L147">            BibEntry entry = this.getEntry();</span>
+<span class="nc" id="L148">            boolean success = false;</span>
+
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            if (event.getDragboard().hasContent(DataFormat.FILES)) {</span>
+<span class="nc" id="L151">                List&lt;Path&gt; draggedFiles = event.getDragboard().getFiles().stream().map(File::toPath).collect(Collectors.toList());</span>
+<span class="nc bnc" id="L152" title="All 4 branches missed.">                switch (event.getTransferMode()) {</span>
+                    case COPY -&gt; {
+<span class="nc" id="L154">                        LOGGER.debug(&quot;Mode COPY&quot;);</span>
+<span class="nc" id="L155">                        fileLinker.copyFilesToFileDirAndAddToEntry(entry, draggedFiles, libraryTab.getIndexingTaskManager());</span>
+<span class="nc" id="L156">                    }</span>
+                    case MOVE -&gt; {
+<span class="nc" id="L158">                        LOGGER.debug(&quot;Mode MOVE&quot;);</span>
+<span class="nc" id="L159">                        fileLinker.moveFilesToFileDirRenameAndAddToEntry(entry, draggedFiles, libraryTab.getIndexingTaskManager());</span>
+<span class="nc" id="L160">                    }</span>
+                    case LINK -&gt; {
+<span class="nc" id="L162">                        LOGGER.debug(&quot;Mode LINK&quot;);</span>
+<span class="nc" id="L163">                        fileLinker.addFilesToEntry(entry, draggedFiles);</span>
+                    }
+                }
+<span class="nc" id="L166">                success = true;</span>
+            }
+
+<span class="nc" id="L169">            event.setDropCompleted(success);</span>
+<span class="nc" id="L170">            event.consume();</span>
+<span class="nc" id="L171">        });</span>
+<span class="nc" id="L172">    }</span>
+
+    /**
+     * Set-up key bindings specific for the entry editor.
+     */
+    private void setupKeyBindings() {
+<span class="nc" id="L178">        this.addEventHandler(KeyEvent.KEY_PRESSED, event -&gt; {</span>
+<span class="nc" id="L179">            Optional&lt;KeyBinding&gt; keyBinding = keyBindingRepository.mapToKeyBinding(event);</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            if (keyBinding.isPresent()) {</span>
+<span class="nc bnc" id="L181" title="All 7 branches missed.">                switch (keyBinding.get()) {</span>
+                    case ENTRY_EDITOR_NEXT_PANEL:
+                    case ENTRY_EDITOR_NEXT_PANEL_2:
+<span class="nc" id="L184">                        tabbed.getSelectionModel().selectNext();</span>
+<span class="nc" id="L185">                        event.consume();</span>
+<span class="nc" id="L186">                        break;</span>
+                    case ENTRY_EDITOR_PREVIOUS_PANEL:
+                    case ENTRY_EDITOR_PREVIOUS_PANEL_2:
+<span class="nc" id="L189">                        tabbed.getSelectionModel().selectPrevious();</span>
+<span class="nc" id="L190">                        event.consume();</span>
+<span class="nc" id="L191">                        break;</span>
+                    case ENTRY_EDITOR_NEXT_ENTRY:
+<span class="nc" id="L193">                        libraryTab.selectNextEntry();</span>
+<span class="nc" id="L194">                        event.consume();</span>
+<span class="nc" id="L195">                        break;</span>
+                    case ENTRY_EDITOR_PREVIOUS_ENTRY:
+<span class="nc" id="L197">                        libraryTab.selectPreviousEntry();</span>
+<span class="nc" id="L198">                        event.consume();</span>
+<span class="nc" id="L199">                        break;</span>
+                    case HELP:
+<span class="nc" id="L201">                        new HelpAction(HelpFile.ENTRY_EDITOR, dialogService, preferencesService.getFilePreferences()).execute();</span>
+<span class="nc" id="L202">                        event.consume();</span>
+<span class="nc" id="L203">                        break;</span>
+                    case CLOSE:
+                    case EDIT_ENTRY:
+<span class="nc" id="L206">                        close();</span>
+<span class="nc" id="L207">                        event.consume();</span>
+<span class="nc" id="L208">                        break;</span>
+                    default:
+                        // Pass other keys to parent
+                }
+            }
+<span class="nc" id="L213">        });</span>
+<span class="nc" id="L214">    }</span>
+
+    @FXML
+    public void close() {
+<span class="nc" id="L218">        libraryTab.entryEditorClosing();</span>
+<span class="nc" id="L219">    }</span>
+
+    @FXML
+    private void deleteEntry() {
+<span class="nc" id="L223">        libraryTab.delete(entry);</span>
+<span class="nc" id="L224">    }</span>
+
+    @FXML
+    void generateCiteKeyButton() {
+<span class="nc" id="L228">        GenerateCitationKeySingleAction action = new GenerateCitationKeySingleAction(getEntry(), databaseContext,</span>
+                dialogService, preferencesService, undoManager);
+<span class="nc" id="L230">        action.execute();</span>
+<span class="nc" id="L231">    }</span>
+
+    @FXML
+    void generateCleanupButton() {
+<span class="nc" id="L235">        CleanupSingleAction action = new CleanupSingleAction(getEntry(), preferencesService, dialogService, stateManager, undoManager);</span>
+<span class="nc" id="L236">        action.execute();</span>
+<span class="nc" id="L237">    }</span>
+
+    @FXML
+    private void navigateToPreviousEntry() {
+<span class="nc" id="L241">        libraryTab.selectPreviousEntry();</span>
+<span class="nc" id="L242">    }</span>
+
+    @FXML
+    private void navigateToNextEntry() {
+<span class="nc" id="L246">        libraryTab.selectNextEntry();</span>
+<span class="nc" id="L247">    }</span>
+
+    private List&lt;EntryEditorTab&gt; createTabs() {
+<span class="nc" id="L250">        entryEditorTabs.add(new PreviewTab(databaseContext, dialogService, preferencesService, stateManager, themeManager, libraryTab.getIndexingTaskManager(), taskExecutor));</span>
+
+        // Required, optional, deprecated, and &quot;other&quot; fields
+<span class="nc" id="L253">        entryEditorTabs.add(new RequiredFieldsTab(databaseContext, libraryTab.getSuggestionProviders(), undoManager, dialogService, preferencesService, stateManager, themeManager, libraryTab.getIndexingTaskManager(), bibEntryTypesManager, taskExecutor, journalAbbreviationRepository));</span>
+<span class="nc" id="L254">        entryEditorTabs.add(new OptionalFieldsTab(databaseContext, libraryTab.getSuggestionProviders(), undoManager, dialogService, preferencesService, stateManager, themeManager, libraryTab.getIndexingTaskManager(), bibEntryTypesManager, taskExecutor, journalAbbreviationRepository));</span>
+<span class="nc" id="L255">        entryEditorTabs.add(new OptionalFields2Tab(databaseContext, libraryTab.getSuggestionProviders(), undoManager, dialogService, preferencesService, stateManager, themeManager, libraryTab.getIndexingTaskManager(), bibEntryTypesManager, taskExecutor, journalAbbreviationRepository));</span>
+<span class="nc" id="L256">        entryEditorTabs.add(new DeprecatedFieldsTab(databaseContext, libraryTab.getSuggestionProviders(), undoManager, dialogService, preferencesService, stateManager, themeManager, libraryTab.getIndexingTaskManager(), bibEntryTypesManager, taskExecutor, journalAbbreviationRepository));</span>
+<span class="nc" id="L257">        entryEditorTabs.add(new OtherFieldsTab(databaseContext, libraryTab.getSuggestionProviders(), undoManager, dialogService, preferencesService, stateManager, themeManager, libraryTab.getIndexingTaskManager(), bibEntryTypesManager, taskExecutor, journalAbbreviationRepository));</span>
+
+        // Comment Tab: Tab for general and user-specific comments
+<span class="nc" id="L260">        entryEditorTabs.add(new CommentsTab(preferencesService, databaseContext, libraryTab.getSuggestionProviders(), undoManager, dialogService, stateManager, themeManager, libraryTab.getIndexingTaskManager(), taskExecutor, journalAbbreviationRepository));</span>
+
+        // General fields from preferences
+        // First, remove all tabs that are already handled above or below; except for the source tab (which has different titles for BibTeX and BibLaTeX mode)
+<span class="nc" id="L264">        Map&lt;String, Set&lt;Field&gt;&gt; entryEditorTabList = new HashMap&lt;&gt;(entryEditorPreferences.getEntryEditorTabs());</span>
+<span class="nc" id="L265">        entryEditorTabList.remove(PreviewTab.NAME);</span>
+<span class="nc" id="L266">        entryEditorTabList.remove(RequiredFieldsTab.NAME);</span>
+<span class="nc" id="L267">        entryEditorTabList.remove(OptionalFieldsTab.NAME);</span>
+<span class="nc" id="L268">        entryEditorTabList.remove(OptionalFields2Tab.NAME);</span>
+<span class="nc" id="L269">        entryEditorTabList.remove(DeprecatedFieldsTab.NAME);</span>
+<span class="nc" id="L270">        entryEditorTabList.remove(CommentsTab.NAME);</span>
+<span class="nc" id="L271">        entryEditorTabList.remove(MathSciNetTab.NAME);</span>
+<span class="nc" id="L272">        entryEditorTabList.remove(FileAnnotationTab.NAME);</span>
+<span class="nc" id="L273">        entryEditorTabList.remove(RelatedArticlesTab.NAME);</span>
+<span class="nc" id="L274">        entryEditorTabList.remove(LatexCitationsTab.NAME);</span>
+<span class="nc" id="L275">        entryEditorTabList.remove(FulltextSearchResultsTab.NAME);</span>
+<span class="nc" id="L276">        entryEditorTabList.remove(SciteTab.NAME);</span>
+<span class="nc" id="L277">        entryEditorTabList.remove(&quot;Comments&quot;);</span>
+        // Then show the remaining configured
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        for (Map.Entry&lt;String, Set&lt;Field&gt;&gt; tab : entryEditorTabList.entrySet()) {</span>
+<span class="nc" id="L280">            entryEditorTabs.add(new UserDefinedFieldsTab(tab.getKey(), tab.getValue(), databaseContext, libraryTab.getSuggestionProviders(), undoManager, dialogService, preferencesService, stateManager, themeManager, libraryTab.getIndexingTaskManager(), taskExecutor, journalAbbreviationRepository));</span>
+<span class="nc" id="L281">        }</span>
+
+        // &quot;Special&quot; tabs
+<span class="nc" id="L284">        entryEditorTabs.add(new MathSciNetTab());</span>
+<span class="nc" id="L285">        entryEditorTabs.add(new FileAnnotationTab(libraryTab.getAnnotationCache()));</span>
+<span class="nc" id="L286">        entryEditorTabs.add(new SciteTab(preferencesService, taskExecutor, dialogService));</span>
+<span class="nc" id="L287">        entryEditorTabs.add(new CitationRelationsTab(entryEditorPreferences, dialogService, databaseContext,</span>
+                undoManager, stateManager, fileMonitor, preferencesService, libraryTab, taskExecutor));
+<span class="nc" id="L289">        entryEditorTabs.add(new RelatedArticlesTab(entryEditorPreferences, preferencesService, dialogService, taskExecutor));</span>
+
+<span class="nc" id="L291">        sourceTab = new SourceTab(</span>
+                databaseContext,
+                undoManager,
+<span class="nc" id="L294">                preferencesService.getFieldPreferences(),</span>
+<span class="nc" id="L295">                preferencesService.getImportFormatPreferences(),</span>
+                fileMonitor,
+                dialogService,
+                stateManager,
+                bibEntryTypesManager,
+                keyBindingRepository);
+<span class="nc" id="L301">        entryEditorTabs.add(sourceTab);</span>
+
+<span class="nc" id="L303">        entryEditorTabs.add(new LatexCitationsTab(databaseContext, preferencesService, taskExecutor, dialogService));</span>
+
+<span class="nc" id="L305">        entryEditorTabs.add(new FulltextSearchResultsTab(stateManager, preferencesService, dialogService, taskExecutor));</span>
+
+<span class="nc" id="L307">        return entryEditorTabs;</span>
+    }
+
+    private void recalculateVisibleTabs() {
+<span class="nc" id="L311">        List&lt;Tab&gt; visibleTabs = tabs.stream().filter(tab -&gt; tab.shouldShow(entry)).collect(Collectors.toList());</span>
+
+        // Start of ugly hack:
+        // We need to find out, which tabs will be shown and which not and remove and re-add the appropriate tabs
+        // to the editor. We don't want to simply remove all and re-add the complete list of visible tabs, because
+        // the tabs give an ugly animation the looks like all tabs are shifting in from the right.
+        // This hack is required since tabbed.getTabs().setAll(visibleTabs) changes the order of the tabs in the editor
+
+        // First, remove tabs that we do not want to show
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        List&lt;EntryEditorTab&gt; toBeRemoved = tabs.stream().filter(tab -&gt; !tab.shouldShow(entry)).toList();</span>
+<span class="nc" id="L321">        tabbed.getTabs().removeAll(toBeRemoved);</span>
+
+        // Next add all the visible tabs (if not already present) at the right position
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        for (int i = 0; i &lt; visibleTabs.size(); i++) {</span>
+<span class="nc" id="L325">            Tab toBeAdded = visibleTabs.get(i);</span>
+<span class="nc" id="L326">            Tab shown = null;</span>
+
+<span class="nc bnc" id="L328" title="All 2 branches missed.">            if (i &lt; tabbed.getTabs().size()) {</span>
+<span class="nc" id="L329">                shown = tabbed.getTabs().get(i);</span>
+            }
+
+<span class="nc bnc" id="L332" title="All 2 branches missed.">            if (!toBeAdded.equals(shown)) {</span>
+<span class="nc" id="L333">                tabbed.getTabs().add(i, toBeAdded);</span>
+            }
+        }
+<span class="nc" id="L336">    }</span>
+
+    /**
+     * @return the currently edited entry
+     */
+    public BibEntry getEntry() {
+<span class="nc" id="L342">        return entry;</span>
+    }
+
+    /**
+     * Sets the entry to edit.
+     */
+    public void setEntry(BibEntry entry) {
+<span class="nc" id="L349">        Objects.requireNonNull(entry);</span>
+
+        // Remove subscription for old entry if existing
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        if (typeSubscription != null) {</span>
+<span class="nc" id="L353">            typeSubscription.unsubscribe();</span>
+        }
+
+<span class="nc" id="L356">        this.entry = entry;</span>
+
+<span class="nc" id="L358">        recalculateVisibleTabs();</span>
+<span class="nc" id="L359">        EasyBind.listen(preferencesService.getPreviewPreferences().showPreviewAsExtraTabProperty(),</span>
+<span class="nc" id="L360">                (obs, oldValue, newValue) -&gt; recalculateVisibleTabs());</span>
+
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (entryEditorPreferences.showSourceTabByDefault()) {</span>
+<span class="nc" id="L363">            tabbed.getSelectionModel().select(sourceTab);</span>
+        }
+
+        // Notify current tab about new entry
+<span class="nc" id="L367">        getSelectedTab().notifyAboutFocus(entry);</span>
+
+<span class="nc" id="L369">        setupToolBar();</span>
+
+        // Subscribe to type changes for rebuilding the currently visible tab
+<span class="nc" id="L372">        typeSubscription = EasyBind.subscribe(this.entry.typeProperty(), type -&gt; {</span>
+<span class="nc" id="L373">            typeLabel.setText(new TypedBibEntry(entry, databaseContext.getMode()).getTypeForDisplay());</span>
+<span class="nc" id="L374">            recalculateVisibleTabs();</span>
+<span class="nc" id="L375">            getSelectedTab().notifyAboutFocus(entry);</span>
+<span class="nc" id="L376">        });</span>
+<span class="nc" id="L377">    }</span>
+
+    private EntryEditorTab getSelectedTab() {
+<span class="nc" id="L380">        return (EntryEditorTab) tabbed.getSelectionModel().getSelectedItem();</span>
+    }
+
+    private void setupToolBar() {
+        // Update type label
+<span class="nc" id="L385">        TypedBibEntry typedEntry = new TypedBibEntry(entry, databaseContext.getMode());</span>
+<span class="nc" id="L386">        typeLabel.setText(typedEntry.getTypeForDisplay());</span>
+
+        // Add type change menu
+<span class="nc" id="L389">        ContextMenu typeMenu = new ChangeEntryTypeMenu(Collections.singletonList(entry), databaseContext, undoManager, keyBindingRepository, bibEntryTypesManager).asContextMenu();</span>
+<span class="nc" id="L390">        typeLabel.setOnMouseClicked(event -&gt; typeMenu.show(typeLabel, Side.RIGHT, 0, 0));</span>
+<span class="nc" id="L391">        typeChangeButton.setOnMouseClicked(event -&gt; typeMenu.show(typeChangeButton, Side.RIGHT, 0, 0));</span>
+
+        // Add menu for fetching bibliographic information
+<span class="nc" id="L394">        ContextMenu fetcherMenu = new ContextMenu();</span>
+<span class="nc" id="L395">        SortedSet&lt;EntryBasedFetcher&gt; entryBasedFetchers = WebFetchers.getEntryBasedFetchers(</span>
+<span class="nc" id="L396">                preferencesService.getImporterPreferences(),</span>
+<span class="nc" id="L397">                preferencesService.getImportFormatPreferences(),</span>
+<span class="nc" id="L398">                preferencesService.getFilePreferences(),</span>
+                databaseContext);
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        for (EntryBasedFetcher fetcher : entryBasedFetchers) {</span>
+<span class="nc" id="L401">            MenuItem fetcherMenuItem = new MenuItem(fetcher.getName());</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">            if (fetcher instanceof PdfMergeMetadataImporter.EntryBasedFetcherWrapper) {</span>
+                // Handle Grobid Opt-In in case of the PdfMergeMetadataImporter
+<span class="nc" id="L404">                fetcherMenuItem.setOnAction(event -&gt; {</span>
+<span class="nc" id="L405">                    GrobidOptInDialogHelper.showAndWaitIfUserIsUndecided(dialogService, preferencesService.getGrobidPreferences());</span>
+<span class="nc" id="L406">                    PdfMergeMetadataImporter.EntryBasedFetcherWrapper pdfMergeMetadataImporter =</span>
+                            new PdfMergeMetadataImporter.EntryBasedFetcherWrapper(
+<span class="nc" id="L408">                                    preferencesService.getImportFormatPreferences(),</span>
+<span class="nc" id="L409">                                    preferencesService.getFilePreferences(),</span>
+                                    databaseContext);
+<span class="nc" id="L411">                    fetchAndMerge(pdfMergeMetadataImporter);</span>
+<span class="nc" id="L412">                });</span>
+            } else {
+<span class="nc" id="L414">                fetcherMenuItem.setOnAction(event -&gt; fetchAndMerge(fetcher));</span>
+            }
+<span class="nc" id="L416">            fetcherMenu.getItems().add(fetcherMenuItem);</span>
+<span class="nc" id="L417">        }</span>
+
+<span class="nc" id="L419">        fetcherButton.setOnMouseClicked(event -&gt; fetcherMenu.show(fetcherButton, Side.RIGHT, 0, 0));</span>
+<span class="nc" id="L420">    }</span>
+
+    private void fetchAndMerge(EntryBasedFetcher fetcher) {
+<span class="nc" id="L423">        new FetchAndMergeEntry(libraryTab.getBibDatabaseContext(), taskExecutor, preferencesService, dialogService, undoManager).fetchAndMerge(entry, fetcher);</span>
+<span class="nc" id="L424">    }</span>
+
+    public void setFocusToField(Field field) {
+<span class="nc" id="L427">        DefaultTaskExecutor.runInJavaFXThread(() -&gt; {</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">            for (Tab tab : tabbed.getTabs()) {</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">                if ((tab instanceof FieldsEditorTab fieldsEditorTab)</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">                        &amp;&amp; fieldsEditorTab.getShownFields().contains(field)) {</span>
+<span class="nc" id="L431">                    tabbed.getSelectionModel().select(tab);</span>
+<span class="nc" id="L432">                    fieldsEditorTab.requestFocus(field);</span>
+                }
+<span class="nc" id="L434">            }</span>
+<span class="nc" id="L435">        });</span>
+<span class="nc" id="L436">    }</span>
+
+    public void nextPreviewStyle() {
+<span class="nc" id="L439">        this.entryEditorTabs.forEach(EntryEditorTab::nextPreviewStyle);</span>
+<span class="nc" id="L440">    }</span>
+
+    public void previousPreviewStyle() {
+<span class="nc" id="L443">        this.entryEditorTabs.forEach(EntryEditorTab::previousPreviewStyle);</span>
+<span class="nc" id="L444">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

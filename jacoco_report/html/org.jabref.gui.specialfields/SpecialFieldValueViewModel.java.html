@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpecialFieldValueViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.specialfields</a> &gt; <span class="el_source">SpecialFieldValueViewModel.java</span></div><h1>SpecialFieldValueViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.specialfields;
+
+import java.util.Objects;
+import java.util.Optional;
+
+import org.jabref.gui.actions.Action;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.field.SpecialFieldValue;
+
+public class SpecialFieldValueViewModel {
+
+    private final SpecialFieldValue value;
+
+<span class="fc" id="L16">    public SpecialFieldValueViewModel(SpecialFieldValue value) {</span>
+<span class="fc" id="L17">        Objects.requireNonNull(value);</span>
+<span class="fc" id="L18">        this.value = value;</span>
+<span class="fc" id="L19">    }</span>
+
+    public SpecialFieldValue getValue() {
+<span class="fc" id="L22">        return value;</span>
+    }
+
+    public Optional&lt;JabRefIcon&gt; getIcon() {
+<span class="nc" id="L26">        return getAction().getIcon();</span>
+    }
+
+    public String getMenuString() {
+<span class="nc" id="L30">        return getAction().getText();</span>
+    }
+
+    public String getToolTipText() {
+<span class="nc bnc" id="L34" title="All 17 branches missed.">        return switch (value) {</span>
+<span class="nc" id="L35">            case PRINTED -&gt; Localization.lang(&quot;Toggle print status&quot;);</span>
+<span class="nc" id="L36">            case CLEAR_PRIORITY -&gt; Localization.lang(&quot;No priority information&quot;);</span>
+<span class="nc" id="L37">            case PRIORITY_HIGH -&gt; Localization.lang(&quot;Priority high&quot;);</span>
+<span class="nc" id="L38">            case PRIORITY_MEDIUM -&gt; Localization.lang(&quot;Priority medium&quot;);</span>
+<span class="nc" id="L39">            case PRIORITY_LOW -&gt; Localization.lang(&quot;Priority low&quot;);</span>
+<span class="nc" id="L40">            case QUALITY_ASSURED -&gt; Localization.lang(&quot;Toggle quality assured&quot;);</span>
+<span class="nc" id="L41">            case CLEAR_RANK -&gt; Localization.lang(&quot;No rank information&quot;);</span>
+<span class="nc" id="L42">            case RANK_1 -&gt; Localization.lang(&quot;One star&quot;);</span>
+<span class="nc" id="L43">            case RANK_2 -&gt; Localization.lang(&quot;Two stars&quot;);</span>
+<span class="nc" id="L44">            case RANK_3 -&gt; Localization.lang(&quot;Three stars&quot;);</span>
+<span class="nc" id="L45">            case RANK_4 -&gt; Localization.lang(&quot;Four stars&quot;);</span>
+<span class="nc" id="L46">            case RANK_5 -&gt; Localization.lang(&quot;Five stars&quot;);</span>
+<span class="nc" id="L47">            case CLEAR_READ_STATUS -&gt; Localization.lang(&quot;No read status information&quot;);</span>
+<span class="nc" id="L48">            case READ -&gt; Localization.lang(&quot;Read status read&quot;);</span>
+<span class="nc" id="L49">            case SKIMMED -&gt; Localization.lang(&quot;Read status skimmed&quot;);</span>
+<span class="nc" id="L50">            case RELEVANT -&gt; Localization.lang(&quot;Toggle relevance&quot;);</span>
+        };
+    }
+
+    public Action getAction() {
+<span class="nc bnc" id="L55" title="All 17 branches missed.">        return switch (value) {</span>
+<span class="nc" id="L56">            case PRINTED -&gt; StandardActions.TOGGLE_PRINTED;</span>
+<span class="nc" id="L57">            case CLEAR_PRIORITY -&gt; StandardActions.CLEAR_PRIORITY;</span>
+<span class="nc" id="L58">            case PRIORITY_HIGH -&gt; StandardActions.PRIORITY_HIGH;</span>
+<span class="nc" id="L59">            case PRIORITY_MEDIUM -&gt; StandardActions.PRIORITY_MEDIUM;</span>
+<span class="nc" id="L60">            case PRIORITY_LOW -&gt; StandardActions.PRIORITY_LOW;</span>
+<span class="nc" id="L61">            case QUALITY_ASSURED -&gt; StandardActions.QUALITY_ASSURED;</span>
+<span class="nc" id="L62">            case CLEAR_RANK -&gt; StandardActions.CLEAR_RANK;</span>
+<span class="nc" id="L63">            case RANK_1 -&gt; StandardActions.RANK_1;</span>
+<span class="nc" id="L64">            case RANK_2 -&gt; StandardActions.RANK_2;</span>
+<span class="nc" id="L65">            case RANK_3 -&gt; StandardActions.RANK_3;</span>
+<span class="nc" id="L66">            case RANK_4 -&gt; StandardActions.RANK_4;</span>
+<span class="nc" id="L67">            case RANK_5 -&gt; StandardActions.RANK_5;</span>
+<span class="nc" id="L68">            case CLEAR_READ_STATUS -&gt; StandardActions.CLEAR_READ_STATUS;</span>
+<span class="nc" id="L69">            case READ -&gt; StandardActions.READ;</span>
+<span class="nc" id="L70">            case SKIMMED -&gt; StandardActions.SKIMMED;</span>
+<span class="nc" id="L71">            case RELEVANT -&gt; StandardActions.RELEVANT;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

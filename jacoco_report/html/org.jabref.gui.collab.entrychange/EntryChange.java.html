@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryChange.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.collab.entrychange</a> &gt; <span class="el_source">EntryChange.java</span></div><h1>EntryChange.java</h1><pre class="source lang-java linenums">package org.jabref.gui.collab.entrychange;
+
+import javax.swing.undo.CompoundEdit;
+
+import org.jabref.gui.collab.DatabaseChange;
+import org.jabref.gui.collab.DatabaseChangeResolverFactory;
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.gui.undo.UndoableInsertEntries;
+import org.jabref.gui.undo.UndoableRemoveEntries;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+
+public final class EntryChange extends DatabaseChange {
+    private final BibEntry oldEntry;
+    private final BibEntry newEntry;
+
+    public EntryChange(BibEntry oldEntry, BibEntry newEntry, BibDatabaseContext databaseContext, DatabaseChangeResolverFactory databaseChangeResolverFactory) {
+<span class="nc" id="L19">        super(databaseContext, databaseChangeResolverFactory);</span>
+<span class="nc" id="L20">        this.oldEntry = oldEntry;</span>
+<span class="nc" id="L21">        this.newEntry = newEntry;</span>
+<span class="nc" id="L22">        setChangeName(oldEntry.getCitationKey().map(key -&gt; Localization.lang(&quot;Modified entry '%0'&quot;, key))</span>
+<span class="nc" id="L23">                           .orElse(Localization.lang(&quot;Modified entry&quot;)));</span>
+<span class="nc" id="L24">    }</span>
+
+    public EntryChange(BibEntry oldEntry, BibEntry newEntry, BibDatabaseContext databaseContext) {
+<span class="nc" id="L27">        this(oldEntry, newEntry, databaseContext, null);</span>
+<span class="nc" id="L28">    }</span>
+
+    public BibEntry getOldEntry() {
+<span class="nc" id="L31">        return oldEntry;</span>
+    }
+
+    public BibEntry getNewEntry() {
+<span class="nc" id="L35">        return newEntry;</span>
+    }
+
+    @Override
+    public void applyChange(NamedCompound undoEdit) {
+<span class="nc" id="L40">        databaseContext.getDatabase().removeEntry(oldEntry);</span>
+<span class="nc" id="L41">        databaseContext.getDatabase().insertEntry(newEntry);</span>
+<span class="nc" id="L42">        CompoundEdit changeEntryEdit = new CompoundEdit();</span>
+<span class="nc" id="L43">        changeEntryEdit.addEdit(new UndoableRemoveEntries(databaseContext.getDatabase(), oldEntry));</span>
+<span class="nc" id="L44">        changeEntryEdit.addEdit(new UndoableInsertEntries(databaseContext.getDatabase(), newEntry));</span>
+<span class="nc" id="L45">        changeEntryEdit.end();</span>
+
+<span class="nc" id="L47">        undoEdit.addEdit(changeEntryEdit);</span>
+<span class="nc" id="L48">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

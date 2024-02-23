@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LatexCitationsTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor</a> &gt; <span class="el_source">LatexCitationsTabViewModel.java</span></div><h1>LatexCitationsTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.Future;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyListWrapper;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.gui.AbstractViewModel;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.DirectoryDialogConfiguration;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.texparser.DefaultLatexParser;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.texparser.Citation;
+import org.jabref.model.texparser.LatexParserResult;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class LatexCitationsTabViewModel extends AbstractViewModel {
+
+<span class="nc" id="L38">    enum Status {</span>
+<span class="nc" id="L39">        IN_PROGRESS,</span>
+<span class="nc" id="L40">        CITATIONS_FOUND,</span>
+<span class="nc" id="L41">        NO_RESULTS,</span>
+<span class="nc" id="L42">        ERROR</span>
+    }
+
+<span class="nc" id="L45">    private static final Logger LOGGER = LoggerFactory.getLogger(LatexCitationsTabViewModel.class);</span>
+    private static final String TEX_EXT = &quot;.tex&quot;;
+    private final BibDatabaseContext databaseContext;
+    private final PreferencesService preferencesService;
+    private final TaskExecutor taskExecutor;
+    private final DialogService dialogService;
+    private final ObjectProperty&lt;Path&gt; directory;
+    private final ObservableList&lt;Citation&gt; citationList;
+    private final ObjectProperty&lt;Status&gt; status;
+    private final StringProperty searchError;
+    private Future&lt;?&gt; searchTask;
+    private LatexParserResult latexParserResult;
+    private BibEntry currentEntry;
+
+    public LatexCitationsTabViewModel(BibDatabaseContext databaseContext,
+                                      PreferencesService preferencesService,
+                                      TaskExecutor taskExecutor,
+<span class="nc" id="L62">                                      DialogService dialogService) {</span>
+<span class="nc" id="L63">        this.databaseContext = databaseContext;</span>
+<span class="nc" id="L64">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L65">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L66">        this.dialogService = dialogService;</span>
+<span class="nc" id="L67">        this.directory = new SimpleObjectProperty&lt;&gt;(databaseContext.getMetaData().getLatexFileDirectory(preferencesService.getFilePreferences().getUserAndHost())</span>
+<span class="nc" id="L68">                                                                   .orElse(FileUtil.getInitialDirectory(databaseContext, preferencesService.getFilePreferences().getWorkingDirectory())));</span>
+<span class="nc" id="L69">        this.citationList = FXCollections.observableArrayList();</span>
+<span class="nc" id="L70">        this.status = new SimpleObjectProperty&lt;&gt;(Status.IN_PROGRESS);</span>
+<span class="nc" id="L71">        this.searchError = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L72">    }</span>
+
+    public void init(BibEntry entry) {
+<span class="nc" id="L75">        cancelSearch();</span>
+
+<span class="nc" id="L77">        currentEntry = entry;</span>
+<span class="nc" id="L78">        Optional&lt;String&gt; citeKey = entry.getCitationKey();</span>
+
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (citeKey.isPresent()) {</span>
+<span class="nc" id="L81">            startSearch(citeKey.get());</span>
+        } else {
+<span class="nc" id="L83">            searchError.set(Localization.lang(&quot;Selected entry does not have an associated citation key.&quot;));</span>
+<span class="nc" id="L84">            status.set(Status.ERROR);</span>
+        }
+<span class="nc" id="L86">    }</span>
+
+    public ObjectProperty&lt;Path&gt; directoryProperty() {
+<span class="nc" id="L89">        return directory;</span>
+    }
+
+    public ObservableList&lt;Citation&gt; getCitationList() {
+<span class="nc" id="L93">        return new ReadOnlyListWrapper&lt;&gt;(citationList);</span>
+    }
+
+    public ObjectProperty&lt;Status&gt; statusProperty() {
+<span class="nc" id="L97">        return status;</span>
+    }
+
+    public StringProperty searchErrorProperty() {
+<span class="nc" id="L101">        return searchError;</span>
+    }
+
+    private void startSearch(String citeKey) {
+<span class="nc" id="L105">        searchTask = BackgroundTask.wrap(() -&gt; searchAndParse(citeKey))</span>
+<span class="nc" id="L106">                                   .onRunning(() -&gt; status.set(Status.IN_PROGRESS))</span>
+<span class="nc" id="L107">                                   .onSuccess(result -&gt; {</span>
+<span class="nc" id="L108">                                       citationList.setAll(result);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                                       status.set(citationList.isEmpty() ? Status.NO_RESULTS : Status.CITATIONS_FOUND);</span>
+<span class="nc" id="L110">                                   })</span>
+<span class="nc" id="L111">                                   .onFailure(error -&gt; {</span>
+<span class="nc" id="L112">                                       searchError.set(error.getMessage());</span>
+<span class="nc" id="L113">                                       status.set(Status.ERROR);</span>
+<span class="nc" id="L114">                                   })</span>
+<span class="nc" id="L115">                                   .executeWith(taskExecutor);</span>
+<span class="nc" id="L116">    }</span>
+
+    private void cancelSearch() {
+<span class="nc bnc" id="L119" title="All 6 branches missed.">        if (searchTask == null || searchTask.isCancelled() || searchTask.isDone()) {</span>
+<span class="nc" id="L120">            return;</span>
+        }
+
+<span class="nc" id="L123">        status.set(Status.IN_PROGRESS);</span>
+<span class="nc" id="L124">        searchTask.cancel(true);</span>
+<span class="nc" id="L125">    }</span>
+
+    private Collection&lt;Citation&gt; searchAndParse(String citeKey) throws IOException {
+        // we need to check whether the user meanwhile set the LaTeX file directory or the database changed locations
+<span class="nc" id="L129">        Path newDirectory = databaseContext.getMetaData().getLatexFileDirectory(preferencesService.getFilePreferences().getUserAndHost())</span>
+<span class="nc" id="L130">                                           .orElse(FileUtil.getInitialDirectory(databaseContext, preferencesService.getFilePreferences().getWorkingDirectory()));</span>
+
+<span class="nc bnc" id="L132" title="All 4 branches missed.">        if (latexParserResult == null || !newDirectory.equals(directory.get())) {</span>
+<span class="nc" id="L133">            directory.set(newDirectory);</span>
+
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            if (!newDirectory.toFile().exists()) {</span>
+<span class="nc" id="L136">                throw new IOException(&quot;Current search directory does not exist: %s&quot;.formatted(newDirectory));</span>
+            }
+
+<span class="nc" id="L139">            List&lt;Path&gt; texFiles = searchDirectory(newDirectory);</span>
+<span class="nc" id="L140">            LOGGER.debug(&quot;Found tex files: {}&quot;, texFiles);</span>
+<span class="nc" id="L141">            latexParserResult = new DefaultLatexParser().parse(texFiles);</span>
+        }
+
+<span class="nc" id="L144">        return latexParserResult.getCitationsByKey(citeKey);</span>
+    }
+
+    /**
+     * @param directory the directory to search for. It is recursively searched.
+     */
+    private List&lt;Path&gt; searchDirectory(Path directory) {
+<span class="nc" id="L151">        LOGGER.debug(&quot;Searching directory {}&quot;, directory);</span>
+        try {
+<span class="nc" id="L153">            return Files.walk(directory)</span>
+<span class="nc" id="L154">                        .filter(Files::isRegularFile)</span>
+<span class="nc" id="L155">                        .filter(path -&gt; path.toString().endsWith(TEX_EXT))</span>
+<span class="nc" id="L156">                        .toList();</span>
+<span class="nc" id="L157">        } catch (IOException e) {</span>
+<span class="nc" id="L158">            LOGGER.error(&quot;Error while searching files&quot;, e);</span>
+<span class="nc" id="L159">            return List.of();</span>
+        }
+    }
+
+    public void setLatexDirectory() {
+<span class="nc" id="L164">        DirectoryDialogConfiguration directoryDialogConfiguration = new DirectoryDialogConfiguration.Builder()</span>
+<span class="nc" id="L165">                .withInitialDirectory(directory.get()).build();</span>
+
+<span class="nc" id="L167">        dialogService.showDirectorySelectionDialog(directoryDialogConfiguration).ifPresent(selectedDirectory -&gt;</span>
+<span class="nc" id="L168">                databaseContext.getMetaData().setLatexFileDirectory(preferencesService.getFilePreferences().getUserAndHost(), selectedDirectory.toAbsolutePath()));</span>
+
+<span class="nc" id="L170">        init(currentEntry);</span>
+<span class="nc" id="L171">    }</span>
+
+    public boolean shouldShow() {
+<span class="nc" id="L174">        return preferencesService.getEntryEditorPreferences().shouldShowLatexCitationsTab();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

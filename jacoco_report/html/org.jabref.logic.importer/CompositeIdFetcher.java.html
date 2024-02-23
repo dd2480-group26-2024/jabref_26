@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompositeIdFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer</a> &gt; <span class="el_source">CompositeIdFetcher.java</span></div><h1>CompositeIdFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer;
+
+import java.util.Optional;
+import java.util.stream.Stream;
+
+import org.jabref.logic.importer.fetcher.ArXivFetcher;
+import org.jabref.logic.importer.fetcher.DoiFetcher;
+import org.jabref.logic.importer.fetcher.isbntobibtex.IsbnFetcher;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.identifier.ArXivIdentifier;
+import org.jabref.model.entry.identifier.DOI;
+import org.jabref.model.entry.identifier.ISBN;
+
+public class CompositeIdFetcher {
+
+    private final ImportFormatPreferences importFormatPreferences;
+
+<span class="fc" id="L18">    public CompositeIdFetcher(ImportFormatPreferences importFormatPreferences) {</span>
+<span class="fc" id="L19">        this.importFormatPreferences = importFormatPreferences;</span>
+<span class="fc" id="L20">    }</span>
+
+    public Optional&lt;BibEntry&gt; performSearchById(String identifier) throws FetcherException {
+<span class="fc" id="L23">        Optional&lt;DOI&gt; doi = DOI.findInText(identifier);</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (doi.isPresent()) {</span>
+<span class="fc" id="L25">            return new DoiFetcher(importFormatPreferences).performSearchById(doi.get().getNormalized());</span>
+        }
+<span class="fc" id="L27">        Optional&lt;ArXivIdentifier&gt; arXivIdentifier = ArXivIdentifier.parse(identifier);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (arXivIdentifier.isPresent()) {</span>
+<span class="fc" id="L29">            return new ArXivFetcher(importFormatPreferences).performSearchById(arXivIdentifier.get().getNormalized());</span>
+        }
+<span class="fc" id="L31">        Optional&lt;ISBN&gt; isbn = ISBN.parse(identifier);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (isbn.isPresent()) {</span>
+<span class="fc" id="L33">            return new IsbnFetcher(importFormatPreferences)</span>
+                    // .addRetryFetcher(new EbookDeIsbnFetcher(importFormatPreferences))
+                    // .addRetryFetcher(new DoiToBibtexConverterComIsbnFetcher(importFormatPreferences))
+<span class="fc" id="L36">                    .performSearchById(isbn.get().getNormalized());</span>
+        }
+        /* TODO: IACR is currently disabled, because it needs to be reworked: https://github.com/JabRef/jabref/issues/8876
+        Optional&lt;IacrEprint&gt; iacrEprint = IacrEprint.parse(identifier);
+        if (iacrEprint.isPresent()) {
+            return new IacrEprintFetcher(importFormatPreferences).performSearchById(iacrEprint.get().getNormalized());
+        }*/
+
+<span class="fc" id="L44">        return Optional.empty();</span>
+    }
+
+    public String getName() {
+<span class="nc" id="L48">        return &quot;CompositeIdFetcher&quot;;</span>
+    }
+
+    public static boolean containsValidId(String identifier) {
+<span class="fc" id="L52">        Optional&lt;DOI&gt; doi = DOI.findInText(identifier);</span>
+<span class="fc" id="L53">        Optional&lt;ArXivIdentifier&gt; arXivIdentifier = ArXivIdentifier.parse(identifier);</span>
+<span class="fc" id="L54">        Optional&lt;ISBN&gt; isbn = ISBN.parse(identifier);</span>
+
+<span class="fc" id="L56">        return Stream.of(doi, arXivIdentifier, isbn).anyMatch(Optional::isPresent);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

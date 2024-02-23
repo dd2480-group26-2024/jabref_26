@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DoiDuplicationChecker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.integrity</a> &gt; <span class="el_source">DoiDuplicationChecker.java</span></div><h1>DoiDuplicationChecker.java</h1><pre class="source lang-java linenums">package org.jabref.logic.integrity;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import javafx.collections.ObservableList;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.identifier.DOI;
+
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+
+<span class="fc" id="L18">public class DoiDuplicationChecker implements DatabaseChecker {</span>
+
+    @Override
+    public List&lt;IntegrityMessage&gt; check(BibDatabase database) {
+<span class="fc" id="L22">        ObservableList&lt;BibEntry&gt; bibEntries = database.getEntries();</span>
+<span class="fc" id="L23">        BiMap&lt;DOI, List&lt;BibEntry&gt;&gt; duplicateMap = HashBiMap.create(bibEntries.size());</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        for (BibEntry bibEntry : bibEntries) {</span>
+<span class="fc" id="L25">            bibEntry.getDOI().ifPresent(doi -&gt;</span>
+<span class="fc" id="L26">                    duplicateMap.computeIfAbsent(doi, absentDoi -&gt; new ArrayList&lt;&gt;()).add(bibEntry));</span>
+<span class="fc" id="L27">        }</span>
+
+<span class="fc" id="L29">        return duplicateMap.inverse().keySet().stream()</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">                           .filter(list -&gt; list.size() &gt; 1)</span>
+<span class="fc" id="L31">                           .flatMap(list -&gt; list.stream())</span>
+<span class="fc" id="L32">                           .map(item -&gt; new IntegrityMessage(Localization.lang(&quot;Same DOI used in multiple entries&quot;), item, StandardField.DOI))</span>
+<span class="fc" id="L33">                           .collect(Collectors.toList());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

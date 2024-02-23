@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StateManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui</a> &gt; <span class="el_source">StateManager.java</span></div><h1>StateManager.java</h1><pre class="source lang-java linenums">package org.jabref.gui;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+import javafx.beans.Observable;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyListProperty;
+import javafx.beans.property.ReadOnlyListWrapper;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.ObservableMap;
+import javafx.concurrent.Task;
+import javafx.scene.Node;
+import javafx.util.Pair;
+
+import org.jabref.gui.edit.automaticfiededitor.LastAutomaticFieldEditorEdit;
+import org.jabref.gui.sidepane.SidePaneType;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.CustomLocalDragboard;
+import org.jabref.gui.util.DialogWindowState;
+import org.jabref.gui.util.OptionalObjectProperty;
+import org.jabref.logic.search.SearchQuery;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.groups.GroupTreeNode;
+
+import com.tobiasdiez.easybind.EasyBind;
+import com.tobiasdiez.easybind.EasyBinding;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class manages the GUI-state of JabRef, including:
+ *
+ * &lt;ul&gt;
+ *   &lt;li&gt;currently selected database&lt;/li&gt;
+ *   &lt;li&gt;currently selected group&lt;/li&gt;
+ *   &lt;li&gt;active search&lt;/li&gt;
+ *   &lt;li&gt;active number of search results&lt;/li&gt;
+ *   &lt;li&gt;focus owner&lt;/li&gt;
+ *   &lt;li&gt;dialog window sizes/positions&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public class StateManager {
+
+<span class="fc" id="L53">    private static final Logger LOGGER = LoggerFactory.getLogger(StateManager.class);</span>
+<span class="fc" id="L54">    private final CustomLocalDragboard localDragboard = new CustomLocalDragboard();</span>
+<span class="fc" id="L55">    private final ObservableList&lt;BibDatabaseContext&gt; openDatabases = FXCollections.observableArrayList();</span>
+<span class="fc" id="L56">    private final OptionalObjectProperty&lt;BibDatabaseContext&gt; activeDatabase = OptionalObjectProperty.empty();</span>
+<span class="fc" id="L57">    private final ReadOnlyListWrapper&lt;GroupTreeNode&gt; activeGroups = new ReadOnlyListWrapper&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="fc" id="L58">    private final ObservableList&lt;BibEntry&gt; selectedEntries = FXCollections.observableArrayList();</span>
+<span class="fc" id="L59">    private final ObservableMap&lt;BibDatabaseContext, ObservableList&lt;GroupTreeNode&gt;&gt; selectedGroups = FXCollections.observableHashMap();</span>
+<span class="fc" id="L60">    private final OptionalObjectProperty&lt;SearchQuery&gt; activeSearchQuery = OptionalObjectProperty.empty();</span>
+<span class="fc" id="L61">    private final ObservableMap&lt;BibDatabaseContext, IntegerProperty&gt; searchResultMap = FXCollections.observableHashMap();</span>
+<span class="fc" id="L62">    private final OptionalObjectProperty&lt;Node&gt; focusOwner = OptionalObjectProperty.empty();</span>
+<span class="pc" id="L63">    private final ObservableList&lt;Pair&lt;BackgroundTask&lt;?&gt;, Task&lt;?&gt;&gt;&gt; backgroundTasks = FXCollections.observableArrayList(task -&gt; new Observable[]{task.getValue().progressProperty(), task.getValue().runningProperty()});</span>
+<span class="pc" id="L64">    private final EasyBinding&lt;Boolean&gt; anyTaskRunning = EasyBind.reduce(backgroundTasks, tasks -&gt; tasks.map(Pair::getValue).anyMatch(Task::isRunning));</span>
+<span class="pc bnc" id="L65" title="All 4 branches missed.">    private final EasyBinding&lt;Boolean&gt; anyTasksThatWillNotBeRecoveredRunning = EasyBind.reduce(backgroundTasks, tasks -&gt; tasks.anyMatch(task -&gt; !task.getKey().willBeRecoveredAutomatically() &amp;&amp; task.getValue().isRunning()));</span>
+<span class="pc" id="L66">    private final EasyBinding&lt;Double&gt; tasksProgress = EasyBind.reduce(backgroundTasks, tasks -&gt; tasks.map(Pair::getValue).filter(Task::isRunning).mapToDouble(Task::getProgress).average().orElse(1));</span>
+<span class="fc" id="L67">    private final ObservableMap&lt;String, DialogWindowState&gt; dialogWindowStates = FXCollections.observableHashMap();</span>
+<span class="fc" id="L68">    private final ObservableList&lt;SidePaneType&gt; visibleSidePanes = FXCollections.observableArrayList();</span>
+
+<span class="fc" id="L70">    private final ObjectProperty&lt;LastAutomaticFieldEditorEdit&gt; lastAutomaticFieldEditorEdit = new SimpleObjectProperty&lt;&gt;();</span>
+
+<span class="fc" id="L72">    private final ObservableList&lt;String&gt; searchHistory = FXCollections.observableArrayList();</span>
+
+<span class="fc" id="L74">    public StateManager() {</span>
+<span class="fc" id="L75">        activeGroups.bind(Bindings.valueAt(selectedGroups, activeDatabase.orElseOpt(null)));</span>
+<span class="fc" id="L76">    }</span>
+
+    public ObservableList&lt;SidePaneType&gt; getVisibleSidePaneComponents() {
+<span class="nc" id="L79">        return visibleSidePanes;</span>
+    }
+
+    public CustomLocalDragboard getLocalDragboard() {
+<span class="nc" id="L83">        return localDragboard;</span>
+    }
+
+    public ObservableList&lt;BibDatabaseContext&gt; getOpenDatabases() {
+<span class="nc" id="L87">        return openDatabases;</span>
+    }
+
+    public OptionalObjectProperty&lt;BibDatabaseContext&gt; activeDatabaseProperty() {
+<span class="fc" id="L91">        return activeDatabase;</span>
+    }
+
+    public OptionalObjectProperty&lt;SearchQuery&gt; activeSearchQueryProperty() {
+<span class="nc" id="L95">        return activeSearchQuery;</span>
+    }
+
+    public void setActiveSearchResultSize(BibDatabaseContext database, IntegerProperty resultSize) {
+<span class="nc" id="L99">        searchResultMap.put(database, resultSize);</span>
+<span class="nc" id="L100">    }</span>
+
+    public IntegerProperty getSearchResultSize() {
+<span class="nc" id="L103">        return searchResultMap.getOrDefault(activeDatabase.getValue().orElse(new BibDatabaseContext()), new SimpleIntegerProperty(0));</span>
+    }
+
+    public ReadOnlyListProperty&lt;GroupTreeNode&gt; activeGroupProperty() {
+<span class="nc" id="L107">        return activeGroups.getReadOnlyProperty();</span>
+    }
+
+    public ObservableList&lt;BibEntry&gt; getSelectedEntries() {
+<span class="fc" id="L111">        return selectedEntries;</span>
+    }
+
+    public void setSelectedEntries(List&lt;BibEntry&gt; newSelectedEntries) {
+<span class="nc" id="L115">        selectedEntries.setAll(newSelectedEntries);</span>
+<span class="nc" id="L116">    }</span>
+
+    public void setSelectedGroups(BibDatabaseContext database, List&lt;GroupTreeNode&gt; newSelectedGroups) {
+<span class="fc" id="L119">        Objects.requireNonNull(newSelectedGroups);</span>
+<span class="fc" id="L120">        selectedGroups.put(database, FXCollections.observableArrayList(newSelectedGroups));</span>
+<span class="fc" id="L121">    }</span>
+
+    public ObservableList&lt;GroupTreeNode&gt; getSelectedGroup(BibDatabaseContext database) {
+<span class="fc" id="L124">        ObservableList&lt;GroupTreeNode&gt; selectedGroupsForDatabase = selectedGroups.get(database);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        return selectedGroupsForDatabase != null ? selectedGroupsForDatabase : FXCollections.observableArrayList();</span>
+    }
+
+    public void clearSelectedGroups(BibDatabaseContext database) {
+<span class="nc" id="L129">        selectedGroups.remove(database);</span>
+<span class="nc" id="L130">    }</span>
+
+    public Optional&lt;BibDatabaseContext&gt; getActiveDatabase() {
+<span class="fc" id="L133">        return activeDatabase.get();</span>
+    }
+
+    public void setActiveDatabase(BibDatabaseContext database) {
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (database == null) {</span>
+<span class="nc" id="L138">            LOGGER.info(&quot;No open database detected&quot;);</span>
+<span class="nc" id="L139">            activeDatabaseProperty().set(Optional.empty());</span>
+        } else {
+<span class="fc" id="L141">            activeDatabaseProperty().set(Optional.of(database));</span>
+        }
+<span class="fc" id="L143">    }</span>
+
+    public void clearSearchQuery() {
+<span class="nc" id="L146">        activeSearchQuery.setValue(Optional.empty());</span>
+<span class="nc" id="L147">    }</span>
+
+    public void setSearchQuery(SearchQuery searchQuery) {
+<span class="nc" id="L150">        activeSearchQuery.setValue(Optional.of(searchQuery));</span>
+<span class="nc" id="L151">    }</span>
+
+    public OptionalObjectProperty&lt;Node&gt; focusOwnerProperty() {
+<span class="nc" id="L154">        return focusOwner;</span>
+    }
+
+    public Optional&lt;Node&gt; getFocusOwner() {
+<span class="nc" id="L158">        return focusOwner.get();</span>
+    }
+
+    public ObservableList&lt;Task&lt;?&gt;&gt; getBackgroundTasks() {
+<span class="nc" id="L162">        return EasyBind.map(backgroundTasks, Pair::getValue);</span>
+    }
+
+    public void addBackgroundTask(BackgroundTask&lt;?&gt; backgroundTask, Task&lt;?&gt; task) {
+<span class="nc" id="L166">        this.backgroundTasks.add(0, new Pair&lt;&gt;(backgroundTask, task));</span>
+<span class="nc" id="L167">    }</span>
+
+    public EasyBinding&lt;Boolean&gt; getAnyTaskRunning() {
+<span class="nc" id="L170">        return anyTaskRunning;</span>
+    }
+
+    public EasyBinding&lt;Boolean&gt; getAnyTasksThatWillNotBeRecoveredRunning() {
+<span class="nc" id="L174">        return anyTasksThatWillNotBeRecoveredRunning;</span>
+    }
+
+    public EasyBinding&lt;Double&gt; getTasksProgress() {
+<span class="nc" id="L178">        return tasksProgress;</span>
+    }
+
+    public DialogWindowState getDialogWindowState(String className) {
+<span class="nc" id="L182">        return dialogWindowStates.get(className);</span>
+    }
+
+    public void setDialogWindowState(String className, DialogWindowState state) {
+<span class="nc" id="L186">        dialogWindowStates.put(className, state);</span>
+<span class="nc" id="L187">    }</span>
+
+    public ObjectProperty&lt;LastAutomaticFieldEditorEdit&gt; lastAutomaticFieldEditorEditProperty() {
+<span class="nc" id="L190">        return lastAutomaticFieldEditorEdit;</span>
+    }
+
+    public LastAutomaticFieldEditorEdit getLastAutomaticFieldEditorEdit() {
+<span class="nc" id="L194">        return lastAutomaticFieldEditorEditProperty().get();</span>
+    }
+
+    public void setLastAutomaticFieldEditorEdit(LastAutomaticFieldEditorEdit automaticFieldEditorEdit) {
+<span class="nc" id="L198">        lastAutomaticFieldEditorEditProperty().set(automaticFieldEditorEdit);</span>
+<span class="nc" id="L199">    }</span>
+
+    public List&lt;String&gt; collectAllDatabasePaths() {
+<span class="nc" id="L202">        List&lt;String&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L203">        getOpenDatabases().stream()</span>
+<span class="nc" id="L204">                          .map(BibDatabaseContext::getDatabasePath)</span>
+<span class="nc" id="L205">                          .forEachOrdered(pathOptional -&gt; pathOptional.ifPresentOrElse(</span>
+<span class="nc" id="L206">                                  path -&gt; list.add(path.toAbsolutePath().toString()),</span>
+<span class="nc" id="L207">                                  () -&gt; list.add(&quot;&quot;)));</span>
+<span class="nc" id="L208">        return list;</span>
+    }
+
+    public void addSearchHistory(String search) {
+<span class="nc" id="L212">        searchHistory.remove(search);</span>
+<span class="nc" id="L213">        searchHistory.add(search);</span>
+<span class="nc" id="L214">    }</span>
+
+    public ObservableList&lt;String&gt; getWholeSearchHistory() {
+<span class="nc" id="L217">        return searchHistory;</span>
+    }
+
+    public List&lt;String&gt; getLastSearchHistory(int size) {
+<span class="nc" id="L221">        int sizeSearches = searchHistory.size();</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (size &lt; sizeSearches) {</span>
+<span class="nc" id="L223">            return searchHistory.subList(sizeSearches - size, sizeSearches);</span>
+        }
+<span class="nc" id="L225">        return searchHistory;</span>
+    }
+
+    public void clearSearchHistory() {
+<span class="nc" id="L229">        searchHistory.clear();</span>
+<span class="nc" id="L230">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZbMATH.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">ZbMATH.java</span></div><h1>ZbMATH.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.cleanup.FieldFormatterCleanup;
+import org.jabref.logic.cleanup.MoveFieldCleanup;
+import org.jabref.logic.formatter.bibtexfields.RemoveBracesFormatter;
+import org.jabref.logic.importer.EntryBasedParserFetcher;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.IdBasedParserFetcher;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.SearchBasedParserFetcher;
+import org.jabref.logic.importer.fetcher.transformers.ZbMathQueryTransformer;
+import org.jabref.logic.importer.fileformat.BibtexParser;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.AMSField;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+
+import kong.unirest.HttpResponse;
+import kong.unirest.JsonNode;
+import kong.unirest.Unirest;
+import kong.unirest.json.JSONArray;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+
+/**
+ * Fetches data from the Zentralblatt Math (https://www.zbmath.org/)
+ */
+public class ZbMATH implements SearchBasedParserFetcher, IdBasedParserFetcher, EntryBasedParserFetcher {
+
+    private final ImportFormatPreferences preferences;
+
+<span class="fc" id="L41">    public ZbMATH(ImportFormatPreferences preferences) {</span>
+<span class="fc" id="L42">        this.preferences = Objects.requireNonNull(preferences);</span>
+<span class="fc" id="L43">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L47">        return &quot;zbMATH&quot;;</span>
+    }
+
+    @Override
+    public URL getURLForEntry(BibEntry entry) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L52">        Optional&lt;String&gt; zblidInEntry = entry.getField(StandardField.ZBL_NUMBER);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (zblidInEntry.isPresent()) {</span>
+            // zbmath id is already present
+<span class="fc" id="L55">            return getUrlForIdentifier(zblidInEntry.get());</span>
+        }
+
+<span class="fc" id="L58">        URIBuilder uriBuilder = new URIBuilder(&quot;https://zbmath.org/citationmatching/match&quot;);</span>
+<span class="fc" id="L59">        uriBuilder.addParameter(&quot;n&quot;, &quot;1&quot;); // return only the best matching entry</span>
+<span class="fc" id="L60">        uriBuilder.addParameter(&quot;m&quot;, &quot;5&quot;); // return only entries with a score of at least 5</span>
+
+<span class="fc" id="L62">        entry.getFieldOrAlias(StandardField.TITLE).ifPresent(title -&gt; uriBuilder.addParameter(&quot;t&quot;, title));</span>
+<span class="pc" id="L63">        entry.getFieldOrAlias(StandardField.JOURNAL).ifPresent(journal -&gt; uriBuilder.addParameter(&quot;j&quot;, journal));</span>
+<span class="pc" id="L64">        entry.getFieldOrAlias(StandardField.YEAR).ifPresent(year -&gt; uriBuilder.addParameter(&quot;y&quot;, year));</span>
+<span class="fc" id="L65">        entry.getFieldOrAlias(StandardField.PAGINATION)</span>
+<span class="pc" id="L66">             .ifPresent(pagination -&gt; uriBuilder.addParameter(&quot;p&quot;, pagination));</span>
+<span class="pc" id="L67">        entry.getFieldOrAlias(StandardField.VOLUME).ifPresent(volume -&gt; uriBuilder.addParameter(&quot;v&quot;, volume));</span>
+<span class="pc" id="L68">        entry.getFieldOrAlias(StandardField.ISSUE).ifPresent(issue -&gt; uriBuilder.addParameter(&quot;i&quot;, issue));</span>
+
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (entry.getFieldOrAlias(StandardField.AUTHOR).isPresent()) {</span>
+            // replace &quot;and&quot; by &quot;;&quot; as citation matching API uses &quot;;&quot; for separation
+<span class="fc" id="L72">            AuthorList authors = AuthorList.parse(entry.getFieldOrAlias(StandardField.AUTHOR).get());</span>
+<span class="fc" id="L73">            String authorsWithSemicolon = authors.getAuthors().stream()</span>
+<span class="fc" id="L74">                                                 .map(author -&gt; author.getLastFirst(false))</span>
+<span class="fc" id="L75">                                                 .collect(Collectors.joining(&quot;;&quot;));</span>
+<span class="fc" id="L76">            uriBuilder.addParameter(&quot;a&quot;, authorsWithSemicolon);</span>
+        }
+
+        /*
+        zbmath citation matching API does only return json, thus we use the
+        citation matching API to extract the zbl_id and then use getUrlForIdentifier
+        to get the bibtex data.
+         */
+<span class="fc" id="L84">        String urlString = uriBuilder.build().toString();</span>
+<span class="fc" id="L85">        HttpResponse&lt;JsonNode&gt; response = Unirest.get(urlString)</span>
+<span class="fc" id="L86">                                                 .asJson();</span>
+<span class="fc" id="L87">        String zblid = null;</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (response.getStatus() == 200) {</span>
+<span class="fc" id="L89">            JSONArray result = response.getBody()</span>
+<span class="fc" id="L90">                                       .getObject()</span>
+<span class="fc" id="L91">                                       .getJSONArray(&quot;results&quot;);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (!result.isEmpty()) {</span>
+<span class="fc" id="L93">                zblid = result.getJSONObject(0)</span>
+<span class="fc" id="L94">                              .get(&quot;zbl_id&quot;)</span>
+<span class="fc" id="L95">                              .toString();</span>
+            }
+        }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (zblid == null) {</span>
+            // citation matching API found no matching entry
+<span class="fc" id="L100">            return null;</span>
+        } else {
+<span class="fc" id="L102">            return getUrlForIdentifier(zblid);</span>
+        }
+    }
+
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L108">        URIBuilder uriBuilder = new URIBuilder(&quot;https://zbmath.org/bibtexoutput/&quot;);</span>
+<span class="fc" id="L109">        uriBuilder.addParameter(&quot;q&quot;, new ZbMathQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;)); // search all fields</span>
+<span class="fc" id="L110">        uriBuilder.addParameter(&quot;start&quot;, &quot;0&quot;); // start index</span>
+<span class="fc" id="L111">        uriBuilder.addParameter(&quot;count&quot;, &quot;200&quot;); // should return up to 200 items (instead of default 100)</span>
+<span class="fc" id="L112">        return uriBuilder.build().toURL();</span>
+    }
+
+    @Override
+    public URL getUrlForIdentifier(String identifier) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L117">        URIBuilder uriBuilder = new URIBuilder(&quot;https://zbmath.org/bibtexoutput/&quot;);</span>
+<span class="fc" id="L118">        String query = &quot;an:&quot;.concat(identifier); // use an: to search for a zbMATH identifier</span>
+<span class="fc" id="L119">        uriBuilder.addParameter(&quot;q&quot;, query);</span>
+<span class="fc" id="L120">        uriBuilder.addParameter(&quot;start&quot;, &quot;0&quot;); // start index</span>
+<span class="fc" id="L121">        uriBuilder.addParameter(&quot;count&quot;, &quot;1&quot;); // return exactly one item</span>
+<span class="fc" id="L122">        return uriBuilder.build().toURL();</span>
+    }
+
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L127">        return new BibtexParser(preferences);</span>
+    }
+
+    @Override
+    public void doPostCleanup(BibEntry entry) {
+<span class="fc" id="L132">        new MoveFieldCleanup(new UnknownField(&quot;msc2010&quot;), StandardField.KEYWORDS).cleanup(entry);</span>
+<span class="fc" id="L133">        new MoveFieldCleanup(AMSField.FJOURNAL, StandardField.JOURNAL).cleanup(entry);</span>
+<span class="fc" id="L134">        new FieldFormatterCleanup(StandardField.JOURNAL, new RemoveBracesFormatter()).cleanup(entry);</span>
+<span class="fc" id="L135">        new FieldFormatterCleanup(StandardField.TITLE, new RemoveBracesFormatter()).cleanup(entry);</span>
+<span class="fc" id="L136">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

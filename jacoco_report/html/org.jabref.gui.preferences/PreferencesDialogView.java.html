@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreferencesDialogView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences</a> &gt; <span class="el_source">PreferencesDialogView.java</span></div><h1>PreferencesDialogView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences;
+
+import java.util.Locale;
+import java.util.Optional;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ListView;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.input.KeyCode;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.keyboard.KeyBinding;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.ControlHelper;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import jakarta.inject.Inject;
+import org.controlsfx.control.textfield.CustomTextField;
+
+/**
+ * Preferences dialog. Contains a TabbedPane, and tabs will be defined in separate classes. Tabs MUST implement the
+ * PreferencesTab interface, since this dialog will call the storeSettings() method of all tabs when the user presses
+ * ok.
+ */
+public class PreferencesDialogView extends BaseDialog&lt;PreferencesDialogViewModel&gt; {
+
+    @FXML private CustomTextField searchBox;
+    @FXML private ListView&lt;PreferencesTab&gt; preferenceTabList;
+    @FXML private ScrollPane preferencesContainer;
+    @FXML private ButtonType saveButton;
+    @FXML private ToggleButton memoryStickMode;
+
+    @Inject private DialogService dialogService;
+    @Inject private PreferencesService preferencesService;
+    @Inject private ThemeManager themeManager;
+
+    private PreferencesDialogViewModel viewModel;
+    private final Class&lt;? extends PreferencesTab&gt; preferencesTabToSelectClass;
+
+<span class="nc" id="L48">    public PreferencesDialogView(Class&lt;? extends PreferencesTab&gt; preferencesTabToSelectClass) {</span>
+<span class="nc" id="L49">        this.setTitle(Localization.lang(&quot;JabRef preferences&quot;));</span>
+<span class="nc" id="L50">        this.preferencesTabToSelectClass = preferencesTabToSelectClass;</span>
+
+<span class="nc" id="L52">        ViewLoader.view(this)</span>
+<span class="nc" id="L53">                  .load()</span>
+<span class="nc" id="L54">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L56">        ControlHelper.setAction(saveButton, getDialogPane(), event -&gt; savePreferencesAndCloseDialog());</span>
+
+        // Stop the default button from firing when the user hits enter within the search box
+<span class="nc" id="L59">        searchBox.setOnKeyPressed(event -&gt; {</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            if (event.getCode() == KeyCode.ENTER) {</span>
+<span class="nc" id="L61">                event.consume();</span>
+            }
+<span class="nc" id="L63">        });</span>
+
+<span class="nc" id="L65">        themeManager.updateFontStyle(getDialogPane().getScene());</span>
+<span class="nc" id="L66">    }</span>
+
+    public PreferencesDialogViewModel getViewModel() {
+<span class="nc" id="L69">        return viewModel;</span>
+    }
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L74">        viewModel = new PreferencesDialogViewModel(dialogService, preferencesService);</span>
+
+<span class="nc" id="L76">        preferenceTabList.itemsProperty().setValue(viewModel.getPreferenceTabs());</span>
+
+        // The list view does not respect the listener for the dialog and needs its own
+<span class="nc" id="L79">        preferenceTabList.setOnKeyReleased(key -&gt; {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (preferencesService.getKeyBindingRepository().checkKeyCombinationEquality(KeyBinding.CLOSE, key)) {</span>
+<span class="nc" id="L81">                this.closeDialog();</span>
+            }
+<span class="nc" id="L83">        });</span>
+
+<span class="nc" id="L85">        PreferencesSearchHandler searchHandler = new PreferencesSearchHandler(viewModel.getPreferenceTabs());</span>
+<span class="nc" id="L86">        preferenceTabList.itemsProperty().bindBidirectional(searchHandler.filteredPreferenceTabsProperty());</span>
+<span class="nc" id="L87">        searchBox.textProperty().addListener((observable, previousText, newText) -&gt; {</span>
+<span class="nc" id="L88">            searchHandler.filterTabs(newText.toLowerCase(Locale.ROOT));</span>
+<span class="nc" id="L89">            preferenceTabList.getSelectionModel().clearSelection();</span>
+<span class="nc" id="L90">            preferenceTabList.getSelectionModel().selectFirst();</span>
+<span class="nc" id="L91">        });</span>
+<span class="nc" id="L92">        searchBox.setPromptText(Localization.lang(&quot;Search&quot;) + &quot;...&quot;);</span>
+<span class="nc" id="L93">        searchBox.setLeft(IconTheme.JabRefIcons.SEARCH.getGraphicNode());</span>
+
+<span class="nc" id="L95">        EasyBind.subscribe(preferenceTabList.getSelectionModel().selectedItemProperty(), tab -&gt; {</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (tab instanceof AbstractPreferenceTabView&lt;?&gt; preferencesTab) {</span>
+<span class="nc" id="L97">                preferencesContainer.setContent(preferencesTab.getBuilder());</span>
+<span class="nc" id="L98">                preferencesTab.prefWidthProperty().bind(preferencesContainer.widthProperty().subtract(10d));</span>
+<span class="nc" id="L99">                preferencesTab.getStyleClass().add(&quot;preferencesTab&quot;);</span>
+            } else {
+<span class="nc" id="L101">                preferencesContainer.setContent(null);</span>
+            }
+<span class="nc" id="L103">        });</span>
+
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (this.preferencesTabToSelectClass != null) {</span>
+<span class="nc" id="L106">            Optional&lt;PreferencesTab&gt; tabToSelectIfExist = preferenceTabList.getItems()</span>
+<span class="nc" id="L107">                                                                           .stream()</span>
+<span class="nc" id="L108">                                                                           .filter(prefTab -&gt; prefTab.getClass().equals(preferencesTabToSelectClass))</span>
+<span class="nc" id="L109">                                                                           .findFirst();</span>
+<span class="nc" id="L110">            tabToSelectIfExist.ifPresent(preferencesTab -&gt; preferenceTabList.getSelectionModel().select(preferencesTab));</span>
+<span class="nc" id="L111">        } else {</span>
+<span class="nc" id="L112">            preferenceTabList.getSelectionModel().selectFirst();</span>
+        }
+
+<span class="nc" id="L115">        new ViewModelListCellFactory&lt;PreferencesTab&gt;()</span>
+<span class="nc" id="L116">                .withText(PreferencesTab::getTabName)</span>
+<span class="nc" id="L117">                .install(preferenceTabList);</span>
+
+<span class="nc" id="L119">        memoryStickMode.selectedProperty().bindBidirectional(viewModel.getMemoryStickProperty());</span>
+
+<span class="nc" id="L121">        viewModel.setValues();</span>
+<span class="nc" id="L122">    }</span>
+
+    @FXML
+    private void closeDialog() {
+<span class="nc" id="L126">        close();</span>
+<span class="nc" id="L127">    }</span>
+
+    @FXML
+    private void savePreferencesAndCloseDialog() {
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if (viewModel.validSettings()) {</span>
+<span class="nc" id="L132">            viewModel.storeAllSettings();</span>
+<span class="nc" id="L133">            closeDialog();</span>
+        }
+<span class="nc" id="L135">    }</span>
+
+    @FXML
+    void exportPreferences() {
+<span class="nc" id="L139">        viewModel.exportPreferences();</span>
+<span class="nc" id="L140">    }</span>
+
+    @FXML
+    void importPreferences() {
+<span class="nc" id="L144">        viewModel.importPreferences();</span>
+<span class="nc" id="L145">    }</span>
+
+    @FXML
+    void showAllPreferences() {
+<span class="nc" id="L149">        viewModel.showPreferences();</span>
+<span class="nc" id="L150">    }</span>
+
+    @FXML
+    void resetPreferences() {
+<span class="nc" id="L154">        viewModel.resetPreferences();</span>
+<span class="nc" id="L155">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

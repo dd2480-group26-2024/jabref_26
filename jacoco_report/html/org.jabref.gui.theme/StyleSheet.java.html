@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StyleSheet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.theme</a> &gt; <span class="el_source">StyleSheet.java</span></div><h1>StyleSheet.java</h1><pre class="source lang-java linenums">package org.jabref.gui.theme;
+
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.util.Optional;
+
+import org.jabref.gui.JabRefFrame;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+<span class="fc" id="L15">abstract class StyleSheet {</span>
+
+    static final String DATA_URL_PREFIX = &quot;data:text/css;charset=utf-8;base64,&quot;;
+    static final String EMPTY_WEBENGINE_CSS = DATA_URL_PREFIX;
+
+<span class="fc" id="L20">    private static final Logger LOGGER = LoggerFactory.getLogger(StyleSheet.class);</span>
+
+    abstract URL getSceneStylesheet();
+
+    abstract String getWebEngineStylesheet();
+
+    Path getWatchPath() {
+<span class="nc" id="L27">        return null;</span>
+    }
+
+    abstract void reload();
+
+    static Optional&lt;StyleSheet&gt; create(String name) {
+<span class="fc" id="L33">        Optional&lt;URL&gt; styleSheetUrl = Optional.ofNullable(JabRefFrame.class.getResource(name));</span>
+
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (styleSheetUrl.isEmpty()) {</span>
+            try {
+<span class="fc" id="L37">                styleSheetUrl = Optional.of(Path.of(name).toUri().toURL());</span>
+<span class="fc" id="L38">            } catch (InvalidPathException e) {</span>
+<span class="fc" id="L39">                LOGGER.warn(&quot;Cannot load additional css {} because it is an invalid path: {}&quot;, name, e.getLocalizedMessage());</span>
+<span class="nc" id="L40">            } catch (MalformedURLException e) {</span>
+<span class="nc" id="L41">                LOGGER.warn(&quot;Cannot load additional css url {} because it is a malformed url: {}&quot;, name, e.getLocalizedMessage());</span>
+<span class="fc" id="L42">            }</span>
+        }
+
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (styleSheetUrl.isEmpty()) {</span>
+            try {
+<span class="nc" id="L47">                return Optional.of(new StyleSheetDataUrl(new URL(EMPTY_WEBENGINE_CSS)));</span>
+<span class="fc" id="L48">            } catch (MalformedURLException e) {</span>
+<span class="fc" id="L49">                return Optional.empty();</span>
+            }
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        } else if (&quot;file&quot;.equals(styleSheetUrl.get().getProtocol())) {</span>
+<span class="fc" id="L52">            StyleSheet styleSheet = new StyleSheetFile(styleSheetUrl.get());</span>
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (Files.isDirectory(styleSheet.getWatchPath())) {</span>
+<span class="fc" id="L55">                LOGGER.warn(&quot;Failed to loadCannot load additional css {} because it is a directory.&quot;, styleSheet.getWatchPath());</span>
+<span class="fc" id="L56">                return Optional.empty();</span>
+            }
+
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (!Files.exists(styleSheet.getWatchPath())) {</span>
+<span class="fc" id="L60">                LOGGER.warn(&quot;Cannot load additional css {} because the file does not exist.&quot;, styleSheet.getWatchPath());</span>
+                // Should not return empty, since the user can create the file later.
+            }
+
+<span class="fc" id="L64">            return Optional.of(new StyleSheetFile(styleSheetUrl.get()));</span>
+        } else {
+<span class="nc" id="L66">            return Optional.of(new StyleSheetResource(styleSheetUrl.get()));</span>
+        }
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L72">        return &quot;StyleSheet{&quot; + getSceneStylesheet() + &quot;}&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

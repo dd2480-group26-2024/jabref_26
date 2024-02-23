@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BindingsHelper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">BindingsHelper.java</span></div><h1>BindingsHelper.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.binding.ObjectBinding;
+import javafx.beans.binding.StringBinding;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.Property;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
+import javafx.collections.MapChangeListener;
+import javafx.collections.ObservableList;
+import javafx.collections.ObservableMap;
+import javafx.css.PseudoClass;
+import javafx.scene.Node;
+
+import com.tobiasdiez.easybind.EasyBind;
+import com.tobiasdiez.easybind.PreboundBinding;
+import com.tobiasdiez.easybind.Subscription;
+
+/**
+ * Helper methods for javafx binding. Some methods are taken from https://bugs.openjdk.java.net/browse/JDK-8134679
+ */
+public class BindingsHelper {
+
+    private BindingsHelper() {
+    }
+
+    public static Subscription includePseudoClassWhen(Node node, PseudoClass pseudoClass, ObservableValue&lt;? extends Boolean&gt; condition) {
+<span class="nc" id="L36">        Consumer&lt;Boolean&gt; changePseudoClass = value -&gt; node.pseudoClassStateChanged(pseudoClass, value);</span>
+<span class="nc" id="L37">        Subscription subscription = EasyBind.subscribe(condition, changePseudoClass);</span>
+
+        // Put the pseudo class there depending on the current value
+<span class="nc" id="L40">        changePseudoClass.accept(condition.getValue());</span>
+<span class="nc" id="L41">        return subscription;</span>
+    }
+
+    public static &lt;T, U&gt; ObservableList&lt;U&gt; map(ObservableValue&lt;T&gt; source, Function&lt;T, List&lt;U&gt;&gt; mapper) {
+<span class="nc" id="L45">        PreboundBinding&lt;List&lt;U&gt;&gt; binding = new PreboundBinding&lt;&gt;(source) {</span>
+            @Override
+            protected List&lt;U&gt; computeValue() {
+<span class="nc" id="L48">                return mapper.apply(source.getValue());</span>
+            }
+        };
+
+<span class="nc" id="L52">        ObservableList&lt;U&gt; list = FXCollections.observableArrayList();</span>
+<span class="nc" id="L53">        binding.addListener((observable, oldValue, newValue) -&gt; list.setAll(newValue));</span>
+<span class="nc" id="L54">        return list;</span>
+    }
+
+    /**
+     * Binds propertyA bidirectional to propertyB using the provided map functions to convert between them.
+     */
+    public static &lt;A, B&gt; void bindBidirectional(Property&lt;A&gt; propertyA, Property&lt;B&gt; propertyB, Function&lt;A, B&gt; mapAtoB, Function&lt;B, A&gt; mapBtoA) {
+<span class="fc" id="L61">        Consumer&lt;B&gt; updateA = newValueB -&gt; propertyA.setValue(mapBtoA.apply(newValueB));</span>
+<span class="pc" id="L62">        Consumer&lt;A&gt; updateB = newValueA -&gt; propertyB.setValue(mapAtoB.apply(newValueA));</span>
+<span class="fc" id="L63">        bindBidirectional(propertyA, propertyB, updateA, updateB);</span>
+<span class="fc" id="L64">    }</span>
+
+    /**
+     * Binds propertyA bidirectional to propertyB while using updateB to update propertyB when propertyA changed.
+     */
+    public static &lt;A&gt; void bindBidirectional(Property&lt;A&gt; propertyA, ObservableValue&lt;A&gt; propertyB, Consumer&lt;A&gt; updateB) {
+<span class="nc" id="L70">        bindBidirectional(propertyA, propertyB, propertyA::setValue, updateB);</span>
+<span class="nc" id="L71">    }</span>
+
+    /**
+     * Binds propertyA bidirectional to propertyB using updateB to update propertyB when propertyA changed and similar for updateA.
+     */
+    public static &lt;A, B&gt; void bindBidirectional(ObservableValue&lt;A&gt; propertyA, ObservableValue&lt;B&gt; propertyB, Consumer&lt;B&gt; updateA, Consumer&lt;A&gt; updateB) {
+<span class="fc" id="L77">        final BidirectionalBinding&lt;A, B&gt; binding = new BidirectionalBinding&lt;&gt;(propertyA, propertyB, updateA, updateB);</span>
+
+        // use updateB as initial source
+<span class="fc" id="L80">        updateA.accept(propertyB.getValue());</span>
+
+<span class="fc" id="L82">        propertyA.addListener(binding.getChangeListenerA());</span>
+<span class="fc" id="L83">        propertyB.addListener(binding.getChangeListenerB());</span>
+<span class="fc" id="L84">    }</span>
+
+    public static &lt;A, B&gt; void bindContentBidirectional(ObservableList&lt;A&gt; propertyA, ListProperty&lt;B&gt; propertyB, Consumer&lt;ObservableList&lt;B&gt;&gt; updateA, Consumer&lt;List&lt;A&gt;&gt; updateB) {
+<span class="nc" id="L87">        bindContentBidirectional(</span>
+                propertyA,
+                (ObservableValue&lt;ObservableList&lt;B&gt;&gt;) propertyB,
+                updateA,
+                updateB);
+<span class="nc" id="L92">    }</span>
+
+    public static &lt;A, B&gt; void bindContentBidirectional(ObservableList&lt;A&gt; propertyA, ObservableValue&lt;B&gt; propertyB, Consumer&lt;B&gt; updateA, Consumer&lt;List&lt;A&gt;&gt; updateB) {
+<span class="fc" id="L95">        final BidirectionalListBinding&lt;A, B&gt; binding = new BidirectionalListBinding&lt;&gt;(propertyA, propertyB, updateA, updateB);</span>
+
+        // use property as initial source
+<span class="fc" id="L98">        updateA.accept(propertyB.getValue());</span>
+
+<span class="fc" id="L100">        propertyA.addListener(binding);</span>
+<span class="fc" id="L101">        propertyB.addListener(binding);</span>
+<span class="fc" id="L102">    }</span>
+
+    public static &lt;A, B&gt; void bindContentBidirectional(ListProperty&lt;A&gt; listProperty, Property&lt;B&gt; property, Function&lt;List&lt;A&gt;, B&gt; mapToB, Function&lt;B, List&lt;A&gt;&gt; mapToList) {
+<span class="fc" id="L105">        Consumer&lt;B&gt; updateList = newValueB -&gt; listProperty.setAll(mapToList.apply(newValueB));</span>
+<span class="fc" id="L106">        Consumer&lt;List&lt;A&gt;&gt; updateB = newValueList -&gt; property.setValue(mapToB.apply(newValueList));</span>
+
+<span class="fc" id="L108">        bindContentBidirectional(</span>
+                listProperty,
+                property,
+                updateList,
+                updateB);
+<span class="fc" id="L113">    }</span>
+
+    public static &lt;A, V, B&gt; void bindContentBidirectional(ObservableMap&lt;A, V&gt; propertyA, ObservableValue&lt;B&gt; propertyB, Consumer&lt;B&gt; updateA, Consumer&lt;Map&lt;A, V&gt;&gt; updateB) {
+<span class="nc" id="L116">        final BidirectionalMapBinding&lt;A, V, B&gt; binding = new BidirectionalMapBinding&lt;&gt;(propertyA, propertyB, updateA, updateB);</span>
+
+        // use list as initial source
+<span class="nc" id="L119">        updateB.accept(propertyA);</span>
+
+<span class="nc" id="L121">        propertyA.addListener(binding);</span>
+<span class="nc" id="L122">        propertyB.addListener(binding);</span>
+<span class="nc" id="L123">    }</span>
+
+    public static &lt;A, V, B&gt; void bindContentBidirectional(ObservableMap&lt;A, V&gt; propertyA, Property&lt;B&gt; propertyB, Consumer&lt;B&gt; updateA, Function&lt;Map&lt;A, V&gt;, B&gt; mapToB) {
+<span class="nc" id="L126">        Consumer&lt;Map&lt;A, V&gt;&gt; updateB = newValueList -&gt; propertyB.setValue(mapToB.apply(newValueList));</span>
+<span class="nc" id="L127">        bindContentBidirectional(</span>
+                propertyA,
+                propertyB,
+                updateA,
+                updateB);
+<span class="nc" id="L132">    }</span>
+
+    public static &lt;T&gt; ObservableValue&lt;T&gt; constantOf(T value) {
+<span class="nc" id="L135">        return new ObjectBinding&lt;&gt;() {</span>
+            @Override
+            protected T computeValue() {
+<span class="nc" id="L138">                return value;</span>
+            }
+        };
+    }
+
+    public static ObservableValue&lt;Boolean&gt; constantOf(boolean value) {
+<span class="nc" id="L144">        return new BooleanBinding() {</span>
+            @Override
+            protected boolean computeValue() {
+<span class="nc" id="L147">                return value;</span>
+            }
+        };
+    }
+
+    public static ObservableValue&lt;? extends String&gt; emptyString() {
+<span class="nc" id="L153">        return new StringBinding() {</span>
+            @Override
+            protected String computeValue() {
+<span class="nc" id="L156">                return &quot;&quot;;</span>
+            }
+        };
+    }
+
+    /**
+     * Returns a wrapper around the given list that posts changes on the JavaFX thread.
+     */
+    public static &lt;T&gt; ObservableList&lt;T&gt; forUI(ObservableList&lt;T&gt; list) {
+<span class="nc" id="L165">        return new UiThreadList&lt;&gt;(list);</span>
+    }
+
+    public static &lt;T&gt; ObservableValue&lt;T&gt; ifThenElse(ObservableValue&lt;Boolean&gt; condition, T value, T other) {
+<span class="nc" id="L169">        return EasyBind.map(condition, conditionValue -&gt; {</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            if (conditionValue) {</span>
+<span class="nc" id="L171">                return value;</span>
+            } else {
+<span class="nc" id="L173">                return other;</span>
+            }
+        });
+    }
+
+    /**
+     * Invokes {@code subscriber} for the every new value of {@code observable}, but not for the current value.
+     *
+     * @param observable observable value to subscribe to
+     * @param subscriber action to invoke for values of {@code observable}.
+     * @return a subscription that can be used to stop invoking subscriber for any further {@code observable} changes.
+     * @apiNote {@link EasyBind#subscribe(ObservableValue, Consumer)} is similar but also invokes the {@code subscriber} for the current value
+     */
+    public static &lt;T&gt; Subscription subscribeFuture(ObservableValue&lt;T&gt; observable, Consumer&lt;? super T&gt; subscriber) {
+<span class="nc" id="L187">        ChangeListener&lt;? super T&gt; listener = (obs, oldValue, newValue) -&gt; subscriber.accept(newValue);</span>
+<span class="nc" id="L188">        observable.addListener(listener);</span>
+<span class="nc" id="L189">        return () -&gt; observable.removeListener(listener);</span>
+    }
+
+    private static class BidirectionalBinding&lt;A, B&gt; {
+
+        private final ObservableValue&lt;A&gt; propertyA;
+        private final Consumer&lt;B&gt; updateA;
+        private final Consumer&lt;A&gt; updateB;
+<span class="fc" id="L197">        private boolean updating = false;</span>
+
+<span class="fc" id="L199">        public BidirectionalBinding(ObservableValue&lt;A&gt; propertyA, ObservableValue&lt;B&gt; propertyB, Consumer&lt;B&gt; updateA, Consumer&lt;A&gt; updateB) {</span>
+<span class="fc" id="L200">            this.propertyA = propertyA;</span>
+<span class="fc" id="L201">            this.updateA = updateA;</span>
+<span class="fc" id="L202">            this.updateB = updateB;</span>
+<span class="fc" id="L203">        }</span>
+
+        public ChangeListener&lt;? super A&gt; getChangeListenerA() {
+<span class="fc" id="L206">            return this::changedA;</span>
+        }
+
+        public ChangeListener&lt;? super B&gt; getChangeListenerB() {
+<span class="fc" id="L210">            return this::changedB;</span>
+        }
+
+        public void changedA(ObservableValue&lt;? extends A&gt; observable, A oldValue, A newValue) {
+<span class="nc" id="L214">            updateLocked(updateB, oldValue, newValue);</span>
+<span class="nc" id="L215">        }</span>
+
+        public void changedB(ObservableValue&lt;? extends B&gt; observable, B oldValue, B newValue) {
+<span class="nc" id="L218">            updateLocked(updateA, oldValue, newValue);</span>
+<span class="nc" id="L219">        }</span>
+
+        private &lt;T&gt; void updateLocked(Consumer&lt;T&gt; update, T oldValue, T newValue) {
+<span class="nc bnc" id="L222" title="All 2 branches missed.">            if (!updating) {</span>
+                try {
+<span class="nc" id="L224">                    updating = true;</span>
+<span class="nc" id="L225">                    update.accept(newValue);</span>
+                } finally {
+<span class="nc" id="L227">                    updating = false;</span>
+                }
+            }
+<span class="nc" id="L230">        }</span>
+    }
+
+    private static class BidirectionalListBinding&lt;A, B&gt; implements ListChangeListener&lt;A&gt;, ChangeListener&lt;B&gt; {
+
+        private final ObservableList&lt;A&gt; listProperty;
+        private final ObservableValue&lt;B&gt; property;
+        private final Consumer&lt;B&gt; updateA;
+        private final Consumer&lt;List&lt;A&gt;&gt; updateB;
+<span class="fc" id="L239">        private boolean updating = false;</span>
+
+<span class="fc" id="L241">        public BidirectionalListBinding(ObservableList&lt;A&gt; listProperty, ObservableValue&lt;B&gt; property, Consumer&lt;B&gt; updateA, Consumer&lt;List&lt;A&gt;&gt; updateB) {</span>
+<span class="fc" id="L242">            this.listProperty = listProperty;</span>
+<span class="fc" id="L243">            this.property = property;</span>
+<span class="fc" id="L244">            this.updateA = updateA;</span>
+<span class="fc" id="L245">            this.updateB = updateB;</span>
+<span class="fc" id="L246">        }</span>
+
+        @Override
+        public void changed(ObservableValue&lt;? extends B&gt; observable, B oldValue, B newValue) {
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            if (!updating) {</span>
+                try {
+<span class="nc" id="L252">                    updating = true;</span>
+<span class="nc" id="L253">                    updateA.accept(newValue);</span>
+                } finally {
+<span class="nc" id="L255">                    updating = false;</span>
+                }
+            }
+<span class="fc" id="L258">        }</span>
+
+        @Override
+        public void onChanged(Change&lt;? extends A&gt; c) {
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            if (!updating) {</span>
+                try {
+<span class="fc" id="L264">                    updating = true;</span>
+<span class="fc" id="L265">                    updateB.accept(listProperty);</span>
+                } finally {
+<span class="fc" id="L267">                    updating = false;</span>
+                }
+            }
+<span class="fc" id="L270">        }</span>
+    }
+
+    private static class BidirectionalMapBinding&lt;A, V, B&gt; implements MapChangeListener&lt;A, V&gt;, ChangeListener&lt;B&gt; {
+
+        private final ObservableMap&lt;A, V&gt; mapProperty;
+        private final ObservableValue&lt;B&gt; property;
+        private final Consumer&lt;B&gt; updateA;
+        private final Consumer&lt;Map&lt;A, V&gt;&gt; updateB;
+<span class="nc" id="L279">        private boolean updating = false;</span>
+
+<span class="nc" id="L281">        public BidirectionalMapBinding(ObservableMap&lt;A, V&gt; mapProperty, ObservableValue&lt;B&gt; property, Consumer&lt;B&gt; updateA, Consumer&lt;Map&lt;A, V&gt;&gt; updateB) {</span>
+<span class="nc" id="L282">            this.mapProperty = mapProperty;</span>
+<span class="nc" id="L283">            this.property = property;</span>
+<span class="nc" id="L284">            this.updateA = updateA;</span>
+<span class="nc" id="L285">            this.updateB = updateB;</span>
+<span class="nc" id="L286">        }</span>
+
+        @Override
+        public void changed(ObservableValue&lt;? extends B&gt; observable, B oldValue, B newValue) {
+<span class="nc bnc" id="L290" title="All 2 branches missed.">            if (!updating) {</span>
+                try {
+<span class="nc" id="L292">                    updating = true;</span>
+<span class="nc" id="L293">                    updateA.accept(newValue);</span>
+                } finally {
+<span class="nc" id="L295">                    updating = false;</span>
+                }
+            }
+<span class="nc" id="L298">        }</span>
+
+        @Override
+        public void onChanged(Change&lt;? extends A, ? extends V&gt; c) {
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            if (!updating) {</span>
+                try {
+<span class="nc" id="L304">                    updating = true;</span>
+<span class="nc" id="L305">                    updateB.accept(mapProperty);</span>
+                } finally {
+<span class="nc" id="L307">                    updating = false;</span>
+                }
+            }
+<span class="nc" id="L310">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

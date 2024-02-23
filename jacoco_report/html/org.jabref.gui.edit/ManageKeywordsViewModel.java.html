@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManageKeywordsViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.edit</a> &gt; <span class="el_source">ManageKeywordsViewModel.java</span></div><h1>ManageKeywordsViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.edit;
+
+import java.util.List;
+import java.util.Optional;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.gui.undo.UndoableFieldChange;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.FieldChange;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.Keyword;
+import org.jabref.model.entry.KeywordList;
+import org.jabref.preferences.BibEntryPreferences;
+
+import com.tobiasdiez.easybind.EasyBind;
+
+public class ManageKeywordsViewModel {
+
+    private final List&lt;BibEntry&gt; entries;
+<span class="fc" id="L25">    private final KeywordList sortedKeywordsOfAllEntriesBeforeUpdateByUser = new KeywordList();</span>
+    private final BibEntryPreferences bibEntryPreferences;
+<span class="fc" id="L27">    private final ObjectProperty&lt;ManageKeywordsDisplayType&gt; displayType = new SimpleObjectProperty&lt;&gt;(ManageKeywordsDisplayType.CONTAINED_IN_ALL_ENTRIES);</span>
+    private final ObservableList&lt;String&gt; keywords;
+
+<span class="fc" id="L30">    public ManageKeywordsViewModel(BibEntryPreferences bibEntryPreferences, List&lt;BibEntry&gt; entries) {</span>
+<span class="fc" id="L31">        this.bibEntryPreferences = bibEntryPreferences;</span>
+<span class="fc" id="L32">        this.entries = entries;</span>
+<span class="fc" id="L33">        this.keywords = FXCollections.observableArrayList();</span>
+
+<span class="fc" id="L35">        EasyBind.subscribe(displayType, this::fillKeywordsList);</span>
+<span class="fc" id="L36">    }</span>
+
+    public ManageKeywordsDisplayType getDisplayType() {
+<span class="nc" id="L39">        return displayType.get();</span>
+    }
+
+    public ObjectProperty&lt;ManageKeywordsDisplayType&gt; displayTypeProperty() {
+<span class="nc" id="L43">        return displayType;</span>
+    }
+
+    private void fillKeywordsList(ManageKeywordsDisplayType type) {
+<span class="fc" id="L47">        keywords.clear();</span>
+<span class="fc" id="L48">        sortedKeywordsOfAllEntriesBeforeUpdateByUser.clear();</span>
+<span class="fc" id="L49">        Character keywordSeparator = bibEntryPreferences.getKeywordSeparator();</span>
+
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (type == ManageKeywordsDisplayType.CONTAINED_IN_ALL_ENTRIES) {</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            for (BibEntry entry : entries) {</span>
+<span class="fc" id="L53">                KeywordList separatedKeywords = entry.getKeywords(keywordSeparator);</span>
+<span class="fc" id="L54">                sortedKeywordsOfAllEntriesBeforeUpdateByUser.addAll(separatedKeywords);</span>
+<span class="fc" id="L55">            }</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        } else if (type == ManageKeywordsDisplayType.CONTAINED_IN_ANY_ENTRY) {</span>
+            // all keywords from first entry have to be added
+<span class="nc" id="L58">            BibEntry firstEntry = entries.getFirst();</span>
+<span class="nc" id="L59">            KeywordList separatedKeywords = firstEntry.getKeywords(keywordSeparator);</span>
+<span class="nc" id="L60">            sortedKeywordsOfAllEntriesBeforeUpdateByUser.addAll(separatedKeywords);</span>
+
+            // for the remaining entries, intersection has to be used
+            // this approach ensures that one empty keyword list leads to an empty set of common keywords
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            for (BibEntry entry : entries) {</span>
+<span class="nc" id="L65">                separatedKeywords = entry.getKeywords(keywordSeparator);</span>
+<span class="nc" id="L66">                sortedKeywordsOfAllEntriesBeforeUpdateByUser.retainAll(separatedKeywords);</span>
+<span class="nc" id="L67">            }</span>
+<span class="nc" id="L68">        } else {</span>
+<span class="nc" id="L69">            throw new IllegalStateException(&quot;DisplayType &quot; + type + &quot; not handled&quot;);</span>
+        }
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (Keyword keyword : sortedKeywordsOfAllEntriesBeforeUpdateByUser) {</span>
+<span class="fc" id="L72">            keywords.add(keyword.get());</span>
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">    }</span>
+
+    public ObservableList&lt;String&gt; getKeywords() {
+<span class="fc" id="L77">        return keywords;</span>
+    }
+
+    public void removeKeyword(String keyword) {
+<span class="fc" id="L81">        keywords.remove(keyword);</span>
+<span class="fc" id="L82">    }</span>
+
+    public void saveChanges() {
+<span class="nc" id="L85">        KeywordList keywordsToAdd = new KeywordList();</span>
+<span class="nc" id="L86">        KeywordList userSelectedKeywords = new KeywordList();</span>
+        // build keywordsToAdd and userSelectedKeywords in parallel
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        for (String keyword : keywords) {</span>
+<span class="nc" id="L89">            userSelectedKeywords.add(keyword);</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (!sortedKeywordsOfAllEntriesBeforeUpdateByUser.contains(keyword)) {</span>
+<span class="nc" id="L91">                keywordsToAdd.add(keyword);</span>
+            }
+<span class="nc" id="L93">        }</span>
+
+<span class="nc" id="L95">        KeywordList keywordsToRemove = new KeywordList();</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        for (Keyword kword : sortedKeywordsOfAllEntriesBeforeUpdateByUser) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            if (!userSelectedKeywords.contains(kword)) {</span>
+<span class="nc" id="L98">                keywordsToRemove.add(kword);</span>
+            }
+<span class="nc" id="L100">        }</span>
+
+<span class="nc bnc" id="L102" title="All 4 branches missed.">        if (keywordsToAdd.isEmpty() &amp;&amp; keywordsToRemove.isEmpty()) {</span>
+            // nothing to be done if nothing is new and nothing is obsolete
+<span class="nc" id="L104">            return;</span>
+        }
+
+<span class="nc" id="L107">        NamedCompound ce = updateKeywords(entries, keywordsToAdd, keywordsToRemove);</span>
+        // TODO: bp.getUndoManager().addEdit(ce);
+<span class="nc" id="L109">    }</span>
+
+    private NamedCompound updateKeywords(List&lt;BibEntry&gt; entries, KeywordList keywordsToAdd,
+                                         KeywordList keywordsToRemove) {
+<span class="nc" id="L113">        Character keywordSeparator = bibEntryPreferences.getKeywordSeparator();</span>
+
+<span class="nc" id="L115">        NamedCompound ce = new NamedCompound(Localization.lang(&quot;Update keywords&quot;));</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        for (BibEntry entry : entries) {</span>
+<span class="nc" id="L117">            KeywordList keywords = entry.getKeywords(keywordSeparator);</span>
+
+            // update keywords
+<span class="nc" id="L120">            keywords.removeAll(keywordsToRemove);</span>
+<span class="nc" id="L121">            keywords.addAll(keywordsToAdd);</span>
+
+            // put keywords back
+<span class="nc" id="L124">            Optional&lt;FieldChange&gt; change = entry.putKeywords(keywords, keywordSeparator);</span>
+<span class="nc" id="L125">            change.ifPresent(fieldChange -&gt; ce.addEdit(new UndoableFieldChange(fieldChange)));</span>
+<span class="nc" id="L126">        }</span>
+<span class="nc" id="L127">        ce.end();</span>
+<span class="nc" id="L128">        return ce;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

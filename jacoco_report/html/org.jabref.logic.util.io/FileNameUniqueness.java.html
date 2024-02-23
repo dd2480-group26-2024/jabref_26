@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileNameUniqueness.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.util.io</a> &gt; <span class="el_source">FileNameUniqueness.java</span></div><h1>FileNameUniqueness.java</h1><pre class="source lang-java linenums">package org.jabref.logic.util.io;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.gui.DialogService;
+import org.jabref.logic.l10n.Localization;
+
+<span class="nc" id="L14">public class FileNameUniqueness {</span>
+<span class="fc" id="L15">    private static final Pattern DUPLICATE_MARK_PATTERN = Pattern.compile(&quot;(.*) \\(\\d+\\)&quot;);</span>
+
+    /**
+     * Returns a file name such that it does not match any existing files in targetDirectory
+     *
+     * @param targetDirectory The directory in which file name should be unique
+     * @param fileName        Suggested name for the file
+     * @return a file name such that it does not match any existing files in targetDirectory
+     */
+    public static String getNonOverWritingFileName(Path targetDirectory, String fileName) {
+<span class="fc" id="L25">        Optional&lt;String&gt; extensionOptional = FileUtil.getFileExtension(fileName);</span>
+
+        // the suffix include the '.' , if extension is present Eg: &quot;.pdf&quot;
+        String extensionSuffix;
+        String fileNameWithoutExtension;
+
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (extensionOptional.isPresent()) {</span>
+<span class="fc" id="L32">            extensionSuffix = '.' + extensionOptional.get();</span>
+<span class="fc" id="L33">            fileNameWithoutExtension = fileName.substring(0, fileName.lastIndexOf('.'));</span>
+        } else {
+<span class="nc" id="L35">            extensionSuffix = &quot;&quot;;</span>
+<span class="nc" id="L36">            fileNameWithoutExtension = fileName;</span>
+        }
+
+<span class="fc" id="L39">        String newFileName = fileName;</span>
+
+<span class="fc" id="L41">        int counter = 1;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        while (Files.exists(targetDirectory.resolve(newFileName))) {</span>
+<span class="fc" id="L43">            newFileName = fileNameWithoutExtension +</span>
+                    &quot; (&quot; + counter + &quot;)&quot; +
+                    extensionSuffix;
+<span class="fc" id="L46">            counter++;</span>
+        }
+
+<span class="fc" id="L49">        return newFileName;</span>
+    }
+
+    /**
+     * This function decide whether the newly downloaded file has the same content with other files
+     * It returns ture when the content is duplicate, while returns false if it is not
+     *
+     * @param directory The directory which saves the files (.pdf, for example)
+     * @param fileName Suggest name for the newly downloaded file
+     * @param dialogService To display the error and success message
+     * @return true when the content of the newly downloaded file is same as the file with &quot;similar&quot; name,
+     *         false when there is no &quot;similar&quot; file name or the content is different from that of files with &quot;similar&quot; name
+     * @throws IOException Fail when the file is not exist or something wrong when reading the file
+     */
+    public static boolean isDuplicatedFile(Path directory, Path fileName, DialogService dialogService) throws IOException {
+
+<span class="fc" id="L65">        Objects.requireNonNull(directory);</span>
+<span class="fc" id="L66">        Objects.requireNonNull(fileName);</span>
+<span class="fc" id="L67">        Objects.requireNonNull(dialogService);</span>
+
+<span class="fc" id="L69">        String extensionSuffix = FileUtil.getFileExtension(fileName).orElse(&quot;&quot;);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        extensionSuffix = &quot;&quot;.equals(extensionSuffix) ? extensionSuffix : &quot;.&quot; + extensionSuffix;</span>
+<span class="fc" id="L71">        String newFilename = FileUtil.getBaseName(fileName) + extensionSuffix;</span>
+
+<span class="fc" id="L73">        String fileNameWithoutDuplicated = eraseDuplicateMarks(FileUtil.getBaseName(fileName));</span>
+<span class="fc" id="L74">        String originalFileName = fileNameWithoutDuplicated + extensionSuffix;</span>
+
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (newFilename.equals(originalFileName)) {</span>
+<span class="fc" id="L77">            return false;</span>
+        }
+
+<span class="fc" id="L80">        Path originalFile = directory.resolve(originalFileName);</span>
+<span class="fc" id="L81">        Path duplicateFile = directory.resolve(fileName);</span>
+<span class="fc" id="L82">        int counter = 1;</span>
+
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        while (Files.exists(originalFile)) {</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (com.google.common.io.Files.equal(originalFile.toFile(), duplicateFile.toFile())) {</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                if (duplicateFile.toFile().delete()) {</span>
+<span class="fc" id="L87">                    dialogService.notify(Localization.lang(&quot;File '%1' is a duplicate of '%0'. Keeping '%0'&quot;, originalFileName, fileName));</span>
+                } else {
+<span class="nc" id="L89">                    dialogService.notify(Localization.lang(&quot;File '%1' is a duplicate of '%0'. Keeping both due to deletion error&quot;, originalFileName, fileName));</span>
+                }
+<span class="fc" id="L91">                return true;</span>
+            }
+
+<span class="nc" id="L94">            originalFileName = fileNameWithoutDuplicated +</span>
+                    &quot; (&quot; + counter + &quot;)&quot;
+                    + extensionSuffix;
+<span class="nc" id="L97">            counter++;</span>
+
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (newFilename.equals(originalFileName)) {</span>
+<span class="nc" id="L100">                return false;</span>
+            }
+<span class="nc" id="L102">            originalFile = directory.resolve(originalFileName);</span>
+        }
+<span class="nc" id="L104">        return false;</span>
+    }
+
+    /**
+     * This is the opposite function of getNonOverWritingFileName
+     * It will recover the file name to origin if it has duplicate mark such as &quot; (1)&quot;
+     * change the String whose format is &quot;xxxxxx (number)&quot; into &quot;xxxxxx&quot;, while return the same String when it does not match the format
+     * This is the opposite function of getNonOverWritingFileName
+     *
+     * @param fileName Suggested name for the file without extensionSuffix, if it has duplicate file name with other file, it will end with something like &quot; (1)&quot;
+     * @return Suggested name for the file without extensionSuffix and duplicate marks such as &quot; (1)&quot;
+     */
+    public static String eraseDuplicateMarks(String fileName) {
+<span class="fc" id="L117">        Matcher m = DUPLICATE_MARK_PATTERN.matcher(fileName);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        return m.find() ? fileName.substring(0, fileName.lastIndexOf('(') - 1) : fileName;</span>
+    }
+
+    public static Path eraseDuplicateMarks(Path filePath) {
+<span class="nc" id="L122">        String extensionSuffix = FileUtil.getFileExtension(filePath).map(ext -&gt; &quot;.&quot; + ext).orElse(&quot;&quot;);</span>
+
+<span class="nc" id="L124">        return filePath.resolveSibling(eraseDuplicateMarks(FileUtil.getBaseName(filePath)) + extensionSuffix);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

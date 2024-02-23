@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IsbnFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher.isbntobibtex</a> &gt; <span class="el_source">IsbnFetcher.java</span></div><h1>IsbnFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher.isbntobibtex;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.importer.EntryBasedFetcher;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.IdBasedFetcher;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.fetcher.AbstractIsbnFetcher;
+import org.jabref.logic.importer.fetcher.GvkFetcher;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.identifier.ISBN;
+import org.jabref.model.util.OptionalUtil;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Fetcher to generate the Bibtex entry from an ISBN.
+ * The default fetcher is the {@link OpenLibraryIsbnFetcher}.
+ * If the entry is not found in the {@link OpenLibraryIsbnFetcher}.
+ * Alternative fetcher can be specified with the {@link IsbnFetcher#addRetryFetcher(AbstractIsbnFetcher)} method.
+ */
+public class IsbnFetcher implements EntryBasedFetcher, IdBasedFetcher {
+
+<span class="fc" id="L34">    private static final Logger LOGGER = LoggerFactory.getLogger(IsbnFetcher.class);</span>
+<span class="fc" id="L35">    private static final Pattern NEWLINE_SPACE_PATTERN = Pattern.compile(&quot;\\n|\\r\\n|\\s&quot;);</span>
+    protected final ImportFormatPreferences importFormatPreferences;
+    private final List&lt;AbstractIsbnFetcher&gt; retryIsbnFetcher;
+    private final GvkFetcher gvkIbsnFetcher;
+
+<span class="fc" id="L40">    public IsbnFetcher(ImportFormatPreferences importFormatPreferences) {</span>
+<span class="fc" id="L41">        this.importFormatPreferences = importFormatPreferences;</span>
+<span class="fc" id="L42">        OpenLibraryIsbnFetcher openLibraryIsbnFetcher = new OpenLibraryIsbnFetcher(importFormatPreferences);</span>
+<span class="fc" id="L43">        this.gvkIbsnFetcher = new GvkFetcher(importFormatPreferences);</span>
+<span class="fc" id="L44">        this.retryIsbnFetcher = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L45">        this.addRetryFetcher(openLibraryIsbnFetcher);</span>
+<span class="fc" id="L46">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L50">        return &quot;ISBN&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;HelpFile&gt; getHelpPage() {
+<span class="nc" id="L55">        return Optional.of(HelpFile.FETCHER_ISBN);</span>
+    }
+
+    @Override
+    public Optional&lt;BibEntry&gt; performSearchById(String identifier) throws FetcherException {
+<span class="fc" id="L60">        Optional&lt;BibEntry&gt; bibEntry = Optional.empty();</span>
+
+        try {
+<span class="fc" id="L63">            identifier = removeNewlinesAndSpacesFromIdentifier(identifier);</span>
+<span class="fc" id="L64">            Optional&lt;ISBN&gt; isbn = ISBN.parse(identifier);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (isbn.isPresent()) {</span>
+<span class="fc" id="L66">                bibEntry = gvkIbsnFetcher.performSearchById(isbn.get().getNormalized());</span>
+            }
+<span class="nc" id="L68">        } catch (FetcherException ex) {</span>
+<span class="nc" id="L69">            LOGGER.debug(&quot;Got a fetcher exception for IBSN search&quot;, ex);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (retryIsbnFetcher.isEmpty()) {</span>
+<span class="nc" id="L71">                throw ex;</span>
+            }
+        } finally {
+            // do not move the iterator in the loop as this would always return a new one and thus create and endless loop
+<span class="fc" id="L75">            Iterator&lt;AbstractIsbnFetcher&gt; iterator = retryIsbnFetcher.iterator();</span>
+<span class="fc bfc" id="L76" title="All 4 branches covered.">            while (bibEntry.isEmpty() &amp;&amp; iterator.hasNext()) {</span>
+<span class="fc" id="L77">                LOGGER.debug(&quot;Trying using the alternate ISBN fetchers to find an entry.&quot;);</span>
+
+<span class="fc" id="L79">                AbstractIsbnFetcher fetcher = iterator.next();</span>
+<span class="fc" id="L80">                LOGGER.debug(&quot;No entry found for ISBN {}; trying {} next.&quot;, identifier, fetcher.getName());</span>
+<span class="fc" id="L81">                bibEntry = fetcher.performSearchById(identifier);</span>
+<span class="fc" id="L82">            }</span>
+        }
+
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (bibEntry.isEmpty()) {</span>
+<span class="fc" id="L86">            LOGGER.debug(&quot;Could not found a entry for ISBN {}&quot;, identifier);</span>
+        }
+
+<span class="fc" id="L89">        return bibEntry;</span>
+    }
+
+    @Override
+    public List&lt;BibEntry&gt; performSearch(BibEntry entry) throws FetcherException {
+<span class="fc" id="L94">        Optional&lt;String&gt; isbn = entry.getField(StandardField.ISBN);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (isbn.isPresent()) {</span>
+<span class="fc" id="L96">            return OptionalUtil.toList(performSearchById(isbn.get()));</span>
+        } else {
+<span class="nc" id="L98">            return Collections.emptyList();</span>
+        }
+    }
+
+    public IsbnFetcher addRetryFetcher(AbstractIsbnFetcher retryFetcher) {
+<span class="fc" id="L103">        Objects.requireNonNull(retryFetcher, &quot;Please provide a valid isbn fetcher.&quot;);</span>
+<span class="fc" id="L104">        retryIsbnFetcher.add(retryFetcher);</span>
+<span class="fc" id="L105">        return this;</span>
+    }
+
+    private String removeNewlinesAndSpacesFromIdentifier(String identifier) {
+<span class="fc" id="L109">        return NEWLINE_SPACE_PATTERN.matcher(identifier).replaceAll(&quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LatexCitationsTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor</a> &gt; <span class="el_source">LatexCitationsTab.java</span></div><h1>LatexCitationsTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor;
+
+import javafx.geometry.HPos;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.RowConstraints;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.texparser.CitationsDisplay;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+
+public class LatexCitationsTab extends EntryEditorTab {
+
+    public static final String NAME = &quot;LaTeX Citations&quot;;
+    private final LatexCitationsTabViewModel viewModel;
+    private final GridPane searchPane;
+    private final ProgressIndicator progressIndicator;
+    private final CitationsDisplay citationsDisplay;
+
+    public LatexCitationsTab(BibDatabaseContext databaseContext, PreferencesService preferencesService,
+<span class="nc" id="L37">                             TaskExecutor taskExecutor, DialogService dialogService) {</span>
+<span class="nc" id="L38">        this.viewModel = new LatexCitationsTabViewModel(databaseContext, preferencesService, taskExecutor, dialogService);</span>
+<span class="nc" id="L39">        this.searchPane = new GridPane();</span>
+<span class="nc" id="L40">        this.progressIndicator = new ProgressIndicator();</span>
+<span class="nc" id="L41">        this.citationsDisplay = new CitationsDisplay();</span>
+
+<span class="nc" id="L43">        setText(Localization.lang(&quot;LaTeX Citations&quot;));</span>
+<span class="nc" id="L44">        setTooltip(new Tooltip(Localization.lang(&quot;Search citations for this entry in LaTeX files&quot;)));</span>
+<span class="nc" id="L45">        setGraphic(IconTheme.JabRefIcons.LATEX_CITATIONS.getGraphicNode());</span>
+<span class="nc" id="L46">        setSearchPane();</span>
+<span class="nc" id="L47">    }</span>
+
+    private void setSearchPane() {
+<span class="nc" id="L50">        progressIndicator.setMaxSize(100, 100);</span>
+<span class="nc" id="L51">        citationsDisplay.basePathProperty().bindBidirectional(viewModel.directoryProperty());</span>
+<span class="nc" id="L52">        citationsDisplay.setItems(viewModel.getCitationList());</span>
+
+<span class="nc" id="L54">        RowConstraints mainRow = new RowConstraints();</span>
+<span class="nc" id="L55">        mainRow.setVgrow(Priority.ALWAYS);</span>
+
+<span class="nc" id="L57">        RowConstraints bottomRow = new RowConstraints(40);</span>
+<span class="nc" id="L58">        bottomRow.setVgrow(Priority.NEVER);</span>
+
+<span class="nc" id="L60">        ColumnConstraints column = new ColumnConstraints();</span>
+<span class="nc" id="L61">        column.setPercentWidth(100);</span>
+<span class="nc" id="L62">        column.setHalignment(HPos.CENTER);</span>
+
+<span class="nc" id="L64">        searchPane.getColumnConstraints().setAll(column);</span>
+<span class="nc" id="L65">        searchPane.getRowConstraints().setAll(mainRow, bottomRow);</span>
+<span class="nc" id="L66">        searchPane.setId(&quot;citationsPane&quot;);</span>
+<span class="nc" id="L67">        setContent(searchPane);</span>
+
+<span class="nc" id="L69">        EasyBind.subscribe(viewModel.statusProperty(), status -&gt; {</span>
+<span class="nc" id="L70">            searchPane.getChildren().clear();</span>
+<span class="nc bnc" id="L71" title="All 5 branches missed.">            switch (status) {</span>
+                case IN_PROGRESS:
+<span class="nc" id="L73">                    searchPane.add(progressIndicator, 0, 0);</span>
+<span class="nc" id="L74">                    break;</span>
+                case CITATIONS_FOUND:
+<span class="nc" id="L76">                    searchPane.add(getCitationsPane(), 0, 0);</span>
+<span class="nc" id="L77">                    break;</span>
+                case NO_RESULTS:
+<span class="nc" id="L79">                    searchPane.add(getNotFoundPane(), 0, 0);</span>
+<span class="nc" id="L80">                    break;</span>
+                case ERROR:
+<span class="nc" id="L82">                    searchPane.add(getErrorPane(), 0, 0);</span>
+                    break;
+            }
+<span class="nc" id="L85">            searchPane.add(getLatexDirectoryBox(), 0, 1);</span>
+<span class="nc" id="L86">        });</span>
+<span class="nc" id="L87">    }</span>
+
+    private HBox getLatexDirectoryBox() {
+<span class="nc" id="L90">        Text latexDirectoryText = new Text(Localization.lang(&quot;Current search directory:&quot;));</span>
+<span class="nc" id="L91">        Text latexDirectoryPath = new Text(viewModel.directoryProperty().get().toString());</span>
+<span class="nc" id="L92">        latexDirectoryPath.setStyle(&quot;-fx-font-family:monospace;-fx-font-weight: bold;&quot;);</span>
+<span class="nc" id="L93">        Button latexDirectoryButton = new Button(Localization.lang(&quot;Set LaTeX file directory&quot;));</span>
+<span class="nc" id="L94">        latexDirectoryButton.setGraphic(IconTheme.JabRefIcons.LATEX_FILE_DIRECTORY.getGraphicNode());</span>
+<span class="nc" id="L95">        latexDirectoryButton.setOnAction(event -&gt; viewModel.setLatexDirectory());</span>
+<span class="nc" id="L96">        HBox latexDirectoryBox = new HBox(10, latexDirectoryText, latexDirectoryPath, latexDirectoryButton);</span>
+<span class="nc" id="L97">        latexDirectoryBox.setAlignment(Pos.CENTER);</span>
+<span class="nc" id="L98">        return latexDirectoryBox;</span>
+    }
+
+    private VBox getCitationsPane() {
+<span class="nc" id="L102">        VBox citationsBox = new VBox(30, citationsDisplay);</span>
+<span class="nc" id="L103">        citationsBox.setStyle(&quot;-fx-padding: 0;&quot;);</span>
+<span class="nc" id="L104">        return citationsBox;</span>
+    }
+
+    private VBox getNotFoundPane() {
+<span class="nc" id="L108">        Label titleLabel = new Label(Localization.lang(&quot;No citations found&quot;));</span>
+<span class="nc" id="L109">        titleLabel.getStyleClass().add(&quot;heading&quot;);</span>
+
+<span class="nc" id="L111">        Text notFoundText = new Text(Localization.lang(&quot;No LaTeX files containing this entry were found.&quot;));</span>
+<span class="nc" id="L112">        notFoundText.getStyleClass().add(&quot;description&quot;);</span>
+
+<span class="nc" id="L114">        VBox notFoundBox = new VBox(30, titleLabel, notFoundText);</span>
+<span class="nc" id="L115">        notFoundBox.setStyle(&quot;-fx-padding: 30 0 0 30;&quot;);</span>
+<span class="nc" id="L116">        return notFoundBox;</span>
+    }
+
+    private VBox getErrorPane() {
+<span class="nc" id="L120">        Label titleLabel = new Label(Localization.lang(&quot;Error&quot;));</span>
+<span class="nc" id="L121">        titleLabel.setStyle(&quot;-fx-font-size: 1.5em;-fx-font-weight: bold;-fx-text-fill: -fx-accent;&quot;);</span>
+<span class="nc" id="L122">        Text errorMessageText = new Text(viewModel.searchErrorProperty().get());</span>
+<span class="nc" id="L123">        VBox errorMessageBox = new VBox(30, titleLabel, errorMessageText);</span>
+<span class="nc" id="L124">        errorMessageBox.setStyle(&quot;-fx-padding: 30 0 0 30;&quot;);</span>
+<span class="nc" id="L125">        return errorMessageBox;</span>
+    }
+
+    @Override
+    protected void bindToEntry(BibEntry entry) {
+<span class="nc" id="L130">        viewModel.init(entry);</span>
+<span class="nc" id="L131">    }</span>
+
+    @Override
+    public boolean shouldShow(BibEntry entry) {
+<span class="nc" id="L135">        return viewModel.shouldShow();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,495 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlobalSearchBar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.search</a> &gt; <span class="el_source">GlobalSearchBar.java</span></div><h1>GlobalSearchBar.java</h1><pre class="source lang-java linenums">package org.jabref.gui.search;
+
+import java.lang.reflect.Field;
+import java.time.Duration;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.collections.ListChangeListener;
+import javafx.collections.ObservableList;
+import javafx.css.PseudoClass;
+import javafx.event.Event;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Cursor;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
+import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
+import javafx.scene.control.Skin;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.cell.TextFieldListCell;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
+
+import org.jabref.gui.ClipBoardManager;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.autocompleter.AppendPersonNamesStrategy;
+import org.jabref.gui.autocompleter.AutoCompleteFirstNameMode;
+import org.jabref.gui.autocompleter.AutoCompletionTextInputBinding;
+import org.jabref.gui.autocompleter.PersonNameStringConverter;
+import org.jabref.gui.autocompleter.SuggestionProvider;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.keyboard.KeyBinding;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.gui.search.rules.describer.SearchDescribers;
+import org.jabref.gui.undo.CountingUndoManager;
+import org.jabref.gui.util.BindingsHelper;
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.gui.util.IconValidationDecorator;
+import org.jabref.gui.util.TooltipTextUtil;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.search.SearchQuery;
+import org.jabref.model.entry.Author;
+import org.jabref.model.search.rules.SearchRules;
+import org.jabref.preferences.PreferencesService;
+import org.jabref.preferences.SearchPreferences;
+
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+import impl.org.controlsfx.skin.AutoCompletePopup;
+import org.controlsfx.control.textfield.AutoCompletionBinding;
+import org.controlsfx.control.textfield.CustomTextField;
+import org.reactfx.util.FxTimer;
+import org.reactfx.util.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.jabref.gui.actions.ActionHelper.needsDatabase;
+
+public class GlobalSearchBar extends HBox {
+
+<span class="nc" id="L85">    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalSearchBar.class);</span>
+
+    private static final int SEARCH_DELAY = 400;
+<span class="nc" id="L88">    private static final PseudoClass CLASS_NO_RESULTS = PseudoClass.getPseudoClass(&quot;emptyResult&quot;);</span>
+<span class="nc" id="L89">    private static final PseudoClass CLASS_RESULTS_FOUND = PseudoClass.getPseudoClass(&quot;emptyResult&quot;);</span>
+
+<span class="nc" id="L91">    private final CustomTextField searchField = SearchTextField.create();</span>
+    private final ToggleButton caseSensitiveButton;
+    private final ToggleButton regularExpressionButton;
+    private final ToggleButton fulltextButton;
+    private final Button openGlobalSearchButton;
+    private final ToggleButton keepSearchString;
+    // private final Button searchModeButton;
+<span class="nc" id="L98">    private final Tooltip searchFieldTooltip = new Tooltip();</span>
+<span class="nc" id="L99">    private final Label currentResults = new Label(&quot;&quot;);</span>
+
+    private final StateManager stateManager;
+    private final PreferencesService preferencesService;
+    private final Validator regexValidator;
+    private final UndoManager undoManager;
+
+    private final SearchPreferences searchPreferences;
+    private final DialogService dialogService;
+
+<span class="nc" id="L109">    private final BooleanProperty globalSearchActive = new SimpleBooleanProperty(false);</span>
+    private GlobalSearchResultDialog globalSearchResultDialog;
+
+    public GlobalSearchBar(LibraryTabContainer tabContainer,
+                           StateManager stateManager,
+                           PreferencesService preferencesService,
+                           CountingUndoManager undoManager,
+                           DialogService dialogService) {
+<span class="nc" id="L117">        super();</span>
+<span class="nc" id="L118">        this.stateManager = stateManager;</span>
+<span class="nc" id="L119">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L120">        this.searchPreferences = preferencesService.getSearchPreferences();</span>
+<span class="nc" id="L121">        this.undoManager = undoManager;</span>
+<span class="nc" id="L122">        this.dialogService = dialogService;</span>
+
+<span class="nc" id="L124">        searchField.disableProperty().bind(needsDatabase(stateManager).not());</span>
+
+        // fits the standard &quot;found x entries&quot;-message thus hinders the searchbar to jump around while searching if the tabContainer width is too small
+<span class="nc" id="L127">        currentResults.setPrefWidth(150);</span>
+
+<span class="nc" id="L129">        searchField.setTooltip(searchFieldTooltip);</span>
+<span class="nc" id="L130">        searchFieldTooltip.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);</span>
+<span class="nc" id="L131">        searchFieldTooltip.setMaxHeight(10);</span>
+<span class="nc" id="L132">        updateHintVisibility();</span>
+
+<span class="nc" id="L134">        KeyBindingRepository keyBindingRepository = preferencesService.getKeyBindingRepository();</span>
+<span class="nc" id="L135">        searchField.addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; {</span>
+<span class="nc" id="L136">            Optional&lt;KeyBinding&gt; keyBinding = keyBindingRepository.mapToKeyBinding(event);</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (keyBinding.isPresent()) {</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                if (keyBinding.get() == KeyBinding.CLOSE) {</span>
+                    // Clear search and select first entry, if available
+<span class="nc" id="L140">                    searchField.setText(&quot;&quot;);</span>
+<span class="nc" id="L141">                    tabContainer.getCurrentLibraryTab().getMainTable().getSelectionModel().selectFirst();</span>
+<span class="nc" id="L142">                    event.consume();</span>
+                }
+            }
+<span class="nc" id="L145">        });</span>
+
+<span class="nc" id="L147">        searchField.setContextMenu(SearchFieldRightClickMenu.create(</span>
+                keyBindingRepository,
+                stateManager,
+                searchField,
+                tabContainer,
+                undoManager));
+
+<span class="nc" id="L154">        ObservableList&lt;String&gt; search = stateManager.getWholeSearchHistory();</span>
+<span class="nc" id="L155">        search.addListener((ListChangeListener.Change&lt;? extends String&gt; change) -&gt; {</span>
+<span class="nc" id="L156">            searchField.setContextMenu(SearchFieldRightClickMenu.create(</span>
+                    keyBindingRepository,
+                    stateManager,
+                    searchField,
+                    tabContainer,
+                    undoManager));
+<span class="nc" id="L162">        });</span>
+
+<span class="nc" id="L164">        ClipBoardManager.addX11Support(searchField);</span>
+
+<span class="nc" id="L166">        regularExpressionButton = IconTheme.JabRefIcons.REG_EX.asToggleButton();</span>
+<span class="nc" id="L167">        caseSensitiveButton = IconTheme.JabRefIcons.CASE_SENSITIVE.asToggleButton();</span>
+<span class="nc" id="L168">        fulltextButton = IconTheme.JabRefIcons.FULLTEXT.asToggleButton();</span>
+<span class="nc" id="L169">        openGlobalSearchButton = IconTheme.JabRefIcons.OPEN_GLOBAL_SEARCH.asButton();</span>
+<span class="nc" id="L170">        keepSearchString = IconTheme.JabRefIcons.KEEP_SEARCH_STRING.asToggleButton();</span>
+
+<span class="nc" id="L172">        initSearchModifierButtons();</span>
+
+<span class="nc" id="L174">        BooleanBinding focusedOrActive = searchField.focusedProperty()</span>
+<span class="nc" id="L175">                                                    .or(regularExpressionButton.focusedProperty())</span>
+<span class="nc" id="L176">                                                    .or(caseSensitiveButton.focusedProperty())</span>
+<span class="nc" id="L177">                                                    .or(fulltextButton.focusedProperty())</span>
+<span class="nc" id="L178">                                                    .or(keepSearchString.focusedProperty())</span>
+<span class="nc" id="L179">                                                    .or(searchField.textProperty()</span>
+<span class="nc" id="L180">                                                                   .isNotEmpty());</span>
+
+<span class="nc" id="L182">        regularExpressionButton.visibleProperty().unbind();</span>
+<span class="nc" id="L183">        regularExpressionButton.visibleProperty().bind(focusedOrActive);</span>
+<span class="nc" id="L184">        caseSensitiveButton.visibleProperty().unbind();</span>
+<span class="nc" id="L185">        caseSensitiveButton.visibleProperty().bind(focusedOrActive);</span>
+<span class="nc" id="L186">        fulltextButton.visibleProperty().unbind();</span>
+<span class="nc" id="L187">        fulltextButton.visibleProperty().bind(focusedOrActive);</span>
+<span class="nc" id="L188">        keepSearchString.visibleProperty().unbind();</span>
+<span class="nc" id="L189">        keepSearchString.visibleProperty().bind(focusedOrActive);</span>
+
+<span class="nc" id="L191">        StackPane modifierButtons = new StackPane(new HBox(regularExpressionButton, caseSensitiveButton, fulltextButton, keepSearchString));</span>
+<span class="nc" id="L192">        modifierButtons.setAlignment(Pos.CENTER);</span>
+<span class="nc" id="L193">        searchField.setRight(new HBox(searchField.getRight(), modifierButtons));</span>
+<span class="nc" id="L194">        searchField.getStyleClass().add(&quot;search-field&quot;);</span>
+<span class="nc" id="L195">        searchField.setMinWidth(100);</span>
+<span class="nc" id="L196">        HBox.setHgrow(searchField, Priority.ALWAYS);</span>
+
+<span class="nc" id="L198">        regexValidator = new FunctionBasedValidator&lt;&gt;(</span>
+<span class="nc" id="L199">                searchField.textProperty(),</span>
+<span class="nc bnc" id="L200" title="All 4 branches missed.">                query -&gt; !(regularExpressionButton.isSelected() &amp;&amp; !validRegex()),</span>
+<span class="nc" id="L201">                ValidationMessage.error(Localization.lang(&quot;Invalid regular expression&quot;)));</span>
+<span class="nc" id="L202">        ControlsFxVisualizer visualizer = new ControlsFxVisualizer();</span>
+<span class="nc" id="L203">        visualizer.setDecoration(new IconValidationDecorator(Pos.CENTER_LEFT));</span>
+<span class="nc" id="L204">        Platform.runLater(() -&gt; visualizer.initVisualization(regexValidator.getValidationStatus(), searchField));</span>
+
+<span class="nc" id="L206">        this.getChildren().addAll(searchField, openGlobalSearchButton, currentResults);</span>
+<span class="nc" id="L207">        this.setSpacing(4.0);</span>
+<span class="nc" id="L208">        this.setAlignment(Pos.CENTER_LEFT);</span>
+
+<span class="nc" id="L210">        Timer searchTask = FxTimer.create(Duration.ofMillis(SEARCH_DELAY), this::updateSearchQuery);</span>
+<span class="nc" id="L211">        BindingsHelper.bindBidirectional(</span>
+<span class="nc" id="L212">                stateManager.activeSearchQueryProperty(),</span>
+<span class="nc" id="L213">                searchField.textProperty(),</span>
+                searchTerm -&gt; {
+                    // Async update
+<span class="nc" id="L216">                    searchTask.restart();</span>
+<span class="nc" id="L217">                },</span>
+<span class="nc" id="L218">                query -&gt; setSearchTerm(query.map(SearchQuery::getQuery).orElse(&quot;&quot;)));</span>
+
+<span class="nc" id="L220">        this.stateManager.activeSearchQueryProperty().addListener((obs, oldvalue, newValue) -&gt; newValue.ifPresent(this::updateSearchResultsForQuery));</span>
+<span class="nc" id="L221">        this.stateManager.activeDatabaseProperty().addListener((obs, oldValue, newValue) -&gt; stateManager.activeSearchQueryProperty().get().ifPresent(this::updateSearchResultsForQuery));</span>
+        /*
+         * The listener tracks a change on the focus property value.
+         * This happens, from active (user types a query) to inactive / focus
+         * lost (e.g., user selects an entry or triggers the search).
+         * The search history should only be filled, if focus is lost.
+         */
+<span class="nc" id="L228">        searchField.focusedProperty().addListener((obs, oldValue, newValue) -&gt; {</span>
+            // Focus lost can be derived by checking that there is no newValue (or the text is empty)
+<span class="nc bnc" id="L230" title="All 6 branches missed.">            if (oldValue &amp;&amp; !(newValue || searchField.getText().isBlank())) {</span>
+<span class="nc" id="L231">                this.stateManager.addSearchHistory(searchField.textProperty().get());</span>
+            }
+<span class="nc" id="L233">        });</span>
+<span class="nc" id="L234">    }</span>
+
+    private void updateSearchResultsForQuery(SearchQuery query) {
+<span class="nc" id="L237">        updateResults(this.stateManager.getSearchResultSize().intValue(), SearchDescribers.getSearchDescriberFor(query).getDescription(),</span>
+<span class="nc" id="L238">                query.isGrammarBasedSearch());</span>
+<span class="nc" id="L239">    }</span>
+
+    private void initSearchModifierButtons() {
+<span class="nc" id="L242">        regularExpressionButton.setSelected(searchPreferences.isRegularExpression());</span>
+<span class="nc" id="L243">        regularExpressionButton.setTooltip(new Tooltip(Localization.lang(&quot;regular expression&quot;)));</span>
+<span class="nc" id="L244">        initSearchModifierButton(regularExpressionButton);</span>
+<span class="nc" id="L245">        regularExpressionButton.setOnAction(event -&gt; {</span>
+<span class="nc" id="L246">            searchPreferences.setSearchFlag(SearchRules.SearchFlags.REGULAR_EXPRESSION, regularExpressionButton.isSelected());</span>
+<span class="nc" id="L247">            updateSearchQuery();</span>
+<span class="nc" id="L248">        });</span>
+
+<span class="nc" id="L250">        caseSensitiveButton.setSelected(searchPreferences.isCaseSensitive());</span>
+<span class="nc" id="L251">        caseSensitiveButton.setTooltip(new Tooltip(Localization.lang(&quot;Case sensitive&quot;)));</span>
+<span class="nc" id="L252">        initSearchModifierButton(caseSensitiveButton);</span>
+<span class="nc" id="L253">        caseSensitiveButton.setOnAction(event -&gt; {</span>
+<span class="nc" id="L254">            searchPreferences.setSearchFlag(SearchRules.SearchFlags.CASE_SENSITIVE, caseSensitiveButton.isSelected());</span>
+<span class="nc" id="L255">            updateSearchQuery();</span>
+<span class="nc" id="L256">        });</span>
+
+<span class="nc" id="L258">        fulltextButton.setSelected(searchPreferences.isFulltext());</span>
+<span class="nc" id="L259">        fulltextButton.setTooltip(new Tooltip(Localization.lang(&quot;Fulltext search&quot;)));</span>
+<span class="nc" id="L260">        initSearchModifierButton(fulltextButton);</span>
+<span class="nc" id="L261">        fulltextButton.setOnAction(event -&gt; {</span>
+<span class="nc" id="L262">            searchPreferences.setSearchFlag(SearchRules.SearchFlags.FULLTEXT, fulltextButton.isSelected());</span>
+<span class="nc" id="L263">            updateSearchQuery();</span>
+<span class="nc" id="L264">        });</span>
+
+<span class="nc" id="L266">        keepSearchString.setSelected(searchPreferences.shouldKeepSearchString());</span>
+<span class="nc" id="L267">        keepSearchString.setTooltip(new Tooltip(Localization.lang(&quot;Keep search string across libraries&quot;)));</span>
+<span class="nc" id="L268">        initSearchModifierButton(keepSearchString);</span>
+<span class="nc" id="L269">        keepSearchString.setOnAction(evt -&gt; {</span>
+<span class="nc" id="L270">            searchPreferences.setSearchFlag(SearchRules.SearchFlags.KEEP_SEARCH_STRING, keepSearchString.isSelected());</span>
+<span class="nc" id="L271">            updateSearchQuery();</span>
+<span class="nc" id="L272">        });</span>
+
+<span class="nc" id="L274">        openGlobalSearchButton.disableProperty().bindBidirectional(globalSearchActive);</span>
+<span class="nc" id="L275">        openGlobalSearchButton.setTooltip(new Tooltip(Localization.lang(&quot;Search across libraries in a new window&quot;)));</span>
+<span class="nc" id="L276">        initSearchModifierButton(openGlobalSearchButton);</span>
+<span class="nc" id="L277">        openGlobalSearchButton.setOnAction(evt -&gt; {</span>
+<span class="nc" id="L278">            globalSearchActive.setValue(true);</span>
+<span class="nc" id="L279">            globalSearchResultDialog = new GlobalSearchResultDialog(undoManager);</span>
+<span class="nc" id="L280">            updateSearchQuery();</span>
+<span class="nc" id="L281">            dialogService.showCustomDialogAndWait(globalSearchResultDialog);</span>
+<span class="nc" id="L282">            globalSearchActive.setValue(false);</span>
+<span class="nc" id="L283">        });</span>
+<span class="nc" id="L284">    }</span>
+
+    private void initSearchModifierButton(ButtonBase searchButton) {
+<span class="nc" id="L287">        searchButton.setCursor(Cursor.DEFAULT);</span>
+<span class="nc" id="L288">        searchButton.setMinHeight(28);</span>
+<span class="nc" id="L289">        searchButton.setMaxHeight(28);</span>
+<span class="nc" id="L290">        searchButton.setMinWidth(28);</span>
+<span class="nc" id="L291">        searchButton.setMaxWidth(28);</span>
+<span class="nc" id="L292">        searchButton.setPadding(new Insets(1.0));</span>
+<span class="nc" id="L293">        searchButton.managedProperty().bind(searchField.editableProperty());</span>
+<span class="nc" id="L294">        searchButton.visibleProperty().bind(searchField.editableProperty());</span>
+<span class="nc" id="L295">    }</span>
+
+    /**
+     * Focuses the search field if it is not focused.
+     */
+    public void focus() {
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        if (!searchField.isFocused()) {</span>
+<span class="nc" id="L302">            searchField.requestFocus();</span>
+        }
+<span class="nc" id="L304">        searchField.selectAll();</span>
+<span class="nc" id="L305">    }</span>
+
+    public void updateSearchQuery() {
+<span class="nc" id="L308">        LOGGER.debug(&quot;Flags: {}&quot;, searchPreferences.getSearchFlags());</span>
+<span class="nc" id="L309">        LOGGER.debug(&quot;Updated search query: {}&quot;, searchField.getText());</span>
+
+        // An empty search field should cause the search to be cleared.
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        if (searchField.getText().isEmpty()) {</span>
+<span class="nc" id="L313">            currentResults.setText(&quot;&quot;);</span>
+<span class="nc" id="L314">            setSearchFieldHintTooltip(null);</span>
+<span class="nc" id="L315">            stateManager.clearSearchQuery();</span>
+<span class="nc" id="L316">            return;</span>
+        }
+
+        // Invalid regular expression
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        if (!regexValidator.getValidationStatus().isValid()) {</span>
+<span class="nc" id="L321">            currentResults.setText(Localization.lang(&quot;Invalid regular expression&quot;));</span>
+<span class="nc" id="L322">            return;</span>
+        }
+
+<span class="nc" id="L325">        SearchQuery searchQuery = new SearchQuery(this.searchField.getText(), searchPreferences.getSearchFlags());</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if (!searchQuery.isValid()) {</span>
+<span class="nc" id="L327">            informUserAboutInvalidSearchQuery();</span>
+<span class="nc" id="L328">            return;</span>
+        }
+<span class="nc" id="L330">        stateManager.setSearchQuery(searchQuery);</span>
+<span class="nc" id="L331">    }</span>
+
+    private boolean validRegex() {
+        try {
+<span class="nc" id="L335">            Pattern.compile(searchField.getText());</span>
+<span class="nc" id="L336">        } catch (PatternSyntaxException e) {</span>
+<span class="nc" id="L337">            LOGGER.debug(e.getMessage());</span>
+<span class="nc" id="L338">            return false;</span>
+<span class="nc" id="L339">        }</span>
+<span class="nc" id="L340">        return true;</span>
+    }
+
+    private void informUserAboutInvalidSearchQuery() {
+<span class="nc" id="L344">        searchField.pseudoClassStateChanged(CLASS_NO_RESULTS, true);</span>
+
+<span class="nc" id="L346">        stateManager.clearSearchQuery();</span>
+
+<span class="nc" id="L348">        String illegalSearch = Localization.lang(&quot;Search failed: illegal search expression&quot;);</span>
+<span class="nc" id="L349">        currentResults.setText(illegalSearch);</span>
+<span class="nc" id="L350">    }</span>
+
+    public void setAutoCompleter(SuggestionProvider&lt;Author&gt; searchCompleter) {
+<span class="nc bnc" id="L353" title="All 2 branches missed.">        if (preferencesService.getAutoCompletePreferences().shouldAutoComplete()) {</span>
+<span class="nc" id="L354">            AutoCompletionTextInputBinding&lt;Author&gt; autoComplete = AutoCompletionTextInputBinding.autoComplete(searchField,</span>
+<span class="nc" id="L355">                    searchCompleter::provideSuggestions,</span>
+                    new PersonNameStringConverter(false, false, AutoCompleteFirstNameMode.BOTH),
+                    new AppendPersonNamesStrategy());
+<span class="nc" id="L358">            AutoCompletePopup&lt;Author&gt; popup = getPopup(autoComplete);</span>
+<span class="nc" id="L359">            popup.setSkin(new SearchPopupSkin&lt;&gt;(popup));</span>
+        }
+<span class="nc" id="L361">    }</span>
+
+    /**
+     * The popup has private access in {@link AutoCompletionBinding}, so we use reflection to access it.
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private &lt;T&gt; AutoCompletePopup&lt;T&gt; getPopup(AutoCompletionBinding&lt;T&gt; autoCompletionBinding) {
+        try {
+            // TODO: reflective access, should be removed
+<span class="nc" id="L370">            Field privatePopup = AutoCompletionBinding.class.getDeclaredField(&quot;autoCompletionPopup&quot;);</span>
+<span class="nc" id="L371">            privatePopup.setAccessible(true);</span>
+<span class="nc" id="L372">            return (AutoCompletePopup&lt;T&gt;) privatePopup.get(autoCompletionBinding);</span>
+<span class="nc" id="L373">        } catch (IllegalAccessException | NoSuchFieldException e) {</span>
+<span class="nc" id="L374">            LOGGER.error(&quot;Could not get access to auto completion popup&quot;, e);</span>
+<span class="nc" id="L375">            return new AutoCompletePopup&lt;&gt;();</span>
+        }
+    }
+
+    private void updateResults(int matched, TextFlow description, boolean grammarBasedSearch) {
+<span class="nc bnc" id="L380" title="All 2 branches missed.">        if (matched == 0) {</span>
+<span class="nc" id="L381">            currentResults.setText(Localization.lang(&quot;No results found.&quot;));</span>
+<span class="nc" id="L382">            searchField.pseudoClassStateChanged(CLASS_NO_RESULTS, true);</span>
+        } else {
+<span class="nc" id="L384">            currentResults.setText(Localization.lang(&quot;Found %0 results.&quot;, String.valueOf(matched)));</span>
+<span class="nc" id="L385">            searchField.pseudoClassStateChanged(CLASS_RESULTS_FOUND, true);</span>
+        }
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        if (grammarBasedSearch) {</span>
+            // TODO: switch Icon color
+            // searchIcon.setIcon(IconTheme.JabRefIcon.ADVANCED_SEARCH.getIcon());
+        } else {
+            // TODO: switch Icon color
+            // searchIcon.setIcon(IconTheme.JabRefIcon.SEARCH.getIcon());
+        }
+
+<span class="nc" id="L395">        setSearchFieldHintTooltip(description);</span>
+<span class="nc" id="L396">    }</span>
+
+    private void setSearchFieldHintTooltip(TextFlow description) {
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (preferencesService.getWorkspacePreferences().shouldShowAdvancedHints()) {</span>
+<span class="nc" id="L400">            String genericDescription = Localization.lang(&quot;Hint:\n\nTo search all fields for &lt;b&gt;Smith&lt;/b&gt;, enter:\n&lt;tt&gt;smith&lt;/tt&gt;\n\nTo search the field &lt;b&gt;author&lt;/b&gt; for &lt;b&gt;Smith&lt;/b&gt; and the field &lt;b&gt;title&lt;/b&gt; for &lt;b&gt;electrical&lt;/b&gt;, enter:\n&lt;tt&gt;author=Smith and title=electrical&lt;/tt&gt;&quot;);</span>
+<span class="nc" id="L401">            List&lt;Text&gt; genericDescriptionTexts = TooltipTextUtil.createTextsFromHtml(genericDescription);</span>
+
+<span class="nc bnc" id="L403" title="All 2 branches missed.">            if (description == null) {</span>
+<span class="nc" id="L404">                TextFlow emptyHintTooltip = new TextFlow();</span>
+<span class="nc" id="L405">                emptyHintTooltip.getChildren().setAll(genericDescriptionTexts);</span>
+<span class="nc" id="L406">                searchFieldTooltip.setGraphic(emptyHintTooltip);</span>
+<span class="nc" id="L407">            } else {</span>
+<span class="nc" id="L408">                description.getChildren().add(new Text(&quot;\n\n&quot;));</span>
+<span class="nc" id="L409">                description.getChildren().addAll(genericDescriptionTexts);</span>
+<span class="nc" id="L410">                searchFieldTooltip.setGraphic(description);</span>
+            }
+        }
+<span class="nc" id="L413">    }</span>
+
+    public void updateHintVisibility() {
+<span class="nc" id="L416">        setSearchFieldHintTooltip(null);</span>
+<span class="nc" id="L417">    }</span>
+
+    public void setSearchTerm(String searchTerm) {
+<span class="nc bnc" id="L420" title="All 2 branches missed.">        if (searchTerm.equals(searchField.getText())) {</span>
+<span class="nc" id="L421">            return;</span>
+        }
+
+<span class="nc" id="L424">        DefaultTaskExecutor.runInJavaFXThread(() -&gt; searchField.setText(searchTerm));</span>
+<span class="nc" id="L425">    }</span>
+
+    private static class SearchPopupSkin&lt;T&gt; implements Skin&lt;AutoCompletePopup&lt;T&gt;&gt; {
+
+        private final AutoCompletePopup&lt;T&gt; control;
+        private final ListView&lt;T&gt; suggestionList;
+        private final BorderPane container;
+
+<span class="nc" id="L433">        public SearchPopupSkin(AutoCompletePopup&lt;T&gt; control) {</span>
+<span class="nc" id="L434">            this.control = control;</span>
+<span class="nc" id="L435">            this.suggestionList = new ListView&lt;&gt;(control.getSuggestions());</span>
+<span class="nc" id="L436">            this.suggestionList.getStyleClass().add(&quot;auto-complete-popup&quot;);</span>
+<span class="nc" id="L437">            this.suggestionList.getStylesheets().add(Objects.requireNonNull(AutoCompletionBinding.class.getResource(&quot;autocompletion.css&quot;)).toExternalForm());</span>
+<span class="nc" id="L438">            this.suggestionList.prefHeightProperty().bind(Bindings.min(control.visibleRowCountProperty(), Bindings.size(this.suggestionList.getItems())).multiply(24).add(18));</span>
+<span class="nc" id="L439">            this.suggestionList.setCellFactory(TextFieldListCell.forListView(control.getConverter()));</span>
+<span class="nc" id="L440">            this.suggestionList.prefWidthProperty().bind(control.prefWidthProperty());</span>
+<span class="nc" id="L441">            this.suggestionList.maxWidthProperty().bind(control.maxWidthProperty());</span>
+<span class="nc" id="L442">            this.suggestionList.minWidthProperty().bind(control.minWidthProperty());</span>
+
+<span class="nc" id="L444">            this.container = new BorderPane();</span>
+<span class="nc" id="L445">            this.container.setCenter(suggestionList);</span>
+
+<span class="nc" id="L447">            this.registerEventListener();</span>
+<span class="nc" id="L448">        }</span>
+
+        private void registerEventListener() {
+<span class="nc" id="L451">            this.suggestionList.setOnMouseClicked(me -&gt; {</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">                if (me.getButton() == MouseButton.PRIMARY) {</span>
+<span class="nc" id="L453">                    this.onSuggestionChosen(this.suggestionList.getSelectionModel().getSelectedItem());</span>
+                }
+<span class="nc" id="L455">            });</span>
+<span class="nc" id="L456">            this.suggestionList.setOnKeyPressed(ke -&gt; {</span>
+<span class="nc bnc" id="L457" title="All 3 branches missed.">                switch (ke.getCode()) {</span>
+                    case TAB:
+                    case ENTER:
+<span class="nc" id="L460">                        this.onSuggestionChosen(this.suggestionList.getSelectionModel().getSelectedItem());</span>
+<span class="nc" id="L461">                        break;</span>
+                    case ESCAPE:
+<span class="nc bnc" id="L463" title="All 2 branches missed.">                        if (this.control.isHideOnEscape()) {</span>
+<span class="nc" id="L464">                            this.control.hide();</span>
+                        }
+                        break;
+                    default:
+                        break;
+                }
+<span class="nc" id="L470">            });</span>
+<span class="nc" id="L471">        }</span>
+
+        private void onSuggestionChosen(T suggestion) {
+<span class="nc bnc" id="L474" title="All 2 branches missed.">            if (suggestion != null) {</span>
+<span class="nc" id="L475">                Event.fireEvent(this.control, new AutoCompletePopup.SuggestionEvent&lt;&gt;(suggestion));</span>
+            }
+<span class="nc" id="L477">        }</span>
+
+        @Override
+        public Node getNode() {
+<span class="nc" id="L481">            return this.container;</span>
+        }
+
+        @Override
+        public AutoCompletePopup&lt;T&gt; getSkinnable() {
+<span class="nc" id="L486">            return this.control;</span>
+        }
+
+        @Override
+        public void dispose() {
+            // empty
+<span class="nc" id="L492">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

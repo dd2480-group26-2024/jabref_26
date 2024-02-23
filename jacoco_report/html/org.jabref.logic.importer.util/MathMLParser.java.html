@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MathMLParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.util</a> &gt; <span class="el_source">MathMLParser.java</span></div><h1>MathMLParser.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.util;
+
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.Objects;
+
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.transform.Result;
+import javax.xml.transform.Source;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+<span class="nc" id="L23">public class MathMLParser {</span>
+<span class="fc" id="L24">    private static final Logger LOGGER = LoggerFactory.getLogger(MathMLParser.class);</span>
+    private static final String XSLT_FILE_PATH = &quot;/xslt/mathml_latex/mmltex.xsl&quot;;
+
+    /**
+     * Parses the MathML element into its corresponding
+     * LaTeX representation, using an XSLT transformation file
+     *
+     * @param reader the stream reader
+     * @return Returns the LaTeX representation
+     */
+    public static String parse(XMLStreamReader reader) {
+<span class="fc" id="L35">        String xmlContent = &quot;&quot;;</span>
+<span class="fc" id="L36">        String latexResult = &quot;&lt;Unsupported MathML expression&gt;&quot;;</span>
+
+        try {
+            // extract XML content
+<span class="fc" id="L40">            xmlContent = StaxParser.getXMLContent(reader);</span>
+
+            // convert to LaTeX using XSLT file
+<span class="fc" id="L43">            Source xmlSource = new StreamSource(new StringReader(xmlContent));</span>
+
+<span class="fc" id="L45">            URL xsltResource = MathMLParser.class.getResource(XSLT_FILE_PATH);</span>
+<span class="fc" id="L46">            Source xsltSource = new StreamSource(Objects.requireNonNull(xsltResource).openStream(), xsltResource.toURI().toASCIIString());</span>
+
+<span class="fc" id="L48">            TransformerFactory transformerFactory = TransformerFactory.newInstance();</span>
+<span class="fc" id="L49">            Transformer transformer = transformerFactory.newTransformer(xsltSource);</span>
+
+<span class="fc" id="L51">            StringWriter writer = new StringWriter();</span>
+<span class="fc" id="L52">            Result result = new StreamResult(writer);</span>
+<span class="fc" id="L53">            transformer.transform(xmlSource, result);</span>
+
+<span class="fc" id="L55">            latexResult = writer.getBuffer().toString();</span>
+<span class="fc" id="L56">        } catch (XMLStreamException e) {</span>
+<span class="fc" id="L57">            LOGGER.debug(&quot;An exception occurred when getting XML content&quot;, e);</span>
+<span class="nc" id="L58">        } catch (IOException e) {</span>
+<span class="nc" id="L59">            LOGGER.debug(&quot;An I/O exception occurred&quot;, e);</span>
+<span class="nc" id="L60">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L61">            LOGGER.debug(&quot;XSLT Source URI invalid&quot;, e);</span>
+<span class="nc" id="L62">        } catch (TransformerException e) {</span>
+<span class="nc" id="L63">            LOGGER.debug(&quot;An exception occurred during transformation&quot;, e);</span>
+<span class="pc" id="L64">        }</span>
+
+<span class="fc" id="L66">        return latexResult;</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

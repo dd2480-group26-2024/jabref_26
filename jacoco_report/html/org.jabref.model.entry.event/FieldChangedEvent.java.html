@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldChangedEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.event</a> &gt; <span class="el_source">FieldChangedEvent.java</span></div><h1>FieldChangedEvent.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.event;
+
+import org.jabref.model.FieldChange;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+
+/**
+ * &lt;code&gt;FieldChangedEvent&lt;/code&gt; is fired when a field of &lt;code&gt;BibEntry&lt;/code&gt; has been modified, removed or added.
+ */
+public class FieldChangedEvent extends EntryChangedEvent {
+
+    private final Field field;
+    private final String newValue;
+    private final String oldValue;
+<span class="pc" id="L15">    private int majorCharacterChange = 0;</span>
+
+    /**
+     * @param bibEntry Affected BibEntry object
+     * @param field    Name of field which has been changed
+     * @param oldValue old field value
+     * @param newValue new field value
+     * @param location Location affected by this event
+     */
+    public FieldChangedEvent(BibEntry bibEntry, Field field, String newValue, String oldValue,
+                             EntriesEventSource location) {
+<span class="nc" id="L26">        super(bibEntry, location);</span>
+<span class="nc" id="L27">        this.field = field;</span>
+<span class="nc" id="L28">        this.newValue = newValue;</span>
+<span class="nc" id="L29">        this.oldValue = oldValue;</span>
+<span class="nc" id="L30">        this.majorCharacterChange = computeMajorCharacterChange(oldValue, newValue);</span>
+<span class="nc" id="L31">    }</span>
+
+    /**
+     * @param bibEntry Affected BibEntry object
+     * @param field    Name of field which has been changed
+     * @param newValue new field value
+     */
+    public FieldChangedEvent(BibEntry bibEntry, Field field, String newValue, String oldValue) {
+<span class="fc" id="L39">        super(bibEntry);</span>
+<span class="fc" id="L40">        this.field = field;</span>
+<span class="fc" id="L41">        this.newValue = newValue;</span>
+<span class="fc" id="L42">        this.oldValue = oldValue;</span>
+<span class="fc" id="L43">        this.majorCharacterChange = computeMajorCharacterChange(oldValue, newValue);</span>
+<span class="fc" id="L44">    }</span>
+
+    /**
+     * @param location Location affected by this event
+     */
+    public FieldChangedEvent(FieldChange fieldChange, EntriesEventSource location) {
+<span class="fc" id="L50">        super(fieldChange.getEntry(), location);</span>
+<span class="fc" id="L51">        this.field = fieldChange.getField();</span>
+<span class="fc" id="L52">        this.newValue = fieldChange.getNewValue();</span>
+<span class="fc" id="L53">        this.oldValue = fieldChange.getOldValue();</span>
+<span class="fc" id="L54">        this.majorCharacterChange = computeMajorCharacterChange(oldValue, newValue);</span>
+<span class="fc" id="L55">    }</span>
+
+    public FieldChangedEvent(FieldChange fieldChange) {
+<span class="nc" id="L58">        this(fieldChange, EntriesEventSource.LOCAL);</span>
+<span class="nc" id="L59">    }</span>
+
+    private int computeMajorCharacterChange(String oldValue, String newValue) {
+        // We do == because of performance reasons
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (oldValue == newValue) {</span>
+<span class="nc" id="L64">            return 0;</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        } else if ((oldValue == null) &amp;&amp; (newValue != null)) {</span>
+<span class="fc" id="L66">            return newValue.length();</span>
+<span class="pc bpc" id="L67" title="1 of 4 branches missed.">        } else if ((newValue == null) &amp;&amp; (oldValue != null)) {</span>
+<span class="fc" id="L68">            return oldValue.length();</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">        } else if ((oldValue.length() == newValue.length()) &amp;&amp; !oldValue.equals(newValue)) {</span>
+<span class="fc" id="L70">            return newValue.length();</span>
+        } else {
+<span class="fc" id="L72">            return Math.abs(newValue.length() - oldValue.length());</span>
+        }
+    }
+
+    public Field getField() {
+<span class="fc" id="L77">        return field;</span>
+    }
+
+    public String getNewValue() {
+<span class="fc" id="L81">        return newValue;</span>
+    }
+
+    public String getOldValue() {
+<span class="fc" id="L85">        return oldValue;</span>
+    }
+
+    public int getMajorCharacterChange() {
+<span class="nc" id="L89">        return majorCharacterChange;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

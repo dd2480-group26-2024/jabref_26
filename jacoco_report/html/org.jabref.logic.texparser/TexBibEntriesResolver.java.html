@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TexBibEntriesResolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.texparser</a> &gt; <span class="el_source">TexBibEntriesResolver.java</span></div><h1>TexBibEntriesResolver.java</h1><pre class="source lang-java linenums">package org.jabref.logic.texparser;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.OpenDatabase;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.texparser.Citation;
+import org.jabref.model.texparser.LatexBibEntriesResolverResult;
+import org.jabref.model.texparser.LatexParserResult;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.LibraryPreferences;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class TexBibEntriesResolver {
+
+<span class="fc" id="L27">    private static final Logger LOGGER = LoggerFactory.getLogger(TexBibEntriesResolver.class);</span>
+
+    private final BibDatabase masterDatabase;
+    private final LibraryPreferences libraryPreferences;
+    private final ImportFormatPreferences importFormatPreferences;
+    private final FileUpdateMonitor fileMonitor;
+
+<span class="fc" id="L34">    public TexBibEntriesResolver(BibDatabase masterDatabase, LibraryPreferences libraryPreferences, ImportFormatPreferences importFormatPreferences, FileUpdateMonitor fileMonitor) {</span>
+<span class="fc" id="L35">        this.masterDatabase = masterDatabase;</span>
+<span class="fc" id="L36">        this.libraryPreferences = libraryPreferences;</span>
+<span class="fc" id="L37">        this.importFormatPreferences = importFormatPreferences;</span>
+<span class="fc" id="L38">        this.fileMonitor = fileMonitor;</span>
+<span class="fc" id="L39">    }</span>
+
+    /**
+     * Resolve all BibTeX entries and check if they are in the given database.
+     */
+    public LatexBibEntriesResolverResult resolve(LatexParserResult latexParserResult) {
+<span class="fc" id="L45">        LatexBibEntriesResolverResult resolverResult = new LatexBibEntriesResolverResult(latexParserResult);</span>
+
+        // Preload databases from BIB files.
+<span class="fc" id="L48">        Map&lt;Path, BibDatabase&gt; bibDatabases = resolverResult.getBibFiles().values().stream().distinct().collect(Collectors.toMap(</span>
+<span class="fc" id="L49">                Function.identity(), path -&gt; {</span>
+                    try {
+<span class="fc" id="L51">                        return OpenDatabase.loadDatabase(path, importFormatPreferences, fileMonitor).getDatabase();</span>
+<span class="nc" id="L52">                    } catch (IOException e) {</span>
+<span class="nc" id="L53">                        LOGGER.error(&quot;Error opening file '{}'&quot;, path, e);</span>
+<span class="nc" id="L54">                        return ParserResult.fromError(e).getDatabase();</span>
+                    }
+                }));
+
+        // Get all pairs Entry&lt;String entryKey, Citation&gt;.
+<span class="fc" id="L59">        Stream&lt;Map.Entry&lt;String, Citation&gt;&gt; citationsStream = latexParserResult.getCitations().entries().stream().distinct();</span>
+
+<span class="fc" id="L61">        Set&lt;BibEntry&gt; newEntries = citationsStream.flatMap(mapEntry -&gt; apply(mapEntry, latexParserResult, bibDatabases)).collect(Collectors.toSet());</span>
+
+        // Add all new entries to the newEntries set.
+<span class="fc" id="L64">        resolverResult.getNewEntries().addAll(newEntries);</span>
+
+<span class="fc" id="L66">        return resolverResult;</span>
+    }
+
+    private Stream&lt;? extends BibEntry&gt; apply(Map.Entry&lt;String, Citation&gt; mapEntry, LatexParserResult latexParserResult, Map&lt;Path, BibDatabase&gt; bibDatabases) {
+<span class="fc" id="L70">        return latexParserResult.getBibFiles().get(mapEntry.getValue().getPath()).stream().distinct().flatMap(bibFile -&gt;</span>
+                // Get a specific entry from an entryKey and a BIB file.
+<span class="fc" id="L72">                bibDatabases.get(bibFile).getEntriesByCitationKey(mapEntry.getKey()).stream().distinct()</span>
+                            // Check if there is already an entry with the same key in the given database.
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                            .filter(entry -&gt; !entry.equals(masterDatabase.getEntryByCitationKey(entry.getCitationKey().orElse(&quot;&quot;)).orElse(new BibEntry())))</span>
+                            // Add cross-referencing data to the entry (fill empty fields).
+<span class="fc" id="L76">                            .map(entry -&gt; addCrossReferencingData(entry, bibFile, bibDatabases)));</span>
+    }
+
+    private BibEntry addCrossReferencingData(BibEntry entry, Path bibFile, Map&lt;Path, BibDatabase&gt; bibDatabases) {
+<span class="fc" id="L80">        bibDatabases.get(bibFile).getReferencedEntry(entry).ifPresent(refEntry -&gt;</span>
+<span class="fc" id="L81">                refEntry.getFields().forEach(field -&gt; entry.getFieldMap().putIfAbsent(field, refEntry.getFieldOrAlias(field).orElse(&quot;&quot;))));</span>
+
+<span class="fc" id="L83">        return entry;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

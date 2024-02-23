@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StandardFileType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.util</a> &gt; <span class="el_source">StandardFileType.java</span></div><h1>StandardFileType.java</h1><pre class="source lang-java linenums">package org.jabref.logic.util;
+
+import java.util.Arrays;
+import java.util.List;
+
+import org.jabref.model.util.OptionalUtil;
+
+/**
+ * @implNote Enter the extensions in lowercase without a dot! The dot is added implicitly.
+ */
+<span class="fc" id="L11">public enum StandardFileType implements FileType {</span>
+
+<span class="fc" id="L13">    ENDNOTE(&quot;Endnote&quot;, &quot;ref&quot;, &quot;enw&quot;),</span>
+<span class="fc" id="L14">    ISI(&quot;Isi&quot;, &quot;isi&quot;, &quot;txt&quot;),</span>
+<span class="fc" id="L15">    MEDLINE(&quot;Medline&quot;, &quot;nbib&quot;, &quot;xml&quot;),</span>
+<span class="fc" id="L16">    MEDLINE_PLAIN(&quot;Medline Plain&quot;, &quot;nbib&quot;, &quot;txt&quot;),</span>
+<span class="fc" id="L17">    PUBMED(&quot;Pubmed&quot;, &quot;fcgi&quot;),</span>
+<span class="fc" id="L18">    SILVER_PLATTER(&quot;SilverPlatter&quot;, &quot;dat&quot;, &quot;txt&quot;),</span>
+<span class="fc" id="L19">    AUX(&quot;Aux file&quot;, &quot;aux&quot;),</span>
+<span class="fc" id="L20">    BIBTEX_DB(&quot;Bibtex library&quot;, &quot;bib&quot;),</span>
+<span class="fc" id="L21">    CITATION_STYLE(&quot;Citation Style&quot;, &quot;csl&quot;),</span>
+<span class="fc" id="L22">    CLASS(&quot;Class file&quot;, &quot;class&quot;),</span>
+<span class="fc" id="L23">    CSV(&quot;CSV&quot;, &quot;csv&quot;),</span>
+<span class="fc" id="L24">    HTML(&quot;HTML&quot;, &quot;html&quot;, &quot;htm&quot;),</span>
+<span class="fc" id="L25">    JAR(&quot;JAR&quot;, &quot;jar&quot;),</span>
+<span class="fc" id="L26">    JAVA_KEYSTORE(&quot;Java Keystore&quot;, &quot;jks&quot;),</span>
+<span class="fc" id="L27">    JSTYLE(&quot;LibreOffice layout style&quot;, &quot;jstyle&quot;),</span>
+<span class="fc" id="L28">    LAYOUT(&quot;Custom Exporter format&quot;, &quot;layout&quot;),</span>
+<span class="fc" id="L29">    ODS(&quot;OpenOffice Calc&quot;, &quot;ods&quot;),</span>
+<span class="fc" id="L30">    PDF(&quot;PDF&quot;, &quot;pdf&quot;),</span>
+<span class="fc" id="L31">    RIS(&quot;RIS&quot;, &quot;ris&quot;),</span>
+<span class="fc" id="L32">    TERMS(&quot;Protected terms&quot;, &quot;terms&quot;),</span>
+<span class="fc" id="L33">    TXT(&quot;Plain Text&quot;, &quot;txt&quot;),</span>
+<span class="fc" id="L34">    RDF(&quot;RDF&quot;, &quot;rdf&quot;),</span>
+<span class="fc" id="L35">    RTF(&quot;RTF&quot;, &quot;rtf&quot;),</span>
+<span class="fc" id="L36">    SXC(&quot;Open Office Calc 1.x&quot;, &quot;sxc&quot;),</span>
+<span class="fc" id="L37">    TEX(&quot;LaTeX&quot;, &quot;tex&quot;),</span>
+<span class="fc" id="L38">    XML(&quot;XML&quot;, &quot;xml&quot;),</span>
+<span class="fc" id="L39">    JSON(&quot;JSON&quot;, &quot;json&quot;),</span>
+<span class="fc" id="L40">    XMP(&quot;XMP&quot;, &quot;xmp&quot;),</span>
+<span class="fc" id="L41">    ZIP(&quot;Zip Archive&quot;, &quot;zip&quot;),</span>
+<span class="fc" id="L42">    CSS(&quot;CSS Styleshet&quot;, &quot;css&quot;),</span>
+<span class="fc" id="L43">    YAML(&quot;YAML Markup&quot;, &quot;yaml&quot;),</span>
+<span class="fc" id="L44">    CFF(&quot;CFF&quot;, &quot;cff&quot;),</span>
+<span class="fc" id="L45">    ANY_FILE(&quot;Any&quot;, &quot;*&quot;),</span>
+<span class="fc" id="L46">    CER(&quot;SSL Certificate&quot;, &quot;cer&quot;),</span>
+<span class="fc" id="L47">    CITAVI(&quot;Citavi&quot;, &quot;ctv6bak&quot;, &quot;ctv5bak&quot;),</span>
+<span class="fc" id="L48">    MARKDOWN(&quot;Markdown&quot;, &quot;md&quot;);</span>
+
+    private final List&lt;String&gt; extensions;
+    private final String name;
+
+<span class="fc" id="L53">    StandardFileType(String name, String... extensions) {</span>
+<span class="fc" id="L54">        this.extensions = Arrays.asList(extensions);</span>
+<span class="fc" id="L55">        this.name = name;</span>
+<span class="fc" id="L56">    }</span>
+
+    @Override
+    public List&lt;String&gt; getExtensions() {
+<span class="fc" id="L60">        return extensions;</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L65">        return this.name;</span>
+    }
+
+    public static FileType fromExtensions(String... extensions) {
+<span class="nc" id="L69">        var exts = Arrays.asList(extensions);</span>
+
+<span class="nc" id="L71">        return OptionalUtil.orElse(Arrays.stream(StandardFileType.values())</span>
+<span class="nc" id="L72">                                         .filter(field -&gt; field.getExtensions().stream().anyMatch(exts::contains))</span>
+<span class="nc" id="L73">                                         .findAny(),</span>
+                                   new UnknownFileType(extensions));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitationStyleCache.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.citationstyle</a> &gt; <span class="el_source">CitationStyleCache.java</span></div><h1>CitationStyleCache.java</h1><pre class="source lang-java linenums">package org.jabref.logic.citationstyle;
+
+import java.util.Objects;
+
+import org.jabref.logic.preview.PreviewLayout;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.event.EntriesRemovedEvent;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.event.EntryChangedEvent;
+
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.eventbus.Subscribe;
+
+/**
+ * Caches the generated Citations for quicker access
+ * {@link CitationStyleGenerator} generates the citation with JavaScript which may take some time
+ */
+public class CitationStyleCache {
+
+    private static final int CACHE_SIZE = 1024;
+
+    private PreviewLayout citationStyle;
+    private final LoadingCache&lt;BibEntry, String&gt; citationStyleCache;
+
+<span class="fc" id="L27">    public CitationStyleCache(BibDatabaseContext databaseContext) {</span>
+<span class="fc" id="L28">        citationStyleCache = CacheBuilder.newBuilder().maximumSize(CACHE_SIZE).build(new CacheLoader&lt;BibEntry, String&gt;() {</span>
+            @Override
+            public String load(BibEntry entry) {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">                if (citationStyle != null) {</span>
+<span class="nc" id="L32">                    return citationStyle.generatePreview(entry, databaseContext);</span>
+                } else {
+<span class="fc" id="L34">                    return &quot;&quot;;</span>
+                }
+            }
+        });
+<span class="fc" id="L38">        databaseContext.getDatabase().registerListener(new BibDatabaseEntryListener());</span>
+<span class="fc" id="L39">    }</span>
+
+    /**
+     * Returns the citation for the given entry.
+     */
+    public String getCitationFor(BibEntry entry) {
+<span class="fc" id="L45">        return citationStyleCache.getUnchecked(entry);</span>
+    }
+
+    public void setCitationStyle(PreviewLayout citationStyle) {
+<span class="nc" id="L49">        Objects.requireNonNull(citationStyle);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (!this.citationStyle.equals(citationStyle)) {</span>
+<span class="nc" id="L51">            this.citationStyle = citationStyle;</span>
+<span class="nc" id="L52">            this.citationStyleCache.invalidateAll();</span>
+        }
+<span class="nc" id="L54">    }</span>
+
+<span class="fc" id="L56">    private class BibDatabaseEntryListener {</span>
+        /**
+         * removes the outdated citation of the changed entry
+         */
+        @Subscribe
+        public void listen(EntryChangedEvent entryChangedEvent) {
+<span class="nc" id="L62">            citationStyleCache.invalidate(entryChangedEvent.getBibEntry());</span>
+<span class="nc" id="L63">        }</span>
+
+        /**
+         * removes the citation of the removed entries as they are not needed anymore
+         */
+        @Subscribe
+        public void listen(EntriesRemovedEvent entriesRemovedEvent) {
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            for (BibEntry entry : entriesRemovedEvent.getBibEntries()) {</span>
+<span class="nc" id="L71">                citationStyleCache.invalidate(entry);</span>
+<span class="nc" id="L72">            }</span>
+<span class="nc" id="L73">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

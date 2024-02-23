@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BiblioscapeImporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fileformat</a> &gt; <span class="el_source">BiblioscapeImporter.java</span></div><h1>BiblioscapeImporter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fileformat;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+
+import org.jabref.logic.importer.Importer;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+
+/**
+ * Imports a Biblioscape Tag File. The format is described on
+ * http://www.biblioscape.com/download/Biblioscape8.pdf Several
+ * Biblioscape field types are ignored. Others are only included in the BibTeX
+ * field &quot;comment&quot;.
+ */
+<span class="fc" id="L27">public class BiblioscapeImporter extends Importer {</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L31">        return &quot;Biblioscape&quot;;</span>
+    }
+
+    @Override
+    public StandardFileType getFileType() {
+<span class="fc" id="L36">        return StandardFileType.TXT;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="fc" id="L41">        return &quot;Imports a Biblioscape Tag File.\n&quot; +</span>
+                &quot;Several Biblioscape field types are ignored. Others are only included in the BibTeX field \&quot;comment\&quot;.&quot;;
+    }
+
+    @Override
+    public boolean isRecognizedFormat(BufferedReader reader) {
+<span class="fc" id="L47">        Objects.requireNonNull(reader);</span>
+<span class="fc" id="L48">        return true;</span>
+    }
+
+    @Override
+    public ParserResult importDatabase(BufferedReader reader) throws IOException {
+<span class="fc" id="L53">        List&lt;BibEntry&gt; bibItems = new ArrayList&lt;&gt;();</span>
+        String line;
+<span class="fc" id="L55">        Map&lt;Field, String&gt; hm = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L56">        Map&lt;String, StringBuilder&gt; lines = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L57">        StringBuilder previousLine = null;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        while ((line = reader.readLine()) != null) {</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (line.isEmpty()) {</span>
+<span class="fc" id="L60">                continue; // ignore empty lines, e.g. at file</span>
+            }
+            // end
+            // entry delimiter -&gt; item complete
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (&quot;------&quot;.equals(line)) {</span>
+<span class="fc" id="L65">                String[] type = new String[2];</span>
+<span class="fc" id="L66">                String[] pages = new String[2];</span>
+<span class="fc" id="L67">                String country = null;</span>
+<span class="fc" id="L68">                String address = null;</span>
+<span class="fc" id="L69">                String titleST = null;</span>
+<span class="fc" id="L70">                String titleTI = null;</span>
+<span class="fc" id="L71">                List&lt;String&gt; comments = new ArrayList&lt;&gt;();</span>
+                // add item
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                for (Map.Entry&lt;String, StringBuilder&gt; entry : lines.entrySet()) {</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                    if (&quot;AU&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L75">                        hm.put(StandardField.AUTHOR, entry.getValue()</span>
+<span class="fc" id="L76">                                                          .toString());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                    } else if (&quot;TI&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L78">                        titleTI = entry.getValue()</span>
+<span class="fc" id="L79">                                       .toString();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                    } else if (&quot;ST&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L81">                        titleST = entry.getValue()</span>
+<span class="fc" id="L82">                                       .toString();</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                    } else if (&quot;YP&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L84">                        hm.put(StandardField.YEAR, entry</span>
+<span class="fc" id="L85">                                .getValue().toString());</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">                    } else if (&quot;VL&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L87">                        hm.put(StandardField.VOLUME, entry</span>
+<span class="fc" id="L88">                                .getValue().toString());</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                    } else if (&quot;NB&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L90">                        hm.put(StandardField.NUMBER, entry</span>
+<span class="fc" id="L91">                                .getValue().toString());</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                    } else if (&quot;PS&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L93">                        pages[0] = entry.getValue()</span>
+<span class="fc" id="L94">                                        .toString();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                    } else if (&quot;PE&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L96">                        pages[1] = entry.getValue()</span>
+<span class="fc" id="L97">                                        .toString();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                    } else if (&quot;KW&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L99">                        hm.put(StandardField.KEYWORDS, entry</span>
+<span class="fc" id="L100">                                .getValue().toString());</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                    } else if (&quot;RT&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L102">                        type[0] = entry.getValue()</span>
+<span class="fc" id="L103">                                       .toString();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                    } else if (&quot;SB&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L105">                        comments.add(&quot;Subject: &quot;</span>
+<span class="fc" id="L106">                                + entry.getValue());</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                    } else if (&quot;SA&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L108">                        comments</span>
+<span class="fc" id="L109">                                .add(&quot;Secondary Authors: &quot; + entry.getValue());</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                    } else if (&quot;NT&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L111">                        hm.put(StandardField.NOTE, entry</span>
+<span class="fc" id="L112">                                .getValue().toString());</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                    } else if (&quot;PB&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L114">                        hm.put(StandardField.PUBLISHER, entry</span>
+<span class="fc" id="L115">                                .getValue().toString());</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                    } else if (&quot;TA&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L117">                        comments</span>
+<span class="fc" id="L118">                                .add(&quot;Tertiary Authors: &quot; + entry.getValue());</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                    } else if (&quot;TT&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L120">                        comments</span>
+<span class="fc" id="L121">                                .add(&quot;Tertiary Title: &quot; + entry.getValue());</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                    } else if (&quot;ED&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L123">                        hm.put(StandardField.EDITION, entry</span>
+<span class="fc" id="L124">                                .getValue().toString());</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                    } else if (&quot;TW&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L126">                        type[1] = entry.getValue()</span>
+<span class="fc" id="L127">                                       .toString();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                    } else if (&quot;QA&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L129">                        comments</span>
+<span class="fc" id="L130">                                .add(&quot;Quaternary Authors: &quot; + entry.getValue());</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                    } else if (&quot;QT&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L132">                        comments</span>
+<span class="fc" id="L133">                                .add(&quot;Quaternary Title: &quot; + entry.getValue());</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                    } else if (&quot;IS&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L135">                        hm.put(StandardField.ISBN, entry</span>
+<span class="fc" id="L136">                                .getValue().toString());</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                    } else if (&quot;AB&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L138">                        hm.put(StandardField.ABSTRACT, entry</span>
+<span class="fc" id="L139">                                .getValue().toString());</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                    } else if (&quot;AD&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L141">                        address = entry.getValue()</span>
+<span class="fc" id="L142">                                       .toString();</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                    } else if (&quot;LG&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L144">                        hm.put(StandardField.LANGUAGE, entry</span>
+<span class="fc" id="L145">                                .getValue().toString());</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                    } else if (&quot;CO&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L147">                        country = entry.getValue()</span>
+<span class="fc" id="L148">                                       .toString();</span>
+<span class="fc bfc" id="L149" title="All 4 branches covered.">                    } else if (&quot;UR&quot;.equals(entry.getKey()) || &quot;AT&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L150">                        String s = entry.getValue().toString().trim();</span>
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">                        hm.put(s.startsWith(&quot;http://&quot;) || s.startsWith(&quot;ftp://&quot;) ? StandardField.URL</span>
+<span class="fc" id="L152">                                : StandardField.PDF, entry.getValue().toString());</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                    } else if (&quot;C1&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L154">                        comments.add(&quot;Custom1: &quot;</span>
+<span class="fc" id="L155">                                + entry.getValue());</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">                    } else if (&quot;C2&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L157">                        comments.add(&quot;Custom2: &quot;</span>
+<span class="fc" id="L158">                                + entry.getValue());</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">                    } else if (&quot;C3&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L160">                        comments.add(&quot;Custom3: &quot;</span>
+<span class="fc" id="L161">                                + entry.getValue());</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                    } else if (&quot;C4&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L163">                        comments.add(&quot;Custom4: &quot;</span>
+<span class="fc" id="L164">                                + entry.getValue());</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                    } else if (&quot;C5&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L166">                        comments.add(&quot;Custom5: &quot;</span>
+<span class="fc" id="L167">                                + entry.getValue());</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                    } else if (&quot;C6&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L169">                        comments.add(&quot;Custom6: &quot;</span>
+<span class="fc" id="L170">                                + entry.getValue());</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                    } else if (&quot;DE&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L172">                        hm.put(StandardField.ANNOTE, entry</span>
+<span class="fc" id="L173">                                .getValue().toString());</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                    } else if (&quot;CA&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L175">                        comments.add(&quot;Categories: &quot;</span>
+<span class="fc" id="L176">                                + entry.getValue());</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                    } else if (&quot;TH&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L178">                        comments.add(&quot;Short Title: &quot;</span>
+<span class="fc" id="L179">                                + entry.getValue());</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                    } else if (&quot;SE&quot;.equals(entry.getKey())) {</span>
+<span class="fc" id="L181">                        hm.put(StandardField.CHAPTER, entry</span>
+<span class="fc" id="L182">                                .getValue().toString());</span>
+                        // else if (entry.getKey().equals(&quot;AC&quot;))
+                        //   hm.put(&quot;&quot;,entry.getValue().toString());
+                        // else if (entry.getKey().equals(&quot;LP&quot;))
+                        //   hm.put(&quot;&quot;,entry.getValue().toString());
+                    }
+<span class="fc" id="L188">                }</span>
+
+<span class="fc" id="L190">                EntryType bibtexType = BibEntry.DEFAULT_TYPE;</span>
+                // to find type, first check TW, then RT
+<span class="fc bfc" id="L192" title="All 4 branches covered.">                for (int i = 1; (i &gt;= 0) &amp;&amp; BibEntry.DEFAULT_TYPE.equals(bibtexType); --i) {</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                    if (type[i] == null) {</span>
+<span class="fc" id="L194">                        continue;</span>
+                    }
+<span class="fc" id="L196">                    type[i] = type[i].toLowerCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                    if (type[i].contains(&quot;article&quot;)) {</span>
+<span class="fc" id="L198">                        bibtexType = StandardEntryType.Article;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                    } else if (type[i].contains(&quot;journal&quot;)) {</span>
+<span class="fc" id="L200">                        bibtexType = StandardEntryType.Article;</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                    } else if (type[i].contains(&quot;book section&quot;)) {</span>
+<span class="fc" id="L202">                        bibtexType = StandardEntryType.InBook;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                    } else if (type[i].contains(&quot;book&quot;)) {</span>
+<span class="fc" id="L204">                        bibtexType = StandardEntryType.Book;</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                    } else if (type[i].contains(&quot;conference&quot;)) {</span>
+<span class="fc" id="L206">                        bibtexType = StandardEntryType.InProceedings;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                    } else if (type[i].contains(&quot;proceedings&quot;)) {</span>
+<span class="fc" id="L208">                        bibtexType = StandardEntryType.InProceedings;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                    } else if (type[i].contains(&quot;report&quot;)) {</span>
+<span class="fc" id="L210">                        bibtexType = StandardEntryType.TechReport;</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                    } else if (type[i].contains(&quot;thesis&quot;)</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                            &amp;&amp; type[i].contains(&quot;master&quot;)) {</span>
+<span class="fc" id="L213">                        bibtexType = StandardEntryType.MastersThesis;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                    } else if (type[i].contains(&quot;thesis&quot;)) {</span>
+<span class="fc" id="L215">                        bibtexType = StandardEntryType.PhdThesis;</span>
+                    }
+                }
+
+                // depending on bibtexType, decide where to place the titleRT and
+                // titleTI
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                if (bibtexType.equals(StandardEntryType.Article)) {</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                    if (titleST != null) {</span>
+<span class="fc" id="L223">                        hm.put(StandardField.JOURNAL, titleST);</span>
+                    }
+<span class="fc bfc" id="L225" title="All 2 branches covered.">                    if (titleTI != null) {</span>
+<span class="fc" id="L226">                        hm.put(StandardField.TITLE, titleTI);</span>
+                    }
+<span class="fc bfc" id="L228" title="All 2 branches covered.">                } else if (bibtexType.equals(StandardEntryType.InBook)) {</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">                    if (titleST != null) {</span>
+<span class="fc" id="L230">                        hm.put(StandardField.BOOKTITLE, titleST);</span>
+                    }
+<span class="fc bfc" id="L232" title="All 2 branches covered.">                    if (titleTI != null) {</span>
+<span class="fc" id="L233">                        hm.put(StandardField.TITLE, titleTI);</span>
+                    }
+                } else {
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                    if (titleST != null) {</span>
+<span class="fc" id="L237">                        hm.put(StandardField.BOOKTITLE, titleST);</span>
+                    }
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                    if (titleTI != null) {</span>
+<span class="fc" id="L240">                        hm.put(StandardField.TITLE, titleTI);</span>
+                    }
+                }
+
+                // concatenate pages
+<span class="fc bfc" id="L245" title="All 4 branches covered.">                if ((pages[0] != null) || (pages[1] != null)) {</span>
+<span class="fc bfc" id="L246" title="All 4 branches covered.">                    hm.put(StandardField.PAGES, (pages[0] == null ? &quot;&quot; : pages[0]) + (pages[1] == null ? &quot;&quot; : &quot;--&quot; + pages[1]));</span>
+                }
+
+                // concatenate address and country
+<span class="fc bfc" id="L250" title="All 2 branches covered.">                if (address != null) {</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">                    hm.put(StandardField.ADDRESS, address + (country == null ? &quot;&quot; : &quot;, &quot; + country));</span>
+                }
+
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                if (!comments.isEmpty()) { // set comment if present</span>
+<span class="fc" id="L255">                    hm.put(StandardField.COMMENT, String.join(&quot;;&quot;, comments));</span>
+                }
+<span class="fc" id="L257">                BibEntry b = new BibEntry(bibtexType);</span>
+<span class="fc" id="L258">                b.setField(hm);</span>
+<span class="fc" id="L259">                bibItems.add(b);</span>
+
+<span class="fc" id="L261">                hm.clear();</span>
+<span class="fc" id="L262">                lines.clear();</span>
+<span class="fc" id="L263">                previousLine = null;</span>
+
+<span class="fc" id="L265">                continue;</span>
+            }
+            // new key
+<span class="fc bfc" id="L268" title="All 4 branches covered.">            if (line.startsWith(&quot;--&quot;) &amp;&amp; (line.length() &gt;= 7)</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                    &amp;&amp; &quot;-- &quot;.equals(line.substring(4, 7))) {</span>
+<span class="fc" id="L270">                previousLine = new StringBuilder(line.substring(7));</span>
+<span class="fc" id="L271">                lines.put(line.substring(2, 4), previousLine);</span>
+<span class="fc" id="L272">                continue;</span>
+            }
+            // continuation (folding) of previous line
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            if (previousLine == null) {</span>
+<span class="fc" id="L276">                return new ParserResult();</span>
+            }
+<span class="fc" id="L278">            previousLine.append(line.trim());</span>
+        }
+
+<span class="fc" id="L281">        return new ParserResult(bibItems);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

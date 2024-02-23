@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OSX.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.desktop.os</a> &gt; <span class="el_source">OSX.java</span></div><h1>OSX.java</h1><pre class="source lang-java linenums">package org.jabref.gui.desktop.os;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+
+import org.jabref.Launcher;
+import org.jabref.architecture.AllowedToUseAwt;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.externalfiletype.ExternalFileType;
+import org.jabref.gui.externalfiletype.ExternalFileTypes;
+import org.jabref.preferences.FilePreferences;
+
+/**
+ * This class contains macOS (OSX) specific implementations for file directories and file/application open handling methods &lt;br&gt;
+ * We cannot use a static logger instance here in this class as the Logger first needs to be configured in the {@link Launcher#addLogToDisk}
+ * The configuration of tinylog will become immutable as soon as the first log entry is issued.
+ * https://tinylog.org/v2/configuration/
+ **/
+@AllowedToUseAwt(&quot;Requires AWT to open a file&quot;)
+<span class="nc" id="L21">public class OSX extends NativeDesktop {</span>
+
+    @Override
+    public void openFile(String filePath, String fileType, FilePreferences filePreferences) throws IOException {
+<span class="nc" id="L25">        Optional&lt;ExternalFileType&gt; type = ExternalFileTypes.getExternalFileTypeByExt(fileType, filePreferences);</span>
+<span class="nc bnc" id="L26" title="All 4 branches missed.">        if (type.isPresent() &amp;&amp; !type.get().getOpenWithApplication().isEmpty()) {</span>
+<span class="nc" id="L27">            openFileWithApplication(filePath, type.get().getOpenWithApplication());</span>
+        } else {
+<span class="nc" id="L29">            String[] cmd = {&quot;/usr/bin/open&quot;, filePath};</span>
+<span class="nc" id="L30">            Runtime.getRuntime().exec(cmd);</span>
+        }
+<span class="nc" id="L32">    }</span>
+
+    @Override
+    public void openFileWithApplication(String filePath, String application) throws IOException {
+        // Use &quot;-a &lt;application&gt;&quot; if the app is specified, and just &quot;open &lt;filename&gt;&quot; otherwise:
+<span class="nc bnc" id="L37" title="All 4 branches missed.">        String[] cmd = (application != null) &amp;&amp; !application.isEmpty() ? new String[] {&quot;/usr/bin/open&quot;, &quot;-a&quot;,</span>
+<span class="nc" id="L38">                application, filePath} : new String[] {&quot;/usr/bin/open&quot;, filePath};</span>
+<span class="nc" id="L39">        new ProcessBuilder(cmd).start();</span>
+<span class="nc" id="L40">    }</span>
+
+    @Override
+    public void openFolderAndSelectFile(Path file) throws IOException {
+<span class="nc" id="L44">        String[] cmd = {&quot;/usr/bin/open&quot;, &quot;-R&quot;, file.toString()};</span>
+<span class="nc" id="L45">        Runtime.getRuntime().exec(cmd);</span>
+<span class="nc" id="L46">    }</span>
+
+    @Override
+    public void openConsole(String absolutePath, DialogService dialogService) throws IOException {
+<span class="nc" id="L50">         new ProcessBuilder(&quot;open&quot;, &quot;-a&quot;, &quot;Terminal&quot;, absolutePath).start();</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    public String detectProgramPath(String programName, String directoryName) {
+<span class="nc" id="L55">        return programName;</span>
+    }
+
+    @Override
+    public Path getApplicationDirectory() {
+<span class="nc" id="L60">        return Path.of(&quot;/Applications&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

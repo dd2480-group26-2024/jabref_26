@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpecialFieldsToSeparateFields.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.migrations</a> &gt; <span class="el_source">SpecialFieldsToSeparateFields.java</span></div><h1>SpecialFieldsToSeparateFields.java</h1><pre class="source lang-java linenums">package org.jabref.migrations;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.Keyword;
+import org.jabref.model.entry.KeywordList;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.model.entry.field.SpecialFieldValue;
+
+public class SpecialFieldsToSeparateFields implements PostOpenMigration {
+    private final KeywordList possibleKeywordsToMigrate;
+    private final Character keywordDelimiter;
+<span class="fc" id="L20">    private final Map&lt;String, SpecialField&gt; migrationTable = getMigrationTable();</span>
+
+<span class="fc" id="L22">    public SpecialFieldsToSeparateFields(Character keywordDelimiter) {</span>
+<span class="fc" id="L23">        List&lt;SpecialFieldValue&gt; specialFieldValues = Arrays.asList(SpecialFieldValue.values());</span>
+<span class="fc" id="L24">        possibleKeywordsToMigrate = new KeywordList(specialFieldValues.stream()</span>
+<span class="fc" id="L25">                                                                      .map(SpecialFieldValue::getKeyword)</span>
+<span class="fc" id="L26">                                                                      .filter(Optional::isPresent)</span>
+<span class="fc" id="L27">                                                                      .map(Optional::get)</span>
+<span class="fc" id="L28">                                                                      .collect(Collectors.toList()));</span>
+<span class="fc" id="L29">        this.keywordDelimiter = keywordDelimiter;</span>
+<span class="fc" id="L30">    }</span>
+
+    @Override
+    public void performMigration(ParserResult parserResult) {
+<span class="fc" id="L34">        parserResult.getDatabase().getEntries().forEach(this::migrateEntry);</span>
+<span class="fc" id="L35">    }</span>
+
+    private void migrateEntry(BibEntry entry) {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (Keyword keyword : possibleKeywordsToMigrate) {</span>
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">            if (entry.getKeywords(keywordDelimiter).contains(keyword) &amp;&amp; migrationTable.containsKey(keyword.get())) {</span>
+<span class="fc" id="L40">                entry.setField(migrationTable.get(keyword.get()), keyword.get());</span>
+            }
+<span class="fc" id="L42">        }</span>
+
+<span class="fc" id="L44">        entry.removeKeywords(possibleKeywordsToMigrate, keywordDelimiter);</span>
+<span class="fc" id="L45">    }</span>
+
+    /**
+     * Mapping of special field values (contained in the keywords) to their corresponding special field
+     */
+    private Map&lt;String, SpecialField&gt; getMigrationTable() {
+<span class="fc" id="L51">        Map&lt;String, SpecialField&gt; map = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L52">        map.put(&quot;printed&quot;, SpecialField.PRINTED);</span>
+
+<span class="fc" id="L54">        map.put(&quot;prio1&quot;, SpecialField.PRIORITY);</span>
+<span class="fc" id="L55">        map.put(&quot;prio2&quot;, SpecialField.PRIORITY);</span>
+<span class="fc" id="L56">        map.put(&quot;prio3&quot;, SpecialField.PRIORITY);</span>
+
+<span class="fc" id="L58">        map.put(&quot;qualityAssured&quot;, SpecialField.QUALITY);</span>
+
+<span class="fc" id="L60">        map.put(&quot;rank1&quot;, SpecialField.RANKING);</span>
+<span class="fc" id="L61">        map.put(&quot;rank2&quot;, SpecialField.RANKING);</span>
+<span class="fc" id="L62">        map.put(&quot;rank3&quot;, SpecialField.RANKING);</span>
+<span class="fc" id="L63">        map.put(&quot;rank4&quot;, SpecialField.RANKING);</span>
+<span class="fc" id="L64">        map.put(&quot;rank5&quot;, SpecialField.RANKING);</span>
+
+<span class="fc" id="L66">        map.put(&quot;read&quot;, SpecialField.READ_STATUS);</span>
+<span class="fc" id="L67">        map.put(&quot;skimmed&quot;, SpecialField.READ_STATUS);</span>
+
+<span class="fc" id="L69">        map.put(&quot;relevant&quot;, SpecialField.RELEVANCE);</span>
+
+<span class="fc" id="L71">        return map;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

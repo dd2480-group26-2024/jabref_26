@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GroupsParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.util</a> &gt; <span class="el_source">GroupsParser.java</span></div><h1>GroupsParser.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.util;
+
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.util.EnumSet;
+import java.util.List;
+
+import org.jabref.logic.auxparser.DefaultAuxParser;
+import org.jabref.logic.groups.DefaultGroupsFactory;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.MetadataSerializationConfiguration;
+import org.jabref.logic.util.strings.QuotedStringTokenizer;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.groups.AbstractGroup;
+import org.jabref.model.groups.AutomaticKeywordGroup;
+import org.jabref.model.groups.AutomaticPersonsGroup;
+import org.jabref.model.groups.ExplicitGroup;
+import org.jabref.model.groups.GroupHierarchyType;
+import org.jabref.model.groups.GroupTreeNode;
+import org.jabref.model.groups.KeywordGroup;
+import org.jabref.model.groups.RegexKeywordGroup;
+import org.jabref.model.groups.SearchGroup;
+import org.jabref.model.groups.TexGroup;
+import org.jabref.model.groups.WordKeywordGroup;
+import org.jabref.model.metadata.MetaData;
+import org.jabref.model.search.rules.SearchRules;
+import org.jabref.model.search.rules.SearchRules.SearchFlags;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.model.util.FileUpdateMonitor;
+
+import org.slf4j.LoggerFactory;
+
+/**
+ * Converts string representation of groups to a parsed {@link GroupTreeNode}.
+ */
+public class GroupsParser {
+
+<span class="fc" id="L42">    private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(GroupsParser.class);</span>
+
+    private GroupsParser() {
+    }
+
+    public static GroupTreeNode importGroups(List&lt;String&gt; orderedData, Character keywordSeparator, FileUpdateMonitor fileMonitor, MetaData metaData)
+            throws ParseException {
+        try {
+<span class="fc" id="L50">            GroupTreeNode cursor = null;</span>
+<span class="fc" id="L51">            GroupTreeNode root = null;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            for (String string : orderedData) {</span>
+                // This allows to read databases that have been modified by, e.g., BibDesk
+<span class="fc" id="L54">                string = string.trim();</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                if (string.isEmpty()) {</span>
+<span class="nc" id="L56">                    continue;</span>
+                }
+
+<span class="fc" id="L59">                int spaceIndex = string.indexOf(' ');</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">                if (spaceIndex &lt;= 0) {</span>
+<span class="nc" id="L61">                    throw new ParseException(&quot;Expected \&quot;&quot; + string + &quot;\&quot; to contain whitespace&quot;);</span>
+                }
+<span class="fc" id="L63">                int level = Integer.parseInt(string.substring(0, spaceIndex));</span>
+<span class="fc" id="L64">                AbstractGroup group = GroupsParser.fromString(string.substring(spaceIndex + 1), keywordSeparator, fileMonitor, metaData);</span>
+<span class="fc" id="L65">                GroupTreeNode newNode = GroupTreeNode.fromGroup(group);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                if (cursor == null) {</span>
+                    // create new root
+<span class="fc" id="L68">                    cursor = newNode;</span>
+<span class="fc" id="L69">                    root = cursor;</span>
+                } else {
+                    // insert at desired location
+<span class="fc bfc" id="L72" title="All 4 branches covered.">                    while ((level &lt;= cursor.getLevel()) &amp;&amp; (cursor.getParent().isPresent())) {</span>
+<span class="fc" id="L73">                        cursor = cursor.getParent().get();</span>
+                    }
+<span class="fc" id="L75">                    cursor.addChild(newNode);</span>
+<span class="fc" id="L76">                    cursor = newNode;</span>
+                }
+<span class="fc" id="L78">            }</span>
+<span class="fc" id="L79">            return root;</span>
+<span class="nc" id="L80">        } catch (ParseException e) {</span>
+<span class="nc" id="L81">            throw new ParseException(Localization</span>
+<span class="nc" id="L82">                    .lang(&quot;Group tree could not be parsed. If you save the BibTeX library, all groups will be lost.&quot;),</span>
+                    e);
+        }
+    }
+
+    /**
+     * Re-create a group instance from a textual representation.
+     *
+     * @param s The result from the group's toString() method.
+     * @return New instance of the encoded group.
+     * @throws ParseException If an error occurred and a group could not be created, e.g. due to a malformed regular expression.
+     */
+    public static AbstractGroup fromString(String s, Character keywordSeparator, FileUpdateMonitor fileMonitor, MetaData metaData)
+            throws ParseException {
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (s.startsWith(MetadataSerializationConfiguration.KEYWORD_GROUP_ID)) {</span>
+<span class="fc" id="L97">            return keywordGroupFromString(s, keywordSeparator);</span>
+        }
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (s.startsWith(MetadataSerializationConfiguration.ALL_ENTRIES_GROUP_ID)) {</span>
+<span class="fc" id="L100">            return allEntriesGroupFromString(s);</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (s.startsWith(MetadataSerializationConfiguration.SEARCH_GROUP_ID)) {</span>
+<span class="fc" id="L103">            return searchGroupFromString(s);</span>
+        }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (s.startsWith(MetadataSerializationConfiguration.EXPLICIT_GROUP_ID)) {</span>
+<span class="fc" id="L106">            return explicitGroupFromString(s, keywordSeparator);</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (s.startsWith(MetadataSerializationConfiguration.LEGACY_EXPLICIT_GROUP_ID)) {</span>
+<span class="fc" id="L109">            return legacyExplicitGroupFromString(s, keywordSeparator);</span>
+        }
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (s.startsWith(MetadataSerializationConfiguration.AUTOMATIC_PERSONS_GROUP_ID)) {</span>
+<span class="fc" id="L112">            return automaticPersonsGroupFromString(s);</span>
+        }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (s.startsWith(MetadataSerializationConfiguration.AUTOMATIC_KEYWORD_GROUP_ID)) {</span>
+<span class="fc" id="L115">            return automaticKeywordGroupFromString(s);</span>
+        }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (s.startsWith(MetadataSerializationConfiguration.TEX_GROUP_ID)) {</span>
+<span class="fc" id="L118">            return texGroupFromString(s, fileMonitor, metaData);</span>
+        }
+
+<span class="fc" id="L121">        throw new ParseException(&quot;Unknown group: &quot; + s);</span>
+    }
+
+    private static AbstractGroup texGroupFromString(String string, FileUpdateMonitor fileMonitor, MetaData metaData) throws ParseException {
+<span class="fc" id="L125">        QuotedStringTokenizer tok = new QuotedStringTokenizer(string.substring(MetadataSerializationConfiguration.TEX_GROUP_ID</span>
+<span class="fc" id="L126">                .length()), MetadataSerializationConfiguration.GROUP_UNIT_SEPARATOR, MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+
+<span class="fc" id="L128">        String name = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+<span class="fc" id="L129">        GroupHierarchyType context = GroupHierarchyType.getByNumberOrDefault(Integer.parseInt(tok.nextToken()));</span>
+        try {
+<span class="fc" id="L131">            Path path = Path.of(tok.nextToken());</span>
+            try {
+<span class="fc" id="L133">                TexGroup newGroup = TexGroup.create(name, context, path, new DefaultAuxParser(new BibDatabase()), fileMonitor, metaData);</span>
+<span class="fc" id="L134">                addGroupDetails(tok, newGroup);</span>
+<span class="fc" id="L135">                return newGroup;</span>
+<span class="nc" id="L136">            } catch (IOException ex) {</span>
+                // Problem accessing file -&gt; create without file monitoring
+<span class="nc" id="L138">                LOGGER.warn(&quot;Could not access file {}. The group {} will not reflect changes to the aux file.&quot;, path, name, ex);</span>
+
+<span class="nc" id="L140">                TexGroup newGroup = TexGroup.create(name, context, path, new DefaultAuxParser(new BibDatabase()), metaData);</span>
+<span class="nc" id="L141">                addGroupDetails(tok, newGroup);</span>
+<span class="nc" id="L142">                return newGroup;</span>
+            }
+<span class="nc" id="L144">        } catch (InvalidPathException | IOException ex) {</span>
+<span class="nc" id="L145">            throw new ParseException(ex);</span>
+        }
+    }
+
+    private static AbstractGroup automaticPersonsGroupFromString(String string) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (!string.startsWith(MetadataSerializationConfiguration.AUTOMATIC_PERSONS_GROUP_ID)) {</span>
+<span class="nc" id="L151">            throw new IllegalArgumentException(&quot;KeywordGroup cannot be created from \&quot;&quot; + string + &quot;\&quot;.&quot;);</span>
+        }
+<span class="fc" id="L153">        QuotedStringTokenizer tok = new QuotedStringTokenizer(string.substring(MetadataSerializationConfiguration.AUTOMATIC_PERSONS_GROUP_ID</span>
+<span class="fc" id="L154">                .length()), MetadataSerializationConfiguration.GROUP_UNIT_SEPARATOR, MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+
+<span class="fc" id="L156">        String name = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+<span class="fc" id="L157">        GroupHierarchyType context = GroupHierarchyType.getByNumberOrDefault(Integer.parseInt(tok.nextToken()));</span>
+<span class="fc" id="L158">        Field field = FieldFactory.parseField(StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR));</span>
+<span class="fc" id="L159">        AutomaticPersonsGroup newGroup = new AutomaticPersonsGroup(name, context, field);</span>
+<span class="fc" id="L160">        addGroupDetails(tok, newGroup);</span>
+<span class="fc" id="L161">        return newGroup;</span>
+    }
+
+    private static AbstractGroup automaticKeywordGroupFromString(String string) {
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (!string.startsWith(MetadataSerializationConfiguration.AUTOMATIC_KEYWORD_GROUP_ID)) {</span>
+<span class="nc" id="L166">            throw new IllegalArgumentException(&quot;KeywordGroup cannot be created from \&quot;&quot; + string + &quot;\&quot;.&quot;);</span>
+        }
+<span class="fc" id="L168">        QuotedStringTokenizer tok = new QuotedStringTokenizer(string.substring(MetadataSerializationConfiguration.AUTOMATIC_KEYWORD_GROUP_ID</span>
+<span class="fc" id="L169">                .length()), MetadataSerializationConfiguration.GROUP_UNIT_SEPARATOR, MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+
+<span class="fc" id="L171">        String name = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+<span class="fc" id="L172">        GroupHierarchyType context = GroupHierarchyType.getByNumberOrDefault(Integer.parseInt(tok.nextToken()));</span>
+<span class="fc" id="L173">        Field field = FieldFactory.parseField(StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR));</span>
+<span class="fc" id="L174">        Character delimiter = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR).charAt(0);</span>
+<span class="fc" id="L175">        Character hierarchicalDelimiter = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR).charAt(0);</span>
+<span class="fc" id="L176">        AutomaticKeywordGroup newGroup = new AutomaticKeywordGroup(name, context, field, delimiter, hierarchicalDelimiter);</span>
+<span class="fc" id="L177">        addGroupDetails(tok, newGroup);</span>
+<span class="fc" id="L178">        return newGroup;</span>
+    }
+
+    /**
+     * Parses s and recreates the KeywordGroup from it.
+     *
+     * @param s The String representation obtained from KeywordGroup.toString()
+     */
+    private static KeywordGroup keywordGroupFromString(String s, Character keywordSeparator) throws ParseException {
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (!s.startsWith(MetadataSerializationConfiguration.KEYWORD_GROUP_ID)) {</span>
+<span class="nc" id="L188">            throw new IllegalArgumentException(&quot;KeywordGroup cannot be created from \&quot;&quot; + s + &quot;\&quot;.&quot;);</span>
+        }
+<span class="fc" id="L190">        QuotedStringTokenizer tok = new QuotedStringTokenizer(s.substring(MetadataSerializationConfiguration.KEYWORD_GROUP_ID</span>
+<span class="fc" id="L191">                .length()), MetadataSerializationConfiguration.GROUP_UNIT_SEPARATOR, MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+
+<span class="fc" id="L193">        String name = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+<span class="fc" id="L194">        GroupHierarchyType context = GroupHierarchyType.getByNumberOrDefault(Integer.parseInt(tok.nextToken()));</span>
+<span class="fc" id="L195">        Field field = FieldFactory.parseField(StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR));</span>
+<span class="fc" id="L196">        String expression = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        boolean caseSensitive = Integer.parseInt(tok.nextToken()) == 1;</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        boolean regExp = Integer.parseInt(tok.nextToken()) == 1;</span>
+        KeywordGroup newGroup;
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (regExp) {</span>
+<span class="fc" id="L201">            newGroup = new RegexKeywordGroup(name, context, field, expression, caseSensitive);</span>
+        } else {
+<span class="fc" id="L203">            newGroup = new WordKeywordGroup(name, context, field, expression, caseSensitive, keywordSeparator, false);</span>
+        }
+<span class="fc" id="L205">        addGroupDetails(tok, newGroup);</span>
+<span class="fc" id="L206">        return newGroup;</span>
+    }
+
+    private static ExplicitGroup explicitGroupFromString(String input, Character keywordSeparator) throws ParseException {
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (!input.startsWith(MetadataSerializationConfiguration.EXPLICIT_GROUP_ID)) {</span>
+<span class="nc" id="L211">            throw new IllegalArgumentException(&quot;ExplicitGroup cannot be created from \&quot;&quot; + input + &quot;\&quot;.&quot;);</span>
+        }
+<span class="fc" id="L213">        QuotedStringTokenizer tok = new QuotedStringTokenizer(input.substring(MetadataSerializationConfiguration.EXPLICIT_GROUP_ID.length()),</span>
+                MetadataSerializationConfiguration.GROUP_UNIT_SEPARATOR, MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);
+
+<span class="fc" id="L216">        String name = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+        try {
+<span class="fc" id="L218">            int context = Integer.parseInt(tok.nextToken());</span>
+<span class="fc" id="L219">            ExplicitGroup newGroup = new ExplicitGroup(name, GroupHierarchyType.getByNumberOrDefault(context), keywordSeparator);</span>
+<span class="fc" id="L220">            addGroupDetails(tok, newGroup);</span>
+<span class="fc" id="L221">            return newGroup;</span>
+<span class="nc" id="L222">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L223">            throw new ParseException(&quot;Could not parse context in &quot; + input);</span>
+        }
+    }
+
+    private static ExplicitGroup legacyExplicitGroupFromString(String input, Character keywordSeparator) throws ParseException {
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (!input.startsWith(MetadataSerializationConfiguration.LEGACY_EXPLICIT_GROUP_ID)) {</span>
+<span class="nc" id="L229">            throw new IllegalArgumentException(&quot;ExplicitGroup cannot be created from \&quot;&quot; + input + &quot;\&quot;.&quot;);</span>
+        }
+<span class="fc" id="L231">        QuotedStringTokenizer tok = new QuotedStringTokenizer(input.substring(MetadataSerializationConfiguration.LEGACY_EXPLICIT_GROUP_ID.length()),</span>
+                MetadataSerializationConfiguration.GROUP_UNIT_SEPARATOR, MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);
+
+<span class="fc" id="L234">        String name = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+        try {
+<span class="fc" id="L236">            int context = Integer.parseInt(tok.nextToken());</span>
+<span class="fc" id="L237">            ExplicitGroup newGroup = new ExplicitGroup(name, GroupHierarchyType.getByNumberOrDefault(context), keywordSeparator);</span>
+<span class="fc" id="L238">            GroupsParser.addLegacyEntryKeys(tok, newGroup);</span>
+<span class="fc" id="L239">            return newGroup;</span>
+<span class="fc" id="L240">        } catch (NumberFormatException exception) {</span>
+<span class="fc" id="L241">            throw new ParseException(&quot;Could not parse context in &quot; + input);</span>
+        }
+    }
+
+    /**
+     * Called only when created fromString.
+     * JabRef used to store the entries of an explicit group in the serialization, e.g.
+     *  ExplicitGroup:GroupName\;0\;Key1\;Key2\;;
+     * This method exists for backwards compatibility.
+     */
+    private static void addLegacyEntryKeys(QuotedStringTokenizer tok, ExplicitGroup group) {
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        while (tok.hasMoreTokens()) {</span>
+<span class="fc" id="L253">            String key = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+<span class="fc" id="L254">            group.addLegacyEntryKey(key);</span>
+<span class="fc" id="L255">        }</span>
+<span class="fc" id="L256">    }</span>
+
+    private static AbstractGroup allEntriesGroupFromString(String s) {
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if (!s.startsWith(MetadataSerializationConfiguration.ALL_ENTRIES_GROUP_ID)) {</span>
+<span class="nc" id="L260">            throw new IllegalArgumentException(&quot;AllEntriesGroup cannot be created from \&quot;&quot; + s + &quot;\&quot;.&quot;);</span>
+        }
+<span class="fc" id="L262">        return DefaultGroupsFactory.getAllEntriesGroup();</span>
+    }
+
+    /**
+     * Parses s and recreates the SearchGroup from it.
+     *
+     * @param s The String representation obtained from SearchGroup.toString(), or null if incompatible
+     */
+    private static AbstractGroup searchGroupFromString(String s) {
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (!s.startsWith(MetadataSerializationConfiguration.SEARCH_GROUP_ID)) {</span>
+<span class="nc" id="L272">            throw new IllegalArgumentException(&quot;SearchGroup cannot be created from \&quot;&quot; + s + &quot;\&quot;.&quot;);</span>
+        }
+<span class="fc" id="L274">        QuotedStringTokenizer tok = new QuotedStringTokenizer(s.substring(MetadataSerializationConfiguration.SEARCH_GROUP_ID.length()),</span>
+                MetadataSerializationConfiguration.GROUP_UNIT_SEPARATOR, MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);
+
+<span class="fc" id="L277">        String name = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+<span class="fc" id="L278">        int context = Integer.parseInt(tok.nextToken());</span>
+<span class="fc" id="L279">        String expression = StringUtil.unquote(tok.nextToken(), MetadataSerializationConfiguration.GROUP_QUOTE_CHAR);</span>
+<span class="fc" id="L280">        EnumSet&lt;SearchFlags&gt; searchFlags = EnumSet.noneOf(SearchFlags.class);</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (Integer.parseInt(tok.nextToken()) == 1) {</span>
+<span class="nc" id="L282">            searchFlags.add(SearchRules.SearchFlags.CASE_SENSITIVE);</span>
+        }
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (Integer.parseInt(tok.nextToken()) == 1) {</span>
+<span class="fc" id="L285">            searchFlags.add(SearchRules.SearchFlags.REGULAR_EXPRESSION);</span>
+        }
+        // version 0 contained 4 additional booleans to specify search
+        // fields; these are ignored now, all fields are always searched
+<span class="fc" id="L289">        SearchGroup searchGroup = new SearchGroup(name,</span>
+<span class="fc" id="L290">                GroupHierarchyType.getByNumberOrDefault(context), expression, searchFlags</span>
+        );
+<span class="fc" id="L292">        addGroupDetails(tok, searchGroup);</span>
+<span class="fc" id="L293">        return searchGroup;</span>
+    }
+
+    private static void addGroupDetails(QuotedStringTokenizer tokenizer, AbstractGroup group) {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (tokenizer.hasMoreTokens()) {</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            group.setExpanded(Integer.parseInt(tokenizer.nextToken()) == 1);</span>
+<span class="fc" id="L299">            group.setColor(tokenizer.nextToken());</span>
+<span class="fc" id="L300">            group.setIconName(tokenizer.nextToken());</span>
+<span class="fc" id="L301">            group.setDescription(tokenizer.nextToken());</span>
+        }
+<span class="fc" id="L303">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

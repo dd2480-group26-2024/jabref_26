@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IEEETranEntryTypeDefinitions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.types</a> &gt; <span class="el_source">IEEETranEntryTypeDefinitions.java</span></div><h1>IEEETranEntryTypeDefinitions.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.types;
+
+import java.util.Arrays;
+import java.util.List;
+
+import org.jabref.model.entry.BibEntryType;
+import org.jabref.model.entry.BibEntryTypeBuilder;
+import org.jabref.model.entry.field.IEEEField;
+import org.jabref.model.entry.field.OrFields;
+import org.jabref.model.entry.field.StandardField;
+
+/**
+ * This class represents all supported IEEETran entry types.
+ * &lt;p&gt;
+ * See &lt;a href=&quot;http://ctan.sharelatex.com/tex-archive/macros/latex/contrib/IEEEtran/bibtex/IEEEtran_bst_HOWTO.pdf&quot;&gt;http://ctan.sharelatex.com/tex-archive/macros/latex/contrib/IEEEtran/bibtex/IEEEtran_bst_HOWTO.pdf&lt;/a&gt;
+ * &lt;p&gt;
+ * Electronic, IEEETranBSTCTL, Periodical, Patent, Standard
+ */
+public class IEEETranEntryTypeDefinitions {
+    /**
+     * Electronic entry type for internet references
+     * &lt;p&gt;
+     * Required fields:
+     * Optional fields: author, month, year, title, language, howpublished, organization, address, note, url
+     */
+<span class="fc" id="L26">    private static final BibEntryType ELECTRONIC = new BibEntryTypeBuilder()</span>
+<span class="fc" id="L27">            .withType(IEEETranEntryType.Electronic)</span>
+<span class="fc" id="L28">            .withImportantFields(StandardField.AUTHOR, StandardField.MONTH, StandardField.YEAR, StandardField.TITLE, StandardField.LANGUAGE,</span>
+                    StandardField.HOWPUBLISHED, StandardField.ORGANIZATION, StandardField.ADDRESS, StandardField.NOTE, StandardField.URL)
+<span class="fc" id="L30">            .build();</span>
+
+    /**
+     * Special entry type that can be used to externally control some aspects of the bibliography style.
+     */
+<span class="fc" id="L35">    private static final BibEntryType IEEETRANBSTCTL = new BibEntryTypeBuilder()</span>
+<span class="fc" id="L36">            .withType(IEEETranEntryType.IEEEtranBSTCTL)</span>
+<span class="fc" id="L37">            .withImportantFields(IEEEField.CTLUSE_ARTICLE_NUMBER, IEEEField.CTLUSE_PAPER, IEEEField.CTLUSE_FORCED_ETAL,</span>
+                    IEEEField.CTLUSE_URL, IEEEField.CTLMAX_NAMES_FORCED_ETAL, IEEEField.CTLNAMES_SHOW_ETAL,
+                    IEEEField.CTLUSE_ALT_SPACING, IEEEField.CTLALT_STRETCH_FACTOR, IEEEField.CTLDASH_REPEATED_NAMES,
+                    IEEEField.CTLNAME_FORMAT_STRING, IEEEField.CTLNAME_LATEX_CMD, IEEEField.CTLNAME_URL_PREFIX)
+<span class="fc" id="L41">            .build();</span>
+
+    /**
+     * The periodical entry type is used for journals and magazines.
+     * &lt;p&gt;
+     * Required fields: title, year
+     * Optional fields: editor, language, series, volume, number, organization, month, note, url
+     */
+<span class="fc" id="L49">    private static final BibEntryType PERIODICAL = new BibEntryTypeBuilder()</span>
+<span class="fc" id="L50">            .withType(IEEETranEntryType.Periodical)</span>
+<span class="fc" id="L51">            .withRequiredFields(StandardField.TITLE, StandardField.YEAR)</span>
+<span class="fc" id="L52">            .withImportantFields(StandardField.EDITOR, StandardField.LANGUAGE, StandardField.SERIES, StandardField.VOLUME, StandardField.NUMBER, StandardField.ORGANIZATION, StandardField.MONTH, StandardField.NOTE, StandardField.URL)</span>
+<span class="fc" id="L53">            .build();</span>
+
+    /**
+     * Entry type for patents.
+     * &lt;p&gt;
+     * Required fields: nationality, number, year or yearfiled
+     * Optional fields: author, title, language, assignee, address, type, number, day, dayfiled, month, monthfiled, note, url
+     */
+<span class="fc" id="L61">    private static final BibEntryType PATENT = new BibEntryTypeBuilder()</span>
+<span class="fc" id="L62">            .withType(IEEETranEntryType.Patent)</span>
+<span class="fc" id="L63">            .withRequiredFields(new OrFields(StandardField.YEAR, StandardField.YEARFILED), StandardField.NATIONALITY, StandardField.NUMBER)</span>
+<span class="fc" id="L64">            .withImportantFields(StandardField.AUTHOR, StandardField.TITLE, StandardField.LANGUAGE, StandardField.ASSIGNEE, StandardField.ADDRESS,</span>
+                    StandardField.TYPE, StandardField.NUMBER, StandardField.DAY, StandardField.DAYFILED, StandardField.MONTH,
+                    StandardField.MONTHFILED, StandardField.NOTE, StandardField.URL)
+<span class="fc" id="L67">            .build();</span>
+
+    /**
+     * The standard entry type is used for proposed or formally published standards.
+     * &lt;p&gt;
+     * Required fields: title, organization or institution
+     * Optional fields: author, language, howpublished, type, number, revision, address, month, year, note, url
+     */
+<span class="fc" id="L75">    private static final BibEntryType STANDARD = new BibEntryTypeBuilder()</span>
+<span class="fc" id="L76">            .withType(IEEETranEntryType.Standard)</span>
+<span class="fc" id="L77">            .withRequiredFields(new OrFields(StandardField.ORGANIZATION, StandardField.INSTITUTION), StandardField.TITLE)</span>
+<span class="fc" id="L78">            .withImportantFields(StandardField.AUTHOR, StandardField.LANGUAGE, StandardField.HOWPUBLISHED, StandardField.TYPE,</span>
+                    StandardField.NUMBER, StandardField.REVISION, StandardField.ADDRESS, StandardField.MONTH, StandardField.YEAR,
+                    StandardField.NOTE, StandardField.URL)
+<span class="fc" id="L81">            .build();</span>
+
+<span class="fc" id="L83">    public static final List&lt;BibEntryType&gt; ALL = Arrays.asList(ELECTRONIC, IEEETRANBSTCTL, PERIODICAL, PATENT, STANDARD);</span>
+
+    private IEEETranEntryTypeDefinitions() {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

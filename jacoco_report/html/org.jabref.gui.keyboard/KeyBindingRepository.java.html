@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KeyBindingRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.keyboard</a> &gt; <span class="el_source">KeyBindingRepository.java</span></div><h1>KeyBindingRepository.java</h1><pre class="source lang-java linenums">package org.jabref.gui.keyboard;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
+
+import org.jabref.logic.util.OS;
+
+public class KeyBindingRepository {
+
+    /**
+     * sorted by localization
+     */
+    private final SortedMap&lt;KeyBinding, String&gt; bindings;
+
+    public KeyBindingRepository() {
+<span class="fc" id="L27">        this(Collections.emptyList(), Collections.emptyList());</span>
+<span class="fc" id="L28">    }</span>
+
+<span class="fc" id="L30">    public KeyBindingRepository(SortedMap&lt;KeyBinding, String&gt; bindings) {</span>
+<span class="fc" id="L31">        this.bindings = bindings;</span>
+<span class="fc" id="L32">    }</span>
+
+<span class="fc" id="L34">    public KeyBindingRepository(List&lt;String&gt; bindNames, List&lt;String&gt; bindings) {</span>
+<span class="fc" id="L35">        this.bindings = new TreeMap&lt;&gt;(Comparator.comparing(KeyBinding::getLocalization));</span>
+
+<span class="pc bpc" id="L37" title="5 of 6 branches missed.">        if ((bindNames.isEmpty()) || (bindings.isEmpty()) || (bindNames.size() != bindings.size())) {</span>
+            // Use default key bindings
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            for (KeyBinding keyBinding : KeyBinding.values()) {</span>
+<span class="fc" id="L40">                put(keyBinding, keyBinding.getDefaultKeyBinding());</span>
+            }
+        } else {
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            for (int i = 0; i &lt; bindNames.size(); i++) {</span>
+<span class="nc" id="L44">                put(bindNames.get(i), bindings.get(i));</span>
+            }
+        }
+<span class="fc" id="L47">    }</span>
+
+    /**
+     * Check if the given keyCombination equals the given keyEvent
+     *
+     * @param combination as KeyCombination
+     * @param keyEvent    as KeEvent
+     * @return true if matching, else false
+     */
+    public static boolean checkKeyCombinationEquality(KeyCombination combination, KeyEvent keyEvent) {
+<span class="fc" id="L57">        KeyCode code = keyEvent.getCode();</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (code == KeyCode.UNDEFINED) {</span>
+<span class="nc" id="L59">            return false;</span>
+        }
+
+<span class="fc" id="L62">        return combination.match(keyEvent);</span>
+    }
+
+    public Optional&lt;String&gt; get(KeyBinding key) {
+<span class="fc" id="L66">        return Optional.ofNullable(bindings.get(key));</span>
+    }
+
+    public String get(String key) {
+<span class="fc" id="L70">        Optional&lt;KeyBinding&gt; keyBinding = getKeyBinding(key);</span>
+<span class="fc" id="L71">        Optional&lt;String&gt; result = keyBinding.flatMap(k -&gt; Optional.ofNullable(bindings.get(k)));</span>
+
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (result.isPresent()) {</span>
+<span class="fc" id="L74">            return result.get();</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        } else if (keyBinding.isPresent()) {</span>
+<span class="nc" id="L76">            return keyBinding.get().getDefaultKeyBinding();</span>
+        } else {
+<span class="nc" id="L78">            return &quot;Not associated&quot;;</span>
+        }
+    }
+
+    /**
+     * Returns the HashMap containing all key bindings.
+     */
+    public SortedMap&lt;KeyBinding, String&gt; getKeyBindings() {
+<span class="fc" id="L86">        return new TreeMap&lt;&gt;(bindings);</span>
+    }
+
+    public void put(KeyBinding key, String value) {
+<span class="fc" id="L90">        bindings.put(key, value);</span>
+<span class="fc" id="L91">    }</span>
+
+    public void put(String key, String value) {
+<span class="nc" id="L94">        getKeyBinding(key).ifPresent(binding -&gt; put(binding, value));</span>
+<span class="nc" id="L95">    }</span>
+
+    private Optional&lt;KeyBinding&gt; getKeyBinding(String key) {
+<span class="fc" id="L98">        return Arrays.stream(KeyBinding.values()).filter(b -&gt; b.getConstant().equals(key)).findFirst();</span>
+    }
+
+    public void resetToDefault(String key) {
+<span class="fc" id="L102">        getKeyBinding(key).ifPresent(b -&gt; bindings.put(b, b.getDefaultKeyBinding()));</span>
+<span class="fc" id="L103">    }</span>
+
+    public void resetToDefault() {
+<span class="fc" id="L106">        bindings.forEach((b, s) -&gt; bindings.put(b, b.getDefaultKeyBinding()));</span>
+<span class="fc" id="L107">    }</span>
+
+    public int size() {
+<span class="nc" id="L110">        return this.bindings.size();</span>
+    }
+
+    public Optional&lt;KeyBinding&gt; mapToKeyBinding(KeyEvent keyEvent) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        for (KeyBinding binding : KeyBinding.values()) {</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (checkKeyCombinationEquality(binding, keyEvent)) {</span>
+<span class="nc" id="L116">                return Optional.of(binding);</span>
+            }
+        }
+<span class="nc" id="L119">        return Optional.empty();</span>
+    }
+
+    public Optional&lt;KeyCombination&gt; getKeyCombination(KeyBinding bindName) {
+<span class="fc" id="L123">        String binding = get(bindName.getConstant());</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (binding.isEmpty()) {</span>
+<span class="nc" id="L125">            return Optional.empty();</span>
+        }
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (OS.OS_X) {</span>
+<span class="nc" id="L128">            binding = binding.replace(&quot;ctrl&quot;, &quot;meta&quot;);</span>
+        }
+<span class="fc" id="L130">        return Optional.of(KeyCombination.valueOf(binding));</span>
+    }
+
+    /**
+     * Check if the given KeyBinding equals the given keyEvent
+     *
+     * @param binding  as KeyBinding
+     * @param keyEvent as KeEvent
+     * @return true if matching, else false
+     */
+    public boolean checkKeyCombinationEquality(KeyBinding binding, KeyEvent keyEvent) {
+<span class="fc" id="L141">        return getKeyCombination(binding).filter(combination -&gt; checkKeyCombinationEquality(combination, keyEvent))</span>
+<span class="fc" id="L142">                                         .isPresent();</span>
+    }
+
+    public List&lt;String&gt; getBindNames() {
+<span class="nc" id="L146">        return bindings.keySet().stream().map(KeyBinding::getConstant).collect(Collectors.toList());</span>
+    }
+
+    public List&lt;String&gt; getBindings() {
+<span class="nc" id="L150">        return new ArrayList&lt;&gt;(bindings.values());</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L156">            return true;</span>
+        }
+<span class="pc bpc" id="L158" title="2 of 4 branches missed.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L159">            return false;</span>
+        }
+
+<span class="fc" id="L162">        KeyBindingRepository that = (KeyBindingRepository) o;</span>
+
+<span class="fc" id="L164">        return bindings.equals(that.bindings);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L169">        return bindings.hashCode();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

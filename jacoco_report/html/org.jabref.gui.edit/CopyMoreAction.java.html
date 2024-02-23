@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CopyMoreAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.edit</a> &gt; <span class="el_source">CopyMoreAction.java</span></div><h1>CopyMoreAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.edit;
+
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.jabref.gui.ClipBoardManager;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.JabRefDialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.layout.Layout;
+import org.jabref.logic.layout.LayoutHelper;
+import org.jabref.logic.push.CitationCommandString;
+import org.jabref.logic.util.OS;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class CopyMoreAction extends SimpleCommand {
+
+<span class="fc" id="L32">    private static final Logger LOGGER = LoggerFactory.getLogger(CopyMoreAction.class);</span>
+    private final StandardActions action;
+    private final DialogService dialogService;
+    private final StateManager stateManager;
+    private final ClipBoardManager clipBoardManager;
+    private final PreferencesService preferencesService;
+    private final JournalAbbreviationRepository abbreviationRepository;
+
+    public CopyMoreAction(StandardActions action,
+                          DialogService dialogService,
+                          StateManager stateManager,
+                          ClipBoardManager clipBoardManager,
+                          PreferencesService preferencesService,
+<span class="fc" id="L45">                          JournalAbbreviationRepository abbreviationRepository) {</span>
+<span class="fc" id="L46">        this.action = action;</span>
+<span class="fc" id="L47">        this.dialogService = dialogService;</span>
+<span class="fc" id="L48">        this.stateManager = stateManager;</span>
+<span class="fc" id="L49">        this.clipBoardManager = clipBoardManager;</span>
+<span class="fc" id="L50">        this.preferencesService = preferencesService;</span>
+<span class="fc" id="L51">        this.abbreviationRepository = abbreviationRepository;</span>
+
+<span class="fc" id="L53">        this.executable.bind(ActionHelper.needsEntriesSelected(stateManager));</span>
+<span class="fc" id="L54">    }</span>
+
+    @Override
+    public void execute() {
+<span class="pc bpc" id="L58" title="1 of 4 branches missed.">        if (stateManager.getActiveDatabase().isEmpty() || stateManager.getSelectedEntries().isEmpty()) {</span>
+<span class="fc" id="L59">            return;</span>
+        }
+
+<span class="pc bpc" id="L62" title="4 of 7 branches missed.">        switch (action) {</span>
+            case COPY_TITLE -&gt;
+<span class="fc" id="L64">                    copyTitle();</span>
+            case COPY_KEY -&gt;
+<span class="fc" id="L66">                    copyKey();</span>
+            case COPY_CITE_KEY -&gt;
+<span class="nc" id="L68">                    copyCiteKey();</span>
+            case COPY_KEY_AND_TITLE -&gt;
+<span class="nc" id="L70">                    copyKeyAndTitle();</span>
+            case COPY_KEY_AND_LINK -&gt;
+<span class="nc" id="L72">                    copyKeyAndLink();</span>
+            case COPY_DOI, COPY_DOI_URL -&gt;
+<span class="fc" id="L74">                    copyDoi();</span>
+            default -&gt;
+<span class="nc" id="L76">                    LOGGER.info(&quot;Unknown copy command.&quot;);</span>
+        }
+<span class="fc" id="L78">    }</span>
+
+    private void copyTitle() {
+<span class="fc" id="L81">        List&lt;BibEntry&gt; selectedBibEntries = stateManager.getSelectedEntries();</span>
+
+<span class="fc" id="L83">        List&lt;String&gt; titles = selectedBibEntries.stream()</span>
+<span class="fc" id="L84">                                                .filter(bibEntry -&gt; bibEntry.getTitle().isPresent())</span>
+<span class="fc" id="L85">                                                .map(bibEntry -&gt; bibEntry.getTitle().get())</span>
+<span class="fc" id="L86">                                                .collect(Collectors.toList());</span>
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (titles.isEmpty()) {</span>
+<span class="fc" id="L89">            dialogService.notify(Localization.lang(&quot;None of the selected entries have titles.&quot;));</span>
+<span class="fc" id="L90">            return;</span>
+        }
+
+<span class="fc" id="L93">        final String copiedTitles = String.join(&quot;\n&quot;, titles);</span>
+<span class="fc" id="L94">        clipBoardManager.setContent(copiedTitles);</span>
+
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (titles.size() == selectedBibEntries.size()) {</span>
+            // All entries had titles.
+<span class="fc" id="L98">            dialogService.notify(Localization.lang(&quot;Copied '%0' to clipboard.&quot;,</span>
+<span class="fc" id="L99">                    JabRefDialogService.shortenDialogMessage(copiedTitles)));</span>
+        } else {
+<span class="fc" id="L101">            dialogService.notify(Localization.lang(&quot;Warning: %0 out of %1 entries have undefined title.&quot;,</span>
+<span class="fc" id="L102">                    Integer.toString(selectedBibEntries.size() - titles.size()), Integer.toString(selectedBibEntries.size())));</span>
+        }
+<span class="fc" id="L104">    }</span>
+
+    private void copyDoi() {
+<span class="fc" id="L107">        List&lt;BibEntry&gt; entries = stateManager.getSelectedEntries();</span>
+
+        // Collect all non-null DOI or DOI urls
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (action == StandardActions.COPY_DOI_URL) {</span>
+<span class="nc" id="L111">            copyDoiList(entries.stream()</span>
+<span class="nc" id="L112">                               .filter(entry -&gt; entry.getDOI().isPresent())</span>
+<span class="nc" id="L113">                               .map(entry -&gt; entry.getDOI().get().getURIAsASCIIString())</span>
+<span class="nc" id="L114">                               .collect(Collectors.toList()), entries.size());</span>
+        } else {
+<span class="fc" id="L116">            copyDoiList(entries.stream()</span>
+<span class="fc" id="L117">                               .filter(entry -&gt; entry.getDOI().isPresent())</span>
+<span class="fc" id="L118">                               .map(entry -&gt; entry.getDOI().get().getDOI())</span>
+<span class="fc" id="L119">                               .collect(Collectors.toList()), entries.size());</span>
+        }
+<span class="fc" id="L121">    }</span>
+
+    private void copyDoiList(List&lt;String&gt; dois, int size) {
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (dois.isEmpty()) {</span>
+<span class="fc" id="L125">            dialogService.notify(Localization.lang(&quot;None of the selected entries have DOIs.&quot;));</span>
+<span class="fc" id="L126">            return;</span>
+        }
+
+<span class="fc" id="L129">        final String copiedDois = String.join(&quot;,&quot;, dois);</span>
+<span class="fc" id="L130">        clipBoardManager.setContent(copiedDois);</span>
+
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (dois.size() == size) {</span>
+            // All entries had DOIs.
+<span class="fc" id="L134">            dialogService.notify(Localization.lang(&quot;Copied '%0' to clipboard.&quot;,</span>
+<span class="fc" id="L135">                    JabRefDialogService.shortenDialogMessage(copiedDois)));</span>
+        } else {
+<span class="fc" id="L137">            dialogService.notify(Localization.lang(&quot;Warning: %0 out of %1 entries have undefined DOIs.&quot;,</span>
+<span class="fc" id="L138">                    Integer.toString(size - dois.size()), Integer.toString(size)));</span>
+        }
+<span class="fc" id="L140">    }</span>
+
+    private void doCopyKey(Function&lt;List&lt;String&gt;, String&gt; mapKeyList) {
+<span class="fc" id="L143">        List&lt;BibEntry&gt; entries = stateManager.getSelectedEntries();</span>
+
+        // Collect all non-null keys.
+<span class="fc" id="L146">        List&lt;String&gt; keys = entries.stream()</span>
+<span class="fc" id="L147">                                   .filter(entry -&gt; entry.getCitationKey().isPresent())</span>
+<span class="fc" id="L148">                                   .map(entry -&gt; entry.getCitationKey().get())</span>
+<span class="fc" id="L149">                                   .collect(Collectors.toList());</span>
+
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (keys.isEmpty()) {</span>
+<span class="fc" id="L152">            dialogService.notify(Localization.lang(&quot;None of the selected entries have citation keys.&quot;));</span>
+<span class="fc" id="L153">            return;</span>
+        }
+
+<span class="fc" id="L156">        String clipBoardContent = mapKeyList.apply(keys);</span>
+
+<span class="fc" id="L158">        clipBoardManager.setContent(clipBoardContent);</span>
+
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (keys.size() == entries.size()) {</span>
+            // All entries had keys.
+<span class="fc" id="L162">            dialogService.notify(Localization.lang(&quot;Copied '%0' to clipboard.&quot;,</span>
+<span class="fc" id="L163">                    JabRefDialogService.shortenDialogMessage(clipBoardContent)));</span>
+        } else {
+<span class="fc" id="L165">            dialogService.notify(Localization.lang(&quot;Warning: %0 out of %1 entries have undefined citation key.&quot;,</span>
+<span class="fc" id="L166">                    Integer.toString(entries.size() - keys.size()), Integer.toString(entries.size())));</span>
+        }
+<span class="fc" id="L168">    }</span>
+
+    private void copyCiteKey() {
+<span class="nc" id="L171">        doCopyKey(keys -&gt; {</span>
+<span class="nc" id="L172">            CitationCommandString citeCommand = preferencesService.getExternalApplicationsPreferences().getCiteCommand();</span>
+<span class="nc" id="L173">            return citeCommand.prefix() + String.join(citeCommand.delimiter(), keys) + citeCommand.suffix();</span>
+        });
+<span class="nc" id="L175">    }</span>
+
+    private void copyKey() {
+<span class="fc" id="L178">        doCopyKey(keys -&gt; String.join(preferencesService.getExternalApplicationsPreferences().getCiteCommand().delimiter(), keys));</span>
+<span class="fc" id="L179">    }</span>
+
+    private void copyKeyAndTitle() {
+<span class="nc" id="L182">        List&lt;BibEntry&gt; entries = stateManager.getSelectedEntries();</span>
+
+        // ToDo: this string should be configurable to allow arbitrary exports
+<span class="nc" id="L185">        StringReader layoutString = new StringReader(&quot;\\citationkey - \\begin{title}\\format[RemoveBrackets]{\\title}\\end{title}\n&quot;);</span>
+        Layout layout;
+        try {
+<span class="nc" id="L188">            layout = new LayoutHelper(layoutString, preferencesService.getLayoutFormatterPreferences(), abbreviationRepository).getLayoutFromText();</span>
+<span class="nc" id="L189">        } catch (IOException e) {</span>
+<span class="nc" id="L190">            LOGGER.info(&quot;Could not get layout.&quot;, e);</span>
+<span class="nc" id="L191">            return;</span>
+<span class="nc" id="L192">        }</span>
+
+<span class="nc" id="L194">        StringBuilder keyAndTitle = new StringBuilder();</span>
+
+<span class="nc" id="L196">        int entriesWithKeys = 0;</span>
+        // Collect all non-null keys.
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        for (BibEntry entry : entries) {</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            if (entry.hasCitationKey()) {</span>
+<span class="nc" id="L200">                entriesWithKeys++;</span>
+<span class="nc" id="L201">                stateManager.getActiveDatabase()</span>
+<span class="nc" id="L202">                            .map(BibDatabaseContext::getDatabase)</span>
+<span class="nc" id="L203">                            .ifPresent(bibDatabase -&gt; keyAndTitle.append(layout.doLayout(entry, bibDatabase)));</span>
+            }
+<span class="nc" id="L205">        }</span>
+
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        if (entriesWithKeys == 0) {</span>
+<span class="nc" id="L208">            dialogService.notify(Localization.lang(&quot;None of the selected entries have citation keys.&quot;));</span>
+<span class="nc" id="L209">            return;</span>
+        }
+
+<span class="nc" id="L212">        clipBoardManager.setContent(keyAndTitle.toString());</span>
+
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (entriesWithKeys == entries.size()) {</span>
+            // All entries had keys.
+<span class="nc" id="L216">            dialogService.notify(Localization.lang(&quot;Copied '%0' to clipboard.&quot;,</span>
+<span class="nc" id="L217">                    JabRefDialogService.shortenDialogMessage(keyAndTitle.toString())));</span>
+        } else {
+<span class="nc" id="L219">            dialogService.notify(Localization.lang(&quot;Warning: %0 out of %1 entries have undefined citation key.&quot;,</span>
+<span class="nc" id="L220">                    Integer.toString(entries.size() - entriesWithKeys), Integer.toString(entries.size())));</span>
+        }
+<span class="nc" id="L222">    }</span>
+
+    /**
+     * This method will copy each selected entry's citation key as a hyperlink to its url to the clipboard. In case an
+     * entry doesn't have a citation key it will not be copied. In case an entry doesn't have an url this will only copy
+     * the citation key.
+     */
+    private void copyKeyAndLink() {
+<span class="nc" id="L230">        List&lt;BibEntry&gt; entries = stateManager.getSelectedEntries();</span>
+
+<span class="nc" id="L232">        StringBuilder keyAndLink = new StringBuilder();</span>
+<span class="nc" id="L233">        StringBuilder fallbackString = new StringBuilder();</span>
+
+<span class="nc" id="L235">        List&lt;BibEntry&gt; entriesWithKey = entries.stream()</span>
+<span class="nc" id="L236">                                               .filter(BibEntry::hasCitationKey)</span>
+<span class="nc" id="L237">                                               .toList();</span>
+
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        if (entriesWithKey.isEmpty()) {</span>
+<span class="nc" id="L240">            dialogService.notify(Localization.lang(&quot;None of the selected entries have citation keys.&quot;));</span>
+<span class="nc" id="L241">            return;</span>
+        }
+
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        for (BibEntry entry : entriesWithKey) {</span>
+<span class="nc" id="L245">            String key = entry.getCitationKey().orElse(&quot;&quot;);</span>
+<span class="nc bnc" id="L246" title="All 4 branches missed.">            if (LOGGER.isDebugEnabled() &amp;&amp; key.isEmpty()) {</span>
+<span class="nc" id="L247">                LOGGER.debug(&quot;entry {} had no citation key, but it should have had one&quot;, entry);</span>
+            }
+<span class="nc" id="L249">            String url = entry.getField(StandardField.URL).orElse(&quot;&quot;);</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            keyAndLink.append(url.isEmpty() ? key : &quot;&lt;a href=\&quot;%s\&quot;&gt;%s&lt;/a&gt;&quot;.formatted(url, key));</span>
+<span class="nc" id="L251">            keyAndLink.append(OS.NEWLINE);</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            fallbackString.append(url.isEmpty() ? key : &quot;%s - %s&quot;.formatted(key, url));</span>
+<span class="nc" id="L253">            fallbackString.append(OS.NEWLINE);</span>
+<span class="nc" id="L254">        }</span>
+
+<span class="nc" id="L256">        clipBoardManager.setHtmlContent(keyAndLink.toString(), fallbackString.toString());</span>
+
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        if (entriesWithKey.size() == entries.size()) {</span>
+            // All entries had keys.
+<span class="nc" id="L260">            dialogService.notify(Localization.lang(&quot;Copied '%0' to clipboard.&quot;,</span>
+<span class="nc" id="L261">                    JabRefDialogService.shortenDialogMessage(keyAndLink.toString())));</span>
+        } else {
+<span class="nc" id="L263">            dialogService.notify(Localization.lang(&quot;Warning: %0 out of %1 entries have undefined citation key.&quot;,</span>
+<span class="nc" id="L264">                    Long.toString(entries.size() - entriesWithKey.size()), Integer.toString(entries.size())));</span>
+        }
+<span class="nc" id="L266">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

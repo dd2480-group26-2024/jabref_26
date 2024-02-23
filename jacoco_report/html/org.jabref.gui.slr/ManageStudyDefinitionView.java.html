@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManageStudyDefinitionView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.slr</a> &gt; <span class="el_source">ManageStudyDefinitionView.java</span></div><h1>ManageStudyDefinitionView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.slr;
+
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.StringJoiner;
+import java.util.function.Consumer;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.cell.CheckBoxTableCell;
+import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.DirectoryDialogConfiguration;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.gui.util.ViewModelTableRowFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.study.Study;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import jakarta.inject.Inject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class controls the user interface of the study definition management dialog. The UI elements and their layout
+ * are defined in the FXML file.
+ */
+public class ManageStudyDefinitionView extends BaseDialog&lt;SlrStudyAndDirectory&gt; {
+<span class="nc" id="L45">    private static final Logger LOGGER = LoggerFactory.getLogger(ManageStudyDefinitionView.class);</span>
+
+    @FXML private TextField studyTitle;
+    @FXML private TextField addAuthor;
+    @FXML private TextField addResearchQuestion;
+    @FXML private TextField addQuery;
+    @FXML private TextField studyDirectory;
+    @FXML private Button selectStudyDirectory;
+
+    @FXML private ButtonType saveSurveyButtonType;
+    @FXML private Label helpIcon;
+
+    @FXML private TableView&lt;String&gt; authorTableView;
+    @FXML private TableColumn&lt;String, String&gt; authorsColumn;
+    @FXML private TableColumn&lt;String, String&gt; authorsActionColumn;
+
+    @FXML private TableView&lt;String&gt; questionTableView;
+    @FXML private TableColumn&lt;String, String&gt; questionsColumn;
+    @FXML private TableColumn&lt;String, String&gt; questionsActionColumn;
+
+    @FXML private TableView&lt;String&gt; queryTableView;
+    @FXML private TableColumn&lt;String, String&gt; queriesColumn;
+    @FXML private TableColumn&lt;String, String&gt; queriesActionColumn;
+
+    @FXML private TableView&lt;StudyCatalogItem&gt; catalogTable;
+    @FXML private TableColumn&lt;StudyCatalogItem, Boolean&gt; catalogEnabledColumn;
+    @FXML private TableColumn&lt;StudyCatalogItem, String&gt; catalogColumn;
+
+    @Inject private DialogService dialogService;
+    @Inject private PreferencesService prefs;
+    @Inject private ThemeManager themeManager;
+
+    private ManageStudyDefinitionViewModel viewModel;
+
+    // not present if new study is created;
+    // present if existing study is edited
+    private final Optional&lt;Study&gt; study;
+
+    // Either the proposed directory (on new study creation)
+    // or the &quot;real&quot; directory of the study
+    private final Path pathToStudyDataDirectory;
+
+    /**
+     * This is used to create a new study
+     *
+     * @param pathToStudyDataDirectory This directory is proposed in the file chooser
+     */
+<span class="nc" id="L92">    public ManageStudyDefinitionView(Path pathToStudyDataDirectory) {</span>
+<span class="nc" id="L93">        this.pathToStudyDataDirectory = pathToStudyDataDirectory;</span>
+<span class="nc" id="L94">        this.setTitle(&quot;Define study parameters&quot;);</span>
+<span class="nc" id="L95">        this.study = Optional.empty();</span>
+
+<span class="nc" id="L97">        ViewLoader.view(this)</span>
+<span class="nc" id="L98">                  .load()</span>
+<span class="nc" id="L99">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L101">        setupSaveSurveyButton(false);</span>
+
+<span class="nc" id="L103">        themeManager.updateFontStyle(getDialogPane().getScene());</span>
+<span class="nc" id="L104">    }</span>
+
+    /**
+     * This is used to edit an existing study.
+     *
+     * @param study          the study to edit
+     * @param studyDirectory the directory of the study
+     */
+<span class="nc" id="L112">    public ManageStudyDefinitionView(Study study, Path studyDirectory) {</span>
+<span class="nc" id="L113">        this.pathToStudyDataDirectory = studyDirectory;</span>
+<span class="nc" id="L114">        this.setTitle(Localization.lang(&quot;Manage study definition&quot;));</span>
+<span class="nc" id="L115">        this.study = Optional.of(study);</span>
+
+<span class="nc" id="L117">        ViewLoader.view(this)</span>
+<span class="nc" id="L118">                  .load()</span>
+<span class="nc" id="L119">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L121">        setupSaveSurveyButton(true);</span>
+
+<span class="nc" id="L123">        themeManager.updateFontStyle(getDialogPane().getScene());</span>
+<span class="nc" id="L124">    }</span>
+
+    private void setupSaveSurveyButton(boolean isEdit) {
+<span class="nc" id="L127">        Button saveSurveyButton = (Button) this.getDialogPane().lookupButton(saveSurveyButtonType);</span>
+
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (!isEdit) {</span>
+<span class="nc" id="L130">            saveSurveyButton.setText(Localization.lang(&quot;Start survey&quot;));</span>
+        }
+
+<span class="nc" id="L133">        saveSurveyButton.disableProperty().bind(Bindings.or(Bindings.or(Bindings.or(Bindings.or(</span>
+<span class="nc" id="L134">                                Bindings.isEmpty(viewModel.getQueries()),</span>
+<span class="nc" id="L135">                                Bindings.isEmpty(viewModel.getCatalogs())),</span>
+<span class="nc" id="L136">                                Bindings.isEmpty(viewModel.getAuthors())),</span>
+<span class="nc" id="L137">                                viewModel.getTitle().isEmpty()),</span>
+<span class="nc" id="L138">                                viewModel.getDirectory().isEmpty()));</span>
+
+<span class="nc" id="L140">        setResultConverter(button -&gt; {</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            if (button == saveSurveyButtonType) {</span>
+<span class="nc" id="L142">                return viewModel.saveStudy();</span>
+            }
+            // Cancel button will return null
+<span class="nc" id="L145">            return null;</span>
+        });
+<span class="nc" id="L147">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (study.isEmpty()) {</span>
+<span class="nc" id="L152">            viewModel = new ManageStudyDefinitionViewModel(</span>
+<span class="nc" id="L153">                    prefs.getImportFormatPreferences(),</span>
+<span class="nc" id="L154">                    prefs.getImporterPreferences(),</span>
+                    dialogService);
+        } else {
+<span class="nc" id="L157">            viewModel = new ManageStudyDefinitionViewModel(</span>
+<span class="nc" id="L158">                    study.get(),</span>
+                    pathToStudyDataDirectory,
+<span class="nc" id="L160">                    prefs.getImportFormatPreferences(),</span>
+<span class="nc" id="L161">                    prefs.getImporterPreferences(),</span>
+                    dialogService);
+
+            // The directory of the study cannot be changed
+<span class="nc" id="L165">            studyDirectory.setEditable(false);</span>
+<span class="nc" id="L166">            selectStudyDirectory.setDisable(true);</span>
+        }
+
+        // Listen whether any catalogs are removed from selection -&gt; Add back to the catalog selector
+<span class="nc" id="L170">        studyTitle.textProperty().bindBidirectional(viewModel.titleProperty());</span>
+<span class="nc" id="L171">        studyDirectory.textProperty().bindBidirectional(viewModel.getDirectory());</span>
+
+<span class="nc" id="L173">        initAuthorTab();</span>
+<span class="nc" id="L174">        initQuestionsTab();</span>
+<span class="nc" id="L175">        initQueriesTab();</span>
+<span class="nc" id="L176">        initCatalogsTab();</span>
+<span class="nc" id="L177">    }</span>
+
+    private void initAuthorTab() {
+<span class="nc" id="L180">        setupCommonPropertiesForTables(addAuthor, this::addAuthor, authorsColumn, authorsActionColumn);</span>
+<span class="nc" id="L181">        setupCellFactories(authorsColumn, authorsActionColumn, viewModel::deleteAuthor);</span>
+<span class="nc" id="L182">        authorTableView.setItems(viewModel.getAuthors());</span>
+<span class="nc" id="L183">    }</span>
+
+    private void initQuestionsTab() {
+<span class="nc" id="L186">        setupCommonPropertiesForTables(addResearchQuestion, this::addResearchQuestion, questionsColumn, questionsActionColumn);</span>
+<span class="nc" id="L187">        setupCellFactories(questionsColumn, questionsActionColumn, viewModel::deleteQuestion);</span>
+<span class="nc" id="L188">        questionTableView.setItems(viewModel.getResearchQuestions());</span>
+<span class="nc" id="L189">    }</span>
+
+    private void initQueriesTab() {
+<span class="nc" id="L192">        setupCommonPropertiesForTables(addQuery, this::addQuery, queriesColumn, queriesActionColumn);</span>
+<span class="nc" id="L193">        setupCellFactories(queriesColumn, queriesActionColumn, viewModel::deleteQuery);</span>
+<span class="nc" id="L194">        queryTableView.setItems(viewModel.getQueries());</span>
+
+        // TODO: Keep until PR #7279 is merged
+<span class="nc" id="L197">        helpIcon.setTooltip(new Tooltip(new StringJoiner(&quot;\n&quot;)</span>
+<span class="nc" id="L198">                .add(Localization.lang(&quot;Query terms are separated by spaces.&quot;))</span>
+<span class="nc" id="L199">                .add(Localization.lang(&quot;All query terms are joined using the logical AND, and OR operators&quot;) + &quot;.&quot;)</span>
+<span class="nc" id="L200">                .add(Localization.lang(&quot;If the sequence of terms is relevant wrap them in double quotes&quot;) + &quot;(\&quot;).&quot;)</span>
+<span class="nc" id="L201">                .add(Localization.lang(&quot;An example:&quot;) + &quot; rain AND (clouds OR drops) AND \&quot;precipitation distribution\&quot;&quot;)</span>
+<span class="nc" id="L202">                .toString()));</span>
+<span class="nc" id="L203">    }</span>
+
+    private void initCatalogsTab() {
+<span class="nc" id="L206">        new ViewModelTableRowFactory&lt;StudyCatalogItem&gt;()</span>
+<span class="nc" id="L207">                .withOnMouseClickedEvent((entry, event) -&gt; {</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                    if (event.getButton() == MouseButton.PRIMARY) {</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">                        entry.setEnabled(!entry.isEnabled());</span>
+                    }
+<span class="nc" id="L211">                })</span>
+<span class="nc" id="L212">                .install(catalogTable);</span>
+
+<span class="nc" id="L214">        catalogColumn.setReorderable(false);</span>
+<span class="nc" id="L215">        catalogColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+
+<span class="nc" id="L217">        catalogEnabledColumn.setResizable(false);</span>
+<span class="nc" id="L218">        catalogEnabledColumn.setReorderable(false);</span>
+<span class="nc" id="L219">        catalogEnabledColumn.setCellFactory(CheckBoxTableCell.forTableColumn(catalogEnabledColumn));</span>
+<span class="nc" id="L220">        catalogEnabledColumn.setCellValueFactory(param -&gt; param.getValue().enabledProperty());</span>
+
+<span class="nc" id="L222">        catalogColumn.setEditable(false);</span>
+<span class="nc" id="L223">        catalogColumn.setCellValueFactory(param -&gt; param.getValue().nameProperty());</span>
+
+<span class="nc" id="L225">        catalogTable.setItems(viewModel.getCatalogs());</span>
+<span class="nc" id="L226">    }</span>
+
+    private void setupCommonPropertiesForTables(Node addControl,
+                                                Runnable addAction,
+                                                TableColumn&lt;?, String&gt; contentColumn,
+                                                TableColumn&lt;?, String&gt; actionColumn) {
+<span class="nc" id="L232">        addControl.setOnKeyPressed(event -&gt; {</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (event.getCode() == KeyCode.ENTER) {</span>
+<span class="nc" id="L234">                addAction.run();</span>
+            }
+<span class="nc" id="L236">        });</span>
+
+<span class="nc" id="L238">        contentColumn.setReorderable(false);</span>
+<span class="nc" id="L239">        contentColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+<span class="nc" id="L240">        actionColumn.setReorderable(false);</span>
+<span class="nc" id="L241">        actionColumn.setResizable(false);</span>
+<span class="nc" id="L242">    }</span>
+
+    private void setupCellFactories(TableColumn&lt;String, String&gt; contentColumn,
+                                    TableColumn&lt;String, String&gt; actionColumn,
+                                    Consumer&lt;String&gt; removeAction) {
+<span class="nc" id="L247">        contentColumn.setCellValueFactory(param -&gt; new SimpleStringProperty(param.getValue()));</span>
+<span class="nc" id="L248">        actionColumn.setCellValueFactory(param -&gt; new SimpleStringProperty(param.getValue()));</span>
+<span class="nc" id="L249">        new ValueTableCellFactory&lt;String, String&gt;()</span>
+<span class="nc" id="L250">                .withGraphic(item -&gt; IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode())</span>
+<span class="nc" id="L251">                .withTooltip(name -&gt; Localization.lang(&quot;Remove&quot;))</span>
+<span class="nc" id="L252">                .withOnMouseClickedEvent(item -&gt; evt -&gt;</span>
+<span class="nc" id="L253">                        removeAction.accept(item))</span>
+<span class="nc" id="L254">                .install(actionColumn);</span>
+<span class="nc" id="L255">    }</span>
+
+    @FXML
+    private void addAuthor() {
+<span class="nc" id="L259">        viewModel.addAuthor(addAuthor.getText());</span>
+<span class="nc" id="L260">        addAuthor.setText(&quot;&quot;);</span>
+<span class="nc" id="L261">    }</span>
+
+    @FXML
+    private void addResearchQuestion() {
+<span class="nc" id="L265">        viewModel.addResearchQuestion(addResearchQuestion.getText());</span>
+<span class="nc" id="L266">        addResearchQuestion.setText(&quot;&quot;);</span>
+<span class="nc" id="L267">    }</span>
+
+    @FXML
+    private void addQuery() {
+<span class="nc" id="L271">        viewModel.addQuery(addQuery.getText());</span>
+<span class="nc" id="L272">        addQuery.setText(&quot;&quot;);</span>
+<span class="nc" id="L273">    }</span>
+
+    @FXML
+    public void selectStudyDirectory() {
+<span class="nc" id="L277">        DirectoryDialogConfiguration directoryDialogConfiguration = new DirectoryDialogConfiguration.Builder()</span>
+<span class="nc" id="L278">                .withInitialDirectory(pathToStudyDataDirectory)</span>
+<span class="nc" id="L279">                .build();</span>
+
+<span class="nc" id="L281">        viewModel.setStudyDirectory(dialogService.showDirectorySelectionDialog(directoryDialogConfiguration));</span>
+<span class="nc" id="L282">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MainMenu.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui</a> &gt; <span class="el_source">MainMenu.java</span></div><h1>MainMenu.java</h1><pre class="source lang-java linenums">package org.jabref.gui;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.event.ActionEvent;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.auximport.NewSubLibraryAction;
+import org.jabref.gui.bibtexextractor.ExtractBibtexAction;
+import org.jabref.gui.citationkeypattern.GenerateCitationKeyAction;
+import org.jabref.gui.cleanup.CleanupAction;
+import org.jabref.gui.copyfiles.CopyFilesAction;
+import org.jabref.gui.documentviewer.ShowDocumentViewerAction;
+import org.jabref.gui.duplicationFinder.DuplicateSearch;
+import org.jabref.gui.edit.CopyMoreAction;
+import org.jabref.gui.edit.EditAction;
+import org.jabref.gui.edit.ManageKeywordsAction;
+import org.jabref.gui.edit.OpenBrowserAction;
+import org.jabref.gui.edit.ReplaceStringAction;
+import org.jabref.gui.edit.automaticfiededitor.AutomaticFieldEditorAction;
+import org.jabref.gui.entryeditor.OpenEntryEditorAction;
+import org.jabref.gui.entryeditor.PreviewSwitchAction;
+import org.jabref.gui.exporter.ExportCommand;
+import org.jabref.gui.exporter.ExportToClipboardAction;
+import org.jabref.gui.exporter.SaveAction;
+import org.jabref.gui.exporter.SaveAllAction;
+import org.jabref.gui.exporter.WriteMetadataToLinkedPdfsAction;
+import org.jabref.gui.externalfiles.AutoLinkFilesAction;
+import org.jabref.gui.externalfiles.DownloadFullTextAction;
+import org.jabref.gui.externalfiles.FindUnlinkedFilesAction;
+import org.jabref.gui.help.AboutAction;
+import org.jabref.gui.help.ErrorConsoleAction;
+import org.jabref.gui.help.HelpAction;
+import org.jabref.gui.help.SearchForUpdateAction;
+import org.jabref.gui.importer.ImportCommand;
+import org.jabref.gui.importer.NewDatabaseAction;
+import org.jabref.gui.importer.NewEntryAction;
+import org.jabref.gui.importer.fetcher.LookupIdentifierAction;
+import org.jabref.gui.integrity.IntegrityCheckAction;
+import org.jabref.gui.journals.AbbreviateAction;
+import org.jabref.gui.libraryproperties.LibraryPropertiesAction;
+import org.jabref.gui.linkedfile.RedownloadMissingFilesAction;
+import org.jabref.gui.mergeentries.MergeEntriesAction;
+import org.jabref.gui.preferences.ShowPreferencesAction;
+import org.jabref.gui.preview.CopyCitationAction;
+import org.jabref.gui.push.PushToApplicationCommand;
+import org.jabref.gui.search.RebuildFulltextSearchIndexAction;
+import org.jabref.gui.shared.ConnectToSharedDatabaseCommand;
+import org.jabref.gui.shared.PullChangesFromSharedAction;
+import org.jabref.gui.sidepane.SidePane;
+import org.jabref.gui.sidepane.SidePaneType;
+import org.jabref.gui.slr.EditExistingStudyAction;
+import org.jabref.gui.slr.ExistingStudySearchAction;
+import org.jabref.gui.slr.StartNewStudyAction;
+import org.jabref.gui.specialfields.SpecialFieldMenuItemFactory;
+import org.jabref.gui.texparser.ParseLatexAction;
+import org.jabref.gui.undo.UndoRedoAction;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.citationstyle.CitationStyleOutputFormat;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.importer.IdFetcher;
+import org.jabref.logic.importer.WebFetchers;
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.logic.journals.predatory.PredatoryJournalRepository;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.OS;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+public class MainMenu extends MenuBar {
+    private final JabRefFrame frame;
+    private final SidePane sidePane;
+    private final PushToApplicationCommand pushToApplicationCommand;
+    private final PreferencesService preferencesService;
+    private final StateManager stateManager;
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final TaskExecutor taskExecutor;
+    private final DialogService dialogService;
+    private final JournalAbbreviationRepository abbreviationRepository;
+    private final PredatoryJournalRepository predatoryJournalRepository;
+    private final BibEntryTypesManager entryTypesManager;
+    private final UndoManager undoManager;
+    private final ClipBoardManager clipBoardManager;
+
+    public MainMenu(JabRefFrame frame,
+                    SidePane sidePane,
+                    PushToApplicationCommand pushToApplicationCommand,
+                    PreferencesService preferencesService,
+                    StateManager stateManager,
+                    FileUpdateMonitor fileUpdateMonitor,
+                    TaskExecutor taskExecutor,
+                    DialogService dialogService,
+                    JournalAbbreviationRepository abbreviationRepository,
+                    PredatoryJournalRepository predatoryJournalRepository,
+                    BibEntryTypesManager entryTypesManager,
+                    UndoManager undoManager,
+<span class="nc" id="L104">                    ClipBoardManager clipBoardManager) {</span>
+<span class="nc" id="L105">        this.frame = frame;</span>
+<span class="nc" id="L106">        this.sidePane = sidePane;</span>
+<span class="nc" id="L107">        this.pushToApplicationCommand = pushToApplicationCommand;</span>
+<span class="nc" id="L108">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L109">        this.stateManager = stateManager;</span>
+<span class="nc" id="L110">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="nc" id="L111">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L112">        this.dialogService = dialogService;</span>
+<span class="nc" id="L113">        this.abbreviationRepository = abbreviationRepository;</span>
+<span class="nc" id="L114">        this.predatoryJournalRepository = predatoryJournalRepository;</span>
+<span class="nc" id="L115">        this.entryTypesManager = entryTypesManager;</span>
+<span class="nc" id="L116">        this.undoManager = undoManager;</span>
+<span class="nc" id="L117">        this.clipBoardManager = clipBoardManager;</span>
+
+<span class="nc" id="L119">        createMenu();</span>
+<span class="nc" id="L120">    }</span>
+
+    private void createMenu() {
+<span class="nc" id="L123">        ActionFactory factory = new ActionFactory(Globals.getKeyPrefs());</span>
+<span class="nc" id="L124">        Menu file = new Menu(Localization.lang(&quot;File&quot;));</span>
+<span class="nc" id="L125">        Menu edit = new Menu(Localization.lang(&quot;Edit&quot;));</span>
+<span class="nc" id="L126">        Menu library = new Menu(Localization.lang(&quot;Library&quot;));</span>
+<span class="nc" id="L127">        Menu quality = new Menu(Localization.lang(&quot;Quality&quot;));</span>
+<span class="nc" id="L128">        Menu lookup = new Menu(Localization.lang(&quot;Lookup&quot;));</span>
+<span class="nc" id="L129">        Menu view = new Menu(Localization.lang(&quot;View&quot;));</span>
+<span class="nc" id="L130">        Menu tools = new Menu(Localization.lang(&quot;Tools&quot;));</span>
+<span class="nc" id="L131">        Menu help = new Menu(Localization.lang(&quot;Help&quot;));</span>
+
+<span class="nc" id="L133">        file.getItems().addAll(</span>
+<span class="nc" id="L134">                factory.createMenuItem(StandardActions.NEW_LIBRARY, new NewDatabaseAction(frame, preferencesService)),</span>
+<span class="nc" id="L135">                factory.createMenuItem(StandardActions.OPEN_LIBRARY, frame.getOpenDatabaseAction()),</span>
+<span class="nc" id="L136">                frame.getFileHistory(),</span>
+<span class="nc" id="L137">                factory.createMenuItem(StandardActions.SAVE_LIBRARY, new SaveAction(SaveAction.SaveMethod.SAVE, frame::getCurrentLibraryTab, dialogService, preferencesService, stateManager)),</span>
+<span class="nc" id="L138">                factory.createMenuItem(StandardActions.SAVE_LIBRARY_AS, new SaveAction(SaveAction.SaveMethod.SAVE_AS, frame::getCurrentLibraryTab, dialogService, preferencesService, stateManager)),</span>
+<span class="nc" id="L139">                factory.createMenuItem(StandardActions.SAVE_ALL, new SaveAllAction(frame::getLibraryTabs, preferencesService, dialogService)),</span>
+<span class="nc" id="L140">                factory.createMenuItem(StandardActions.CLOSE_LIBRARY, new JabRefFrame.CloseDatabaseAction(frame)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L144">                factory.createSubMenu(StandardActions.IMPORT,</span>
+<span class="nc" id="L145">                        factory.createMenuItem(StandardActions.IMPORT_INTO_CURRENT_LIBRARY, new ImportCommand(frame, ImportCommand.ImportMethod.TO_EXISTING, preferencesService, stateManager, fileUpdateMonitor, taskExecutor, dialogService)),</span>
+<span class="nc" id="L146">                        factory.createMenuItem(StandardActions.IMPORT_INTO_NEW_LIBRARY, new ImportCommand(frame, ImportCommand.ImportMethod.AS_NEW, preferencesService, stateManager, fileUpdateMonitor, taskExecutor, dialogService))),</span>
+
+<span class="nc" id="L148">                factory.createSubMenu(StandardActions.EXPORT,</span>
+<span class="nc" id="L149">                        factory.createMenuItem(StandardActions.EXPORT_ALL, new ExportCommand(ExportCommand.ExportMethod.EXPORT_ALL, frame::getCurrentLibraryTab, stateManager, dialogService, preferencesService, entryTypesManager, abbreviationRepository, taskExecutor)),</span>
+<span class="nc" id="L150">                        factory.createMenuItem(StandardActions.EXPORT_SELECTED, new ExportCommand(ExportCommand.ExportMethod.EXPORT_SELECTED, frame::getCurrentLibraryTab, stateManager, dialogService, preferencesService, entryTypesManager, abbreviationRepository, taskExecutor)),</span>
+<span class="nc" id="L151">                        factory.createMenuItem(StandardActions.SAVE_SELECTED_AS_PLAIN_BIBTEX, new SaveAction(SaveAction.SaveMethod.SAVE_SELECTED, frame::getCurrentLibraryTab, dialogService, preferencesService, stateManager))),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L155">                factory.createSubMenu(StandardActions.REMOTE_DB,</span>
+<span class="nc" id="L156">                        factory.createMenuItem(StandardActions.CONNECT_TO_SHARED_DB, new ConnectToSharedDatabaseCommand(frame, dialogService)),</span>
+<span class="nc" id="L157">                        factory.createMenuItem(StandardActions.PULL_CHANGES_FROM_SHARED_DB, new PullChangesFromSharedAction(stateManager))),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L161">                factory.createMenuItem(StandardActions.SHOW_PREFS, new ShowPreferencesAction(frame, dialogService)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L165">                factory.createMenuItem(StandardActions.QUIT, new JabRefFrame.CloseAction(frame))</span>
+        );
+
+<span class="nc" id="L168">        edit.getItems().addAll(</span>
+<span class="nc" id="L169">                factory.createMenuItem(StandardActions.UNDO, new UndoRedoAction(StandardActions.UNDO, frame::getCurrentLibraryTab, dialogService, stateManager)),</span>
+<span class="nc" id="L170">                factory.createMenuItem(StandardActions.REDO, new UndoRedoAction(StandardActions.REDO, frame::getCurrentLibraryTab, dialogService, stateManager)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L174">                factory.createMenuItem(StandardActions.CUT, new EditAction(StandardActions.CUT, frame::getCurrentLibraryTab, stateManager, undoManager)),</span>
+
+<span class="nc" id="L176">                factory.createMenuItem(StandardActions.COPY, new EditAction(StandardActions.COPY, frame::getCurrentLibraryTab, stateManager, undoManager)),</span>
+<span class="nc" id="L177">                factory.createSubMenu(StandardActions.COPY_MORE,</span>
+<span class="nc" id="L178">                        factory.createMenuItem(StandardActions.COPY_TITLE, new CopyMoreAction(StandardActions.COPY_TITLE, dialogService, stateManager, clipBoardManager, preferencesService, abbreviationRepository)),</span>
+<span class="nc" id="L179">                        factory.createMenuItem(StandardActions.COPY_KEY, new CopyMoreAction(StandardActions.COPY_KEY, dialogService, stateManager, clipBoardManager, preferencesService, abbreviationRepository)),</span>
+<span class="nc" id="L180">                        factory.createMenuItem(StandardActions.COPY_CITE_KEY, new CopyMoreAction(StandardActions.COPY_CITE_KEY, dialogService, stateManager, clipBoardManager, preferencesService, abbreviationRepository)),</span>
+<span class="nc" id="L181">                        factory.createMenuItem(StandardActions.COPY_KEY_AND_TITLE, new CopyMoreAction(StandardActions.COPY_KEY_AND_TITLE, dialogService, stateManager, clipBoardManager, preferencesService, abbreviationRepository)),</span>
+<span class="nc" id="L182">                        factory.createMenuItem(StandardActions.COPY_KEY_AND_LINK, new CopyMoreAction(StandardActions.COPY_KEY_AND_LINK, dialogService, stateManager, clipBoardManager, preferencesService, abbreviationRepository)),</span>
+<span class="nc" id="L183">                        factory.createMenuItem(StandardActions.COPY_CITATION_PREVIEW, new CopyCitationAction(CitationStyleOutputFormat.HTML, dialogService, stateManager, clipBoardManager, taskExecutor, preferencesService, abbreviationRepository)),</span>
+<span class="nc" id="L184">                        factory.createMenuItem(StandardActions.EXPORT_SELECTED_TO_CLIPBOARD, new ExportToClipboardAction(dialogService, stateManager, clipBoardManager, taskExecutor, preferencesService))),</span>
+
+<span class="nc" id="L186">                factory.createMenuItem(StandardActions.PASTE, new EditAction(StandardActions.PASTE, frame::getCurrentLibraryTab, stateManager, undoManager)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L190">                factory.createMenuItem(StandardActions.REPLACE_ALL, new ReplaceStringAction(frame::getCurrentLibraryTab, stateManager, dialogService)),</span>
+<span class="nc" id="L191">                factory.createMenuItem(StandardActions.GENERATE_CITE_KEYS, new GenerateCitationKeyAction(frame::getCurrentLibraryTab, dialogService, stateManager, taskExecutor, preferencesService, undoManager)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L195">                factory.createMenuItem(StandardActions.MANAGE_KEYWORDS, new ManageKeywordsAction(stateManager)),</span>
+<span class="nc" id="L196">                factory.createMenuItem(StandardActions.AUTOMATIC_FIELD_EDITOR, new AutomaticFieldEditorAction(stateManager, dialogService)));</span>
+<span class="nc" id="L197">        SeparatorMenuItem specialFieldsSeparator = new SeparatorMenuItem();</span>
+<span class="nc" id="L198">        specialFieldsSeparator.visibleProperty().bind(preferencesService.getSpecialFieldsPreferences().specialFieldsEnabledProperty());</span>
+
+<span class="nc" id="L200">        edit.getItems().addAll(</span>
+                specialFieldsSeparator,
+                // ToDo: SpecialField needs the active BasePanel to mark it as changed.
+                //  Refactor BasePanel, should mark the BibDatabaseContext or the UndoManager as dirty instead!
+<span class="nc" id="L204">                SpecialFieldMenuItemFactory.createSpecialFieldMenu(SpecialField.RANKING, factory, frame::getCurrentLibraryTab, dialogService, preferencesService, undoManager, stateManager),</span>
+<span class="nc" id="L205">                SpecialFieldMenuItemFactory.getSpecialFieldSingleItem(SpecialField.RELEVANCE, factory, frame::getCurrentLibraryTab, dialogService, preferencesService, undoManager, stateManager),</span>
+<span class="nc" id="L206">                SpecialFieldMenuItemFactory.getSpecialFieldSingleItem(SpecialField.QUALITY, factory, frame::getCurrentLibraryTab, dialogService, preferencesService, undoManager, stateManager),</span>
+<span class="nc" id="L207">                SpecialFieldMenuItemFactory.getSpecialFieldSingleItem(SpecialField.PRINTED, factory, frame::getCurrentLibraryTab, dialogService, preferencesService, undoManager, stateManager),</span>
+<span class="nc" id="L208">                SpecialFieldMenuItemFactory.createSpecialFieldMenu(SpecialField.PRIORITY, factory, frame::getCurrentLibraryTab, dialogService, preferencesService, undoManager, stateManager),</span>
+<span class="nc" id="L209">                SpecialFieldMenuItemFactory.createSpecialFieldMenu(SpecialField.READ_STATUS, factory, frame::getCurrentLibraryTab, dialogService, preferencesService, undoManager, stateManager));</span>
+<span class="nc" id="L210">        edit.addEventHandler(ActionEvent.ACTION, event -&gt; {</span>
+            // Work around for mac only issue, where cmd+v on a dialogue triggers the paste action of menu item, resulting in addition of the pasted content in the MainTable.
+            // If the mainscreen is not focused, the actions captured by menu are consumed.
+<span class="nc bnc" id="L213" title="All 4 branches missed.">            if (OS.OS_X &amp;&amp; !frame.getMainStage().focusedProperty().get()) {</span>
+<span class="nc" id="L214">                event.consume();</span>
+            }
+<span class="nc" id="L216">        });</span>
+
+        // @formatter:off
+<span class="nc" id="L219">        library.getItems().addAll(</span>
+<span class="nc" id="L220">                factory.createMenuItem(StandardActions.NEW_ENTRY, new NewEntryAction(frame::getCurrentLibraryTab, dialogService, preferencesService, stateManager)),</span>
+<span class="nc" id="L221">                factory.createMenuItem(StandardActions.NEW_ENTRY_FROM_PLAIN_TEXT, new ExtractBibtexAction(dialogService, preferencesService, stateManager)),</span>
+<span class="nc" id="L222">                factory.createMenuItem(StandardActions.DELETE_ENTRY, new EditAction(StandardActions.DELETE_ENTRY, frame::getCurrentLibraryTab, stateManager, undoManager)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L226">                factory.createMenuItem(StandardActions.LIBRARY_PROPERTIES, new LibraryPropertiesAction(stateManager))</span>
+        );
+
+<span class="nc" id="L229">        quality.getItems().addAll(</span>
+<span class="nc" id="L230">                factory.createMenuItem(StandardActions.FIND_DUPLICATES, new DuplicateSearch(frame::getCurrentLibraryTab, dialogService, stateManager, preferencesService, entryTypesManager, taskExecutor)),</span>
+<span class="nc" id="L231">                factory.createMenuItem(StandardActions.MERGE_ENTRIES, new MergeEntriesAction(dialogService, stateManager, preferencesService)),</span>
+<span class="nc" id="L232">                factory.createMenuItem(StandardActions.CHECK_INTEGRITY, new IntegrityCheckAction(frame::getCurrentLibraryTab, preferencesService, dialogService, stateManager, taskExecutor, abbreviationRepository, predatoryJournalRepository)),</span>
+<span class="nc" id="L233">                factory.createMenuItem(StandardActions.CLEANUP_ENTRIES, new CleanupAction(frame::getCurrentLibraryTab, preferencesService, dialogService, stateManager, taskExecutor, undoManager)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L237">                factory.createMenuItem(StandardActions.SET_FILE_LINKS, new AutoLinkFilesAction(dialogService, preferencesService, stateManager, undoManager, taskExecutor)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L241">                factory.createSubMenu(StandardActions.ABBREVIATE,</span>
+<span class="nc" id="L242">                        factory.createMenuItem(StandardActions.ABBREVIATE_DEFAULT, new AbbreviateAction(StandardActions.ABBREVIATE_DEFAULT, frame::getCurrentLibraryTab, dialogService, stateManager, preferencesService.getJournalAbbreviationPreferences(), abbreviationRepository, taskExecutor, undoManager)),</span>
+<span class="nc" id="L243">                        factory.createMenuItem(StandardActions.ABBREVIATE_DOTLESS, new AbbreviateAction(StandardActions.ABBREVIATE_DOTLESS, frame::getCurrentLibraryTab, dialogService, stateManager, preferencesService.getJournalAbbreviationPreferences(), abbreviationRepository, taskExecutor, undoManager)),</span>
+<span class="nc" id="L244">                        factory.createMenuItem(StandardActions.ABBREVIATE_SHORTEST_UNIQUE, new AbbreviateAction(StandardActions.ABBREVIATE_SHORTEST_UNIQUE, frame::getCurrentLibraryTab, dialogService, stateManager, preferencesService.getJournalAbbreviationPreferences(), abbreviationRepository, taskExecutor, undoManager))),</span>
+
+<span class="nc" id="L246">                factory.createMenuItem(StandardActions.UNABBREVIATE, new AbbreviateAction(StandardActions.UNABBREVIATE, frame::getCurrentLibraryTab, dialogService, stateManager, preferencesService.getJournalAbbreviationPreferences(), abbreviationRepository, taskExecutor, undoManager))</span>
+        );
+
+<span class="nc" id="L249">        Menu lookupIdentifiers = factory.createSubMenu(StandardActions.LOOKUP_DOC_IDENTIFIER);</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        for (IdFetcher&lt;?&gt; fetcher : WebFetchers.getIdFetchers(preferencesService.getImportFormatPreferences())) {</span>
+<span class="nc" id="L251">            LookupIdentifierAction&lt;?&gt; identifierAction = new LookupIdentifierAction&lt;&gt;(fetcher, stateManager, undoManager, dialogService, taskExecutor);</span>
+<span class="nc" id="L252">            lookupIdentifiers.getItems().add(factory.createMenuItem(identifierAction.getAction(), identifierAction));</span>
+<span class="nc" id="L253">        }</span>
+
+<span class="nc" id="L255">        lookup.getItems().addAll(</span>
+                lookupIdentifiers,
+<span class="nc" id="L257">                factory.createMenuItem(StandardActions.DOWNLOAD_FULL_TEXT, new DownloadFullTextAction(dialogService, stateManager, preferencesService, taskExecutor)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L261">                factory.createMenuItem(StandardActions.FIND_UNLINKED_FILES, new FindUnlinkedFilesAction(dialogService, stateManager))</span>
+        );
+
+<span class="nc" id="L264">        final MenuItem pushToApplicationMenuItem = factory.createMenuItem(pushToApplicationCommand.getAction(), pushToApplicationCommand);</span>
+<span class="nc" id="L265">        pushToApplicationCommand.registerReconfigurable(pushToApplicationMenuItem);</span>
+
+<span class="nc" id="L267">        tools.getItems().addAll(</span>
+<span class="nc" id="L268">                factory.createMenuItem(StandardActions.PARSE_LATEX, new ParseLatexAction(stateManager)),</span>
+<span class="nc" id="L269">                factory.createMenuItem(StandardActions.NEW_SUB_LIBRARY_FROM_AUX, new NewSubLibraryAction(frame, stateManager, dialogService)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L273">                factory.createMenuItem(StandardActions.WRITE_METADATA_TO_PDF,</span>
+<span class="nc" id="L274">                        new WriteMetadataToLinkedPdfsAction(dialogService, preferencesService.getFieldPreferences(), preferencesService.getFilePreferences(), preferencesService.getXmpPreferences(), entryTypesManager, abbreviationRepository, taskExecutor, stateManager)),</span>
+<span class="nc" id="L275">                factory.createMenuItem(StandardActions.COPY_LINKED_FILES, new CopyFilesAction(dialogService, preferencesService, stateManager, taskExecutor)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L279">                createSendSubMenu(factory, dialogService, stateManager, preferencesService),</span>
+                pushToApplicationMenuItem,
+
+                new SeparatorMenuItem(),
+
+                // Systematic Literature Review (SLR)
+<span class="nc" id="L285">                factory.createMenuItem(StandardActions.START_NEW_STUDY, new StartNewStudyAction(frame, frame::getOpenDatabaseAction, fileUpdateMonitor, taskExecutor, preferencesService, stateManager, dialogService)),</span>
+<span class="nc" id="L286">                factory.createMenuItem(StandardActions.EDIT_EXISTING_STUDY, new EditExistingStudyAction(dialogService, stateManager)),</span>
+<span class="nc" id="L287">                factory.createMenuItem(StandardActions.UPDATE_SEARCH_RESULTS_OF_STUDY, new ExistingStudySearchAction(frame, frame.getOpenDatabaseAction(), dialogService, fileUpdateMonitor, taskExecutor, preferencesService, stateManager)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L291">                factory.createMenuItem(StandardActions.REBUILD_FULLTEXT_SEARCH_INDEX, new RebuildFulltextSearchIndexAction(stateManager, frame::getCurrentLibraryTab, dialogService, preferencesService.getFilePreferences(), taskExecutor)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L295">                factory.createMenuItem(StandardActions.REDOWNLOAD_MISSING_FILES, new RedownloadMissingFilesAction(stateManager, dialogService, preferencesService.getFilePreferences(), taskExecutor))</span>
+        );
+<span class="nc" id="L297">        SidePaneType webSearchPane = SidePaneType.WEB_SEARCH;</span>
+<span class="nc" id="L298">        SidePaneType groupsPane = SidePaneType.GROUPS;</span>
+<span class="nc" id="L299">        SidePaneType openOfficePane = SidePaneType.OPEN_OFFICE;</span>
+<span class="nc" id="L300">        view.getItems().addAll(</span>
+<span class="nc" id="L301">                factory.createCheckMenuItem(webSearchPane.getToggleAction(), sidePane.getToggleCommandFor(webSearchPane), sidePane.paneVisibleBinding(webSearchPane)),</span>
+<span class="nc" id="L302">                factory.createCheckMenuItem(groupsPane.getToggleAction(), sidePane.getToggleCommandFor(groupsPane), sidePane.paneVisibleBinding(groupsPane)),</span>
+<span class="nc" id="L303">                factory.createCheckMenuItem(openOfficePane.getToggleAction(), sidePane.getToggleCommandFor(openOfficePane), sidePane.paneVisibleBinding(openOfficePane)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L307">                factory.createMenuItem(StandardActions.NEXT_PREVIEW_STYLE, new PreviewSwitchAction(PreviewSwitchAction.Direction.NEXT, frame::getCurrentLibraryTab, stateManager)),</span>
+<span class="nc" id="L308">                factory.createMenuItem(StandardActions.PREVIOUS_PREVIEW_STYLE, new PreviewSwitchAction(PreviewSwitchAction.Direction.PREVIOUS, frame::getCurrentLibraryTab, stateManager)),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L312">                factory.createMenuItem(StandardActions.SHOW_PDF_VIEWER, new ShowDocumentViewerAction(stateManager, preferencesService)),</span>
+<span class="nc" id="L313">                factory.createMenuItem(StandardActions.EDIT_ENTRY, new OpenEntryEditorAction(frame::getCurrentLibraryTab, stateManager)),</span>
+<span class="nc" id="L314">                factory.createMenuItem(StandardActions.OPEN_CONSOLE, new OpenConsoleAction(stateManager, preferencesService, dialogService))</span>
+        );
+
+<span class="nc" id="L317">        help.getItems().addAll(</span>
+<span class="nc" id="L318">                factory.createMenuItem(StandardActions.HELP, new HelpAction(HelpFile.CONTENTS, dialogService, preferencesService.getFilePreferences())),</span>
+<span class="nc" id="L319">                factory.createMenuItem(StandardActions.OPEN_FORUM, new OpenBrowserAction(&quot;http://discourse.jabref.org/&quot;, dialogService, preferencesService.getFilePreferences())),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L323">                factory.createMenuItem(StandardActions.ERROR_CONSOLE, new ErrorConsoleAction()),</span>
+
+                new SeparatorMenuItem(),
+
+<span class="nc" id="L327">                factory.createMenuItem(StandardActions.DONATE, new OpenBrowserAction(&quot;https://donations.jabref.org&quot;, dialogService, preferencesService.getFilePreferences())),</span>
+<span class="nc" id="L328">                factory.createMenuItem(StandardActions.SEARCH_FOR_UPDATES, new SearchForUpdateAction(Globals.BUILD_INFO, preferencesService, dialogService, taskExecutor)),</span>
+<span class="nc" id="L329">                factory.createSubMenu(StandardActions.WEB_MENU,</span>
+<span class="nc" id="L330">                        factory.createMenuItem(StandardActions.OPEN_WEBPAGE, new OpenBrowserAction(&quot;https://jabref.org/&quot;, dialogService, preferencesService.getFilePreferences())),</span>
+<span class="nc" id="L331">                        factory.createMenuItem(StandardActions.OPEN_BLOG, new OpenBrowserAction(&quot;https://blog.jabref.org/&quot;, dialogService, preferencesService.getFilePreferences())),</span>
+<span class="nc" id="L332">                        factory.createMenuItem(StandardActions.OPEN_FACEBOOK, new OpenBrowserAction(&quot;https://www.facebook.com/JabRef/&quot;, dialogService, preferencesService.getFilePreferences())),</span>
+<span class="nc" id="L333">                        factory.createMenuItem(StandardActions.OPEN_TWITTER, new OpenBrowserAction(&quot;https://twitter.com/jabref_org&quot;, dialogService, preferencesService.getFilePreferences())),</span>
+<span class="nc" id="L334">                        factory.createMenuItem(StandardActions.OPEN_GITHUB, new OpenBrowserAction(&quot;https://github.com/JabRef/jabref&quot;, dialogService, preferencesService.getFilePreferences())),</span>
+
+                        new SeparatorMenuItem(),
+
+<span class="nc" id="L338">                        factory.createMenuItem(StandardActions.OPEN_DEV_VERSION_LINK, new OpenBrowserAction(&quot;https://builds.jabref.org/master/&quot;, dialogService, preferencesService.getFilePreferences())),</span>
+<span class="nc" id="L339">                        factory.createMenuItem(StandardActions.OPEN_CHANGELOG, new OpenBrowserAction(&quot;https://github.com/JabRef/jabref/blob/main/CHANGELOG.md&quot;, dialogService, preferencesService.getFilePreferences()))</span>
+                ),
+<span class="nc" id="L341">                factory.createMenuItem(StandardActions.ABOUT, new AboutAction())</span>
+        );
+
+        // @formatter:on
+<span class="nc" id="L345">        getStyleClass().add(&quot;mainMenu&quot;);</span>
+<span class="nc" id="L346">        getMenus().addAll(</span>
+                file,
+                edit,
+                library,
+                quality,
+                lookup,
+                tools,
+                view,
+                help);
+<span class="nc" id="L355">        setUseSystemMenuBar(true);</span>
+<span class="nc" id="L356">    }</span>
+
+    private Menu createSendSubMenu(ActionFactory factory,
+                                   DialogService dialogService,
+                                   StateManager stateManager,
+                                   PreferencesService preferencesService) {
+<span class="nc" id="L362">        Menu sendMenu = factory.createMenu(StandardActions.SEND);</span>
+<span class="nc" id="L363">        sendMenu.getItems().addAll(</span>
+<span class="nc" id="L364">                factory.createMenuItem(StandardActions.SEND_AS_EMAIL, new SendAsStandardEmailAction(dialogService, preferencesService, stateManager, entryTypesManager, taskExecutor)),</span>
+<span class="nc" id="L365">                factory.createMenuItem(StandardActions.SEND_TO_KINDLE, new SendAsKindleEmailAction(dialogService, preferencesService, stateManager, taskExecutor))</span>
+        );
+
+<span class="nc" id="L368">        return sendMenu;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

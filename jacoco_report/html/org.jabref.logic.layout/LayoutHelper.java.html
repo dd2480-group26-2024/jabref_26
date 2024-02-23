@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LayoutHelper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.layout</a> &gt; <span class="el_source">LayoutHelper.java</span></div><h1>LayoutHelper.java</h1><pre class="source lang-java linenums">package org.jabref.logic.layout;
+
+import java.io.IOException;
+import java.io.PushbackReader;
+import java.io.Reader;
+import java.nio.file.Path;
+
+import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Map;
+import java.util.HashMap;
+
+
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+
+/**
+ * Helper class to get a Layout object.
+ *
+ * &lt;pre&gt;
+ * &lt;code&gt;
+ * LayoutHelper helper = new LayoutHelper(...a reader...);
+ * Layout layout = helper.getLayoutFromText();
+ * &lt;/code&gt;
+ * &lt;/pre&gt;
+ */
+public class LayoutHelper {
+  
+<span class="fc" id="L33">    public static Map&lt;Integer, Boolean&gt; branchCoverage = new HashMap&lt;&gt;();</span>
+
+  
+    public static final int IS_LAYOUT_TEXT = 1;
+    public static final int IS_SIMPLE_COMMAND = 2;
+    public static final int IS_FIELD_START = 3;
+    public static final int IS_FIELD_END = 4;
+    public static final int IS_OPTION_FIELD = 5;
+    public static final int IS_GROUP_START = 6;
+    public static final int IS_GROUP_END = 7;
+    public static final int IS_ENCODING_NAME = 8;
+    public static final int IS_FILENAME = 9;
+    public static final int IS_FILEPATH = 10;
+
+    private static String currentGroup;
+
+    private final PushbackReader in;
+<span class="fc" id="L50">    private final List&lt;StringInt&gt; parsedEntries = new ArrayList&lt;&gt;();</span>
+    private final List&lt;Path&gt; fileDirForDatabase;
+    private final LayoutFormatterPreferences preferences;
+    private final JournalAbbreviationRepository abbreviationRepository;
+    private boolean endOfFile;
+
+    public LayoutHelper(Reader in,
+                        List&lt;Path&gt; fileDirForDatabase,
+                        LayoutFormatterPreferences preferences,
+<span class="fc" id="L59">                        JournalAbbreviationRepository abbreviationRepository) {</span>
+<span class="fc" id="L60">        this.in = new PushbackReader(Objects.requireNonNull(in));</span>
+<span class="fc" id="L61">        this.preferences = Objects.requireNonNull(preferences);</span>
+<span class="fc" id="L62">        this.abbreviationRepository = abbreviationRepository;</span>
+<span class="fc" id="L63">        this.fileDirForDatabase = fileDirForDatabase;</span>
+<span class="fc" id="L64">    }</span>
+
+    public LayoutHelper(Reader in,
+                        LayoutFormatterPreferences preferences,
+                        JournalAbbreviationRepository abbreviationRepository) {
+<span class="fc" id="L69">        this(in, Collections.emptyList(), preferences, abbreviationRepository);</span>
+<span class="fc" id="L70">    }</span>
+
+    public Layout getLayoutFromText() throws IOException {
+<span class="fc" id="L73">        parse();</span>
+
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (StringInt parsedEntry : parsedEntries) {</span>
+<span class="pc bpc" id="L76" title="2 of 10 branches missed.">            if ((parsedEntry.i == LayoutHelper.IS_SIMPLE_COMMAND) || (parsedEntry.i == LayoutHelper.IS_FIELD_START)</span>
+                    || (parsedEntry.i == LayoutHelper.IS_FIELD_END) || (parsedEntry.i == LayoutHelper.IS_GROUP_START)
+                    || (parsedEntry.i == LayoutHelper.IS_GROUP_END)) {
+<span class="fc" id="L79">                parsedEntry.s = parsedEntry.s.trim().toLowerCase(Locale.ROOT);</span>
+            }
+<span class="fc" id="L81">        }</span>
+
+<span class="fc" id="L83">        return new Layout(parsedEntries, fileDirForDatabase, preferences, abbreviationRepository);</span>
+    }
+
+    public static String getCurrentGroup() {
+<span class="nc" id="L87">        return LayoutHelper.currentGroup;</span>
+    }
+
+    public static void setCurrentGroup(String newGroup) {
+<span class="nc" id="L91">        LayoutHelper.currentGroup = newGroup;</span>
+<span class="nc" id="L92">    }</span>
+
+    private void doBracketedField(final int field) throws IOException {
+<span class="fc" id="L95">        StringBuilder buffer = null;</span>
+        int currentCharacter;
+<span class="fc" id="L97">        boolean start = false;</span>
+
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        while (!endOfFile) {</span>
+<span class="fc" id="L100">            currentCharacter = read();</span>
+
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (currentCharacter == -1) {</span>
+<span class="nc" id="L103">                endOfFile = true;</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                if (buffer != null) {</span>
+<span class="nc" id="L105">                    parsedEntries.add(new StringInt(buffer.toString(), field));</span>
+                }
+<span class="nc" id="L107">                return;</span>
+            }
+
+<span class="fc bfc" id="L110" title="All 4 branches covered.">            if ((currentCharacter == '{') || (currentCharacter == '}')) {</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                if (currentCharacter == '}') {</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                    if (buffer != null) {</span>
+<span class="fc" id="L113">                        parsedEntries.add(new StringInt(buffer.toString(), field));</span>
+<span class="fc" id="L114">                        return;</span>
+                    }
+                } else {
+<span class="fc" id="L117">                    start = true;</span>
+                }
+            } else {
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                if (buffer == null) {</span>
+<span class="fc" id="L121">                    buffer = new StringBuilder(100);</span>
+                }
+
+<span class="pc bpc" id="L124" title="2 of 4 branches missed.">                if (start &amp;&amp; (currentCharacter != '}')) {</span>
+<span class="fc" id="L125">                    buffer.append((char) currentCharacter);</span>
+                }
+            }
+        }
+<span class="nc" id="L129">    }</span>
+
+    private void doBracketedOptionField() throws IOException {
+<span class="fc" id="L132">        StringBuilder buffer = null;</span>
+        int c;
+<span class="fc" id="L134">        boolean start = false;</span>
+<span class="fc" id="L135">        boolean inQuotes = false;</span>
+<span class="fc" id="L136">        boolean doneWithOptions = false;</span>
+<span class="fc" id="L137">        String option = null;</span>
+        String tmp;
+
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        while (!endOfFile) {</span>
+<span class="fc" id="L141">            branchCoverage.put(1, true);</span>
+<span class="fc" id="L142">            c = read();</span>
+
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (c == -1) {</span>
+<span class="nc" id="L145">                branchCoverage.put(1, true);</span>
+<span class="nc" id="L146">                endOfFile = true;</span>
+
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                if (buffer != null) {</span>
+<span class="nc" id="L149">                    branchCoverage.put(2, true);</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                    if (option == null) {</span>
+<span class="nc" id="L151">                        branchCoverage.put(3, true);</span>
+<span class="nc" id="L152">                        tmp = buffer.toString();</span>
+                    } else {
+<span class="nc" id="L154">                        branchCoverage.put(4, true);</span>
+<span class="nc" id="L155">                        tmp = buffer.toString() + '\n' + option;</span>
+                    }
+
+<span class="nc" id="L158">                    parsedEntries.add(new StringInt(tmp, LayoutHelper.IS_OPTION_FIELD));</span>
+                }
+
+<span class="nc" id="L161">                return;</span>
+            }
+<span class="fc bfc" id="L163" title="All 12 branches covered.">            if (!inQuotes &amp;&amp; ((c == ']') || (c == '[') || (doneWithOptions &amp;&amp; ((c == '{') || (c == '}'))))) {</span>
+<span class="fc" id="L164">                branchCoverage.put(5, true);</span>
+<span class="fc" id="L165">                branchCoverage.put(6, true);</span>
+<span class="fc" id="L166">                branchCoverage.put(7, true);</span>
+<span class="fc" id="L167">                branchCoverage.put(8, true);</span>
+<span class="fc" id="L168">                branchCoverage.put(9, true);</span>
+<span class="fc" id="L169">                branchCoverage.put(10, true);</span>
+<span class="fc bfc" id="L170" title="All 6 branches covered.">                if ((c == ']') || (doneWithOptions &amp;&amp; (c == '}'))) {</span>
+<span class="fc" id="L171">                    branchCoverage.put(11, true);</span>
+<span class="fc" id="L172">                    branchCoverage.put(12, true);</span>
+<span class="fc" id="L173">                    branchCoverage.put(13, true);</span>
+                    // changed section start - arudert
+                    // buffer may be null for parameters
+<span class="pc bpc" id="L176" title="1 of 4 branches missed.">                    if ((c == ']') &amp;&amp; (buffer != null)) {</span>
+<span class="fc" id="L177">                        branchCoverage.put(14, true);</span>
+<span class="fc" id="L178">                        branchCoverage.put(15, true);</span>
+                        // changed section end - arudert
+<span class="fc" id="L180">                        option = buffer.toString();</span>
+<span class="fc" id="L181">                        buffer = null;</span>
+<span class="fc" id="L182">                        start = false;</span>
+<span class="fc" id="L183">                        doneWithOptions = true;</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                    } else if (c == '}') {</span>
+<span class="fc" id="L185">                        branchCoverage.put(16, true);</span>
+                        // changed section begin - arudert
+                        // bracketed option must be followed by an (optionally empty) parameter
+                        // if empty, the parameter is set to &quot; &quot; (whitespace to avoid that the tokenizer that
+                        // splits the string later on ignores the empty parameter)
+<span class="fc bfc" id="L190" title="All 2 branches covered.">                        String parameter = buffer == null ? &quot; &quot; : buffer.toString();</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                        if (option == null) {</span>
+<span class="nc" id="L192">                            branchCoverage.put(17, true);</span>
+<span class="nc" id="L193">                            tmp = parameter;</span>
+                        } else {
+<span class="fc" id="L195">                            branchCoverage.put(18, true);</span>
+<span class="fc" id="L196">                            tmp = parameter + '\n' + option;</span>
+                        }
+
+<span class="fc" id="L199">                        parsedEntries.add(new StringInt(tmp, LayoutHelper.IS_OPTION_FIELD));</span>
+
+<span class="fc" id="L201">                        return;</span>
+                    }
+                    // changed section end - arudert
+                    // changed section start - arudert
+                    // }
+                    // changed section end - arudert
+                } else {
+<span class="fc" id="L208">                    branchCoverage.put(19, true);</span>
+<span class="fc" id="L209">                    start = true;</span>
+                }
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            } else if (c == '&quot;') {</span>
+<span class="fc" id="L212">                branchCoverage.put(20, true);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                inQuotes = !inQuotes;</span>
+
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                if (buffer == null) {</span>
+<span class="nc" id="L216">                    branchCoverage.put(21, true);</span>
+<span class="nc" id="L217">                    buffer = new StringBuilder(100);</span>
+                }
+<span class="fc" id="L219">                buffer.append('&quot;');</span>
+            } else {
+<span class="fc" id="L221">                branchCoverage.put(22, true);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                if (buffer == null) {</span>
+<span class="fc" id="L223">                    branchCoverage.put(23, true);</span>
+<span class="fc" id="L224">                    buffer = new StringBuilder(100);</span>
+                }
+
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                if (start) {</span>
+<span class="fc" id="L228">                    branchCoverage.put(24, true);</span>
+                    // changed section begin - arudert
+                    // keep the backslash so we know wether this is a fieldname or an ordinary parameter
+                    // if (c != '\\') {
+<span class="fc" id="L232">                    buffer.append((char) c);</span>
+                    // }
+                    // changed section end - arudert
+                }
+            }
+        }
+<span class="nc" id="L238">    }</span>
+
+    private void parse() throws IOException {
+<span class="fc" id="L241">        skipWhitespace();</span>
+
+        int c;
+
+<span class="fc" id="L245">        StringBuilder buffer = null;</span>
+<span class="fc" id="L246">        boolean escaped = false;</span>
+
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        while (!endOfFile) {</span>
+<span class="fc" id="L249">            c = read();</span>
+
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            if (c == -1) {</span>
+<span class="fc" id="L252">                endOfFile = true;</span>
+
+                // Check for null, otherwise a Layout that finishes with a curly brace throws a NPE
+<span class="fc bfc" id="L255" title="All 2 branches covered.">                if (buffer != null) {</span>
+<span class="fc" id="L256">                    parsedEntries.add(new StringInt(buffer.toString(), LayoutHelper.IS_LAYOUT_TEXT));</span>
+                }
+
+<span class="fc" id="L259">                return;</span>
+            }
+
+<span class="fc bfc" id="L262" title="All 6 branches covered.">            if ((c == '\\') &amp;&amp; (peek() != '\\') &amp;&amp; !escaped) {</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">                if (buffer != null) {</span>
+<span class="fc" id="L264">                    parsedEntries.add(new StringInt(buffer.toString(), LayoutHelper.IS_LAYOUT_TEXT));</span>
+
+<span class="fc" id="L266">                    buffer = null;</span>
+                }
+
+<span class="fc" id="L269">                parseField();</span>
+
+                // To make sure the next character, if it is a backslash,
+                // doesn't get ignored, since &quot;previous&quot; now holds a backslash:
+<span class="fc" id="L273">                escaped = false;</span>
+            } else {
+<span class="fc bfc" id="L275" title="All 2 branches covered.">                if (buffer == null) {</span>
+<span class="fc" id="L276">                    buffer = new StringBuilder(100);</span>
+                }
+
+<span class="fc bfc" id="L279" title="All 4 branches covered.">                if ((c != '\\') || escaped) /* (previous == '\\'))) */ {</span>
+<span class="fc" id="L280">                    buffer.append((char) c);</span>
+                }
+
+<span class="fc bfc" id="L283" title="All 4 branches covered.">                escaped = (c == '\\') &amp;&amp; !escaped;</span>
+            }
+        }
+<span class="fc" id="L286">    }</span>
+
+    private void parseField() throws IOException {
+        int c;
+<span class="fc" id="L290">        StringBuilder buffer = null;</span>
+        String name;
+
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        while (!endOfFile) {</span>
+<span class="fc" id="L294">            branchCoverage.put(1, true);</span>
+<span class="fc" id="L295">            c = read();</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            if (c == -1) {</span>
+<span class="fc" id="L297">                branchCoverage.put(2, true);</span>
+<span class="fc" id="L298">                endOfFile = true;</span>
+            }
+
+<span class="pc bpc" id="L301" title="1 of 4 branches missed.">            if (!Character.isLetter((char) c) &amp;&amp; (c != '_')) {</span>
+<span class="fc" id="L302">                unread(c);</span>
+<span class="fc" id="L303">                branchCoverage.put(3, true);</span>
+
+<span class="fc bfc" id="L305" title="All 2 branches covered.">                name = buffer == null ? &quot;&quot; : buffer.toString();</span>
+
+<span class="fc bfc" id="L307" title="All 2 branches covered.">                if (name.isEmpty()) {</span>
+<span class="fc" id="L308">                    branchCoverage.put(4, true);</span>
+<span class="fc" id="L309">                    StringBuilder lastFive = new StringBuilder(10);</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">                    if (parsedEntries.isEmpty()) {</span>
+<span class="fc" id="L311">                        branchCoverage.put(5, true);</span>
+<span class="fc" id="L312">                        lastFive.append(&quot;unknown&quot;);</span>
+                    } else {
+<span class="nc" id="L314">                        branchCoverage.put(6, true);</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">                        for (StringInt entry : parsedEntries.subList(Math.max(0, parsedEntries.size() - 6),</span>
+<span class="nc" id="L316">                                parsedEntries.size() - 1)) {</span>
+<span class="nc" id="L317">                            branchCoverage.put(7, true);</span>
+<span class="nc" id="L318">                            lastFive.append(entry.s);</span>
+<span class="nc" id="L319">                        }</span>
+                    }
+<span class="fc" id="L321">                    throw new IOException(</span>
+<span class="fc" id="L322">                            &quot;Backslash parsing error near \'&quot; + lastFive.toString().replace(&quot;\n&quot;, &quot; &quot;) + '\'');</span>
+                }
+
+<span class="fc bfc" id="L325" title="All 2 branches covered.">                if (&quot;begin&quot;.equalsIgnoreCase(name)) {</span>
+                    // get field name
+<span class="fc" id="L327">                    branchCoverage.put(8, true);</span>
+<span class="fc" id="L328">                    doBracketedField(LayoutHelper.IS_FIELD_START);</span>
+
+<span class="fc" id="L330">                    return;</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">                } else if (&quot;begingroup&quot;.equalsIgnoreCase(name)) {</span>
+                    // get field name
+<span class="nc" id="L333">                    branchCoverage.put(9, true);</span>
+<span class="nc" id="L334">                    doBracketedField(LayoutHelper.IS_GROUP_START);</span>
+<span class="nc" id="L335">                    return;</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">                } else if (&quot;format&quot;.equalsIgnoreCase(name)) {</span>
+<span class="fc" id="L337">                    branchCoverage.put(10, true);</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">                    if (c == '[') {</span>
+                        // get format parameter
+                        // get field name
+<span class="fc" id="L341">                        branchCoverage.put(11, true);</span>
+<span class="fc" id="L342">                        doBracketedOptionField();</span>
+
+<span class="fc" id="L344">                        return;</span>
+                    } else {
+                        // get field name
+<span class="fc" id="L347">                        branchCoverage.put(12, true);</span>
+<span class="fc" id="L348">                        doBracketedField(LayoutHelper.IS_OPTION_FIELD);</span>
+
+<span class="fc" id="L350">                        return;</span>
+                    }
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">                } else if (&quot;filename&quot;.equalsIgnoreCase(name)) {</span>
+                    // Print the name of the database BIB file.
+                    // This is only supported in begin/end layouts, not in
+                    // entry layouts.
+<span class="nc" id="L356">                    branchCoverage.put(13, true);</span>
+<span class="nc" id="L357">                    parsedEntries.add(new StringInt(name, LayoutHelper.IS_FILENAME));</span>
+<span class="nc" id="L358">                    return;</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                } else if (&quot;filepath&quot;.equalsIgnoreCase(name)) {</span>
+                    // Print the full path of the database BIB file.
+                    // This is only supported in begin/end layouts, not in
+                    // entry layouts.
+<span class="nc" id="L363">                    branchCoverage.put(14, true);</span>
+<span class="nc" id="L364">                    parsedEntries.add(new StringInt(name, LayoutHelper.IS_FILEPATH));</span>
+<span class="nc" id="L365">                    return;</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">                } else if (&quot;end&quot;.equalsIgnoreCase(name)) {</span>
+                    // get field name
+<span class="fc" id="L368">                    branchCoverage.put(15, true);</span>
+<span class="fc" id="L369">                    doBracketedField(LayoutHelper.IS_FIELD_END);</span>
+<span class="fc" id="L370">                    return;</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                } else if (&quot;endgroup&quot;.equalsIgnoreCase(name)) {</span>
+                    // get field name
+<span class="nc" id="L373">                    branchCoverage.put(16, true);</span>
+<span class="nc" id="L374">                    doBracketedField(LayoutHelper.IS_GROUP_END);</span>
+<span class="nc" id="L375">                    return;</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">                } else if (&quot;encoding&quot;.equalsIgnoreCase(name)) {</span>
+                    // Print the name of the current encoding used for export.
+                    // This is only supported in begin/end layouts, not in
+                    // entry layouts.
+<span class="fc" id="L380">                    branchCoverage.put(17, true);</span>
+<span class="fc" id="L381">                    parsedEntries.add(new StringInt(name, LayoutHelper.IS_ENCODING_NAME));</span>
+<span class="fc" id="L382">                    return;</span>
+                }
+
+                // for all other cases -&gt; simple command
+<span class="fc" id="L386">                parsedEntries.add(new StringInt(name, LayoutHelper.IS_SIMPLE_COMMAND));</span>
+
+<span class="fc" id="L388">                return;</span>
+            } else {
+<span class="fc" id="L390">                branchCoverage.put(18, true);</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">                if (buffer == null) {</span>
+<span class="fc" id="L392">                    branchCoverage.put(19, true);</span>
+<span class="fc" id="L393">                    buffer = new StringBuilder(100);</span>
+                }
+<span class="fc" id="L395">                buffer.append((char) c);</span>
+            }
+        }
+<span class="nc" id="L398">    }</span>
+
+    private int peek() throws IOException {
+<span class="fc" id="L401">        int c = read();</span>
+<span class="fc" id="L402">        unread(c);</span>
+
+<span class="fc" id="L404">        return c;</span>
+    }
+
+    private int read() throws IOException {
+<span class="fc" id="L408">        return in.read();</span>
+    }
+
+    private void skipWhitespace() throws IOException {
+        int c;
+
+        while (true) {
+<span class="fc" id="L415">            c = read();</span>
+
+<span class="pc bpc" id="L417" title="2 of 4 branches missed.">            if ((c == -1) || (c == 65535)) {</span>
+<span class="nc" id="L418">                endOfFile = true;</span>
+
+<span class="nc" id="L420">                return;</span>
+            }
+
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (!Character.isWhitespace((char) c)) {</span>
+<span class="fc" id="L424">                unread(c);</span>
+<span class="fc" id="L425">                break;</span>
+            }
+        }
+<span class="fc" id="L428">    }</span>
+
+    private void unread(int c) throws IOException {
+<span class="fc" id="L431">        in.unread(c);</span>
+<span class="fc" id="L432">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

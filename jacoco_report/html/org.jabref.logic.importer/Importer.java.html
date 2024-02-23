@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Importer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer</a> &gt; <span class="el_source">Importer.java</span></div><h1>Importer.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.StringReader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.Objects;
+
+import org.jabref.logic.util.FileType;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabaseModeDetection;
+
+import com.ibm.icu.text.CharsetDetector;
+import com.ibm.icu.text.CharsetMatch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Role of an importer for JabRef.
+ */
+<span class="fc" id="L29">public abstract class Importer implements Comparable&lt;Importer&gt; {</span>
+
+<span class="fc" id="L31">    private static final Logger LOGGER = LoggerFactory.getLogger(Importer.class);</span>
+
+    /**
+     * Check whether the source is in the correct format for this importer.
+     * &lt;p&gt;
+     * The effect of this method is primarily to avoid unnecessary processing of files when searching for a suitable
+     * import format. If this method returns false, the import routine will move on to the next import format.
+     * &lt;p&gt;
+     * Thus the correct behaviour is to return false if it is certain that the file is not of the suitable type, and
+     * true otherwise. Returning true is the safe choice if not certain.
+     */
+    public abstract boolean isRecognizedFormat(BufferedReader input) throws IOException;
+
+    /**
+     * Check whether the source is in the correct format for this importer.
+     *
+     * @param filePath the path of the file to check
+     * @return true, if the file is in a recognized format
+     * @throws IOException Signals that an I/O exception has occurred.
+     */
+    public boolean isRecognizedFormat(Path filePath) throws IOException {
+<span class="fc" id="L52">        try (BufferedReader bufferedReader = getReader(filePath)) {</span>
+<span class="fc" id="L53">            return isRecognizedFormat(bufferedReader);</span>
+        }
+    }
+
+    /**
+     * Check whether the source is in the correct format for this importer.
+     *
+     * @param data the data to check
+     * @return true, if the data is in a recognized format
+     * @throws IOException Signals that an I/O exception has occurred.
+     */
+    public boolean isRecognizedFormat(String data) throws IOException {
+<span class="fc" id="L65">        try (StringReader stringReader = new StringReader(data);</span>
+<span class="fc" id="L66">             BufferedReader bufferedReader = new BufferedReader(stringReader)) {</span>
+<span class="fc" id="L67">            return isRecognizedFormat(bufferedReader);</span>
+        }
+    }
+
+    /**
+     * Parse the database in the source.
+     * &lt;p&gt;
+     * This method can be called in two different contexts - either when importing in a specified format, or when
+     * importing in unknown format. In the latter case, JabRef cycles through all available import formats. No error
+     * messages or feedback is displayed from individual import formats in this case.
+     * &lt;p&gt;
+     * If importing in a specified format and an empty library is returned, JabRef reports that no entries were found.
+     * &lt;p&gt;
+     * This method should never return null.
+     *
+     * @param input the input to read from
+     */
+    public abstract ParserResult importDatabase(BufferedReader input) throws IOException;
+
+    /**
+     * Parse the database in the specified file.
+     *
+     * @param filePath the path to the file which should be imported
+     */
+    public ParserResult importDatabase(Path filePath) throws IOException {
+<span class="fc" id="L92">        try (InputStream inputStream = Files.newInputStream(filePath, StandardOpenOption.READ)) {</span>
+<span class="fc" id="L93">            BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);</span>
+
+<span class="fc" id="L95">            Charset charset = StandardCharsets.UTF_8;</span>
+
+<span class="fc" id="L97">            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(bufferedInputStream, charset));</span>
+<span class="fc" id="L98">            ParserResult parserResult = importDatabase(bufferedReader);</span>
+<span class="fc" id="L99">            parserResult.getMetaData().setEncoding(charset);</span>
+<span class="fc" id="L100">            parserResult.setPath(filePath);</span>
+
+            // Make sure the mode is always set
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            if (parserResult.getMetaData().getMode().isEmpty()) {</span>
+<span class="fc" id="L104">                parserResult.getMetaData().setMode(BibDatabaseModeDetection.inferMode(parserResult.getDatabase()));</span>
+            }
+<span class="fc" id="L106">            return parserResult;</span>
+        }
+    }
+
+    protected static Charset getCharset(BufferedInputStream bufferedInputStream) {
+<span class="fc" id="L111">        Charset defaultCharSet = StandardCharsets.UTF_8;</span>
+
+        // This reads the first 8000 bytes only, thus the default size of 8192 of the bufferedInputStream is OK.
+        // See https://github.com/unicode-org/icu/blob/06ef8867f35befee7340e35082fefc9d3561d230/icu4j/main/classes/core/src/com/ibm/icu/text/CharsetDetector.java#L125 for details
+<span class="fc" id="L115">        CharsetDetector charsetDetector = new CharsetDetector();</span>
+        try {
+<span class="fc" id="L117">            charsetDetector.setText(bufferedInputStream);</span>
+
+<span class="fc" id="L119">            CharsetMatch[] matches = charsetDetector.detectAll();</span>
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">            if ((matches == null) || (matches.length == 0)) {</span>
+<span class="nc" id="L121">                return defaultCharSet;</span>
+            }
+
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (Arrays.stream(matches).anyMatch(charset -&gt; &quot;ASCII&quot;.equals(charset.getName()))) {</span>
+<span class="fc" id="L125">                return defaultCharSet;</span>
+            }
+
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (matches[0] != null) {</span>
+<span class="fc" id="L129">                return Charset.forName(matches[0].getName());</span>
+            }
+<span class="nc" id="L131">        } catch (IOException e) {</span>
+<span class="nc" id="L132">            LOGGER.error(&quot;Could not determine charset. Using default one.&quot;, e);</span>
+<span class="nc" id="L133">        }</span>
+<span class="nc" id="L134">        return defaultCharSet;</span>
+    }
+
+    /**
+     * Parse the database in the specified string.
+     * &lt;p&gt;
+     * Importer having the facilities to detect the correct encoding of a string should overwrite this method, determine
+     * the encoding and then call {@link #importDatabase(BufferedReader)}.
+     *
+     * @param data the string which should be imported
+     * @return the parsed result
+     * @throws IOException Signals that an I/O exception has occurred.
+     */
+    public ParserResult importDatabase(String data) throws IOException {
+<span class="fc" id="L148">        try (StringReader stringReader = new StringReader(data);</span>
+<span class="fc" id="L149">             BufferedReader bufferedReader = new BufferedReader(stringReader)) {</span>
+<span class="fc" id="L150">            return importDatabase(bufferedReader);</span>
+        }
+    }
+
+    public static BufferedReader getReader(Path filePath) throws IOException {
+<span class="fc" id="L155">        InputStream stream = Files.newInputStream(filePath, StandardOpenOption.READ);</span>
+
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (FileUtil.isBibFile(filePath)) {</span>
+<span class="fc" id="L158">            return getReader(stream);</span>
+        }
+
+<span class="fc" id="L161">        return new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));</span>
+    }
+
+    public static BufferedReader getReader(InputStream stream) {
+<span class="fc" id="L165">        BufferedInputStream bufferedInputStream = new BufferedInputStream(stream);</span>
+<span class="fc" id="L166">        Charset charset = getCharset(bufferedInputStream);</span>
+<span class="fc" id="L167">        InputStreamReader reader = new InputStreamReader(bufferedInputStream, charset);</span>
+<span class="fc" id="L168">        return new BufferedReader(reader);</span>
+    }
+
+    /**
+     * Returns the name of this import format.
+     *
+     * &lt;p&gt;The name must be unique.&lt;/p&gt;
+     *
+     * @return format name, must be unique and not &lt;code&gt;null&lt;/code&gt;
+     */
+    public abstract String getName();
+
+    /**
+     * Returns the type of files that this importer can read
+     *
+     * @return {@link FileType} corresponding to the importer
+     */
+    public abstract FileType getFileType();
+
+    /**
+     * Returns a one-word ID which identifies this importer. Used for example, to identify the importer when used from
+     * the command line.
+     *
+     * @return ID, must be unique and not &lt;code&gt;null&lt;/code&gt;
+     */
+    public String getId() {
+<span class="fc" id="L194">        String id = getName();</span>
+<span class="fc" id="L195">        StringBuilder result = new StringBuilder(id.length());</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (int i = 0; i &lt; id.length(); i++) {</span>
+<span class="fc" id="L197">            char c = id.charAt(i);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (Character.isLetterOrDigit(c)) {</span>
+<span class="fc" id="L199">                result.append(Character.toLowerCase(c));</span>
+            }
+        }
+<span class="fc" id="L202">        return result.toString();</span>
+    }
+
+    /**
+     * Returns the description of the import format.
+     * &lt;p&gt;
+     * The description should specify
+     * &lt;ul&gt;&lt;li&gt;
+     *   what kind of entries from what sources and based on what specification it is able to import
+     * &lt;/li&gt;&lt;li&gt;
+     *   by what criteria it {@link #isRecognizedFormat(BufferedReader) recognizes} an import format
+     * &lt;/li&gt;&lt;/ul&gt;
+     *
+     * @return description of the import format
+     */
+    public abstract String getDescription();
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L221">        return getName().hashCode();</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L227">            return true;</span>
+        }
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (!(obj instanceof Importer)) {</span>
+<span class="nc" id="L230">            return false;</span>
+        }
+<span class="fc" id="L232">        Importer other = (Importer) obj;</span>
+<span class="fc" id="L233">        return Objects.equals(this.getName(), other.getName());</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L238">        return getName();</span>
+    }
+
+    @Override
+    public int compareTo(Importer o) {
+<span class="fc" id="L243">        return getName().compareTo(o.getName());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

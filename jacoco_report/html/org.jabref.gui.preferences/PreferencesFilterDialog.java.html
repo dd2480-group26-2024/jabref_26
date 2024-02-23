@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreferencesFilterDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences</a> &gt; <span class="el_source">PreferencesFilterDialog.java</span></div><h1>PreferencesFilterDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences;
+
+import java.util.Locale;
+import java.util.Objects;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.fxml.FXML;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.preferences.PreferencesFilter;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+
+public class PreferencesFilterDialog extends BaseDialog&lt;Void&gt; {
+
+    private final PreferencesFilter preferencesFilter;
+    private final ObservableList&lt;PreferencesFilter.PreferenceOption&gt; preferenceOptions;
+    private final FilteredList&lt;PreferencesFilter.PreferenceOption&gt; filteredOptions;
+
+    @FXML private TableView&lt;PreferencesFilter.PreferenceOption&gt; table;
+    @FXML private TableColumn&lt;PreferencesFilter.PreferenceOption, PreferencesFilter.PreferenceType&gt; columnType;
+    @FXML private TableColumn&lt;PreferencesFilter.PreferenceOption, String&gt; columnKey;
+    @FXML private TableColumn&lt;PreferencesFilter.PreferenceOption, Object&gt; columnValue;
+    @FXML private TableColumn&lt;PreferencesFilter.PreferenceOption, Object&gt; columnDefaultValue;
+    @FXML private CheckBox showOnlyDeviatingPreferenceOptions;
+    @FXML private Label count;
+    @FXML private TextField searchField;
+
+<span class="nc" id="L41">    public PreferencesFilterDialog(PreferencesFilter preferencesFilter) {</span>
+<span class="nc" id="L42">        this.preferencesFilter = Objects.requireNonNull(preferencesFilter);</span>
+<span class="nc" id="L43">        this.preferenceOptions = FXCollections.observableArrayList();</span>
+<span class="nc" id="L44">        this.filteredOptions = new FilteredList&lt;&gt;(this.preferenceOptions);</span>
+
+<span class="nc" id="L46">        ViewLoader.view(this)</span>
+<span class="nc" id="L47">                  .load()</span>
+<span class="nc" id="L48">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L50">        this.setTitle(Localization.lang(&quot;Preferences&quot;));</span>
+<span class="nc" id="L51">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L55">        showOnlyDeviatingPreferenceOptions.setOnAction(event -&gt; updateModel());</span>
+<span class="nc" id="L56">        filteredOptions.predicateProperty().bind(EasyBind.map(searchField.textProperty(), searchText -&gt; {</span>
+<span class="nc bnc" id="L57" title="All 4 branches missed.">            if ((searchText == null) || searchText.isEmpty()) {</span>
+<span class="nc" id="L58">                return null;</span>
+            }
+<span class="nc" id="L60">            String lowerCaseSearchText = searchText.toLowerCase(Locale.ROOT);</span>
+<span class="nc" id="L61">            return option -&gt; option.getKey().toLowerCase(Locale.ROOT).contains(lowerCaseSearchText);</span>
+        }));
+<span class="nc" id="L63">        columnType.setCellValueFactory(data -&gt; new ReadOnlyObjectWrapper&lt;&gt;(data.getValue().getType()));</span>
+<span class="nc" id="L64">        columnKey.setCellValueFactory(data -&gt; new ReadOnlyStringWrapper(data.getValue().getKey()));</span>
+<span class="nc" id="L65">        columnValue.setCellValueFactory(data -&gt; new ReadOnlyObjectWrapper&lt;&gt;(data.getValue().getValue()));</span>
+<span class="nc" id="L66">        columnDefaultValue.setCellValueFactory(data -&gt; new ReadOnlyObjectWrapper&lt;&gt;(data.getValue().getDefaultValue().orElse(&quot;&quot;)));</span>
+<span class="nc" id="L67">        table.setItems(filteredOptions);</span>
+<span class="nc" id="L68">        count.textProperty().bind(Bindings.size(table.getItems()).asString(&quot;(%d)&quot;));</span>
+<span class="nc" id="L69">        updateModel();</span>
+<span class="nc" id="L70">    }</span>
+
+    private void updateModel() {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (showOnlyDeviatingPreferenceOptions.isSelected()) {</span>
+<span class="nc" id="L74">            preferenceOptions.setAll(preferencesFilter.getDeviatingPreferences());</span>
+        } else {
+<span class="nc" id="L76">            preferenceOptions.setAll(preferencesFilter.getPreferenceOptions());</span>
+        }
+<span class="nc" id="L78">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

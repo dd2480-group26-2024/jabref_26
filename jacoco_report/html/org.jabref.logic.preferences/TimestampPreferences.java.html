@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TimestampPreferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.preferences</a> &gt; <span class="el_source">TimestampPreferences.java</span></div><h1>TimestampPreferences.java</h1><pre class="source lang-java linenums">package org.jabref.logic.preferences;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+
+import org.jabref.model.entry.field.Field;
+
+public class TimestampPreferences {
+    private final BooleanProperty addCreationDate;
+    private final BooleanProperty addModificationDate;
+
+    // These are old preferences. They are used for migration only.
+    private final boolean updateTimestamp;
+    private final Field timestampField;
+    private final String timestampFormat;
+
+<span class="fc" id="L21">    public TimestampPreferences(boolean addCreationDate, boolean modifyTimestamp, boolean updateTimestamp, Field timestampField, String timestampFormat) {</span>
+<span class="fc" id="L22">        this.addCreationDate = new SimpleBooleanProperty(addCreationDate);</span>
+<span class="fc" id="L23">        this.addModificationDate = new SimpleBooleanProperty(modifyTimestamp);</span>
+<span class="fc" id="L24">        this.updateTimestamp = updateTimestamp;</span>
+<span class="fc" id="L25">        this.timestampField = timestampField;</span>
+<span class="fc" id="L26">        this.timestampFormat = timestampFormat;</span>
+<span class="fc" id="L27">    }</span>
+
+    public String now() {
+        // Milli-, Micro-, and Nanoseconds are not relevant to us, so we remove them
+<span class="fc" id="L31">        return DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));</span>
+    }
+
+    public boolean shouldAddCreationDate() {
+<span class="fc" id="L35">        return addCreationDate.get();</span>
+    }
+
+    public BooleanProperty addCreationDateProperty() {
+<span class="nc" id="L39">        return addCreationDate;</span>
+    }
+
+    public void setAddCreationDate(boolean addCreationDate) {
+<span class="nc" id="L43">        this.addCreationDate.set(addCreationDate);</span>
+<span class="nc" id="L44">    }</span>
+
+    public boolean shouldAddModificationDate() {
+<span class="nc" id="L47">        return addModificationDate.get();</span>
+    }
+
+    public BooleanProperty addModificationDateProperty() {
+<span class="nc" id="L51">        return addModificationDate;</span>
+    }
+
+    public void setAddModificationDate(boolean addModificationDate) {
+<span class="nc" id="L55">        this.addModificationDate.set(addModificationDate);</span>
+<span class="nc" id="L56">    }</span>
+
+    /**
+     * Required for migration only.
+     */
+    public boolean shouldUpdateTimestamp() {
+<span class="nc" id="L62">        return updateTimestamp;</span>
+    }
+
+    /**
+     * Required for migration only.
+     */
+    public Field getTimestampField() {
+<span class="nc" id="L69">        return timestampField;</span>
+    }
+
+    /**
+     * Required for migration only.
+     */
+    public String getTimestampFormat() {
+<span class="nc" id="L76">        return timestampFormat;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

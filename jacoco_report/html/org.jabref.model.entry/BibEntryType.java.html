@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibEntryType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry</a> &gt; <span class="el_source">BibEntryType.java</span></div><h1>BibEntryType.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.SequencedSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.jabref.gui.importer.BibEntryTypePrefsAndFileViewModel;
+import org.jabref.logic.exporter.MetaDataSerializer;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.field.BibField;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldPriority;
+import org.jabref.model.entry.field.OrFields;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+
+public class BibEntryType implements Comparable&lt;BibEntryType&gt; {
+
+    private final EntryType type;
+    private final LinkedHashSet&lt;OrFields&gt; requiredFields;
+    private final LinkedHashSet&lt;BibField&gt; fields;
+
+    /**
+     * Provides an enriched EntryType with information about defined standards as mandatory fields etc.
+     *
+     * A builder is available at {@link BibEntryTypeBuilder}
+     *
+     * @param type              The EntryType this BibEntryType is wrapped around.
+     * @param fields            A BibFields list of all fields, including the required fields
+     * @param requiredFields    A OrFields list of just the required fields
+     */
+<span class="fc" id="L36">    public BibEntryType(EntryType type, Collection&lt;BibField&gt; fields, Collection&lt;OrFields&gt; requiredFields) {</span>
+<span class="fc" id="L37">        this.type = Objects.requireNonNull(type);</span>
+<span class="fc" id="L38">        this.fields = new LinkedHashSet&lt;&gt;(fields);</span>
+<span class="fc" id="L39">        this.requiredFields = new LinkedHashSet&lt;&gt;(requiredFields);</span>
+<span class="fc" id="L40">    }</span>
+
+    public EntryType getType() {
+<span class="fc" id="L43">        return type;</span>
+    }
+
+    public Set&lt;BibField&gt; getOptionalFields() {
+<span class="fc" id="L47">        return getAllBibFields().stream()</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                             .filter(field -&gt; !isRequired(field.field()))</span>
+<span class="fc" id="L49">                             .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+    }
+
+    public boolean isRequired(Field field) {
+<span class="fc" id="L53">        return getRequiredFields().stream()</span>
+<span class="fc" id="L54">                                  .anyMatch(fields -&gt; fields.contains(field));</span>
+    }
+
+    /**
+     * Returns all required field names.
+     * If fields have an OR relationship the name includes both field names divided by /, e.g. author/editor.
+     * If you need all required fields as sole entities use @see{getRequiredFieldsFlat} .
+     *
+     * @return a Set of required field name Strings
+     */
+    public Set&lt;OrFields&gt; getRequiredFields() {
+<span class="fc" id="L65">        return Collections.unmodifiableSet(requiredFields);</span>
+    }
+
+    /**
+     * Returns all defined fields.
+     */
+    public Set&lt;BibField&gt; getAllBibFields() {
+<span class="fc" id="L72">        return Collections.unmodifiableSet(fields);</span>
+    }
+
+    public Set&lt;Field&gt; getAllFields() {
+<span class="fc" id="L76">        return fields.stream().map(BibField::field).collect(Collectors.toCollection(LinkedHashSet::new));</span>
+    }
+
+    public SequencedSet&lt;Field&gt; getPrimaryOptionalFields() {
+<span class="fc" id="L80">        return getOptionalFields().stream()</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                                  .filter(field -&gt; field.priority() == FieldPriority.IMPORTANT)</span>
+<span class="fc" id="L82">                                  .map(BibField::field)</span>
+<span class="fc" id="L83">                                  .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+    }
+
+    public SequencedSet&lt;Field&gt; getSecondaryOptionalFields() {
+<span class="fc" id="L87">        return getOptionalFields().stream()</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                                  .filter(field -&gt; field.priority() == FieldPriority.DETAIL)</span>
+<span class="fc" id="L89">                                  .map(BibField::field)</span>
+<span class="fc" id="L90">                                  .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+    }
+
+    public SequencedSet&lt;Field&gt; getDeprecatedFields(BibDatabaseMode mode) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (mode == BibDatabaseMode.BIBTEX) {</span>
+<span class="nc" id="L95">            return new LinkedHashSet&lt;&gt;();</span>
+        }
+<span class="nc" id="L97">        SequencedSet&lt;Field&gt; deprecatedFields = new LinkedHashSet&lt;&gt;(EntryConverter.FIELD_ALIASES_BIBTEX_TO_BIBLATEX.keySet());</span>
+
+        // Only the optional fields which are mapped to another BibLaTeX name should be shown as &quot;deprecated&quot;
+<span class="nc" id="L100">        deprecatedFields.retainAll(getOptionalFieldsAndAliases());</span>
+
+        // BibLaTeX aims for that field &quot;date&quot; is used
+        // Thus, year + month is deprecated
+        // However, year is used in the wild very often, so we do not mark that as default as deprecated
+<span class="nc" id="L105">        deprecatedFields.add(StandardField.MONTH);</span>
+
+<span class="nc" id="L107">        return deprecatedFields;</span>
+    }
+
+    public SequencedSet&lt;Field&gt; getSecondaryOptionalNotDeprecatedFields(BibDatabaseMode mode) {
+<span class="nc" id="L111">        SequencedSet&lt;Field&gt; optionalFieldsNotPrimaryOrDeprecated = new LinkedHashSet&lt;&gt;(getSecondaryOptionalFields());</span>
+<span class="nc" id="L112">        optionalFieldsNotPrimaryOrDeprecated.removeAll(getDeprecatedFields(mode));</span>
+<span class="nc" id="L113">        return optionalFieldsNotPrimaryOrDeprecated;</span>
+    }
+
+    /**
+     * Get list of all optional fields of this entry and all fields being source for a BibTeX to BibLaTeX conversion.
+     */
+    private SequencedSet&lt;Field&gt; getOptionalFieldsAndAliases() {
+<span class="nc" id="L120">        SequencedSet&lt;Field&gt; optionalFieldsAndAliases = new LinkedHashSet&lt;&gt;(getOptionalFields().size());</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        for (BibField field : getOptionalFields()) {</span>
+<span class="nc" id="L122">            optionalFieldsAndAliases.add(field.field());</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">            if (EntryConverter.FIELD_ALIASES_BIBTEX_TO_BIBLATEX.containsKey(field.field())) {</span>
+<span class="nc" id="L124">                optionalFieldsAndAliases.add(field.field());</span>
+            }
+<span class="nc" id="L126">        }</span>
+<span class="nc" id="L127">        return optionalFieldsAndAliases;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L133">            return true;</span>
+        }
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">        if ((o == null) || (getClass() != o.getClass())) {</span>
+<span class="nc" id="L136">            return false;</span>
+        }
+<span class="fc" id="L138">        BibEntryType that = (BibEntryType) o;</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        return type.equals(that.type) &amp;&amp;</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">               Objects.equals(requiredFields, that.requiredFields) &amp;&amp;</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">               Objects.equals(fields, that.fields);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L146">        return Objects.hash(type, requiredFields, fields);</span>
+    }
+
+    /**
+     * Generates a **single line** string containing the information. This is used for debugging purposes.
+     *
+     * See &quot;&lt;a href=&quot;https://biratkirat.medium.com/learning-effective-java-item-10-84cc3ab553bc&quot;&gt;Effective Java, Item 10&lt;/a&gt;&quot; for a discussion on contracts.
+     *
+     * We are sure, we are using this method in a) logs (which should use single lines for output) and b) in the UI. For the UI, we use {@link BibEntryTypePrefsAndFileViewModel},
+     * which in turn uses {@link MetaDataSerializer#serializeCustomEntryTypes(BibEntryType)}
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L159">        return &quot;BibEntryType{&quot; +</span>
+                &quot;type=&quot; + type +
+                &quot;, allFields=&quot; + fields +
+                &quot;, requiredFields=&quot; + requiredFields +
+                '}';
+    }
+
+    @Override
+    public int compareTo(BibEntryType o) {
+<span class="fc" id="L168">        return this.getType().getName().compareTo(o.getType().getName());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TruncateFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.formatter.minifier</a> &gt; <span class="el_source">TruncateFormatter.java</span></div><h1>TruncateFormatter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.formatter.minifier;
+
+import java.util.Objects;
+
+import org.jabref.logic.cleanup.Formatter;
+import org.jabref.logic.l10n.Localization;
+
+public class TruncateFormatter extends Formatter {
+    private final int TRUNCATE_AFTER;
+    private final String KEY;
+
+    /**
+     * The TruncateFormatter truncates a string after the given index and removes trailing whitespaces.
+     *
+     * @param truncateIndex truncate a string after this index.
+     */
+<span class="fc" id="L17">    public TruncateFormatter(final int truncateIndex) {</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        TRUNCATE_AFTER = truncateIndex &gt;= 0 ? truncateIndex : Integer.MAX_VALUE;</span>
+<span class="fc" id="L19">        KEY = &quot;truncate&quot; + TRUNCATE_AFTER;</span>
+<span class="fc" id="L20">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L24">        return Localization.lang(&quot;Truncate&quot;);</span>
+    }
+
+    @Override
+    public String getKey() {
+<span class="fc" id="L29">        return KEY;</span>
+    }
+
+    /**
+     * Truncates a string after the given index.
+     */
+    @Override
+    public String format(final String input) {
+<span class="fc" id="L37">        Objects.requireNonNull(input);</span>
+<span class="fc" id="L38">        final int index = Math.min(TRUNCATE_AFTER, input.length());</span>
+<span class="fc" id="L39">        return input.substring(0, index).stripTrailing();</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="fc" id="L44">        return Localization.lang(&quot;Truncates a string after a given index.&quot;);</span>
+    }
+
+    @Override
+    public String getExampleInput() {
+<span class="fc" id="L49">        return &quot;Truncate this sentence.&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

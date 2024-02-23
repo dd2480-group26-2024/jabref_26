@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UndoableUnabbreviator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.journals</a> &gt; <span class="el_source">UndoableUnabbreviator.java</span></div><h1>UndoableUnabbreviator.java</h1><pre class="source lang-java linenums">package org.jabref.gui.journals;
+
+import javax.swing.undo.CompoundEdit;
+
+import org.jabref.gui.undo.UndoableFieldChange;
+import org.jabref.logic.journals.Abbreviation;
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.AMSField;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+
+public class UndoableUnabbreviator {
+
+    private final JournalAbbreviationRepository journalAbbreviationRepository;
+
+<span class="fc" id="L18">    public UndoableUnabbreviator(JournalAbbreviationRepository journalAbbreviationRepository) {</span>
+<span class="fc" id="L19">        this.journalAbbreviationRepository = journalAbbreviationRepository;</span>
+<span class="fc" id="L20">    }</span>
+
+    /**
+     * Unabbreviate the journal name of the given entry.
+     *
+     * @param entry The entry to be treated.
+     * @param field The field
+     * @param ce    If the entry is changed, add an edit to this compound.
+     * @return true if the entry was changed, false otherwise.
+     */
+    public boolean unabbreviate(BibDatabase database, BibEntry entry, Field field, CompoundEdit ce) {
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (!entry.hasField(field)) {</span>
+<span class="fc" id="L32">            return false;</span>
+        }
+
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (restoreFromFJournal(entry, field, ce)) {</span>
+<span class="fc" id="L36">            return true;</span>
+        }
+
+<span class="fc" id="L39">        String text = entry.getFieldLatexFree(field).get();</span>
+<span class="fc" id="L40">        String origText = text;</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (database != null) {</span>
+<span class="fc" id="L42">            text = database.resolveForStrings(text);</span>
+        }
+
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (!journalAbbreviationRepository.isKnownName(text)) {</span>
+<span class="fc" id="L46">            return false; // Cannot do anything if it is not known.</span>
+        }
+
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (!journalAbbreviationRepository.isAbbreviatedName(text)) {</span>
+<span class="nc" id="L50">            return false; // Cannot unabbreviate unabbreviated name.</span>
+        }
+
+<span class="nc" id="L53">        Abbreviation abbreviation = journalAbbreviationRepository.get(text).get();</span>
+<span class="nc" id="L54">        String newText = abbreviation.getName();</span>
+<span class="nc" id="L55">        entry.setField(field, newText);</span>
+<span class="nc" id="L56">        ce.addEdit(new UndoableFieldChange(entry, field, origText, newText));</span>
+<span class="nc" id="L57">        return true;</span>
+    }
+
+    public boolean restoreFromFJournal(BibEntry entry, Field field, CompoundEdit ce) {
+<span class="pc bpc" id="L61" title="3 of 6 branches missed.">        if ((StandardField.JOURNAL != field &amp;&amp; StandardField.JOURNALTITLE != field) || !entry.hasField(AMSField.FJOURNAL)) {</span>
+<span class="fc" id="L62">            return false;</span>
+        }
+
+<span class="fc" id="L65">        String origText = entry.getField(field).get();</span>
+<span class="fc" id="L66">        String newText = entry.getField(AMSField.FJOURNAL).get().trim();</span>
+
+<span class="fc" id="L68">        entry.setField(AMSField.FJOURNAL, &quot;&quot;);</span>
+<span class="fc" id="L69">        ce.addEdit(new UndoableFieldChange(entry, AMSField.FJOURNAL, newText, &quot;&quot;));</span>
+
+<span class="fc" id="L71">        entry.setField(field, newText);</span>
+<span class="fc" id="L72">        ce.addEdit(new UndoableFieldChange(entry, field, origText, newText));</span>
+
+<span class="fc" id="L74">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

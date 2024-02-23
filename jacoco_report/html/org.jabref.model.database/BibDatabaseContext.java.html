@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibDatabaseContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.database</a> &gt; <span class="el_source">BibDatabaseContext.java</span></div><h1>BibDatabaseContext.java</h1><pre class="source lang-java linenums">package org.jabref.model.database;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.jabref.architecture.AllowedToUseLogic;
+import org.jabref.gui.LibraryTab;
+import org.jabref.logic.crawler.Crawler;
+import org.jabref.logic.crawler.StudyRepository;
+import org.jabref.logic.shared.DatabaseLocation;
+import org.jabref.logic.shared.DatabaseSynchronizer;
+import org.jabref.logic.util.CoarseChangeFilter;
+import org.jabref.logic.util.OS;
+import org.jabref.logic.util.io.BackupFileUtil;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.metadata.MetaData;
+import org.jabref.model.study.Study;
+import org.jabref.preferences.FilePreferences;
+
+import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Represents everything related to a BIB file.
+ *
+ * &lt;p&gt; The entries are stored in BibDatabase, the other data in MetaData
+ * and the options relevant for this file in Defaults.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ *     To get an instance for a .bib file, use {@link org.jabref.logic.importer.fileformat.BibtexParser}.
+ * &lt;/p&gt;
+ */
+@AllowedToUseLogic(&quot;because it needs access to shared database features&quot;)
+public class BibDatabaseContext {
+
+<span class="fc" id="L42">    private static final Logger LOGGER = LoggerFactory.getLogger(LibraryTab.class);</span>
+
+    private final BibDatabase database;
+    private MetaData metaData;
+
+    /**
+     * The path where this database was last saved to.
+     */
+    private Path path;
+
+    private DatabaseSynchronizer dbmsSynchronizer;
+    private CoarseChangeFilter dbmsListener;
+    private DatabaseLocation location;
+
+    public BibDatabaseContext() {
+<span class="fc" id="L57">        this(new BibDatabase());</span>
+<span class="fc" id="L58">    }</span>
+
+    public BibDatabaseContext(BibDatabase database) {
+<span class="fc" id="L61">        this(database, new MetaData());</span>
+<span class="fc" id="L62">    }</span>
+
+<span class="fc" id="L64">    public BibDatabaseContext(BibDatabase database, MetaData metaData) {</span>
+<span class="fc" id="L65">        this.database = Objects.requireNonNull(database);</span>
+<span class="fc" id="L66">        this.metaData = Objects.requireNonNull(metaData);</span>
+<span class="fc" id="L67">        this.location = DatabaseLocation.LOCAL;</span>
+<span class="fc" id="L68">    }</span>
+
+    public BibDatabaseContext(BibDatabase database, MetaData metaData, Path path) {
+<span class="fc" id="L71">        this(database, metaData, path, DatabaseLocation.LOCAL);</span>
+<span class="fc" id="L72">    }</span>
+
+    public BibDatabaseContext(BibDatabase database, MetaData metaData, Path path, DatabaseLocation location) {
+<span class="fc" id="L75">        this(database, metaData);</span>
+<span class="fc" id="L76">        Objects.requireNonNull(location);</span>
+<span class="fc" id="L77">        this.path = path;</span>
+
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (location == DatabaseLocation.LOCAL) {</span>
+<span class="fc" id="L80">            convertToLocalDatabase();</span>
+        }
+<span class="fc" id="L82">    }</span>
+
+    public BibDatabaseMode getMode() {
+<span class="fc" id="L85">        return metaData.getMode().orElse(BibDatabaseMode.BIBLATEX);</span>
+    }
+
+    public void setMode(BibDatabaseMode bibDatabaseMode) {
+<span class="fc" id="L89">        metaData.setMode(bibDatabaseMode);</span>
+<span class="fc" id="L90">    }</span>
+
+    public void setDatabasePath(Path file) {
+<span class="fc" id="L93">        this.path = file;</span>
+<span class="fc" id="L94">    }</span>
+
+    /**
+     * Get the path where this database was last saved to or loaded from, if any.
+     *
+     * @return Optional of the relevant Path, or Optional.empty() if none is defined.
+     */
+    public Optional&lt;Path&gt; getDatabasePath() {
+<span class="fc" id="L102">        return Optional.ofNullable(path);</span>
+    }
+
+    public void clearDatabasePath() {
+<span class="nc" id="L106">        this.path = null;</span>
+<span class="nc" id="L107">    }</span>
+
+    public BibDatabase getDatabase() {
+<span class="fc" id="L110">        return database;</span>
+    }
+
+    public MetaData getMetaData() {
+<span class="fc" id="L114">        return metaData;</span>
+    }
+
+    public void setMetaData(MetaData metaData) {
+<span class="fc" id="L118">        this.metaData = Objects.requireNonNull(metaData);</span>
+<span class="fc" id="L119">    }</span>
+
+    public boolean isBiblatexMode() {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        return getMode() == BibDatabaseMode.BIBLATEX;</span>
+    }
+
+    /**
+     * Returns whether this .bib file belongs to a {@link Study}
+     */
+    public boolean isStudy() {
+<span class="nc" id="L129">        return this.getDatabasePath()</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                .map(path -&gt; path.getFileName().toString().equals(Crawler.FILENAME_STUDY_RESULT_BIB) &amp;&amp;</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                        Files.exists(path.resolveSibling(StudyRepository.STUDY_DEFINITION_FILE_NAME)))</span>
+<span class="nc" id="L132">                .orElse(false);</span>
+    }
+
+    /**
+     * Look up the directories set up for this database.
+     * There can be up to four directories definitions for these files:
+     * &lt;ol&gt;
+     * &lt;li&gt;next to the .bib file.&lt;/li&gt;
+     * &lt;li&gt;the preferences can specify a default one.&lt;/li&gt;
+     * &lt;li&gt;the database's metadata can specify a general directory.&lt;/li&gt;
+     * &lt;li&gt;the database's metadata can specify a user-specific directory.&lt;/li&gt;
+     * &lt;/ol&gt;
+     * &lt;p&gt;
+     * The settings are prioritized in the following order, and the first defined setting is used:
+     * &lt;ol&gt;
+     *     &lt;li&gt;user-specific metadata directory&lt;/li&gt;
+     *     &lt;li&gt;general metadata directory&lt;/li&gt;
+     *     &lt;li&gt;BIB file directory (if configured in the preferences AND none of the two above directories are configured)&lt;/li&gt;
+     *     &lt;li&gt;preferences directory (if .bib file directory should not be used according to the preferences)&lt;/li&gt;
+     * &lt;/ol&gt;
+     *
+     * @param preferences The fileDirectory preferences
+     */
+    public List&lt;Path&gt; getFileDirectories(FilePreferences preferences) {
+<span class="fc" id="L156">        List&lt;Path&gt; fileDirs = new ArrayList&lt;&gt;();</span>
+
+        // 1. Metadata user-specific directory
+<span class="fc" id="L159">        metaData.getUserFileDirectory(preferences.getUserAndHost())</span>
+<span class="pc" id="L160">                .ifPresent(userFileDirectory -&gt; fileDirs.add(getFileDirectoryPath(userFileDirectory)));</span>
+
+        // 2. Metadata general directory
+<span class="fc" id="L163">        metaData.getDefaultFileDirectory()</span>
+<span class="fc" id="L164">                .ifPresent(metaDataDirectory -&gt; fileDirs.add(getFileDirectoryPath(metaDataDirectory)));</span>
+
+        // 3. BIB file directory or main file directory
+        // fileDirs.isEmpty in the case, 1) no user-specific file directory and 2) no general file directory is set
+        // (in the metadata of the bib file)
+<span class="fc bfc" id="L169" title="All 4 branches covered.">        if (fileDirs.isEmpty() &amp;&amp; preferences.shouldStoreFilesRelativeToBibFile()) {</span>
+<span class="fc" id="L170">            getDatabasePath().ifPresent(dbPath -&gt; {</span>
+<span class="fc" id="L171">                Path parentPath = dbPath.getParent();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">                if (parentPath == null) {</span>
+<span class="fc" id="L173">                    parentPath = Path.of(System.getProperty(&quot;user.dir&quot;));</span>
+                }
+<span class="fc" id="L175">                Objects.requireNonNull(parentPath, &quot;BibTeX database parent path is null&quot;);</span>
+<span class="fc" id="L176">                fileDirs.add(parentPath);</span>
+<span class="fc" id="L177">            });</span>
+        } else {
+            // Main file directory
+<span class="fc" id="L180">            preferences.getMainFileDirectory().ifPresent(fileDirs::add);</span>
+        }
+
+<span class="fc" id="L183">        return fileDirs.stream().map(Path::toAbsolutePath).collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Returns the first existing file directory from  {@link #getFileDirectories(FilePreferences)}
+     *
+     * @return the path - or an empty optional, if none of the directories exists
+     */
+    public Optional&lt;Path&gt; getFirstExistingFileDir(FilePreferences preferences) {
+<span class="fc" id="L192">        return getFileDirectories(preferences).stream()</span>
+<span class="fc" id="L193">                                              .filter(Files::exists)</span>
+<span class="fc" id="L194">                                              .findFirst();</span>
+    }
+
+    private Path getFileDirectoryPath(String directoryName) {
+<span class="fc" id="L198">        Path directory = Path.of(directoryName);</span>
+        // If this directory is relative, we try to interpret it as relative to
+        // the file path of this BIB file:
+<span class="fc" id="L201">        Optional&lt;Path&gt; databaseFile = getDatabasePath();</span>
+<span class="fc bfc" id="L202" title="All 4 branches covered.">        if (!directory.isAbsolute() &amp;&amp; databaseFile.isPresent()) {</span>
+<span class="fc" id="L203">            return databaseFile.get().getParent().resolve(directory).normalize();</span>
+        }
+<span class="fc" id="L205">        return directory;</span>
+    }
+
+    public DatabaseSynchronizer getDBMSSynchronizer() {
+<span class="nc" id="L209">        return this.dbmsSynchronizer;</span>
+    }
+
+    public void clearDBMSSynchronizer() {
+<span class="nc" id="L213">        this.dbmsSynchronizer = null;</span>
+<span class="nc" id="L214">    }</span>
+
+    public DatabaseLocation getLocation() {
+<span class="fc" id="L217">        return this.location;</span>
+    }
+
+    public void convertToSharedDatabase(DatabaseSynchronizer dmbsSynchronizer) {
+<span class="nc" id="L221">        this.dbmsSynchronizer = dmbsSynchronizer;</span>
+
+<span class="nc" id="L223">        this.dbmsListener = new CoarseChangeFilter(this);</span>
+<span class="nc" id="L224">        dbmsListener.registerListener(dbmsSynchronizer);</span>
+
+<span class="nc" id="L226">        this.location = DatabaseLocation.SHARED;</span>
+<span class="nc" id="L227">    }</span>
+
+    public void convertToLocalDatabase() {
+<span class="pc bpc" id="L230" title="3 of 4 branches missed.">        if (dbmsListener != null &amp;&amp; (location == DatabaseLocation.SHARED)) {</span>
+<span class="nc" id="L231">            dbmsListener.unregisterListener(dbmsSynchronizer);</span>
+<span class="nc" id="L232">            dbmsListener.shutdown();</span>
+        }
+
+<span class="fc" id="L235">        this.location = DatabaseLocation.LOCAL;</span>
+<span class="fc" id="L236">    }</span>
+
+    public List&lt;BibEntry&gt; getEntries() {
+<span class="fc" id="L239">        return database.getEntries();</span>
+    }
+
+    /**
+     * @return The path to store the lucene index files. One directory for each library.
+     */
+    @NonNull
+    public Path getFulltextIndexPath() {
+<span class="fc" id="L247">        Path appData = OS.getNativeDesktop().getFulltextIndexBaseDirectory();</span>
+        Path indexPath;
+
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (getDatabasePath().isPresent()) {</span>
+<span class="fc" id="L251">            Path databaseFileName = getDatabasePath().get().getFileName();</span>
+<span class="fc" id="L252">            String fileName = BackupFileUtil.getUniqueFilePrefix(databaseFileName) + &quot;--&quot; + databaseFileName;</span>
+<span class="fc" id="L253">            indexPath = appData.resolve(fileName);</span>
+<span class="fc" id="L254">            LOGGER.debug(&quot;Index path for {} is {}&quot;, getDatabasePath().get(), indexPath);</span>
+<span class="fc" id="L255">            return indexPath;</span>
+        }
+
+<span class="fc" id="L258">        indexPath = appData.resolve(&quot;unsaved&quot;);</span>
+<span class="fc" id="L259">        LOGGER.debug(&quot;Using index for unsaved database: {}&quot;, indexPath);</span>
+<span class="fc" id="L260">        return indexPath;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L265">        return &quot;BibDatabaseContext{&quot; +</span>
+                &quot;metaData=&quot; + metaData +
+<span class="nc" id="L267">                &quot;, mode=&quot; + getMode() +</span>
+<span class="nc" id="L268">                &quot;, databasePath=&quot; + getDatabasePath() +</span>
+<span class="nc" id="L269">                &quot;, biblatexMode=&quot; + isBiblatexMode() +</span>
+<span class="nc" id="L270">                &quot;, fulltextIndexPath=&quot; + getFulltextIndexPath() +</span>
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L277">            return true;</span>
+        }
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        if (!(o instanceof BibDatabaseContext that)) {</span>
+<span class="nc" id="L280">            return false;</span>
+        }
+<span class="pc bpc" id="L282" title="4 of 8 branches missed.">        return Objects.equals(database, that.database) &amp;&amp; Objects.equals(metaData, that.metaData) &amp;&amp; Objects.equals(path, that.path) &amp;&amp; location == that.location;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L287">        return Objects.hash(database, metaData, path, location);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

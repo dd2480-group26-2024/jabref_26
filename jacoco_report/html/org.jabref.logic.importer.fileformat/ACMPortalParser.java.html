@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ACMPortalParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fileformat</a> &gt; <span class="el_source">ACMPortalParser.java</span></div><h1>ACMPortalParser.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fileformat;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.CookieHandler;
+import java.net.CookieManager;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.StandardEntryType;
+
+import com.google.common.base.CaseFormat;
+import com.google.common.base.Enums;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import org.apache.http.client.utils.URIBuilder;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+
+<span class="fc" id="L39">public class ACMPortalParser implements Parser {</span>
+
+    private static final String HOST = &quot;https://dl.acm.org&quot;;
+    private static final String DOI_URL = &quot;https://dl.acm.org/action/exportCiteProcCitation&quot;;
+
+    /**
+     * Parse the DOI of the ACM Portal search result page and obtain the corresponding BibEntry
+     *
+     * @param stream html stream
+     * @return BibEntry List
+     */
+    @Override
+    public List&lt;BibEntry&gt; parseEntries(InputStream stream) throws ParseException {
+        List&lt;BibEntry&gt; bibEntries;
+        try {
+<span class="fc" id="L54">            bibEntries = getBibEntriesFromDoiList(this.parseDoiSearchPage(stream));</span>
+<span class="nc" id="L55">        } catch (FetcherException e) {</span>
+<span class="nc" id="L56">            throw new ParseException(e);</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">        return bibEntries;</span>
+    }
+
+    /**
+     * Parse all DOIs from the ACM Portal search results page
+     *
+     * @param stream html stream
+     * @return DOI list
+     */
+    public List&lt;String&gt; parseDoiSearchPage(InputStream stream) throws ParseException {
+<span class="fc" id="L68">        List&lt;String&gt; doiList = new ArrayList&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L71">            Document doc = Jsoup.parse(stream, null, HOST);</span>
+<span class="fc" id="L72">            Elements doiHrefs = doc.select(&quot;div.issue-item__content-right &gt; h5 &gt; span &gt; a&quot;);</span>
+
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            for (Element elem : doiHrefs) {</span>
+<span class="fc" id="L75">                String fullSegment = elem.attr(&quot;href&quot;);</span>
+<span class="fc" id="L76">                String doi = fullSegment.substring(fullSegment.indexOf(&quot;10&quot;));</span>
+<span class="fc" id="L77">                doiList.add(doi);</span>
+<span class="fc" id="L78">            }</span>
+<span class="nc" id="L79">        } catch (IOException ex) {</span>
+<span class="nc" id="L80">            throw new ParseException(ex);</span>
+<span class="fc" id="L81">        }</span>
+
+<span class="fc" id="L83">        return doiList;</span>
+    }
+
+    /**
+     * Obtain BibEntry according to DOI
+     *
+     * @param doiList DOI List
+     * @return BibEntry List
+     */
+    public List&lt;BibEntry&gt; getBibEntriesFromDoiList(List&lt;String&gt; doiList) throws FetcherException {
+<span class="fc" id="L93">        List&lt;BibEntry&gt; bibEntries = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L94">        CookieHandler.setDefault(new CookieManager());</span>
+<span class="fc" id="L95">        try (InputStream stream = new URLDownload(getUrlFromDoiList(doiList)).asInputStream()) {</span>
+<span class="fc" id="L96">            String jsonString = new String((stream.readAllBytes()), StandardCharsets.UTF_8);</span>
+
+<span class="fc" id="L98">            JsonElement jsonElement = JsonParser.parseString(jsonString);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (jsonElement.isJsonObject()) {</span>
+<span class="fc" id="L100">                JsonArray items = jsonElement.getAsJsonObject().getAsJsonArray(&quot;items&quot;);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                for (JsonElement item : items) {</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                    for (Map.Entry&lt;String, JsonElement&gt; entry : item.getAsJsonObject().entrySet()) {</span>
+<span class="fc" id="L103">                        bibEntries.add(parseBibEntry(entry.getValue().toString()));</span>
+<span class="fc" id="L104">                    }</span>
+<span class="fc" id="L105">                }</span>
+            }
+<span class="nc" id="L107">        } catch (IOException | URISyntaxException e) {</span>
+<span class="nc" id="L108">            throw new FetcherException(&quot;A network error occurred while fetching from &quot;, e);</span>
+<span class="fc" id="L109">        }</span>
+
+<span class="fc" id="L111">        return bibEntries;</span>
+    }
+
+    /**
+     * Constructing the query url for the doi
+     *
+     * @param doiList DOI List
+     * @return query URL
+     */
+    public URL getUrlFromDoiList(List&lt;String&gt; doiList) throws URISyntaxException, MalformedURLException {
+<span class="fc" id="L121">        URIBuilder uriBuilder = new URIBuilder(DOI_URL);</span>
+<span class="fc" id="L122">        uriBuilder.addParameter(&quot;targetFile&quot;, &quot;custom-bibtex&quot;);</span>
+<span class="fc" id="L123">        uriBuilder.addParameter(&quot;format&quot;, &quot;bibTex&quot;);</span>
+<span class="fc" id="L124">        uriBuilder.addParameter(&quot;dois&quot;, String.join(&quot;,&quot;, doiList));</span>
+<span class="fc" id="L125">        return uriBuilder.build().toURL();</span>
+    }
+
+    private StandardEntryType typeStrToEnum(String typeStr) {
+        StandardEntryType type;
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (&quot;PAPER_CONFERENCE&quot;.equals(typeStr)) {</span>
+<span class="fc" id="L131">            type = StandardEntryType.Conference;</span>
+        } else {
+<span class="fc" id="L133">            String upperUnderscoreTyeStr = CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, typeStr);</span>
+<span class="fc" id="L134">            type = Enums.getIfPresent(StandardEntryType.class, upperUnderscoreTyeStr).or(StandardEntryType.Article);</span>
+        }
+<span class="fc" id="L136">        return type;</span>
+    }
+
+    /**
+     * Parse BibEntry from query result xml
+     *
+     * @param jsonStr query result in JSON format
+     * @return BibEntry parsed from query result
+     */
+    public BibEntry parseBibEntry(String jsonStr) {
+<span class="fc" id="L146">        JsonObject jsonObject = JsonParser.parseString(jsonStr).getAsJsonObject();</span>
+<span class="fc" id="L147">        BibEntry bibEntry = new BibEntry();</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (jsonObject.has(&quot;type&quot;)) {</span>
+<span class="fc" id="L149">            bibEntry.setType(typeStrToEnum(jsonObject.get(&quot;type&quot;).getAsString()));</span>
+        }
+
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (jsonObject.has(&quot;author&quot;)) {</span>
+<span class="fc" id="L153">            JsonArray authors = jsonObject.getAsJsonArray(&quot;author&quot;);</span>
+<span class="fc" id="L154">            bibEntry.setField(StandardField.AUTHOR, getAuthorsLastFirst(authors));</span>
+        }
+
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (jsonObject.has(&quot;issued&quot;)) {</span>
+<span class="fc" id="L158">            JsonObject issued = jsonObject.get(&quot;issued&quot;).getAsJsonObject();</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            if (issued.has(&quot;date-parts&quot;)) {</span>
+<span class="fc" id="L160">                JsonArray dateArray = issued.get(&quot;date-parts&quot;).getAsJsonArray().get(0).getAsJsonArray();</span>
+<span class="fc" id="L161">                StandardField[] dateField = {StandardField.YEAR, StandardField.MONTH, StandardField.DAY};</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                for (int i = 0; i &lt; dateArray.size(); i++) {</span>
+<span class="fc" id="L163">                    bibEntry.setField(dateField[i], dateArray.get(i).getAsString());</span>
+                }
+            }
+        }
+
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (jsonObject.has(&quot;abstract&quot;)) {</span>
+<span class="fc" id="L169">            bibEntry.setField(StandardField.ABSTRACT, jsonObject.get(&quot;abstract&quot;).getAsString());</span>
+        }
+
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (jsonObject.has(&quot;collection-title&quot;)) {</span>
+<span class="fc" id="L173">            bibEntry.setField(StandardField.SERIES, jsonObject.get(&quot;collection-title&quot;).getAsString());</span>
+        }
+
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (jsonObject.has(&quot;container-title&quot;)) {</span>
+<span class="fc" id="L177">            bibEntry.setField(StandardField.BOOKTITLE, jsonObject.get(&quot;container-title&quot;).getAsString());</span>
+        }
+
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (jsonObject.has(&quot;DOI&quot;)) {</span>
+<span class="fc" id="L181">            bibEntry.setField(StandardField.DOI, jsonObject.get(&quot;DOI&quot;).getAsString());</span>
+        }
+
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (jsonObject.has(&quot;event-place&quot;)) {</span>
+<span class="fc" id="L185">            bibEntry.setField(StandardField.LOCATION, jsonObject.get(&quot;event-place&quot;).getAsString());</span>
+        }
+
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (jsonObject.has(&quot;ISBN&quot;)) {</span>
+<span class="fc" id="L189">            bibEntry.setField(StandardField.ISBN, jsonObject.get(&quot;ISBN&quot;).getAsString());</span>
+        }
+
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (jsonObject.has(&quot;keyword&quot;)) {</span>
+<span class="fc" id="L193">            String[] keywords = jsonObject.get(&quot;keyword&quot;).getAsString().split(&quot;, &quot;);</span>
+<span class="fc" id="L194">            String sortedKeywords = Arrays.stream(keywords).sorted().collect(Collectors.joining(&quot;, &quot;));</span>
+<span class="fc" id="L195">            bibEntry.setField(StandardField.KEYWORDS, sortedKeywords);</span>
+        }
+
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (jsonObject.has(&quot;number-of-pages&quot;)) {</span>
+<span class="fc" id="L199">            bibEntry.setField(StandardField.PAGETOTAL, jsonObject.get(&quot;number-of-pages&quot;).getAsString());</span>
+        }
+
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (jsonObject.has(&quot;page&quot;)) {</span>
+<span class="fc" id="L203">            bibEntry.setField(StandardField.PAGES, jsonObject.get(&quot;page&quot;).getAsString());</span>
+        }
+
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (jsonObject.has(&quot;publisher&quot;)) {</span>
+<span class="fc" id="L207">            bibEntry.setField(StandardField.PUBLISHER, jsonObject.get(&quot;publisher&quot;).getAsString());</span>
+        }
+
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (jsonObject.has(&quot;publisher-place&quot;)) {</span>
+<span class="fc" id="L211">            bibEntry.setField(StandardField.ADDRESS, jsonObject.get(&quot;publisher-place&quot;).getAsString());</span>
+        }
+
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (jsonObject.has(&quot;title&quot;)) {</span>
+<span class="fc" id="L215">            bibEntry.setField(StandardField.TITLE, jsonObject.get(&quot;title&quot;).getAsString());</span>
+        }
+
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (jsonObject.has(&quot;URL&quot;)) {</span>
+<span class="fc" id="L219">            bibEntry.setField(StandardField.URL, jsonObject.get(&quot;URL&quot;).getAsString());</span>
+        }
+
+<span class="fc" id="L222">        return bibEntry;</span>
+    }
+
+    private String getAuthorsLastFirst(JsonArray authors) {
+<span class="fc" id="L226">        List&lt;Author&gt; jabrefAuthors = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (JsonElement author : authors) {</span>
+<span class="fc" id="L229">            JsonObject authorJsonObject = author.getAsJsonObject();</span>
+
+<span class="fc" id="L231">            String given = null;</span>
+<span class="fc" id="L232">            String family = null;</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            if (authorJsonObject.has(&quot;given&quot;)) {</span>
+<span class="fc" id="L234">                given = authorJsonObject.get(&quot;given&quot;).getAsString();</span>
+            }
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">            if (authorJsonObject.has(&quot;family&quot;)) {</span>
+<span class="fc" id="L237">                family = authorJsonObject.get(&quot;family&quot;).getAsString();</span>
+            }
+<span class="fc" id="L239">            Author jabrefAuthor = new Author(given, null, null, family, null);</span>
+<span class="fc" id="L240">            jabrefAuthors.add(jabrefAuthor);</span>
+<span class="fc" id="L241">        }</span>
+<span class="fc" id="L242">        return AuthorList.of(jabrefAuthors).getAsLastFirstNamesWithAnd(false);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

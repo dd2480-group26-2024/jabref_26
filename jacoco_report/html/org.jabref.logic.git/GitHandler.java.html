@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GitHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.git</a> &gt; <span class="el_source">GitHandler.java</span></div><h1>GitHandler.java</h1><pre class="source lang-java linenums">package org.jabref.logic.git;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
+
+import org.jabref.logic.util.io.FileUtil;
+
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.RmCommand;
+import org.eclipse.jgit.api.Status;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.merge.MergeStrategy;
+import org.eclipse.jgit.transport.CredentialsProvider;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class handles the updating of the local and remote git repository that is located at the repository path
+ * This provides an easy-to-use interface to manage a git repository
+ */
+public class GitHandler {
+<span class="fc" id="L28">    static final Logger LOGGER = LoggerFactory.getLogger(GitHandler.class);</span>
+    final Path repositoryPath;
+    final File repositoryPathAsFile;
+<span class="fc" id="L31">    String gitUsername = Optional.ofNullable(System.getenv(&quot;GIT_EMAIL&quot;)).orElse(&quot;&quot;);</span>
+<span class="fc" id="L32">    String gitPassword = Optional.ofNullable(System.getenv(&quot;GIT_PW&quot;)).orElse(&quot;&quot;);</span>
+<span class="fc" id="L33">    final CredentialsProvider credentialsProvider = new UsernamePasswordCredentialsProvider(gitUsername, gitPassword);</span>
+
+    /**
+     * Initialize the handler for the given repository
+     *
+     * @param repositoryPath The root of the initialized git repository
+     */
+<span class="fc" id="L40">    public GitHandler(Path repositoryPath) {</span>
+<span class="fc" id="L41">        this.repositoryPath = repositoryPath;</span>
+<span class="fc" id="L42">        this.repositoryPathAsFile = this.repositoryPath.toFile();</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (!isGitRepository()) {</span>
+            try {
+<span class="fc" id="L45">                Git.init()</span>
+<span class="fc" id="L46">                   .setDirectory(repositoryPathAsFile)</span>
+<span class="fc" id="L47">                   .setInitialBranch(&quot;main&quot;)</span>
+<span class="fc" id="L48">                   .call();</span>
+<span class="fc" id="L49">                setupGitIgnore();</span>
+<span class="fc" id="L50">                String initialCommit = &quot;Initial commit&quot;;</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                if (!createCommitOnCurrentBranch(initialCommit, false)) {</span>
+                    // Maybe, setupGitIgnore failed and did not add something
+                    // Then, we create an empty commit
+<span class="nc" id="L54">                    try (Git git = Git.open(repositoryPathAsFile)) {</span>
+<span class="nc" id="L55">                        git.commit()</span>
+<span class="nc" id="L56">                           .setAllowEmpty(true)</span>
+<span class="nc" id="L57">                           .setMessage(initialCommit)</span>
+<span class="nc" id="L58">                           .call();</span>
+                    }
+                }
+<span class="nc" id="L61">            } catch (GitAPIException | IOException e) {</span>
+<span class="nc" id="L62">                LOGGER.error(&quot;Initialization failed&quot;);</span>
+<span class="fc" id="L63">            }</span>
+        }
+<span class="fc" id="L65">    }</span>
+
+    void setupGitIgnore() {
+        try {
+<span class="fc" id="L69">            Path gitignore = Path.of(repositoryPath.toString(), &quot;.gitignore&quot;);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (!Files.exists(gitignore)) {</span>
+<span class="fc" id="L71">                FileUtil.copyFile(Path.of(this.getClass().getResource(&quot;git.gitignore&quot;).toURI()), gitignore, false);</span>
+            }
+<span class="nc" id="L73">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L74">            LOGGER.error(&quot;Error occurred during copying of the gitignore file into the git repository.&quot;, e);</span>
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">    }</span>
+
+    /**
+     * Returns true if the given path points to a directory that is a git repository (contains a .git folder)
+     */
+    boolean isGitRepository() {
+        // For some reason the solution from https://www.eclipse.org/lists/jgit-dev/msg01892.html does not work
+        // This solution is quite simple but might not work in special cases, for us it should suffice.
+<span class="fc" id="L84">        return Files.exists(Path.of(repositoryPath.toString(), &quot;.git&quot;));</span>
+    }
+
+    /**
+     * Checkout the branch with the specified name, if it does not exist create it
+     *
+     * @param branchToCheckout Name of the branch to check out
+     */
+    public void checkoutBranch(String branchToCheckout) throws IOException, GitAPIException {
+<span class="fc" id="L93">        try (Git git = Git.open(this.repositoryPathAsFile)) {</span>
+<span class="fc" id="L94">            Optional&lt;Ref&gt; branch = getRefForBranch(branchToCheckout);</span>
+<span class="fc" id="L95">            git.checkout()</span>
+               // If the branch does not exist, create it
+<span class="fc" id="L97">               .setCreateBranch(branch.isEmpty())</span>
+<span class="fc" id="L98">               .setName(branchToCheckout)</span>
+<span class="fc" id="L99">               .call();</span>
+        }
+<span class="fc" id="L101">    }</span>
+
+    /**
+     * Returns the reference of the specified branch
+     * If it does not exist returns an empty optional
+     */
+    Optional&lt;Ref&gt; getRefForBranch(String branchName) throws GitAPIException, IOException {
+<span class="fc" id="L108">        try (Git git = Git.open(this.repositoryPathAsFile)) {</span>
+<span class="fc" id="L109">            return git.branchList()</span>
+<span class="fc" id="L110">                      .call()</span>
+<span class="fc" id="L111">                      .stream()</span>
+<span class="fc" id="L112">                      .filter(ref -&gt; ref.getName().equals(&quot;refs/heads/&quot; + branchName))</span>
+<span class="fc" id="L113">                      .findAny();</span>
+        }
+    }
+
+    /**
+     * Creates a commit on the currently checked out branch
+     *
+     * @param amend Whether to amend to the last commit (true), or not (false)
+     * @return Returns true if a new commit was created. This is the case if the repository was not clean on method invocation
+     */
+    public boolean createCommitOnCurrentBranch(String commitMessage, boolean amend) throws IOException, GitAPIException {
+<span class="fc" id="L124">        boolean commitCreated = false;</span>
+<span class="fc" id="L125">        try (Git git = Git.open(this.repositoryPathAsFile)) {</span>
+<span class="fc" id="L126">            Status status = git.status().call();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (!status.isClean()) {</span>
+<span class="fc" id="L128">                commitCreated = true;</span>
+                // Add new and changed files to index
+<span class="fc" id="L130">                git.add()</span>
+<span class="fc" id="L131">                   .addFilepattern(&quot;.&quot;)</span>
+<span class="fc" id="L132">                   .call();</span>
+                // Add all removed files to index
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                if (!status.getMissing().isEmpty()) {</span>
+<span class="nc" id="L135">                    RmCommand removeCommand = git.rm()</span>
+<span class="nc" id="L136">                                                 .setCached(true);</span>
+<span class="nc" id="L137">                    status.getMissing().forEach(removeCommand::addFilepattern);</span>
+<span class="nc" id="L138">                    removeCommand.call();</span>
+                }
+<span class="fc" id="L140">                git.commit()</span>
+<span class="fc" id="L141">                   .setAmend(amend)</span>
+<span class="fc" id="L142">                   .setAllowEmpty(false)</span>
+<span class="fc" id="L143">                   .setMessage(commitMessage)</span>
+<span class="fc" id="L144">                   .call();</span>
+            }
+        }
+<span class="fc" id="L147">        return commitCreated;</span>
+    }
+
+    /**
+     * Merges the source branch into the target branch
+     *
+     * @param targetBranch the name of the branch that is merged into
+     * @param sourceBranch the name of the branch that gets merged
+     */
+    public void mergeBranches(String targetBranch, String sourceBranch, MergeStrategy mergeStrategy) throws IOException, GitAPIException {
+<span class="nc" id="L157">        String currentBranch = this.getCurrentlyCheckedOutBranch();</span>
+<span class="nc" id="L158">        try (Git git = Git.open(this.repositoryPathAsFile)) {</span>
+<span class="nc" id="L159">            Optional&lt;Ref&gt; sourceBranchRef = getRefForBranch(sourceBranch);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            if (sourceBranchRef.isEmpty()) {</span>
+                // Do nothing
+<span class="nc" id="L162">                return;</span>
+            }
+<span class="nc" id="L164">            this.checkoutBranch(targetBranch);</span>
+<span class="nc" id="L165">            git.merge()</span>
+<span class="nc" id="L166">               .include(sourceBranchRef.get())</span>
+<span class="nc" id="L167">               .setStrategy(mergeStrategy)</span>
+<span class="nc" id="L168">               .setMessage(&quot;Merge search branch into working branch.&quot;)</span>
+<span class="nc" id="L169">               .call();</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        }</span>
+<span class="nc" id="L171">        this.checkoutBranch(currentBranch);</span>
+<span class="nc" id="L172">    }</span>
+
+    /**
+     * Pushes all commits made to the branch that is tracked by the currently checked out branch.
+     * If pushing to remote fails, it fails silently.
+     */
+    public void pushCommitsToRemoteRepository() throws IOException {
+<span class="nc" id="L179">        try (Git git = Git.open(this.repositoryPathAsFile)) {</span>
+            try {
+<span class="nc" id="L181">                git.push()</span>
+<span class="nc" id="L182">                   .setCredentialsProvider(credentialsProvider)</span>
+<span class="nc" id="L183">                   .call();</span>
+<span class="nc" id="L184">            } catch (GitAPIException e) {</span>
+<span class="nc" id="L185">                LOGGER.info(&quot;Failed to push&quot;);</span>
+<span class="nc" id="L186">            }</span>
+        }
+<span class="nc" id="L188">    }</span>
+
+    public void pullOnCurrentBranch() throws IOException {
+<span class="nc" id="L191">        try (Git git = Git.open(this.repositoryPathAsFile)) {</span>
+            try {
+<span class="nc" id="L193">                git.pull()</span>
+<span class="nc" id="L194">                   .setCredentialsProvider(credentialsProvider)</span>
+<span class="nc" id="L195">                   .call();</span>
+<span class="nc" id="L196">            } catch (GitAPIException e) {</span>
+<span class="nc" id="L197">                LOGGER.info(&quot;Failed to push&quot;);</span>
+<span class="nc" id="L198">            }</span>
+        }
+<span class="nc" id="L200">    }</span>
+
+    public String getCurrentlyCheckedOutBranch() throws IOException {
+<span class="fc" id="L203">        try (Git git = Git.open(this.repositoryPathAsFile)) {</span>
+<span class="fc" id="L204">            return git.getRepository().getBranch();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
