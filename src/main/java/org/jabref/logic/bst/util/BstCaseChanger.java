@@ -269,6 +269,9 @@ public final class BstCaseChanger {
      * @return the special LaTeX character or null
      */
     public static Optional<String> findSpecialChar(char[] c, int pos) {
+        findSpecialCharToTest(c,pos);
+        /*
+
         System.out.println("\n\nPRINT SOMETHING\n\n");
         if ((pos + 1) < c.length) {
             if ((c[pos] == 'o') && (c[pos + 1] == 'e')) {
@@ -296,6 +299,7 @@ public final class BstCaseChanger {
         if ("ijoOlL".indexOf(c[pos]) >= 0) {
             return Optional.of(String.valueOf(c[pos]));
         }
+        */
         return Optional.empty();
     }
 
