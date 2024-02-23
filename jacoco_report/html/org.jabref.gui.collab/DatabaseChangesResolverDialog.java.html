@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseChangesResolverDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.collab</a> &gt; <span class="el_source">DatabaseChangesResolverDialog.java</span></div><h1>DatabaseChangesResolverDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui.collab;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.beans.property.SimpleStringProperty;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.SelectionMode;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.layout.BorderPane;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.preview.PreviewViewer;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import jakarta.inject.Inject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class DatabaseChangesResolverDialog extends BaseDialog&lt;Boolean&gt; {
+<span class="nc" id="L34">    private final static Logger LOGGER = LoggerFactory.getLogger(DatabaseChangesResolverDialog.class);</span>
+    /**
+     * Reconstructing the details view to preview an {@link DatabaseChange} every time it's selected is a heavy operation.
+     * It is also useless because changes are static and if the change data is static then the view doesn't have to change
+     * either. This cache is used to ensure that we only create the detail view instance once for each {@link DatabaseChange}.
+     */
+<span class="nc" id="L40">    private final Map&lt;DatabaseChange, DatabaseChangeDetailsView&gt; DETAILS_VIEW_CACHE = new HashMap&lt;&gt;();</span>
+
+    @FXML
+    private TableView&lt;DatabaseChange&gt; changesTableView;
+    @FXML
+    private TableColumn&lt;DatabaseChange, String&gt; changeName;
+    @FXML
+    private Button askUserToResolveChangeButton;
+    @FXML
+    private BorderPane changeInfoPane;
+
+    private final List&lt;DatabaseChange&gt; changes;
+    private final BibDatabaseContext database;
+
+    private ExternalChangesResolverViewModel viewModel;
+
+    @Inject private UndoManager undoManager;
+    @Inject private StateManager stateManager;
+    @Inject private DialogService dialogService;
+    @Inject private PreferencesService preferencesService;
+    @Inject private ThemeManager themeManager;
+    @Inject private BibEntryTypesManager entryTypesManager;
+    @Inject private TaskExecutor taskExecutor;
+
+    /**
+     * A dialog going through given &lt;code&gt;changes&lt;/code&gt;, which are diffs to the provided &lt;code&gt;database&lt;/code&gt;.
+     * Each accepted change is written to the provided &lt;code&gt;database&lt;/code&gt;.
+     *
+     * @param changes The list of changes
+     * @param database The database to apply the changes to
+     */
+<span class="nc" id="L71">    public DatabaseChangesResolverDialog(List&lt;DatabaseChange&gt; changes, BibDatabaseContext database, String dialogTitle) {</span>
+<span class="nc" id="L72">        this.changes = changes;</span>
+<span class="nc" id="L73">        this.database = database;</span>
+
+<span class="nc" id="L75">        this.setTitle(dialogTitle);</span>
+<span class="nc" id="L76">        ViewLoader.view(this)</span>
+<span class="nc" id="L77">                .load()</span>
+<span class="nc" id="L78">                .setAsDialogPane(this);</span>
+
+<span class="nc" id="L80">        this.setResultConverter(button -&gt; {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            if (viewModel.areAllChangesResolved()) {</span>
+<span class="nc" id="L82">                LOGGER.info(&quot;External changes are resolved successfully&quot;);</span>
+<span class="nc" id="L83">                return true;</span>
+            } else {
+<span class="nc" id="L85">                LOGGER.info(&quot;External changes aren't resolved&quot;);</span>
+<span class="nc" id="L86">                return false;</span>
+            }
+        });
+<span class="nc" id="L89">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L93">        PreviewViewer previewViewer = new PreviewViewer(database, dialogService, preferencesService, stateManager, themeManager, taskExecutor);</span>
+<span class="nc" id="L94">        DatabaseChangeDetailsViewFactory databaseChangeDetailsViewFactory = new DatabaseChangeDetailsViewFactory(database, dialogService, stateManager, themeManager, preferencesService, entryTypesManager, previewViewer, taskExecutor);</span>
+
+<span class="nc" id="L96">        viewModel = new ExternalChangesResolverViewModel(changes, undoManager);</span>
+
+<span class="nc" id="L98">        changeName.setCellValueFactory(data -&gt; new SimpleStringProperty(data.getValue().getName()));</span>
+<span class="nc" id="L99">        askUserToResolveChangeButton.disableProperty().bind(viewModel.canAskUserToResolveChangeProperty().not());</span>
+
+<span class="nc" id="L101">        changesTableView.setItems(viewModel.getVisibleChanges());</span>
+        // Think twice before setting this to MULTIPLE...
+<span class="nc" id="L103">        changesTableView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);</span>
+<span class="nc" id="L104">        changesTableView.getSelectionModel().selectFirst();</span>
+
+<span class="nc" id="L106">        viewModel.selectedChangeProperty().bind(changesTableView.getSelectionModel().selectedItemProperty());</span>
+<span class="nc" id="L107">        EasyBind.subscribe(viewModel.selectedChangeProperty(), selectedChange -&gt; {</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            if (selectedChange != null) {</span>
+<span class="nc" id="L109">                DatabaseChangeDetailsView detailsView = DETAILS_VIEW_CACHE.computeIfAbsent(selectedChange, databaseChangeDetailsViewFactory::create);</span>
+<span class="nc" id="L110">                changeInfoPane.setCenter(detailsView);</span>
+            }
+<span class="nc" id="L112">        });</span>
+
+<span class="nc" id="L114">        EasyBind.subscribe(viewModel.areAllChangesResolvedProperty(), isResolved -&gt; {</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (isResolved) {</span>
+<span class="nc" id="L116">                viewModel.applyChanges();</span>
+<span class="nc" id="L117">                close();</span>
+            }
+<span class="nc" id="L119">        });</span>
+<span class="nc" id="L120">    }</span>
+
+    @FXML
+    public void denyChanges() {
+<span class="nc" id="L124">        viewModel.denyChange();</span>
+<span class="nc" id="L125">    }</span>
+
+    @FXML
+    public void acceptChanges() {
+<span class="nc" id="L129">        viewModel.acceptChange();</span>
+<span class="nc" id="L130">    }</span>
+
+    @FXML
+    public void askUserToResolveChange() {
+<span class="nc" id="L134">        viewModel.getSelectedChange().flatMap(DatabaseChange::getExternalChangeResolver)</span>
+<span class="nc" id="L135">                 .flatMap(DatabaseChangeResolver::askUserToResolveChange).ifPresent(viewModel::acceptMergedChange);</span>
+<span class="nc" id="L136">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnoCrossRef.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.uno</a> &gt; <span class="el_source">UnoCrossRef.java</span></div><h1>UnoCrossRef.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.uno;
+
+import com.sun.star.beans.PropertyVetoException;
+import com.sun.star.beans.UnknownPropertyException;
+import com.sun.star.beans.XPropertySet;
+import com.sun.star.lang.WrappedTargetException;
+import com.sun.star.lang.XMultiServiceFactory;
+import com.sun.star.text.ReferenceFieldPart;
+import com.sun.star.text.ReferenceFieldSource;
+import com.sun.star.text.XTextContent;
+import com.sun.star.text.XTextDocument;
+import com.sun.star.text.XTextRange;
+import com.sun.star.util.XRefreshable;
+
+public class UnoCrossRef {
+
+    private UnoCrossRef() {
+    }
+
+    /**
+     * Update TextFields, etc. We use it to refresh cross-references in the document.
+     */
+    public static void refresh(XTextDocument doc) {
+        // Refresh the document
+<span class="nc" id="L25">        XRefreshable xRefresh = UnoCast.cast(XRefreshable.class, doc).get();</span>
+<span class="nc" id="L26">        xRefresh.refresh();</span>
+<span class="nc" id="L27">    }</span>
+
+    /**
+     * Insert a clickable cross-reference to a reference mark, with a label containing the target's page number.
+     * &lt;p&gt;
+     * May need a documentConnection.refresh() after, to update the text shown.
+     */
+    public static void insertReferenceToPageNumberOfReferenceMark(XTextDocument doc,
+                                                                  String referenceMarkName,
+                                                                  XTextRange cursor)
+            throws
+            CreationException,
+            WrappedTargetException {
+
+        // based on: https://wiki.openoffice.org/wiki/Documentation/DevGuide/Text/Reference_Marks
+<span class="nc" id="L42">        XMultiServiceFactory msf = UnoCast.cast(XMultiServiceFactory.class, doc).get();</span>
+        // Create a 'GetReference' text field to refer to the reference mark we just inserted,
+        // and get it's XPropertySet interface
+        XPropertySet xFieldProps;
+        try {
+<span class="nc" id="L47">            String name = &quot;com.sun.star.text.textfield.GetReference&quot;;</span>
+<span class="nc" id="L48">            xFieldProps = UnoCast.cast(XPropertySet.class, msf.createInstance(name)).get();</span>
+<span class="nc" id="L49">        } catch (com.sun.star.uno.Exception e) {</span>
+<span class="nc" id="L50">            throw new CreationException(e.getMessage());</span>
+<span class="nc" id="L51">        }</span>
+
+        try {
+            // Set the SourceName of the GetReference text field to the referenceMarkName
+<span class="nc" id="L55">            xFieldProps.setPropertyValue(&quot;SourceName&quot;, referenceMarkName);</span>
+<span class="nc" id="L56">        } catch (UnknownPropertyException ex) {</span>
+<span class="nc" id="L57">            throw new java.lang.IllegalStateException(&quot;The created GetReference does not have property 'SourceName'&quot;);</span>
+<span class="nc" id="L58">        } catch (PropertyVetoException ex) {</span>
+<span class="nc" id="L59">            throw new java.lang.IllegalStateException(&quot;Caught PropertyVetoException on 'SourceName'&quot;);</span>
+<span class="nc" id="L60">        }</span>
+
+        try {
+            // specify that the source is a reference mark (could also be a footnote,
+            // bookmark or sequence field)
+<span class="nc" id="L65">            xFieldProps.setPropertyValue(&quot;ReferenceFieldSource&quot;, ReferenceFieldSource.REFERENCE_MARK);</span>
+<span class="nc" id="L66">        } catch (UnknownPropertyException ex) {</span>
+<span class="nc" id="L67">            throw new java.lang.IllegalStateException(&quot;The created GetReference does not have property&quot;</span>
+                    + &quot; 'ReferenceFieldSource'&quot;);
+<span class="nc" id="L69">        } catch (PropertyVetoException ex) {</span>
+<span class="nc" id="L70">            throw new java.lang.IllegalStateException(&quot;Caught PropertyVetoException on 'ReferenceFieldSource'&quot;);</span>
+<span class="nc" id="L71">        }</span>
+
+        try {
+            // We want the reference displayed as page number
+<span class="nc" id="L75">            xFieldProps.setPropertyValue(&quot;ReferenceFieldPart&quot;, ReferenceFieldPart.PAGE);</span>
+<span class="nc" id="L76">        } catch (UnknownPropertyException ex) {</span>
+<span class="nc" id="L77">            throw new java.lang.IllegalStateException(&quot;The created GetReference does not have property&quot;</span>
+                    + &quot; 'ReferenceFieldPart'&quot;);
+<span class="nc" id="L79">        } catch (PropertyVetoException ex) {</span>
+<span class="nc" id="L80">            throw new java.lang.IllegalStateException(&quot;Caught PropertyVetoException on 'ReferenceFieldPart'&quot;);</span>
+<span class="nc" id="L81">        }</span>
+
+        // Get the XTextContent interface of the GetReference text field
+<span class="nc" id="L84">        XTextContent xRefContent = UnoCast.cast(XTextContent.class, xFieldProps).get();</span>
+
+        // Insert the text field
+<span class="nc" id="L87">        cursor.getText().insertTextContent(cursor.getEnd(), xRefContent, false);</span>
+<span class="nc" id="L88">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

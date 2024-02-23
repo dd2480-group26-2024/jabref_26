@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SemanticScholarFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor.citationrelationtab.semanticscholar</a> &gt; <span class="el_source">SemanticScholarFetcher.java</span></div><h1>SemanticScholarFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor.citationrelationtab.semanticscholar;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.ImporterPreferences;
+import org.jabref.logic.importer.fetcher.CustomizableKeyFetcher;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.logic.util.BuildInfo;
+import org.jabref.model.entry.BibEntry;
+
+import com.google.gson.Gson;
+
+public class SemanticScholarFetcher implements CitationFetcher, CustomizableKeyFetcher {
+    private static final String SEMANTIC_SCHOLAR_API = &quot;https://api.semanticscholar.org/graph/v1/&quot;;
+
+<span class="nc" id="L21">    private static final String API_KEY = new BuildInfo().semanticScholarApiKey;</span>
+
+    private final ImporterPreferences importerPreferences;
+
+<span class="nc" id="L25">    public SemanticScholarFetcher(ImporterPreferences importerPreferences) {</span>
+<span class="nc" id="L26">        this.importerPreferences = importerPreferences;</span>
+<span class="nc" id="L27">    }</span>
+
+    @Override
+    public List&lt;BibEntry&gt; searchCitedBy(BibEntry entry) throws FetcherException {
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        if (entry.getDOI().isPresent()) {</span>
+<span class="nc" id="L32">            StringBuilder urlBuilder = new StringBuilder(SEMANTIC_SCHOLAR_API)</span>
+<span class="nc" id="L33">                    .append(&quot;paper/&quot;)</span>
+<span class="nc" id="L34">                    .append(&quot;DOI:&quot;).append(entry.getDOI().get().getDOI())</span>
+<span class="nc" id="L35">                    .append(&quot;/citations&quot;)</span>
+<span class="nc" id="L36">                    .append(&quot;?fields=&quot;).append(&quot;title,authors,year,citationCount,referenceCount&quot;)</span>
+<span class="nc" id="L37">                    .append(&quot;&amp;limit=1000&quot;);</span>
+            try {
+<span class="nc" id="L39">                URL citationsUrl = URI.create(urlBuilder.toString()).toURL();</span>
+<span class="nc" id="L40">                URLDownload urlDownload = new URLDownload(citationsUrl);</span>
+
+<span class="nc" id="L42">                String apiKey = getApiKey();</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">                if (!apiKey.isEmpty()) {</span>
+<span class="nc" id="L44">                    urlDownload.addHeader(&quot;x-api-key&quot;, apiKey);</span>
+                }
+<span class="nc" id="L46">                CitationsResponse citationsResponse = new Gson()</span>
+<span class="nc" id="L47">                        .fromJson(urlDownload.asString(), CitationsResponse.class);</span>
+
+<span class="nc" id="L49">                return citationsResponse.getData()</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">                                        .stream().filter(citationDataItem -&gt; citationDataItem.getCitingPaper() != null)</span>
+<span class="nc" id="L51">                                        .map(citationDataItem -&gt; citationDataItem.getCitingPaper().toBibEntry()).toList();</span>
+<span class="nc" id="L52">            } catch (IOException e) {</span>
+<span class="nc" id="L53">                throw new RuntimeException(e);</span>
+            }
+        }
+
+<span class="nc" id="L57">        return new ArrayList&lt;&gt;();</span>
+    }
+
+    @Override
+    public List&lt;BibEntry&gt; searchCiting(BibEntry entry) {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (entry.getDOI().isPresent()) {</span>
+<span class="nc" id="L63">            StringBuilder urlBuilder = new StringBuilder(SEMANTIC_SCHOLAR_API)</span>
+<span class="nc" id="L64">                    .append(&quot;paper/&quot;)</span>
+<span class="nc" id="L65">                    .append(&quot;DOI:&quot;).append(entry.getDOI().get().getDOI())</span>
+<span class="nc" id="L66">                    .append(&quot;/references&quot;)</span>
+<span class="nc" id="L67">                    .append(&quot;?fields=&quot;)</span>
+<span class="nc" id="L68">                    .append(&quot;title,authors,year,citationCount,referenceCount&quot;)</span>
+<span class="nc" id="L69">                    .append(&quot;&amp;limit=1000&quot;);</span>
+            try {
+<span class="nc" id="L71">                URL referencesUrl = URI.create(urlBuilder.toString()).toURL();</span>
+<span class="nc" id="L72">                URLDownload urlDownload = new URLDownload(referencesUrl);</span>
+<span class="nc" id="L73">                String apiKey = getApiKey();</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                if (!apiKey.isEmpty()) {</span>
+<span class="nc" id="L75">                    urlDownload.addHeader(&quot;x-api-key&quot;, apiKey);</span>
+                }
+<span class="nc" id="L77">                ReferencesResponse referencesResponse = new Gson()</span>
+<span class="nc" id="L78">                        .fromJson(urlDownload.asString(), ReferencesResponse.class);</span>
+
+<span class="nc" id="L80">                return referencesResponse.getData()</span>
+<span class="nc" id="L81">                                         .stream()</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                                         .filter(citationDataItem -&gt; citationDataItem.getCitedPaper() != null)</span>
+<span class="nc" id="L83">                                         .map(referenceDataItem -&gt; referenceDataItem.getCitedPaper().toBibEntry()).toList();</span>
+<span class="nc" id="L84">            } catch (IOException e) {</span>
+<span class="nc" id="L85">                throw new RuntimeException(e);</span>
+            }
+        }
+
+<span class="nc" id="L89">        return new ArrayList&lt;&gt;();</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="nc" id="L94">        return &quot;Semantic Scholar Citations Fetcher&quot;;</span>
+    }
+
+    private String getApiKey() {
+<span class="nc" id="L98">        return importerPreferences.getApiKey(getName()).orElse(API_KEY);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

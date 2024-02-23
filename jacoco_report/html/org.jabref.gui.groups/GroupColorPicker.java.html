@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GroupColorPicker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.groups</a> &gt; <span class="el_source">GroupColorPicker.java</span></div><h1>GroupColorPicker.java</h1><pre class="source lang-java linenums">package org.jabref.gui.groups;
+
+import java.util.List;
+
+import javafx.scene.paint.Color;
+
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+<span class="nc" id="L11">public class GroupColorPicker {</span>
+
+    // Generate color for top groups
+    public static Color generateColor(List&lt;Color&gt; siblingColors) {
+<span class="fc" id="L15">        return generateColor(siblingColors, null);</span>
+    }
+
+    /**
+     * Algorithm optimized for colors, not for gray-scale (where it does not work)
+     */
+    public static Color generateColor(List&lt;Color&gt; siblingColors, @Nullable Color parentColor) {
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (siblingColors.isEmpty()) {</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            if (parentColor == null) {</span>
+                // We need something colorful to derive other colors based on the color
+<span class="fc" id="L25">                return Color.hsb(Math.random() * 360.0, .50, .75);</span>
+            }
+<span class="nc" id="L27">            return generateSubGroupColor(parentColor);</span>
+        }
+
+<span class="fc" id="L30">        double sumSin = 0;</span>
+<span class="fc" id="L31">        double sumCos = 0;</span>
+
+        // Calculate the mean angle
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (Color color : siblingColors) {</span>
+<span class="fc" id="L35">            double hue = color.getHue();</span>
+<span class="fc" id="L36">            sumSin += Math.sin(Math.toRadians(hue));</span>
+<span class="fc" id="L37">            sumCos += Math.cos(Math.toRadians(hue));</span>
+<span class="fc" id="L38">        }</span>
+
+<span class="fc" id="L40">        double meanAngle = Math.toDegrees(Math.atan2(sumSin, sumCos));</span>
+<span class="fc" id="L41">        meanAngle = (meanAngle + 360) % 360;</span>
+
+        // The opposite angle is potentially the point of maximum average distance
+<span class="fc" id="L44">        double newHue = (meanAngle + 180) % 360;</span>
+
+<span class="fc" id="L46">        double sumSaturation = 0;</span>
+<span class="fc" id="L47">        double sumBrightness = 0;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (Color color : siblingColors) {</span>
+<span class="fc" id="L49">            sumSaturation += color.getSaturation();</span>
+<span class="fc" id="L50">            sumBrightness += color.getBrightness();</span>
+<span class="fc" id="L51">        }</span>
+
+<span class="fc" id="L53">        double averageSaturation = sumSaturation / siblingColors.size();</span>
+<span class="fc" id="L54">        double averageBrightness = sumBrightness / siblingColors.size();</span>
+
+<span class="fc" id="L56">        return Color.hsb(newHue, averageSaturation, averageBrightness);</span>
+    }
+
+    private static Color generateSubGroupColor(Color baseColor) {
+<span class="nc" id="L60">        return baseColor.deriveColor(0.0, 1.0, .9, 1.0);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

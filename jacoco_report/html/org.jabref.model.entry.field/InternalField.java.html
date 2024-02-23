@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InternalField.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.field</a> &gt; <span class="el_source">InternalField.java</span></div><h1>InternalField.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.field;
+
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * JabRef internal fields. These are not normal fields but mostly placeholders with special functions.
+ */
+<span class="fc" id="L11">public enum InternalField implements Field {</span>
+    /**
+     * The BibTeX key (which is used at \cite{key} in LaTeX
+     */
+<span class="fc" id="L15">    KEY_FIELD(&quot;citationkey&quot;),</span>
+
+    /**
+     * field which indicates the entrytype
+     *
+     * Example: @misc{key}
+     */
+<span class="fc" id="L22">    TYPE_HEADER(&quot;entrytype&quot;),</span>
+
+    /**
+     * Used in old layout files
+     */
+<span class="fc" id="L27">    OBSOLETE_TYPE_HEADER(&quot;bibtextype&quot;),</span>
+
+    /**
+     * used in old versions of JabRef. Currently used for conversion only
+     */
+<span class="fc" id="L32">    MARKED_INTERNAL(&quot;__markedentry&quot;),</span>
+
+    /**
+     * Marker that the content is just a BibTeX string
+     */
+<span class="fc" id="L37">    BIBTEX_STRING(&quot;__string&quot;),</span>
+
+    /**
+     * virtual field to denote &quot;all fields&quot;. Used in the metadata serialization for save actions.
+     */
+<span class="fc" id="L42">    INTERNAL_ALL_FIELD(&quot;all&quot;),</span>
+
+    /**
+     * virtual field to denote &quot;all text fields&quot;. Used in the metadata serialization for save actions.
+     */
+<span class="fc" id="L47">    INTERNAL_ALL_TEXT_FIELDS_FIELD(&quot;all-text-fields&quot;),</span>
+
+    /**
+     * all field names starting with &quot;Jabref-internal-&quot; are not appearing in .bib files
+     */
+<span class="fc" id="L52">    INTERNAL_ID_FIELD(&quot;JabRef-internal-id&quot;);</span>
+
+    private final String name;
+    private final Set&lt;FieldProperty&gt; properties;
+
+<span class="fc" id="L57">    InternalField(String name) {</span>
+<span class="fc" id="L58">        this.name = name;</span>
+<span class="fc" id="L59">        this.properties = EnumSet.noneOf(FieldProperty.class);</span>
+<span class="fc" id="L60">    }</span>
+
+<span class="nc" id="L62">    InternalField(String name, FieldProperty first, FieldProperty... rest) {</span>
+<span class="nc" id="L63">        this.name = name;</span>
+<span class="nc" id="L64">        this.properties = EnumSet.of(first, rest);</span>
+<span class="nc" id="L65">    }</span>
+
+    public static Optional&lt;InternalField&gt; fromName(String name) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (&quot;bibtexkey&quot;.equalsIgnoreCase(name)) {</span>
+            // For backwards compatibility
+<span class="fc" id="L70">            return Optional.of(InternalField.KEY_FIELD);</span>
+        }
+
+<span class="fc" id="L73">        return Arrays.stream(InternalField.values())</span>
+<span class="fc" id="L74">                     .filter(field -&gt; field.getName().equalsIgnoreCase(name))</span>
+<span class="fc" id="L75">                     .findAny();</span>
+    }
+
+    @Override
+    public Set&lt;FieldProperty&gt; getProperties() {
+<span class="fc" id="L80">        return properties;</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L85">        return name;</span>
+    }
+
+    @Override
+    public boolean isStandardField() {
+<span class="nc" id="L90">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

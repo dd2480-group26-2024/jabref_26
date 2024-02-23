@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>URLCleanup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.cleanup</a> &gt; <span class="el_source">URLCleanup.java</span></div><h1>URLCleanup.java</h1><pre class="source lang-java linenums">package org.jabref.logic.cleanup;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.formatter.bibtexfields.NormalizeDateFormatter;
+import org.jabref.model.FieldChange;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.Date;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+
+/**
+ * Checks whether URL exists in note field, and stores it under url field.
+ */
+<span class="fc" id="L18">public class URLCleanup implements CleanupJob {</span>
+
+    /*
+     * The urlRegex was originally fetched from a suggested solution in
+     * https://stackoverflow.com/questions/28185064/python-infinite-loop-in-regex-to-match-url.
+     * In order to be functional, we made the necessary adjustments regarding Java
+     * features (mainly doubled backslashes).
+     */
+    public static final String URL_REGEX = &quot;(?i)\\b((?:https?://|www\\d{0,3}[.]|[a-z0-9.\\-]+[.]&quot;
+            + &quot;[a-z]{2,4}/)(?:[^\\s()&lt;&gt;\\\\]+|\\(([^\\s()&lt;&gt;\\\\]+|(\\([^\\s()&quot;
+            + &quot;&lt;&gt;\\\\]+\\)))*\\))+(?:\\(([^\\s()&lt;&gt;\\\\]+|(\\([^\\s()&lt;&gt;\\\\]+\\&quot;
+            + &quot;)))*\\)|[^\\s`!()\\[\\]{};:'\&quot;.,&lt;&gt;?«»“”‘’]))&quot;;
+
+    public static final String DATE_TERMS_REGEX = &quot;accessed on|visited on|retrieved on|viewed on&quot;;
+
+<span class="fc" id="L33">    private static final Field NOTE_FIELD = StandardField.NOTE;</span>
+<span class="fc" id="L34">    private static final Field URL_FIELD = StandardField.URL;</span>
+<span class="fc" id="L35">    private static final Field URLDATE_FIELD = StandardField.URLDATE;</span>
+
+<span class="fc" id="L37">    final Pattern urlPattern = Pattern.compile(URL_REGEX, Pattern.CASE_INSENSITIVE);</span>
+<span class="fc" id="L38">    final Pattern dateTermsPattern = Pattern.compile(DATE_TERMS_REGEX, Pattern.CASE_INSENSITIVE);</span>
+<span class="fc" id="L39">    final Pattern datePattern = Pattern.compile(Date.DATE_REGEX, Pattern.CASE_INSENSITIVE);</span>
+<span class="fc" id="L40">    private final NormalizeDateFormatter formatter = new NormalizeDateFormatter();</span>
+
+    @Override
+    public List&lt;FieldChange&gt; cleanup(BibEntry entry) {
+<span class="fc" id="L44">        List&lt;FieldChange&gt; changes = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L46">        String noteFieldValue = entry.getField(NOTE_FIELD).orElse(&quot;&quot;);</span>
+
+<span class="fc" id="L48">        final Matcher urlMatcher = urlPattern.matcher(noteFieldValue);</span>
+<span class="fc" id="L49">        final Matcher dateTermsMatcher = dateTermsPattern.matcher(noteFieldValue);</span>
+<span class="fc" id="L50">        final Matcher dateMatcher = datePattern.matcher(noteFieldValue);</span>
+
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (urlMatcher.find()) {</span>
+<span class="fc" id="L53">            String url = urlMatcher.group();</span>
+
+            // Remove the URL from the NoteFieldValue
+<span class="fc" id="L56">            String newNoteFieldValue = noteFieldValue</span>
+<span class="fc" id="L57">                    .replace(url, &quot;&quot;)</span>
+
+                    /*
+                     * The following regex erases unnecessary remaining
+                     * content in note field. Explanation:
+                     * &lt;ul&gt;
+                     *     &lt;li&gt;&quot;(, )?&quot;: Matches an optional comma followed by a space&lt;/li&gt;
+                     *     &lt;li&gt;&quot;\\?&quot;: Matches an optional backslash&lt;/li&gt;
+                     *     &lt;li&gt;&quot;url\{\}&quot;: Matches the literal string &quot;url{}&quot;&lt;/li&gt;
+                     * &lt;/ul&gt;
+                     * Note that the backslashes are doubled as Java requirement
+                     */
+<span class="fc" id="L69">                    .replaceAll(&quot;(, )?\\\\?url\\{\\}(, )?&quot;, &quot;&quot;);</span>
+
+            /*
+             * In case the url and note fields hold the same URL, then we just
+             * remove it from the note field, and no other action is performed.
+             */
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (entry.hasField(URL_FIELD)) {</span>
+<span class="fc" id="L76">                String urlFieldValue = entry.getField(URL_FIELD).orElse(&quot;&quot;);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                if (urlFieldValue.equals(url)) {</span>
+<span class="fc" id="L78">                    entry.setField(NOTE_FIELD, newNoteFieldValue).ifPresent(changes::add);</span>
+                }
+<span class="fc" id="L80">            } else {</span>
+<span class="fc" id="L81">                entry.setField(NOTE_FIELD, newNoteFieldValue).ifPresent(changes::add);</span>
+<span class="fc" id="L82">                entry.setField(URL_FIELD, url).ifPresent(changes::add);</span>
+            }
+
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (dateTermsMatcher.find()) {</span>
+<span class="fc" id="L86">                String term = dateTermsMatcher.group();</span>
+<span class="fc" id="L87">                newNoteFieldValue = newNoteFieldValue</span>
+<span class="fc" id="L88">                        .replace(term, &quot;&quot;);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                if (dateMatcher.find()) {</span>
+<span class="fc" id="L90">                    String date = dateMatcher.group();</span>
+<span class="fc" id="L91">                    String formattedDate = formatter.format(date);</span>
+<span class="fc" id="L92">                    newNoteFieldValue = newNoteFieldValue</span>
+<span class="fc" id="L93">                            .replace(date, &quot;&quot;).trim()</span>
+<span class="fc" id="L94">                            .replaceAll(&quot;^,|,$&quot;, &quot;&quot;).trim(); // either starts or ends with a comma</span>
+
+                    // Same approach with the URL cleanup.
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                    if (entry.hasField(URLDATE_FIELD)) {</span>
+<span class="fc" id="L98">                        String urlDateFieldValue = entry.getField(URLDATE_FIELD).orElse(&quot;&quot;);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                        if (urlDateFieldValue.equals(formattedDate)) {</span>
+<span class="fc" id="L100">                            entry.setField(NOTE_FIELD, newNoteFieldValue).ifPresent(changes::add);</span>
+                        }
+<span class="fc" id="L102">                    } else {</span>
+<span class="fc" id="L103">                        entry.setField(NOTE_FIELD, newNoteFieldValue).ifPresent(changes::add);</span>
+<span class="fc" id="L104">                        entry.setField(URLDATE_FIELD, formattedDate).ifPresent(changes::add);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L109">        return changes;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

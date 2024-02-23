@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NewProtectedTermsFileDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.protectedterms</a> &gt; <span class="el_source">NewProtectedTermsFileDialog.java</span></div><h1>NewProtectedTermsFileDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.protectedterms;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.protectedterms.ProtectedTermsList;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.preferences.FilePreferences;
+
+public class NewProtectedTermsFileDialog extends BaseDialog&lt;Void&gt; {
+
+<span class="nc" id="L23">    private final TextField newFile = new TextField();</span>
+    private final DialogService dialogService;
+
+<span class="nc" id="L26">    public NewProtectedTermsFileDialog(List&lt;ProtectedTermsListItemModel&gt; termsLists, DialogService dialogService, FilePreferences filePreferences) {</span>
+<span class="nc" id="L27">        this.dialogService = dialogService;</span>
+
+<span class="nc" id="L29">        this.setTitle(Localization.lang(&quot;New protected terms file&quot;));</span>
+
+<span class="nc" id="L31">        FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()</span>
+<span class="nc" id="L32">                .addExtensionFilter(Localization.lang(&quot;Protected terms file&quot;), StandardFileType.TERMS)</span>
+<span class="nc" id="L33">                .withDefaultExtension(Localization.lang(&quot;Protected terms file&quot;), StandardFileType.TERMS)</span>
+<span class="nc" id="L34">                .withInitialDirectory(filePreferences.getWorkingDirectory())</span>
+<span class="nc" id="L35">                .build();</span>
+
+<span class="nc" id="L37">        Button browse = new Button(Localization.lang(&quot;Browse&quot;));</span>
+<span class="nc" id="L38">        browse.setOnAction(event -&gt; this.dialogService.showFileSaveDialog(fileDialogConfiguration)</span>
+<span class="nc" id="L39">                                                      .ifPresent(file -&gt; newFile.setText(file.toAbsolutePath().toString())));</span>
+
+<span class="nc" id="L41">        TextField newDescription = new TextField();</span>
+<span class="nc" id="L42">        VBox container = new VBox(10,</span>
+<span class="nc" id="L43">                new VBox(5, new Label(Localization.lang(&quot;Description&quot;)), newDescription),</span>
+<span class="nc" id="L44">                new VBox(5, new Label(Localization.lang(&quot;File&quot;)), new HBox(10, newFile, browse))</span>
+        );
+<span class="nc" id="L46">        getDialogPane().setContent(container);</span>
+
+<span class="nc" id="L48">        getDialogPane().getButtonTypes().setAll(</span>
+                ButtonType.OK,
+                ButtonType.CANCEL
+        );
+
+<span class="nc" id="L53">        setResultConverter(button -&gt; {</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">            if (button == ButtonType.OK) {</span>
+<span class="nc" id="L55">                ProtectedTermsList newList = new ProtectedTermsList(newDescription.getText(), new ArrayList&lt;&gt;(), newFile.getText(), false);</span>
+<span class="nc" id="L56">                newList.setEnabled(true);</span>
+<span class="nc" id="L57">                newList.createAndWriteHeading(newDescription.getText());</span>
+<span class="nc" id="L58">                termsLists.add(new ProtectedTermsListItemModel(newList));</span>
+            }
+<span class="nc" id="L60">            return null;</span>
+        });
+<span class="nc" id="L62">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DoiToBibtexConverterComIsbnFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher.isbntobibtex</a> &gt; <span class="el_source">DoiToBibtexConverterComIsbnFetcher.java</span></div><h1>DoiToBibtexConverterComIsbnFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher.isbntobibtex;
+
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.fetcher.AbstractIsbnFetcher;
+import org.jabref.logic.importer.util.JsonReader;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONException;
+import kong.unirest.json.JSONObject;
+import org.apache.http.client.utils.URIBuilder;
+
+/**
+ * Fetcher for ISBN using &lt;a href=&quot;https://doi-to-bibtex-converter.herokuapp.com&quot;&gt;doi-to-bibtex-converter.herokuapp&lt;/a&gt;.
+ */
+public class DoiToBibtexConverterComIsbnFetcher extends AbstractIsbnFetcher {
+    private static final String BASE_URL = &quot;https://doi-to-bibtex-converter.herokuapp.com&quot;;
+
+    public DoiToBibtexConverterComIsbnFetcher(ImportFormatPreferences importFormatPreferences) {
+<span class="nc" id="L34">        super(importFormatPreferences);</span>
+<span class="nc" id="L35">    }</span>
+
+    @Override
+    public String getName() {
+<span class="nc" id="L39">        return &quot;ISBN (doi-to-bibtex-converter.herokuapp.com)&quot;;</span>
+    }
+
+    @Override
+    public URL getUrlForIdentifier(String identifier) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="nc" id="L44">        this.ensureThatIsbnIsValid(identifier);</span>
+<span class="nc" id="L45">        return new URIBuilder(BASE_URL)</span>
+<span class="nc" id="L46">                .setPathSegments(&quot;getInfo.php&quot;)</span>
+<span class="nc" id="L47">                .setParameter(&quot;query&quot;, identifier)</span>
+<span class="nc" id="L48">                .setParameter(&quot;format&quot;, &quot;json&quot;)</span>
+<span class="nc" id="L49">                .build()</span>
+<span class="nc" id="L50">                .toURL();</span>
+    }
+
+    @Override
+    public Parser getParser() {
+<span class="nc" id="L55">        return inputStream -&gt; {</span>
+<span class="nc" id="L56">            JSONObject response = JsonReader.toJsonObject(inputStream);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            if (response.isEmpty()) {</span>
+<span class="nc" id="L58">                return Collections.emptyList();</span>
+            }
+
+<span class="nc" id="L61">            String error = response.optString(&quot;error&quot;);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">            if (StringUtil.isNotBlank(error)) {</span>
+<span class="nc" id="L63">                throw new ParseException(error);</span>
+            }
+
+<span class="nc" id="L66">            BibEntry entry = jsonItemToBibEntry(response);</span>
+<span class="nc" id="L67">            return List.of(entry);</span>
+        };
+    }
+
+    @Override
+    public void doPostCleanup(BibEntry entry) {
+<span class="nc" id="L73">    }</span>
+
+    private BibEntry jsonItemToBibEntry(JSONObject item) throws ParseException {
+        try {
+<span class="nc" id="L77">            JSONArray data = item.optJSONArray(&quot;data&quot;);</span>
+<span class="nc" id="L78">            var type = getElementFromJSONArrayByKey(data, &quot;type&quot;);</span>
+
+<span class="nc" id="L80">            BibEntry entry = new BibEntry(evaluateBibEntryTypeFromString(type));</span>
+<span class="nc" id="L81">            entry.setField(StandardField.AUTHOR, getElementFromJSONArrayByKey(data, &quot;author&quot;));</span>
+<span class="nc" id="L82">            entry.setField(StandardField.PAGES, getElementFromJSONArrayByKey(data, &quot;pagecount&quot;));</span>
+<span class="nc" id="L83">            entry.setField(StandardField.ISBN, getElementFromJSONArrayByKey(data, &quot;isbn&quot;));</span>
+<span class="nc" id="L84">            entry.setField(StandardField.TITLE, getElementFromJSONArrayByKey(data, &quot;title&quot;));</span>
+<span class="nc" id="L85">            entry.setField(StandardField.YEAR, getElementFromJSONArrayByKey(data, &quot;year&quot;));</span>
+<span class="nc" id="L86">            entry.setField(StandardField.MONTH, getElementFromJSONArrayByKey(data, &quot;month&quot;));</span>
+<span class="nc" id="L87">            entry.setField(StandardField.DAY, getElementFromJSONArrayByKey(data, &quot;day&quot;));</span>
+<span class="nc" id="L88">            return entry;</span>
+<span class="nc" id="L89">        } catch (JSONException exception) {</span>
+<span class="nc" id="L90">            throw new ParseException(&quot;CrossRef API JSON format has changed&quot;, exception);</span>
+        }
+    }
+
+    private String getElementFromJSONArrayByKey(JSONArray jsonArray, String key) {
+<span class="nc" id="L95">        return IntStream.range(0, jsonArray.length())</span>
+<span class="nc" id="L96">                        .mapToObj(jsonArray::getJSONObject)</span>
+<span class="nc" id="L97">                        .map(obj -&gt; obj.getString(key))</span>
+<span class="nc" id="L98">                        .findFirst()</span>
+<span class="nc" id="L99">                        .orElse(&quot;&quot;);</span>
+    }
+
+    private StandardEntryType evaluateBibEntryTypeFromString(String type) {
+<span class="nc" id="L103">        return Stream.of(StandardEntryType.values())</span>
+<span class="nc" id="L104">                     .filter(entryType -&gt; entryType.name().equalsIgnoreCase(type))</span>
+<span class="nc" id="L105">                     .findAny()</span>
+<span class="nc" id="L106">                     .orElse(StandardEntryType.Book);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

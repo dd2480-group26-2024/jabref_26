@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RenameFieldTabView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.edit.automaticfiededitor.renamefield</a> &gt; <span class="el_source">RenameFieldTabView.java</span></div><h1>RenameFieldTabView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.edit.automaticfiededitor.renamefield;
+
+import java.util.List;
+
+import javafx.application.Platform;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.TextField;
+
+import org.jabref.gui.StateManager;
+import org.jabref.gui.edit.automaticfiededitor.AbstractAutomaticFieldEditorTabView;
+import org.jabref.gui.edit.automaticfiededitor.AutomaticFieldEditorTab;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+
+import static org.jabref.gui.util.FieldsUtil.FIELD_STRING_CONVERTER;
+
+public class RenameFieldTabView extends AbstractAutomaticFieldEditorTabView implements AutomaticFieldEditorTab {
+    @FXML
+    private Button renameButton;
+    @FXML
+    private ComboBox&lt;Field&gt; fieldComboBox;
+    @FXML
+    private TextField newFieldNameTextField;
+    private final List&lt;BibEntry&gt; selectedEntries;
+    private final BibDatabase database;
+    private final StateManager stateManager;
+    private RenameFieldViewModel viewModel;
+
+<span class="nc" id="L37">    private final ControlsFxVisualizer visualizer = new ControlsFxVisualizer();</span>
+
+<span class="nc" id="L39">    public RenameFieldTabView(BibDatabase database, StateManager stateManager) {</span>
+<span class="nc" id="L40">        this.selectedEntries = stateManager.getSelectedEntries();</span>
+<span class="nc" id="L41">        this.database = database;</span>
+<span class="nc" id="L42">        this.stateManager = stateManager;</span>
+
+<span class="nc" id="L44">        ViewLoader.view(this)</span>
+<span class="nc" id="L45">                  .root(this)</span>
+<span class="nc" id="L46">                  .load();</span>
+<span class="nc" id="L47">    }</span>
+
+    @FXML
+    public void initialize() {
+<span class="nc" id="L51">        viewModel = new RenameFieldViewModel(selectedEntries, database, stateManager);</span>
+
+<span class="nc" id="L53">        fieldComboBox.getItems().setAll(viewModel.getAllFields());</span>
+<span class="nc" id="L54">        fieldComboBox.getSelectionModel().selectFirst();</span>
+
+<span class="nc" id="L56">        fieldComboBox.setConverter(FIELD_STRING_CONVERTER);</span>
+
+<span class="nc" id="L58">        fieldComboBox.valueProperty().bindBidirectional(viewModel.selectedFieldProperty());</span>
+<span class="nc" id="L59">        EasyBind.listen(fieldComboBox.getEditor().textProperty(), observable -&gt; fieldComboBox.commitValue());</span>
+
+<span class="nc" id="L61">        renameButton.disableProperty().bind(viewModel.canRenameProperty().not());</span>
+
+<span class="nc" id="L63">        newFieldNameTextField.textProperty().bindBidirectional(viewModel.newFieldNameProperty());</span>
+
+<span class="nc" id="L65">        Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L66">            visualizer.initVisualization(viewModel.fieldNameValidationStatus(), newFieldNameTextField, true);</span>
+<span class="nc" id="L67">        });</span>
+<span class="nc" id="L68">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L72">        return Localization.lang(&quot;Rename field&quot;);</span>
+    }
+
+    @FXML
+    void renameField() {
+<span class="nc" id="L77">        viewModel.renameField();</span>
+<span class="nc" id="L78">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

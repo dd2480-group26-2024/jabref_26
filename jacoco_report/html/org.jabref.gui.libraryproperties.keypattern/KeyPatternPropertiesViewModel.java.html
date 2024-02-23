@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KeyPatternPropertiesViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.libraryproperties.keypattern</a> &gt; <span class="el_source">KeyPatternPropertiesViewModel.java</span></div><h1>KeyPatternPropertiesViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.libraryproperties.keypattern;
+
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+
+import org.jabref.gui.commonfxcontrols.CitationKeyPatternPanelItemModel;
+import org.jabref.gui.commonfxcontrols.CitationKeyPatternPanelViewModel;
+import org.jabref.gui.libraryproperties.PropertiesTabViewModel;
+import org.jabref.logic.citationkeypattern.DatabaseCitationKeyPattern;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.preferences.PreferencesService;
+
+public class KeyPatternPropertiesViewModel implements PropertiesTabViewModel {
+
+    // The list and the default properties are being overwritten by the bound properties of the tableView, but to
+    // prevent an NPE on storing the preferences before lazy-loading of the setValues, they need to be initialized.
+<span class="nc" id="L20">    private final ListProperty&lt;CitationKeyPatternPanelItemModel&gt; patternListProperty = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L21">    private final ObjectProperty&lt;CitationKeyPatternPanelItemModel&gt; defaultKeyPatternProperty = new SimpleObjectProperty&lt;&gt;(</span>
+            new CitationKeyPatternPanelItemModel(new CitationKeyPatternPanelViewModel.DefaultEntryType(), &quot;&quot;));
+
+    private final PreferencesService preferencesService;
+
+    private final BibDatabaseContext databaseContext;
+
+<span class="nc" id="L28">    public KeyPatternPropertiesViewModel(BibDatabaseContext databaseContext, PreferencesService preferencesService) {</span>
+<span class="nc" id="L29">        this.databaseContext = databaseContext;</span>
+<span class="nc" id="L30">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L31">    }</span>
+
+    @Override
+    public void setValues() {
+        // empty
+<span class="nc" id="L36">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L40">        DatabaseCitationKeyPattern newKeyPattern = new DatabaseCitationKeyPattern(preferencesService.getCitationKeyPatternPreferences().getKeyPattern());</span>
+
+<span class="nc" id="L42">        patternListProperty.forEach(item -&gt; {</span>
+<span class="nc" id="L43">            String patternString = item.getPattern();</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">            if (!item.getEntryType().getName().equals(&quot;default&quot;)) {</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">                if (!patternString.trim().isEmpty()) {</span>
+<span class="nc" id="L46">                    newKeyPattern.addCitationKeyPattern(item.getEntryType(), patternString);</span>
+                }
+            }
+<span class="nc" id="L49">        });</span>
+
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (!defaultKeyPatternProperty.getValue().getPattern().trim().isEmpty()) {</span>
+            // we do not trim the value at the assignment to enable users to have spaces at the beginning and
+            // at the end of the pattern
+<span class="nc" id="L54">            newKeyPattern.setDefaultValue(defaultKeyPatternProperty.getValue().getPattern());</span>
+        }
+
+<span class="nc" id="L57">        databaseContext.getMetaData().setCiteKeyPattern(newKeyPattern);</span>
+<span class="nc" id="L58">    }</span>
+
+    public ListProperty&lt;CitationKeyPatternPanelItemModel&gt; patternListProperty() {
+<span class="nc" id="L61">        return patternListProperty;</span>
+    }
+
+    public ObjectProperty&lt;CitationKeyPatternPanelItemModel&gt; defaultKeyPatternProperty() {
+<span class="nc" id="L65">        return defaultKeyPatternProperty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

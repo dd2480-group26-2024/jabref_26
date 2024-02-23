@@ -1,0 +1,476 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModsExporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.exporter</a> &gt; <span class="el_source">ModsExporter.java</span></div><h1>ModsExporter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.exporter;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.entry.types.EntryType;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * TemplateExporter for exporting in MODS XML format.
+ */
+class ModsExporter extends Exporter {
+
+    private static final String MODS_NAMESPACE_URI = &quot;http://www.loc.gov/mods/v3&quot;;
+    private static final String MINUS = &quot;-&quot;;
+    private static final String DOUBLE_MINUS = &quot;--&quot;;
+    private static final String MODS_SCHEMA_LOCATION = &quot;http://www.loc.gov/standards/mods/v3/mods-3-6.xsd&quot;;
+
+<span class="fc" id="L48">    private static final Logger LOGGER = LoggerFactory.getLogger(ModsExporter.class);</span>
+
+    public ModsExporter() {
+<span class="fc" id="L51">        super(&quot;mods&quot;, &quot;MODS&quot;, StandardFileType.XML);</span>
+<span class="fc" id="L52">    }</span>
+
+    @Override
+    public void export(final BibDatabaseContext databaseContext, final Path file, List&lt;BibEntry&gt; entries) throws SaveException {
+<span class="fc" id="L56">        Objects.requireNonNull(databaseContext);</span>
+<span class="fc" id="L57">        Objects.requireNonNull(entries);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (entries.isEmpty()) { // Only export if entries exist</span>
+<span class="fc" id="L59">            return;</span>
+        }
+
+<span class="fc" id="L62">        XMLStreamWriter writer = null;</span>
+        try {
+<span class="fc" id="L64">            StringWriter sw = new StringWriter();</span>
+            // writer is not an auto closable!
+<span class="fc" id="L66">            writer = createWriter(sw);</span>
+
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            for (BibEntry bibEntry : entries) {</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                if (bibEntry.getCitationKey().isPresent()) {</span>
+<span class="fc" id="L70">                    String citekey = bibEntry.getCitationKey().get();</span>
+<span class="fc" id="L71">                    addIdentifier(writer, new UnknownField(&quot;citekey&quot;), citekey);</span>
+<span class="fc" id="L72">                } else {</span>
+<span class="fc" id="L73">                    writer.writeStartElement(&quot;mods&quot;, &quot;mods&quot;, MODS_NAMESPACE_URI);</span>
+                }
+
+<span class="fc" id="L76">                Map&lt;Field, String&gt; fieldMap = new TreeMap&lt;&gt;(Comparator.comparing(Field::getName));</span>
+<span class="fc" id="L77">                fieldMap.putAll(bibEntry.getFieldMap());</span>
+<span class="fc" id="L78">                addGenre(writer, bibEntry.getType());</span>
+
+<span class="fc" id="L80">                List&lt;String&gt; originItems = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L81">                List&lt;String&gt; parts = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                for (Map.Entry&lt;Field, String&gt; entry : fieldMap.entrySet()) {</span>
+<span class="fc" id="L84">                    Field field = entry.getKey();</span>
+<span class="fc" id="L85">                    String value = entry.getValue();</span>
+
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                    if (StandardField.AUTHOR == field) {</span>
+<span class="fc" id="L88">                        handleAuthors(writer, value);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                    } else if (new UnknownField(&quot;affiliation&quot;).equals(field)) {</span>
+<span class="fc" id="L90">                        addAffiliation(writer, value);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                    } else if (StandardField.ABSTRACT == field) {</span>
+<span class="fc" id="L92">                        addAbstract(writer, value);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                    } else if (StandardField.TITLE == field) {</span>
+<span class="fc" id="L94">                        addTitle(writer, value);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                    } else if (StandardField.LANGUAGE == field) {</span>
+<span class="fc" id="L96">                        addLanguage(writer, value);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                    } else if (StandardField.LOCATION == field) {</span>
+<span class="fc" id="L98">                        addLocation(writer, value);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                    } else if (StandardField.URL == field) {</span>
+<span class="fc" id="L100">                        addUrl(writer, value);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                    } else if (StandardField.NOTE == field) {</span>
+<span class="fc" id="L102">                        addNote(writer, value);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                    } else if (StandardField.KEYWORDS == field) {</span>
+<span class="fc" id="L104">                        addKeyWords(writer, value);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                    } else if (StandardField.URI == field) {</span>
+<span class="fc" id="L106">                        addIdentifier(writer, StandardField.URI, value);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                    } else if (StandardField.ISBN == field) {</span>
+<span class="fc" id="L108">                        addIdentifier(writer, StandardField.ISBN, value);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                    } else if (StandardField.ISSN == field) {</span>
+<span class="fc" id="L110">                        addIdentifier(writer, StandardField.ISSN, value);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                    } else if (StandardField.DOI == field) {</span>
+<span class="fc" id="L112">                        addIdentifier(writer, StandardField.DOI, value);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                    } else if (StandardField.PMID == field) {</span>
+<span class="fc" id="L114">                        addIdentifier(writer, StandardField.PMID, value);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                    } else if (StandardField.PAGES == field) {</span>
+<span class="fc" id="L116">                        addPart(parts, value);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                    } else if (StandardField.VOLUME == field) {</span>
+<span class="fc" id="L118">                        addPart(parts, value);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                    } else if (StandardField.ISSUE == field) {</span>
+<span class="fc" id="L120">                        addPart(parts, value);</span>
+                    }
+<span class="fc" id="L122">                    trackOriginInformation(originItems, field, value);</span>
+<span class="fc" id="L123">                }</span>
+<span class="fc" id="L124">                writeOriginInformation(writer, originItems, fieldMap);</span>
+                // Write related items
+<span class="fc" id="L126">                writeRelatedInformation(writer, parts, fieldMap);</span>
+<span class="fc" id="L127">                writer.writeEndElement(); // end mods</span>
+<span class="fc" id="L128">            }</span>
+<span class="fc" id="L129">            writer.writeEndDocument();</span>
+<span class="fc" id="L130">            writerFormatted(file, sw);</span>
+<span class="nc" id="L131">        } catch (XMLStreamException | IOException | TransformerException ex) {</span>
+<span class="nc" id="L132">            throw new SaveException(ex);</span>
+        } finally {
+            try {
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                if (writer != null) {</span>
+<span class="fc" id="L136">                    writer.flush();</span>
+<span class="fc" id="L137">                    writer.close();</span>
+                }
+<span class="nc" id="L139">            } catch (XMLStreamException e) {</span>
+<span class="nc" id="L140">                LOGGER.error(&quot;Error closing XML writer&quot;, e);</span>
+<span class="fc" id="L141">            }</span>
+        }
+<span class="fc" id="L143">    }</span>
+
+    private XMLStreamWriter createWriter(StringWriter sw) throws XMLStreamException {
+<span class="fc" id="L146">        XMLOutputFactory outputFactory = XMLOutputFactory.newFactory();</span>
+
+<span class="fc" id="L148">        XMLStreamWriter writer = outputFactory.createXMLStreamWriter(new StreamResult(sw));</span>
+<span class="fc" id="L149">        writer.writeDTD(&quot;&lt;?xml version=\&quot;1.0\&quot; encoding=\&quot;UTF-8\&quot; standalone=\&quot;yes\&quot;?&gt;\n&quot;);</span>
+<span class="fc" id="L150">        writer.writeStartElement(&quot;mods&quot;, &quot;modsCollection&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L151">        writer.writeNamespace(&quot;mods&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L152">        writer.writeNamespace(&quot;ns2&quot;, &quot;http://www.w3.org/1999/xlink&quot;);</span>
+<span class="fc" id="L153">        writer.writeNamespace(&quot;xsi&quot;, &quot;http://www.w3.org/2001/XMLSchema-instance&quot;);</span>
+<span class="fc" id="L154">        writer.writeAttribute(&quot;xsi&quot;, &quot;http://www.w3.org/2001/XMLSchema-instance&quot;, &quot;schemaLocation&quot;, MODS_SCHEMA_LOCATION);</span>
+<span class="fc" id="L155">        return writer;</span>
+    }
+
+    private void writerFormatted(Path file, StringWriter sw) throws TransformerException, IOException {
+<span class="fc" id="L159">        Transformer transformer = TransformerFactory.newInstance().newTransformer();</span>
+<span class="fc" id="L160">        transformer.setOutputProperty(OutputKeys.INDENT, &quot;yes&quot;);</span>
+<span class="fc" id="L161">        transformer.setOutputProperty(OutputKeys.STANDALONE, &quot;yes&quot;);</span>
+<span class="fc" id="L162">        transformer.setOutputProperty(&quot;{http://xml.apache.org/xslt}indent-amount&quot;, &quot;4&quot;);</span>
+
+<span class="fc" id="L164">        try (OutputStream outputStream = Files.newOutputStream(file)) {</span>
+<span class="fc" id="L165">            transformer.transform(new StreamSource(new StringReader(sw.toString())), new StreamResult(outputStream));</span>
+        }
+<span class="fc" id="L167">    }</span>
+
+    private void writeOriginInformation(XMLStreamWriter writer, List&lt;String&gt; originItems, Map&lt;Field, String&gt; fieldMap) throws XMLStreamException {
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (originItems.isEmpty()) {</span>
+<span class="fc" id="L171">            writer.writeEmptyElement(&quot;mods&quot;, &quot;originInfo&quot;, MODS_NAMESPACE_URI);</span>
+        } else {
+<span class="fc" id="L173">            writer.writeStartElement(&quot;mods&quot;, &quot;originInfo&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            for (Map.Entry&lt;Field, String&gt; entry : fieldMap.entrySet()) {</span>
+<span class="fc" id="L175">                Field field = entry.getKey();</span>
+<span class="fc" id="L176">                String value = entry.getValue();</span>
+<span class="fc" id="L177">                addOriginInformation(writer, field, value);</span>
+<span class="fc" id="L178">            }</span>
+<span class="fc" id="L179">            writer.writeEndElement();</span>
+        }
+<span class="fc" id="L181">    }</span>
+
+    private void writeRelatedInformation(XMLStreamWriter writer, List&lt;String&gt; parts, Map&lt;Field, String&gt; fieldMap) throws XMLStreamException {
+<span class="fc" id="L184">        writer.writeStartElement(&quot;mods&quot;, &quot;relatedItem&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L185">        writer.writeAttribute(&quot;type&quot;, &quot;host&quot;);</span>
+
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (Map.Entry&lt;Field, String&gt; entry : fieldMap.entrySet()) {</span>
+<span class="fc" id="L188">            Field field = entry.getKey();</span>
+<span class="fc" id="L189">            String value = entry.getValue();</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (StandardField.JOURNAL == field) {</span>
+<span class="fc" id="L191">                addJournal(writer, value);</span>
+            }
+<span class="fc" id="L193">        }</span>
+<span class="fc" id="L194">        writePartInformation(writer, parts, fieldMap);</span>
+
+<span class="fc" id="L196">        writer.writeEndElement(); // end relatedItem</span>
+
+<span class="fc" id="L198">        writer.writeStartElement(&quot;mods&quot;, &quot;typeOfResource&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L199">        writer.writeCharacters(&quot;text&quot;);</span>
+<span class="fc" id="L200">        writer.writeEndElement(); // end typeOfResource</span>
+<span class="fc" id="L201">    }</span>
+
+    private void writePartInformation(XMLStreamWriter writer, List&lt;String&gt; parts, Map&lt;Field, String&gt; fieldMap) throws XMLStreamException {
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (parts.isEmpty()) {</span>
+<span class="fc" id="L205">            writer.writeEmptyElement(&quot;mods&quot;, &quot;part&quot;, MODS_NAMESPACE_URI);</span>
+        } else {
+<span class="fc" id="L207">            writer.writeStartElement(&quot;mods&quot;, &quot;part&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            for (Map.Entry&lt;Field, String&gt; entry : fieldMap.entrySet()) {</span>
+<span class="fc" id="L209">                Field field = entry.getKey();</span>
+<span class="fc" id="L210">                String value = entry.getValue();</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                if (StandardField.PAGES == field) {</span>
+<span class="fc" id="L212">                    addPages(writer, value);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                } else if (StandardField.VOLUME == field) {</span>
+<span class="fc" id="L214">                    addDetail(writer, StandardField.VOLUME, value);</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                } else if (StandardField.ISSUE == field) {</span>
+<span class="fc" id="L216">                    addDetail(writer, StandardField.ISSUE, value);</span>
+                }
+<span class="fc" id="L218">            }</span>
+<span class="fc" id="L219">            writer.writeEndElement(); // end part</span>
+        }
+<span class="fc" id="L221">    }</span>
+
+    private void trackOriginInformation(List&lt;String&gt; originItems, Field field, String value) {
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (field.equals(StandardField.YEAR)) {</span>
+<span class="fc" id="L225">            originItems.add(value);</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        } else if (field.equals(new UnknownField(&quot;created&quot;))) {</span>
+<span class="fc" id="L227">            originItems.add(value);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        } else if (field.equals(StandardField.MODIFICATIONDATE)) {</span>
+<span class="fc" id="L229">            originItems.add(value);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        } else if (field.equals(StandardField.CREATIONDATE)) {</span>
+<span class="fc" id="L231">            originItems.add(value);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        } else if (StandardField.PUBLISHER == field) {</span>
+<span class="fc" id="L233">            originItems.add(value);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        } else if (field.equals(new UnknownField(&quot;issuance&quot;))) {</span>
+<span class="fc" id="L235">            originItems.add(value);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        } else if (field.equals(StandardField.ADDRESS)) {</span>
+<span class="fc" id="L237">            originItems.add(value);</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        } else if (field.equals(StandardField.EDITION)) {</span>
+<span class="fc" id="L239">            originItems.add(value);</span>
+        }
+<span class="fc" id="L241">    }</span>
+
+    private void addPart(List&lt;String&gt; part, String value) {
+<span class="fc" id="L244">        part.add(value);</span>
+<span class="fc" id="L245">    }</span>
+
+    private void addGenre(XMLStreamWriter writer, EntryType entryType) throws XMLStreamException {
+<span class="fc" id="L248">        writer.writeStartElement(&quot;mods&quot;, &quot;genre&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L249">        writer.writeCharacters(entryType.getName());</span>
+<span class="fc" id="L250">        writer.writeEndElement();</span>
+<span class="fc" id="L251">    }</span>
+
+    private void addAbstract(XMLStreamWriter writer, String value) throws XMLStreamException {
+<span class="fc" id="L254">        writer.writeStartElement(&quot;mods&quot;, &quot;abstract&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L255">        writer.writeCharacters(value);</span>
+<span class="fc" id="L256">        writer.writeEndElement(); // end abstract</span>
+<span class="fc" id="L257">    }</span>
+
+    private void addTitle(XMLStreamWriter writer, String value) throws XMLStreamException {
+<span class="fc" id="L260">        writer.writeStartElement(&quot;mods&quot;, &quot;titleInfo&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L261">        writer.writeStartElement(&quot;mods&quot;, &quot;title&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L262">        writer.writeCharacters(value);</span>
+<span class="fc" id="L263">        writer.writeEndElement(); // end title</span>
+<span class="fc" id="L264">        writer.writeEndElement(); // end titleInfo</span>
+<span class="fc" id="L265">    }</span>
+
+    private void addAffiliation(XMLStreamWriter writer, String value) throws XMLStreamException {
+<span class="fc" id="L268">        writer.writeStartElement(&quot;mods&quot;, &quot;name&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L269">        writer.writeStartElement(&quot;mods&quot;, &quot;affiliation&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L270">        writer.writeCharacters(value);</span>
+<span class="fc" id="L271">        writer.writeEndElement(); // end affiliation</span>
+<span class="fc" id="L272">        writer.writeEndElement(); // end name</span>
+<span class="fc" id="L273">    }</span>
+
+    private void addLocation(XMLStreamWriter writer, String value) throws XMLStreamException {
+<span class="fc" id="L276">        writer.writeStartElement(&quot;mods&quot;, &quot;location&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L277">        String[] locations = value.split(&quot;, &quot;);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (String location : locations) {</span>
+<span class="fc" id="L279">            writer.writeStartElement(&quot;mods&quot;, &quot;physicalLocation&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L280">            writer.writeCharacters(location);</span>
+<span class="fc" id="L281">            writer.writeEndElement();</span>
+        }
+<span class="fc" id="L283">        writer.writeEndElement();</span>
+<span class="fc" id="L284">    }</span>
+
+    private void addNote(XMLStreamWriter writer, String value) throws XMLStreamException {
+<span class="fc" id="L287">        String[] notes = value.split(&quot;, &quot;);</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        for (String note : notes) {</span>
+<span class="fc" id="L289">            writer.writeStartElement(&quot;mods&quot;, &quot;note&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L290">            writer.writeCharacters(note);</span>
+<span class="fc" id="L291">            writer.writeEndElement();</span>
+        }
+<span class="fc" id="L293">    }</span>
+
+    private void addUrl(XMLStreamWriter writer, String value) throws XMLStreamException {
+<span class="fc" id="L296">        String[] urls = value.split(&quot;, &quot;);</span>
+<span class="fc" id="L297">        writer.writeStartElement(&quot;mods&quot;, &quot;location&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        for (String url : urls) {</span>
+<span class="fc" id="L299">            writer.writeStartElement(&quot;mods&quot;, &quot;url&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L300">            writer.writeCharacters(url);</span>
+<span class="fc" id="L301">            writer.writeEndElement();</span>
+        }
+<span class="fc" id="L303">        writer.writeEndElement();</span>
+<span class="fc" id="L304">    }</span>
+
+    private void addJournal(XMLStreamWriter writer, String value) throws XMLStreamException { // this may also need to be called within second for loop?
+        // Start TitleInfoDefinition
+<span class="fc" id="L308">        writer.writeStartElement(&quot;mods&quot;, &quot;titleInfo&quot;, MODS_NAMESPACE_URI);</span>
+
+        // Write title element
+<span class="fc" id="L311">        writer.writeStartElement(&quot;mods&quot;, &quot;title&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L312">        writer.writeCharacters(value);</span>
+<span class="fc" id="L313">        writer.writeEndElement(); // End title element</span>
+
+        // End TitleInfoDefinition
+<span class="fc" id="L316">        writer.writeEndElement(); // End titleInfo element</span>
+<span class="fc" id="L317">    }</span>
+
+    private void addLanguage(XMLStreamWriter writer, String value) throws XMLStreamException {
+<span class="fc" id="L320">        writer.writeStartElement(&quot;mods&quot;, &quot;language&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L321">        writer.writeStartElement(&quot;mods&quot;, &quot;languageTerm&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L322">        writer.writeCharacters(value);</span>
+<span class="fc" id="L323">        writer.writeEndElement(); // end languageTerm</span>
+<span class="fc" id="L324">        writer.writeEndElement(); // end language</span>
+<span class="fc" id="L325">    }</span>
+
+    private void addPages(XMLStreamWriter writer, String value) throws XMLStreamException {
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (value.contains(DOUBLE_MINUS)) {</span>
+<span class="nc" id="L329">            addStartAndEndPage(writer, value, DOUBLE_MINUS);</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        } else if (value.contains(MINUS)) {</span>
+<span class="fc" id="L331">            addStartAndEndPage(writer, value, MINUS);</span>
+        } else {
+<span class="fc" id="L333">            BigInteger total = new BigInteger(value);</span>
+<span class="fc" id="L334">            writer.writeStartElement(&quot;mods&quot;, &quot;extent&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L335">            writer.writeStartElement(&quot;mods&quot;, &quot;total&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L336">            writer.writeCharacters(total.toString());</span>
+<span class="fc" id="L337">            writer.writeEndElement();</span>
+<span class="fc" id="L338">            writer.writeEndElement();</span>
+        }
+<span class="fc" id="L340">    }</span>
+
+    private void addKeyWords(XMLStreamWriter writer, String value) throws XMLStreamException {
+<span class="fc" id="L343">        String[] keywords = value.split(&quot;, &quot;);</span>
+
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        for (String keyword : keywords) {</span>
+<span class="fc" id="L346">            writer.writeStartElement(&quot;mods&quot;, &quot;subject&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L347">            writer.writeStartElement(&quot;mods&quot;, &quot;topic&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L348">            writer.writeCharacters(keyword);</span>
+<span class="fc" id="L349">            writer.writeEndElement();</span>
+<span class="fc" id="L350">            writer.writeEndElement();</span>
+        }
+<span class="fc" id="L352">    }</span>
+
+    private void handleAuthors(XMLStreamWriter writer, String value) throws XMLStreamException {
+<span class="fc" id="L355">        String[] authors = value.split(&quot;and&quot;);</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        for (String author : authors) {</span>
+<span class="fc" id="L357">            writer.writeStartElement(&quot;mods&quot;, &quot;name&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L358">            writer.writeAttribute(&quot;type&quot;, &quot;personal&quot;);</span>
+
+<span class="fc bfc" id="L360" title="All 2 branches covered.">            if (author.contains(&quot;,&quot;)) {</span>
+                // if author contains &quot;,&quot;  then this indicates that the author has a forename and family name
+<span class="fc" id="L362">                int commaIndex = author.indexOf(',');</span>
+<span class="fc" id="L363">                String familyName = author.substring(0, commaIndex);</span>
+<span class="fc" id="L364">                writer.writeStartElement(&quot;mods&quot;, &quot;namePart&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L365">                writer.writeAttribute(&quot;type&quot;, &quot;family&quot;);</span>
+<span class="fc" id="L366">                writer.writeCharacters(familyName);</span>
+<span class="fc" id="L367">                writer.writeEndElement();</span>
+
+                // now take care of the forenames
+<span class="fc" id="L370">                String forename = author.substring(commaIndex + 1);</span>
+<span class="fc" id="L371">                String[] forenames = forename.split(&quot; &quot;);</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">                for (String given : forenames) {</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">                    if (!given.isEmpty()) {</span>
+<span class="fc" id="L374">                        writer.writeStartElement(&quot;mods&quot;, &quot;namePart&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L375">                        writer.writeAttribute(&quot;type&quot;, &quot;given&quot;);</span>
+<span class="fc" id="L376">                        writer.writeCharacters(given);</span>
+<span class="fc" id="L377">                        writer.writeEndElement();</span>
+                    }
+                }
+<span class="fc" id="L380">                writer.writeEndElement();</span>
+<span class="fc" id="L381">            } else {</span>
+                // no &quot;,&quot; indicates that there should only be a family name
+<span class="fc" id="L383">                writer.writeStartElement(&quot;mods&quot;, &quot;namePart&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L384">                writer.writeAttribute(&quot;type&quot;, &quot;family&quot;);</span>
+<span class="fc" id="L385">                writer.writeCharacters(author);</span>
+<span class="fc" id="L386">                writer.writeEndElement();</span>
+<span class="fc" id="L387">                writer.writeEndElement();</span>
+            }
+        }
+<span class="fc" id="L390">    }</span>
+
+    private void addIdentifier(XMLStreamWriter writer, Field field, String value) throws XMLStreamException {
+
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        if (new UnknownField(&quot;citekey&quot;).equals(field)) {</span>
+<span class="fc" id="L395">            writer.writeStartElement(&quot;mods&quot;, &quot;mods&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L396">            writer.writeAttribute(&quot;ID&quot;, value);</span>
+        }
+<span class="fc" id="L398">        writer.writeStartElement(&quot;mods&quot;, &quot;identifier&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L399">        writer.writeAttribute(&quot;type&quot;, field.getName());</span>
+<span class="fc" id="L400">        writer.writeCharacters(value);</span>
+<span class="fc" id="L401">        writer.writeEndElement(); // end identifier</span>
+<span class="fc" id="L402">    }</span>
+
+    private void addStartAndEndPage(XMLStreamWriter writer, String value, String minus) throws XMLStreamException {
+<span class="fc" id="L405">        int minusIndex = value.indexOf(minus);</span>
+<span class="fc" id="L406">        String startPage = value.substring(0, minusIndex);</span>
+<span class="fc" id="L407">        String endPage = &quot;&quot;;</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">        if (MINUS.equals(minus)) {</span>
+<span class="fc" id="L409">            endPage = value.substring(minusIndex + 1);</span>
+<span class="nc bnc" id="L410" title="All 2 branches missed.">        } else if (DOUBLE_MINUS.equals(minus)) {</span>
+<span class="nc" id="L411">            endPage = value.substring(minusIndex + 2);</span>
+        }
+
+<span class="fc" id="L414">        writer.writeStartElement(&quot;mods&quot;, &quot;extent&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L415">        writer.writeStartElement(&quot;mods&quot;, &quot;start&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L416">        writer.writeCharacters(startPage);</span>
+<span class="fc" id="L417">        writer.writeEndElement();</span>
+<span class="fc" id="L418">        writer.writeStartElement(&quot;mods&quot;, &quot;end&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L419">        writer.writeCharacters(endPage);</span>
+<span class="fc" id="L420">        writer.writeEndElement();</span>
+<span class="fc" id="L421">        writer.writeEndElement();</span>
+<span class="fc" id="L422">    }</span>
+
+    private void addDetail(XMLStreamWriter writer, Field field, String value) throws XMLStreamException {
+<span class="fc" id="L425">        writer.writeStartElement(&quot;mods&quot;, &quot;detail&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L426">        writer.writeAttribute(&quot;type&quot;, field.getName());</span>
+<span class="fc" id="L427">        writer.writeStartElement(&quot;mods&quot;, &quot;number&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L428">        writer.writeCharacters(value);</span>
+<span class="fc" id="L429">        writer.writeEndElement(); // end number</span>
+<span class="fc" id="L430">        writer.writeEndElement(); // end detail</span>
+<span class="fc" id="L431">    }</span>
+
+    private void addOriginInformation(XMLStreamWriter writer, Field field, String value) throws XMLStreamException {
+
+<span class="fc bfc" id="L435" title="All 2 branches covered.">        if (field.equals(StandardField.YEAR)) {</span>
+<span class="fc" id="L436">            addDate(writer, &quot;dateIssued&quot;, value);</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">        } else if (field.equals(new UnknownField(&quot;created&quot;))) {</span>
+<span class="fc" id="L438">            addDate(writer, &quot;dateCreated&quot;, value);</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">        } else if (field.equals(StandardField.MODIFICATIONDATE)) {</span>
+<span class="fc" id="L440">            addDate(writer, &quot;dateModified&quot;, value);</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        } else if (field.equals(StandardField.CREATIONDATE)) {</span>
+<span class="fc" id="L442">            addDate(writer, &quot;dateCaptured&quot;, value);</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        } else if (StandardField.PUBLISHER == field) {</span>
+<span class="fc" id="L444">            writer.writeStartElement(&quot;mods&quot;, &quot;publisher&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L445">            writer.writeAttribute(&quot;xsi&quot;, MODS_NAMESPACE_URI, &quot;type&quot;, &quot;mods:stringPlusLanguagePlusSupplied&quot;);</span>
+<span class="fc" id="L446">            writer.writeCharacters(value);</span>
+<span class="fc" id="L447">            writer.writeEndElement();</span>
+<span class="fc bfc" id="L448" title="All 2 branches covered.">        } else if (field.equals(new UnknownField(&quot;issuance&quot;))) {</span>
+<span class="fc" id="L449">            writer.writeStartElement(&quot;mods&quot;, &quot;issuance&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L450">            writer.writeCharacters(value);</span>
+<span class="fc" id="L451">            writer.writeEndElement();</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        } else if (field.equals(StandardField.ADDRESS)) {</span>
+<span class="fc" id="L453">            writer.writeStartElement(&quot;mods&quot;, &quot;place&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L454">            String[] places = value.split(&quot;, &quot;);</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">            for (String place : places) {</span>
+<span class="fc" id="L456">                writer.writeStartElement(&quot;mods&quot;, &quot;placeTerm&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L457">                writer.writeAttribute(&quot;type&quot;, &quot;text&quot;);</span>
+<span class="fc" id="L458">                writer.writeCharacters(place);</span>
+<span class="fc" id="L459">                writer.writeEndElement();</span>
+            }
+<span class="fc" id="L461">            writer.writeEndElement();</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        } else if (field.equals(StandardField.EDITION)) {</span>
+<span class="fc" id="L463">            writer.writeStartElement(&quot;mods&quot;, &quot;edition&quot;, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L464">            writer.writeCharacters(value);</span>
+<span class="fc" id="L465">            writer.writeEndElement();</span>
+        }
+<span class="fc" id="L467">    }</span>
+
+    private void addDate(XMLStreamWriter writer, String dateName, String value) throws XMLStreamException {
+<span class="fc" id="L470">        writer.writeStartElement(&quot;mods&quot;, dateName, MODS_NAMESPACE_URI);</span>
+<span class="fc" id="L471">        writer.writeAttribute(&quot;keyDate&quot;, &quot;yes&quot;);</span>
+<span class="fc" id="L472">        writer.writeCharacters(value);</span>
+<span class="fc" id="L473">        writer.writeEndElement(); // close date element</span>
+<span class="fc" id="L474">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UTF8Checker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.integrity</a> &gt; <span class="el_source">UTF8Checker.java</span></div><h1>UTF8Checker.java</h1><pre class="source lang-java linenums">package org.jabref.logic.integrity;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+
+public class UTF8Checker implements EntryChecker {
+    private final Charset charset;
+
+    /**
+     * Creates a UTF8Checker that,
+     * &lt;ol&gt;
+     * &lt;li&gt;decode a String into a bytes array&lt;/li&gt;
+     * &lt;li&gt;attempts to decode the bytes array to a character array using the UTF-8 Charset&lt;/li&gt;
+     * &lt;/ol&gt;
+     *
+     * @param charset the charset used to decode BibEntry fields
+     */
+<span class="fc" id="L28">    public UTF8Checker(Charset charset) {</span>
+<span class="fc" id="L29">        this.charset = charset;</span>
+<span class="fc" id="L30">    }</span>
+
+    /**
+     * Detect any non UTF-8 encoded field
+     *
+     * @param entry the BibEntry of BibLatex.
+     * @return return the warning of UTF-8 check for BibLatex.
+     */
+    @Override
+    public List&lt;IntegrityMessage&gt; check(BibEntry entry) {
+<span class="fc" id="L40">        List&lt;IntegrityMessage&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (Map.Entry&lt;Field, String&gt; field : entry.getFieldMap().entrySet()) {</span>
+<span class="fc" id="L42">            boolean utfOnly = UTF8EncodingChecker(field.getValue().getBytes(charset));</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (!utfOnly) {</span>
+<span class="fc" id="L44">                results.add(new IntegrityMessage(Localization.lang(&quot;Non-UTF-8 encoded field found&quot;), entry,</span>
+<span class="fc" id="L45">                        field.getKey()));</span>
+            }
+<span class="fc" id="L47">        }</span>
+<span class="fc" id="L48">        return results;</span>
+    }
+
+    /**
+     * Check whether a byte array is encoded in UTF-8 charset
+     *
+     * Use java api decoder and try&amp;catch block to check the charset.
+     *
+     * @param data the byte array used to check the encoding charset
+     * @return true if is encoded in UTF-8 &amp; false is not encoded in UTF-8
+     */
+    public static boolean UTF8EncodingChecker(byte[] data) {
+<span class="fc" id="L60">        CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();</span>
+        try {
+<span class="fc" id="L62">            decoder.decode(ByteBuffer.wrap(data));</span>
+<span class="fc" id="L63">        } catch (CharacterCodingException ex) {</span>
+<span class="fc" id="L64">            return false;</span>
+<span class="fc" id="L65">        }</span>
+<span class="fc" id="L66">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

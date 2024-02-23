@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StudyCatalogToFetcherConverter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.crawler</a> &gt; <span class="el_source">StudyCatalogToFetcherConverter.java</span></div><h1>StudyCatalogToFetcherConverter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.crawler;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ImporterPreferences;
+import org.jabref.logic.importer.SearchBasedFetcher;
+import org.jabref.logic.importer.WebFetchers;
+import org.jabref.model.study.StudyDatabase;
+
+/**
+ * Converts library entries from the given study into their corresponding fetchers.
+ */
+class StudyCatalogToFetcherConverter {
+    private final List&lt;StudyDatabase&gt; libraryEntries;
+    private final ImportFormatPreferences importFormatPreferences;
+    private final ImporterPreferences importerPreferences;
+
+    public StudyCatalogToFetcherConverter(List&lt;StudyDatabase&gt; libraryEntries,
+                                          ImportFormatPreferences importFormatPreferences,
+<span class="fc" id="L24">                                          ImporterPreferences importerPreferences) {</span>
+<span class="fc" id="L25">        this.libraryEntries = libraryEntries;</span>
+<span class="fc" id="L26">        this.importFormatPreferences = importFormatPreferences;</span>
+<span class="fc" id="L27">        this.importerPreferences = importerPreferences;</span>
+<span class="fc" id="L28">    }</span>
+
+    /**
+     * Returns a list of instances of all active library fetchers.
+     *
+     * A fetcher is considered active if there exists an library entry of the library the fetcher is associated with that is enabled.
+     *
+     * @return Instances of all active fetchers defined in the study definition.
+     */
+    public List&lt;SearchBasedFetcher&gt; getActiveFetchers() {
+<span class="fc" id="L38">        return getFetchersFromLibraryEntries(this.libraryEntries);</span>
+    }
+
+    /**
+     * Transforms a list of libraryEntries into a list of SearchBasedFetcher instances.
+     *
+     * @param libraryEntries List of entries
+     * @return List of fetcher instances
+     */
+    private List&lt;SearchBasedFetcher&gt; getFetchersFromLibraryEntries(List&lt;StudyDatabase&gt; libraryEntries) {
+<span class="fc" id="L48">        return libraryEntries.parallelStream()</span>
+<span class="fc" id="L49">                             .map(this::createFetcherFromLibraryEntry)</span>
+<span class="fc" id="L50">                             .filter(Objects::nonNull)</span>
+<span class="fc" id="L51">                             .collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Transforms a library entry into a SearchBasedFetcher instance. This only works if the library entry specifies a supported fetcher.
+     *
+     * @param studyDatabase the entry that will be converted
+     * @return An instance of the fetcher defined by the library entry.
+     */
+    private SearchBasedFetcher createFetcherFromLibraryEntry(StudyDatabase studyDatabase) {
+<span class="fc" id="L61">        Set&lt;SearchBasedFetcher&gt; searchBasedFetchers = WebFetchers.getSearchBasedFetchers(importFormatPreferences, importerPreferences);</span>
+<span class="fc" id="L62">        String libraryNameFromFetcher = studyDatabase.getName();</span>
+<span class="fc" id="L63">        return searchBasedFetchers.stream()</span>
+<span class="fc" id="L64">                                  .filter(searchBasedFetcher -&gt; searchBasedFetcher.getName().equalsIgnoreCase(libraryNameFromFetcher))</span>
+<span class="fc" id="L65">                                  .findAny()</span>
+<span class="fc" id="L66">                                  .orElse(null);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SidePaneComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.sidepane</a> &gt; <span class="el_source">SidePaneComponent.java</span></div><h1>SidePaneComponent.java</h1><pre class="source lang-java linenums">package org.jabref.gui.sidepane;
+
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.groups.GroupTreeView;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.logic.l10n.Localization;
+
+public class SidePaneComponent extends BorderPane {
+    private final SidePaneType sidePaneType;
+    private final SimpleCommand closeCommand;
+    private final SimpleCommand moveUpCommand;
+    private final SimpleCommand moveDownCommand;
+    private final SidePaneContentFactory contentFactory;
+
+    private HBox buttonContainer;
+
+    public SidePaneComponent(SidePaneType sidePaneType,
+                             SimpleCommand closeCommand,
+                             SimpleCommand moveUpCommand,
+                             SimpleCommand moveDownCommand,
+<span class="nc" id="L30">                             SidePaneContentFactory contentFactory) {</span>
+<span class="nc" id="L31">        this.sidePaneType = sidePaneType;</span>
+<span class="nc" id="L32">        this.closeCommand = closeCommand;</span>
+<span class="nc" id="L33">        this.moveUpCommand = moveUpCommand;</span>
+<span class="nc" id="L34">        this.moveDownCommand = moveDownCommand;</span>
+<span class="nc" id="L35">        this.contentFactory = contentFactory;</span>
+<span class="nc" id="L36">        initialize();</span>
+<span class="nc" id="L37">    }</span>
+
+    private void initialize() {
+<span class="nc" id="L40">        getStyleClass().add(&quot;sidePaneComponent&quot;);</span>
+<span class="nc" id="L41">        setTop(createHeaderView());</span>
+<span class="nc" id="L42">        setCenter(contentFactory.create(sidePaneType));</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        VBox.setVgrow(this, sidePaneType == SidePaneType.GROUPS ? Priority.ALWAYS : Priority.NEVER);</span>
+<span class="nc" id="L44">    }</span>
+
+    private Node createHeaderView() {
+<span class="nc" id="L47">        Button closeButton = IconTheme.JabRefIcons.CLOSE.asButton();</span>
+<span class="nc" id="L48">        closeButton.setTooltip(new Tooltip(Localization.lang(&quot;Hide panel&quot;)));</span>
+<span class="nc" id="L49">        closeButton.setOnAction(e -&gt; closeCommand.execute());</span>
+
+<span class="nc" id="L51">        Button upButton = IconTheme.JabRefIcons.UP.asButton();</span>
+<span class="nc" id="L52">        upButton.setTooltip(new Tooltip(Localization.lang(&quot;Move panel up&quot;)));</span>
+<span class="nc" id="L53">        upButton.setOnAction(e -&gt; moveUpCommand.execute());</span>
+
+<span class="nc" id="L55">        Button downButton = IconTheme.JabRefIcons.DOWN.asButton();</span>
+<span class="nc" id="L56">        downButton.setTooltip(new Tooltip(Localization.lang(&quot;Move panel down&quot;)));</span>
+<span class="nc" id="L57">        downButton.setOnAction(e -&gt; moveDownCommand.execute());</span>
+
+<span class="nc" id="L59">        this.buttonContainer = new HBox();</span>
+<span class="nc" id="L60">        buttonContainer.getChildren().addAll(upButton, downButton, closeButton);</span>
+
+<span class="nc" id="L62">        Label label = new Label(sidePaneType.getTitle());</span>
+
+<span class="nc" id="L64">        BorderPane headerView = new BorderPane();</span>
+<span class="nc" id="L65">        headerView.setLeft(label);</span>
+<span class="nc" id="L66">        headerView.setRight(buttonContainer);</span>
+<span class="nc" id="L67">        headerView.getStyleClass().add(&quot;sidePaneComponentHeader&quot;);</span>
+
+<span class="nc" id="L69">        return headerView;</span>
+    }
+
+    protected void addExtraButtonToHeader(Button button, int position) {
+<span class="nc" id="L73">        this.buttonContainer.getChildren().add(position, button);</span>
+<span class="nc" id="L74">    }</span>
+
+    public void requestFocus() {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        for (Node child : getChildren()) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            if (child instanceof GroupTreeView groupTreeView) {</span>
+<span class="nc" id="L79">                groupTreeView.requestFocusGroupTree();</span>
+<span class="nc" id="L80">                break;</span>
+            }
+<span class="nc" id="L82">        }</span>
+<span class="nc" id="L83">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

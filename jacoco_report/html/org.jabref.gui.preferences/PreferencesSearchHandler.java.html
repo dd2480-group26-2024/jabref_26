@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreferencesSearchHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences</a> &gt; <span class="el_source">PreferencesSearchHandler.java</span></div><h1>PreferencesSearchHandler.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.collections.FXCollections;
+import javafx.css.PseudoClass;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.control.Labeled;
+
+import com.google.common.collect.ArrayListMultimap;
+
+class PreferencesSearchHandler {
+
+<span class="nc" id="L19">    private static PseudoClass labelHighlight = PseudoClass.getPseudoClass(&quot;search-highlight&quot;);</span>
+    private final List&lt;PreferencesTab&gt; preferenceTabs;
+    private final ListProperty&lt;PreferencesTab&gt; filteredPreferenceTabs;
+    private final ArrayListMultimap&lt;PreferencesTab, Labeled&gt; preferenceTabsLabelNames;
+<span class="nc" id="L23">    private final ArrayList&lt;Labeled&gt; highlightedLabels = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L25">    PreferencesSearchHandler(List&lt;PreferencesTab&gt; preferenceTabs) {</span>
+<span class="nc" id="L26">        this.preferenceTabs = preferenceTabs;</span>
+<span class="nc" id="L27">        this.preferenceTabsLabelNames = getPrefsTabLabelMap();</span>
+<span class="nc" id="L28">        this.filteredPreferenceTabs = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList(preferenceTabs));</span>
+<span class="nc" id="L29">    }</span>
+
+    public void filterTabs(String text) {
+<span class="nc" id="L32">        clearHighlights();</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        if (text.isEmpty()) {</span>
+<span class="nc" id="L34">            clearSearch();</span>
+<span class="nc" id="L35">            return;</span>
+        }
+
+<span class="nc" id="L38">        filteredPreferenceTabs.clear();</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        for (PreferencesTab tab : preferenceTabsLabelNames.keySet()) {</span>
+<span class="nc" id="L40">            boolean tabContainsLabel = false;</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">            for (Labeled labeled : preferenceTabsLabelNames.get(tab)) {</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">                if (labelContainsText(labeled, text)) {</span>
+<span class="nc" id="L43">                    tabContainsLabel = true;</span>
+<span class="nc" id="L44">                    highlightLabel(labeled);</span>
+                }
+<span class="nc" id="L46">            }</span>
+<span class="nc" id="L47">            boolean tabNameIsMatchedByQuery = tab.getTabName().toLowerCase(Locale.ROOT).contains(text);</span>
+<span class="nc bnc" id="L48" title="All 4 branches missed.">            if (tabContainsLabel || tabNameIsMatchedByQuery) {</span>
+<span class="nc" id="L49">                filteredPreferenceTabs.add(tab);</span>
+            }
+<span class="nc" id="L51">        }</span>
+<span class="nc" id="L52">    }</span>
+
+    private boolean labelContainsText(Labeled labeled, String text) {
+<span class="nc" id="L55">        return labeled.getText().toLowerCase(Locale.ROOT).contains(text);</span>
+    }
+
+    private void highlightLabel(Labeled labeled) {
+<span class="nc" id="L59">        labeled.pseudoClassStateChanged(labelHighlight, true);</span>
+<span class="nc" id="L60">        highlightedLabels.add(labeled);</span>
+<span class="nc" id="L61">    }</span>
+
+    private void clearHighlights() {
+<span class="nc" id="L64">        highlightedLabels.forEach(labeled -&gt; labeled.pseudoClassStateChanged(labelHighlight, false));</span>
+<span class="nc" id="L65">    }</span>
+
+    private void clearSearch() {
+<span class="nc" id="L68">        filteredPreferenceTabs.setAll(preferenceTabs);</span>
+<span class="nc" id="L69">    }</span>
+
+    /*
+     * Traverse all nodes of a PreferencesTab and return a
+     * mapping from PreferencesTab to all its Labeled type nodes.
+     */
+    private ArrayListMultimap&lt;PreferencesTab, Labeled&gt; getPrefsTabLabelMap() {
+<span class="nc" id="L76">        ArrayListMultimap&lt;PreferencesTab, Labeled&gt; prefsTabLabelMap = ArrayListMultimap.create();</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        for (PreferencesTab preferencesTab : preferenceTabs) {</span>
+<span class="nc" id="L78">            Node builder = preferencesTab.getBuilder();</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">            if (builder instanceof Parent) {</span>
+<span class="nc" id="L80">                Parent parentBuilder = (Parent) builder;</span>
+<span class="nc" id="L81">                scanLabeledControls(parentBuilder, prefsTabLabelMap, preferencesTab);</span>
+            }
+<span class="nc" id="L83">        }</span>
+<span class="nc" id="L84">        return prefsTabLabelMap;</span>
+    }
+
+    protected ListProperty&lt;PreferencesTab&gt; filteredPreferenceTabsProperty() {
+<span class="nc" id="L88">        return filteredPreferenceTabs;</span>
+    }
+
+    private static void scanLabeledControls(Parent parent, ArrayListMultimap&lt;PreferencesTab, Labeled&gt; prefsTabLabelMap, PreferencesTab preferencesTab) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        for (Node child : parent.getChildrenUnmodifiable()) {</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (!(child instanceof Labeled)) {</span>
+<span class="nc" id="L94">                scanLabeledControls((Parent) child, prefsTabLabelMap, preferencesTab);</span>
+            } else {
+<span class="nc" id="L96">                Labeled labeled = (Labeled) child;</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                if (!labeled.getText().isEmpty()) {</span>
+<span class="nc" id="L98">                    prefsTabLabelMap.put(preferencesTab, labeled);</span>
+                }
+            }
+<span class="nc" id="L101">        }</span>
+<span class="nc" id="L102">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ARK.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.identifier</a> &gt; <span class="el_source">ARK.java</span></div><h1>ARK.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.identifier;
+
+import java.net.URI;
+import java.util.Optional;
+
+/**
+ * Archival Resource Key (ARK) identifiers are URLs that support long-term access to information. They are similar to DOIs
+ * only that we don't know of any service that can extract bibliography information from ARKs. For this reason, if an ARK
+ * is used in an eprint field, it will only be possible to open the ARK in the browner; no lookup
+ * or extraction of biography information will be possible.
+ * &lt;br&gt;&lt;br&gt;
+ * &lt;p&gt;
+ * ARK identifiers are typically prefixed with &quot;ark:/&quot;. Even though the prefix does not help identify the resource, it appears
+ * to be the standard because many websites that feature ARKs, such as archive.org, include it. For the convenience of our users
+ * and to provide them with ability to copy/paste the ark as is, we support arks with or without the prefix.
+ * &lt;/p&gt;
+ */
+public class ARK extends EprintIdentifier {
+    private final String ark;
+
+<span class="nc" id="L21">    private ARK(String ark) {</span>
+<span class="nc" id="L22">        this.ark = ark;</span>
+<span class="nc" id="L23">    }</span>
+
+    public static Optional&lt;ARK&gt; parse(String value) {
+        // TODO: Validate ARK
+<span class="nc" id="L27">        return Optional.of(new ARK(value));</span>
+    }
+
+    @Override
+    public String getNormalized() {
+<span class="nc" id="L32">        String cleanARK = ark.strip();</span>
+<span class="nc" id="L33">        return cleanARK.replaceFirst(&quot;^ark:/&quot;, &quot;&quot;);</span>
+    }
+
+    @Override
+    public Optional&lt;URI&gt; getExternalURI() {
+<span class="nc" id="L38">        return Optional.of(URI.create(&quot;https://n2t.net/ark:/&quot; + getNormalized()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

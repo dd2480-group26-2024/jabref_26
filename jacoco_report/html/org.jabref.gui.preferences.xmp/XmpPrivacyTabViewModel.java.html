@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmpPrivacyTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.xmp</a> &gt; <span class="el_source">XmpPrivacyTabViewModel.java</span></div><h1>XmpPrivacyTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.xmp;
+
+import java.util.Comparator;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.xmp.XmpPreferences;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+
+public class XmpPrivacyTabViewModel implements PreferenceTabViewModel {
+
+<span class="nc" id="L27">    private final BooleanProperty xmpFilterEnabledProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L28">    private final ListProperty&lt;Field&gt; xmpFilterListProperty = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L29">    private final ListProperty&lt;Field&gt; availableFieldsProperty = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L30">    private final ObjectProperty&lt;Field&gt; addFieldProperty = new SimpleObjectProperty&lt;&gt;();</span>
+
+    private final DialogService dialogService;
+    private final XmpPreferences xmpPreferences;
+
+    private final Validator xmpFilterListValidator;
+
+<span class="nc" id="L37">    XmpPrivacyTabViewModel(DialogService dialogService, XmpPreferences xmpPreferences) {</span>
+<span class="nc" id="L38">        this.dialogService = dialogService;</span>
+<span class="nc" id="L39">        this.xmpPreferences = xmpPreferences;</span>
+
+<span class="nc" id="L41">        xmpFilterListValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                xmpFilterListProperty,
+<span class="nc bnc" id="L43" title="All 2 branches missed.">                input -&gt; input.size() &gt; 0,</span>
+<span class="nc" id="L44">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L45">                        Localization.lang(&quot;XMP metadata&quot;),</span>
+<span class="nc" id="L46">                        Localization.lang(&quot;Filter List&quot;),</span>
+<span class="nc" id="L47">                        Localization.lang(&quot;List must not be empty.&quot;))));</span>
+<span class="nc" id="L48">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L52">        xmpFilterEnabledProperty.setValue(xmpPreferences.shouldUseXmpPrivacyFilter());</span>
+
+<span class="nc" id="L54">        xmpFilterListProperty.clear();</span>
+<span class="nc" id="L55">        xmpFilterListProperty.addAll(xmpPreferences.getXmpPrivacyFilter());</span>
+
+<span class="nc" id="L57">        availableFieldsProperty.clear();</span>
+<span class="nc" id="L58">        availableFieldsProperty.addAll(FieldFactory.getCommonFields());</span>
+<span class="nc" id="L59">        availableFieldsProperty.sort((Comparator.comparing(Field::getDisplayName)));</span>
+<span class="nc" id="L60">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L64">        xmpPreferences.setUseXmpPrivacyFilter(xmpFilterEnabledProperty.getValue());</span>
+<span class="nc" id="L65">        xmpPreferences.getXmpPrivacyFilter().clear();</span>
+<span class="nc" id="L66">        xmpPreferences.getXmpPrivacyFilter().addAll(xmpFilterListProperty.getValue());</span>
+<span class="nc" id="L67">    }</span>
+
+    public void addField() {
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (addFieldProperty.getValue() == null) {</span>
+<span class="nc" id="L71">            return;</span>
+        }
+
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (xmpFilterListProperty.getValue().stream().filter(item -&gt; item.equals(addFieldProperty.getValue())).findAny().isEmpty()) {</span>
+<span class="nc" id="L75">            xmpFilterListProperty.add(addFieldProperty.getValue());</span>
+<span class="nc" id="L76">            addFieldProperty.setValue(null);</span>
+        }
+<span class="nc" id="L78">    }</span>
+
+    public void removeFilter(Field filter) {
+<span class="nc" id="L81">        xmpFilterListProperty.remove(filter);</span>
+<span class="nc" id="L82">    }</span>
+
+    public ValidationStatus xmpFilterListValidationStatus() {
+<span class="nc" id="L85">        return xmpFilterListValidator.getValidationStatus();</span>
+    }
+
+    @Override
+    public boolean validateSettings() {
+<span class="nc" id="L90">        ValidationStatus validationStatus = xmpFilterListValidationStatus();</span>
+<span class="nc bnc" id="L91" title="All 4 branches missed.">        if (xmpFilterEnabledProperty.getValue() &amp;&amp; !validationStatus.isValid()) {</span>
+<span class="nc" id="L92">            validationStatus.getHighestMessage().ifPresent(message -&gt;</span>
+<span class="nc" id="L93">                    dialogService.showErrorDialogAndWait(message.getMessage()));</span>
+<span class="nc" id="L94">            return false;</span>
+        }
+<span class="nc" id="L96">        return true;</span>
+    }
+
+    public BooleanProperty xmpFilterEnabledProperty() {
+<span class="nc" id="L100">        return xmpFilterEnabledProperty;</span>
+    }
+
+    public ListProperty&lt;Field&gt; filterListProperty() {
+<span class="nc" id="L104">        return xmpFilterListProperty;</span>
+    }
+
+    public ListProperty&lt;Field&gt; availableFieldsProperty() {
+<span class="nc" id="L108">        return availableFieldsProperty;</span>
+    }
+
+    public ObjectProperty&lt;Field&gt; addFieldNameProperty() {
+<span class="nc" id="L112">        return addFieldProperty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

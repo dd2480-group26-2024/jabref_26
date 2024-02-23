@@ -1,0 +1,932 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BstFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.bst</a> &gt; <span class="el_source">BstFunctions.java</span></div><h1>BstFunctions.java</h1><pre class="source lang-java linenums">package org.jabref.logic.bst;
+
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.bst.util.BstCaseChanger;
+import org.jabref.logic.bst.util.BstNameFormatter;
+import org.jabref.logic.bst.util.BstPurifier;
+import org.jabref.logic.bst.util.BstTextPrefixer;
+import org.jabref.logic.bst.util.BstWidthCalculator;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+
+import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class BstFunctions {
+<span class="fc" id="L25">    private static final Logger LOGGER = LoggerFactory.getLogger(BstFunctions.class);</span>
+<span class="fc" id="L26">    private static final Pattern ADD_PERIOD_PATTERN = Pattern.compile(&quot;([^.?!}\\s])(}|\\s)*$&quot;);</span>
+
+    private final Map&lt;String, String&gt; strings;
+    private final Map&lt;String, Integer&gt; integers;
+    private final Map&lt;String, BstFunction&gt; functions;
+    private final String preamble;
+
+    private final Deque&lt;Object&gt; stack;
+    private final StringBuilder bbl;
+
+<span class="fc" id="L36">    private int bstWarning = 0;</span>
+
+    @FunctionalInterface
+    public interface BstFunction {
+
+        void execute(BstVMVisitor visitor, ParserRuleContext ctx);
+
+        default void execute(BstVMVisitor visitor, ParserRuleContext ctx, BstEntry bstEntryContext) {
+<span class="fc" id="L44">            this.execute(visitor, ctx);</span>
+<span class="fc" id="L45">        }</span>
+    }
+
+    public BstFunctions(BstVMContext bstVMContext,
+<span class="fc" id="L49">                        StringBuilder bbl) {</span>
+<span class="fc" id="L50">        this.strings = bstVMContext.strings();</span>
+<span class="fc" id="L51">        this.integers = bstVMContext.integers();</span>
+<span class="fc" id="L52">        this.functions = bstVMContext.functions();</span>
+<span class="fc" id="L53">        this.preamble = Optional.ofNullable(bstVMContext.bibDatabase()).flatMap(BibDatabase::getPreamble).orElse(&quot;&quot;);</span>
+<span class="fc" id="L54">        this.stack = bstVMContext.stack();</span>
+
+<span class="fc" id="L56">        this.bbl = bbl;</span>
+<span class="fc" id="L57">    }</span>
+
+    protected Map&lt;String, BstFunction&gt; getBuiltInFunctions() {
+<span class="fc" id="L60">        Map&lt;String, BstFunction&gt; builtInFunctions = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L62">        builtInFunctions.put(&quot;&gt;&quot;, this::bstIsGreaterThan);</span>
+<span class="fc" id="L63">        builtInFunctions.put(&quot;&lt;&quot;, this::bstIsLowerThan);</span>
+<span class="fc" id="L64">        builtInFunctions.put(&quot;=&quot;, this::bstEquals);</span>
+<span class="fc" id="L65">        builtInFunctions.put(&quot;+&quot;, this::bstAdd);</span>
+<span class="fc" id="L66">        builtInFunctions.put(&quot;-&quot;, this::bstSubtract);</span>
+<span class="fc" id="L67">        builtInFunctions.put(&quot;*&quot;, this::bstConcat);</span>
+<span class="fc" id="L68">        builtInFunctions.put(&quot;:=&quot;, new BstAssignFunction());</span>
+<span class="fc" id="L69">        builtInFunctions.put(&quot;add.period$&quot;, this::bstAddPeriod);</span>
+<span class="fc" id="L70">        builtInFunctions.put(&quot;call.type$&quot;, new BstCallTypeFunction());</span>
+<span class="fc" id="L71">        builtInFunctions.put(&quot;change.case$&quot;, this::bstChangeCase);</span>
+<span class="fc" id="L72">        builtInFunctions.put(&quot;chr.to.int$&quot;, this::bstChrToInt);</span>
+<span class="fc" id="L73">        builtInFunctions.put(&quot;cite$&quot;, new BstCiteFunction());</span>
+<span class="fc" id="L74">        builtInFunctions.put(&quot;duplicate$&quot;, this::bstDuplicate);</span>
+<span class="fc" id="L75">        builtInFunctions.put(&quot;empty$&quot;, this::bstEmpty);</span>
+<span class="fc" id="L76">        builtInFunctions.put(&quot;format.name$&quot;, this::bstFormatName);</span>
+<span class="fc" id="L77">        builtInFunctions.put(&quot;if$&quot;, this::bstIf);</span>
+<span class="fc" id="L78">        builtInFunctions.put(&quot;int.to.chr$&quot;, this::bstIntToChr);</span>
+<span class="fc" id="L79">        builtInFunctions.put(&quot;int.to.str$&quot;, this::bstIntToStr);</span>
+<span class="fc" id="L80">        builtInFunctions.put(&quot;missing$&quot;, this::bstMissing);</span>
+<span class="fc" id="L81">        builtInFunctions.put(&quot;newline$&quot;, this::bstNewLine);</span>
+<span class="fc" id="L82">        builtInFunctions.put(&quot;num.names$&quot;, this::bstNumNames);</span>
+<span class="fc" id="L83">        builtInFunctions.put(&quot;pop$&quot;, this::bstPop);</span>
+<span class="fc" id="L84">        builtInFunctions.put(&quot;preamble$&quot;, this::bstPreamble);</span>
+<span class="fc" id="L85">        builtInFunctions.put(&quot;purify$&quot;, this::bstPurify);</span>
+<span class="fc" id="L86">        builtInFunctions.put(&quot;quote$&quot;, this::bstQuote);</span>
+<span class="fc" id="L87">        builtInFunctions.put(&quot;skip$&quot;, this::bstSkip);</span>
+<span class="fc" id="L88">        builtInFunctions.put(&quot;stack$&quot;, this::bstStack);</span>
+<span class="fc" id="L89">        builtInFunctions.put(&quot;substring$&quot;, this::bstSubstring);</span>
+<span class="fc" id="L90">        builtInFunctions.put(&quot;swap$&quot;, this::bstSwap);</span>
+<span class="fc" id="L91">        builtInFunctions.put(&quot;text.length$&quot;, this::bstTextLength);</span>
+<span class="fc" id="L92">        builtInFunctions.put(&quot;text.prefix$&quot;, this::bstTextPrefix);</span>
+<span class="fc" id="L93">        builtInFunctions.put(&quot;top$&quot;, this::bstTop);</span>
+<span class="fc" id="L94">        builtInFunctions.put(&quot;type$&quot;, new BstTypeFunction());</span>
+<span class="fc" id="L95">        builtInFunctions.put(&quot;warning$&quot;, this::bstWarning);</span>
+<span class="fc" id="L96">        builtInFunctions.put(&quot;while$&quot;, this::bstWhile);</span>
+<span class="fc" id="L97">        builtInFunctions.put(&quot;width$&quot;, this::bstWidth);</span>
+<span class="fc" id="L98">        builtInFunctions.put(&quot;write$&quot;, this::bstWrite);</span>
+
+<span class="fc" id="L100">        return builtInFunctions;</span>
+    }
+
+    /**
+     * Pops the top two (integer) literals, compares them, and pushes
+     * the integer 1 if the second is greater than the first, 0
+     * otherwise.
+     */
+    private void bstIsGreaterThan(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L110">            throw new BstVMException(&quot;Not enough operands on stack for operation &gt; (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L112">        Object o2 = stack.pop();</span>
+<span class="fc" id="L113">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">        if (!((o1 instanceof Integer) &amp;&amp; (o2 instanceof Integer))) {</span>
+<span class="nc" id="L116">            throw new BstVMException(&quot;Can only compare two integers with &gt;&quot;);</span>
+        }
+
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        stack.push(((Integer) o1).compareTo((Integer) o2) &gt; 0 ? BstVM.TRUE : BstVM.FALSE);</span>
+<span class="fc" id="L120">    }</span>
+
+    /**
+     * Pops the top two (integer) literals, compares them, and pushes
+     * the integer 1 if the second is lower than the first, 0
+     * otherwise.
+     */
+    private void bstIsLowerThan(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L129">            throw new BstVMException(&quot;Not enough operands on stack for operation &lt;&quot;);</span>
+        }
+<span class="fc" id="L131">        Object o2 = stack.pop();</span>
+<span class="fc" id="L132">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">        if (!((o1 instanceof Integer) &amp;&amp; (o2 instanceof Integer))) {</span>
+<span class="nc" id="L135">            throw new BstVMException(&quot;Can only compare two integers with &lt; (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        stack.push(((Integer) o1).compareTo((Integer) o2) &lt; 0 ? BstVM.TRUE : BstVM.FALSE);</span>
+<span class="fc" id="L139">    }</span>
+
+    /**
+     * Pops the top two (both integer or both string) literals, compares
+     * them, and pushes the integer 1 if they're equal, 0 otherwise.
+     */
+    private void bstEquals(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L147">            throw new BstVMException(&quot;Not enough operands on stack for operation = (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L149">        Object o1 = stack.pop();</span>
+<span class="fc" id="L150">        Object o2 = stack.pop();</span>
+
+<span class="pc bpc" id="L152" title="1 of 6 branches missed.">        if ((o1 == null) ^ (o2 == null)) {</span>
+<span class="fc" id="L153">            stack.push(BstVM.FALSE);</span>
+<span class="fc" id="L154">            return;</span>
+        }
+
+<span class="pc bpc" id="L157" title="3 of 4 branches missed.">        if ((o1 == null) &amp;&amp; (o2 == null)) {</span>
+<span class="nc" id="L158">            stack.push(BstVM.TRUE);</span>
+<span class="nc" id="L159">            return;</span>
+        }
+
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        stack.push(o1.equals(o2) ? BstVM.TRUE : BstVM.FALSE);</span>
+<span class="fc" id="L163">    }</span>
+
+    /**
+     *  Pops the top two (integer) literals and pushes their sum.
+     */
+    private void bstAdd(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L170">            throw new BstVMException(&quot;Not enough operands on stack for operation + (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L172">        Object o2 = stack.pop();</span>
+<span class="fc" id="L173">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L175" title="1 of 4 branches missed.">        if (!((o1 instanceof Integer) &amp;&amp; (o2 instanceof Integer))) {</span>
+<span class="fc" id="L176">            throw new BstVMException(&quot;Can only compare two integers with + (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L179">        stack.push((Integer) o1 + (Integer) o2);</span>
+<span class="fc" id="L180">    }</span>
+
+    /**
+     * Pops the top two (integer) literals and pushes their difference
+     * (the first subtracted from the second).
+     */
+    private void bstSubtract(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L188">            throw new BstVMException(&quot;Not enough operands on stack for operation - (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L190">        Object o2 = stack.pop();</span>
+<span class="fc" id="L191">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L193" title="2 of 4 branches missed.">        if (!((o1 instanceof Integer) &amp;&amp; (o2 instanceof Integer))) {</span>
+<span class="nc" id="L194">            throw new BstVMException(&quot;Can only subtract two integers with - (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L197">        stack.push((Integer) o1 - (Integer) o2);</span>
+<span class="fc" id="L198">    }</span>
+
+    /**
+     * Pops the top two (string) literals, concatenates them (in reverse
+     * order, that is, the order in which pushed), and pushes the
+     * resulting string.
+     */
+    private void bstConcat(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L207">            throw new BstVMException(&quot;Not enough operands on stack for operation * (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L209">        Object o2 = stack.pop();</span>
+<span class="fc" id="L210">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (o1 == null) {</span>
+<span class="nc" id="L213">            o1 = &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (o2 == null) {</span>
+<span class="fc" id="L216">            o2 = &quot;&quot;;</span>
+        }
+
+<span class="pc bpc" id="L219" title="2 of 4 branches missed.">        if (!((o1 instanceof String) &amp;&amp; (o2 instanceof String))) {</span>
+<span class="nc" id="L220">            LOGGER.error(&quot;o1: {} ({})&quot;, o1, o1.getClass());</span>
+<span class="nc" id="L221">            LOGGER.error(&quot;o2: {} ({})&quot;, o2, o2.getClass());</span>
+<span class="nc" id="L222">            throw new BstVMException(&quot;Can only concatenate two String with * (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L225">        stack.push(o1.toString() + o2);</span>
+<span class="fc" id="L226">    }</span>
+
+    /**
+     * Pops the top two literals and assigns to the first (which must be
+     * a global or entry variable) the value of the second.
+     */
+<span class="fc" id="L232">    public class BstAssignFunction implements BstFunction {</span>
+
+        @Override
+        public void execute(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="nc" id="L236">            this.execute(visitor, ctx, null);</span>
+<span class="nc" id="L237">        }</span>
+
+        @Override
+        public void execute(BstVMVisitor visitor, ParserRuleContext ctx, BstEntry bstEntry) {
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L242">                throw new BstVMException(&quot;Not enough operands on stack for operation := (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+            }
+<span class="fc" id="L244">            Object o1 = stack.pop();</span>
+<span class="fc" id="L245">            Object o2 = stack.pop();</span>
+
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            if (!(o1 instanceof BstVMVisitor.Identifier identifier)) {</span>
+<span class="nc" id="L248">                throw new BstVMException(&quot;Invalid parameters (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+            }
+<span class="fc" id="L250">            String name = identifier.name();</span>
+
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            if (o2 instanceof String value) {</span>
+<span class="fc bfc" id="L253" title="All 4 branches covered.">                if ((bstEntry != null) &amp;&amp; bstEntry.localStrings.containsKey(name)) {</span>
+<span class="fc" id="L254">                    bstEntry.localStrings.put(name, value);</span>
+<span class="fc" id="L255">                    return;</span>
+                }
+
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">                if (strings.containsKey(name)) {</span>
+<span class="fc" id="L259">                    strings.put(name, value);</span>
+                }
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            } else if (o2 instanceof Integer value) {</span>
+<span class="fc bfc" id="L262" title="All 4 branches covered.">                if ((bstEntry != null) &amp;&amp; bstEntry.localIntegers.containsKey(name)) {</span>
+<span class="fc" id="L263">                    bstEntry.localIntegers.put(name, value);</span>
+<span class="fc" id="L264">                    return;</span>
+                }
+
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                if (integers.containsKey(name)) {</span>
+<span class="fc" id="L268">                    integers.put(name, value);</span>
+                }
+            } else {
+<span class="nc" id="L271">                throw new BstVMException(&quot;Invalid parameters (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+            }
+<span class="fc" id="L273">        }</span>
+    }
+
+    /**
+     * Pops the top (string) literal, adds a `.' to it if the last non
+     * '}' character isn't a `.', `?', or `!', and pushes this resulting
+     * string.
+     */
+    private void bstAddPeriod(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L283">            throw new BstVMException(&quot;Not enough operands on stack for operation add.period$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L285">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (!(o1 instanceof String s)) {</span>
+<span class="nc" id="L288">            throw new BstVMException(&quot;Can only add a period to a string for add.period$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L291">        Matcher m = ADD_PERIOD_PATTERN.matcher(s);</span>
+
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (m.find()) {</span>
+<span class="fc" id="L294">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L295">            m.appendReplacement(sb, m.group(1));</span>
+<span class="fc" id="L296">            sb.append('.');</span>
+<span class="fc" id="L297">            String group2 = m.group(2);</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (group2 != null) {</span>
+<span class="fc" id="L299">                sb.append(m.group(2));</span>
+            }
+<span class="fc" id="L301">            stack.push(sb.toString());</span>
+<span class="fc" id="L302">        } else {</span>
+<span class="fc" id="L303">            stack.push(s);</span>
+        }
+<span class="fc" id="L305">    }</span>
+
+    /**
+     * Executes the function whose name is the entry type of an entry.
+     * For example if an entry is of type book, this function executes
+     * the book function. When given as an argument to the ITERATE
+     * command, call.type$ actually produces the output for the entries.
+     * For an entry with an unknown type, it executes the function
+     * default.type. Thus you should define (before the READ command)
+     * one function for each standard entry type as well as a
+     * default.type function.
+     */
+<span class="fc" id="L317">    public class BstCallTypeFunction implements BstFunction {</span>
+        @Override
+        public void execute(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="nc" id="L320">            throw new BstVMException(&quot;Call.type$ can only be called from within a context (ITERATE or REVERSE). (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+        @Override
+        public void execute(BstVMVisitor visitor, ParserRuleContext ctx, BstEntry bstEntry) {
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            if (bstEntry == null) {</span>
+<span class="nc" id="L326">                this.execute(visitor, ctx); // Throw error</span>
+            } else {
+<span class="fc" id="L328">                functions.get(bstEntry.entry.getType().getName()).execute(visitor, ctx, bstEntry);</span>
+            }
+<span class="fc" id="L330">        }</span>
+    }
+
+    /**
+     * Pops the top two (string) literals; it changes the case of the second
+     * according to the specifications of the first, as follows. (Note: The word
+     * `letters' in the next sentence refers only to those at brace-level 0, the
+     * top-most brace level; no other characters are changed, except perhaps for
+     * \special characters&quot;, described in Section 4.) If the first literal is the
+     * string `t', it converts to lower case all letters except the very first
+     * character in the string, which it leaves alone, and except the first
+     * character following any colon and then nonnull white space, which it also
+     * leaves alone; if it's the string `l', it converts all letters to lower case;
+     * and if it's the string `u', it converts all letters to upper case. It then
+     * pushes this resulting string. If either type is incorrect, it complains and
+     * pushes the null string; however, if both types are correct but the
+     * specification string (i.e., the first string) isn't one of the legal ones, it
+     * merely pushes the second back onto the stack, after complaining. (Another
+     * note: It ignores case differences in the specification string; for example,
+     * the strings t and T are equivalent for the purposes of this built-in
+     * function.)
+     */
+    private void bstChangeCase(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L354">            throw new BstVMException(&quot;Not enough operands on stack for operation change.case$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L357">        Object o1 = stack.pop();</span>
+<span class="pc bpc" id="L358" title="2 of 4 branches missed.">        if (!((o1 instanceof String format) &amp;&amp; (format.length() == 1))) {</span>
+<span class="nc" id="L359">            throw new BstVMException(&quot;A format string of length 1 is needed for change.case$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L362">        Object o2 = stack.pop();</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (!(o2 instanceof String toChange)) {</span>
+<span class="nc" id="L364">            throw new BstVMException(&quot;A string is needed as second parameter for change.case$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L367">        stack.push(BstCaseChanger.changeCase(toChange, BstCaseChanger.FormatMode.of(format)));</span>
+<span class="fc" id="L368">    }</span>
+
+    /**
+     * Pops the top (string) literal, makes sure it's a single
+     * character, converts it to the corresponding ASCII integer, and
+     * pushes this integer.
+     */
+    private void bstChrToInt(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L377">            throw new BstVMException(&quot;Not enough operands on stack for operation chr.to.int$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L379">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L381" title="2 of 4 branches missed.">        if (!((o1 instanceof String s) &amp;&amp; (((String) o1).length() == 1))) {</span>
+<span class="nc" id="L382">            throw new BstVMException(&quot;Can only perform chr.to.int$ on string with length 1 (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L385">        stack.push((int) s.charAt(0));</span>
+<span class="fc" id="L386">    }</span>
+
+    /**
+     * Pushes the string that was the \cite-command argument for this
+     * entry.
+     */
+<span class="fc" id="L392">    public class BstCiteFunction implements BstFunction {</span>
+        @Override
+        public void execute(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="nc" id="L395">            throw new BstVMException(&quot;Must have an entry to cite$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+        @Override
+        public void execute(BstVMVisitor visitor, ParserRuleContext ctx, BstEntry bstEntryContext) {
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">            if (bstEntryContext == null) {</span>
+<span class="nc" id="L401">                execute(visitor, ctx);</span>
+<span class="nc" id="L402">                return;</span>
+            }
+
+<span class="fc" id="L405">            stack.push(bstEntryContext.entry.getCitationKey().orElse(null));</span>
+<span class="fc" id="L406">        }</span>
+    }
+
+    /**
+     * Pops the top literal from the stack and pushes two copies of it.
+     */
+    private void bstDuplicate(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L414">            throw new BstVMException(&quot;Not enough operands on stack for operation duplicate$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L416">        Object o1 = stack.pop();</span>
+
+<span class="fc" id="L418">        stack.push(o1);</span>
+<span class="fc" id="L419">        stack.push(o1);</span>
+<span class="fc" id="L420">    }</span>
+
+    /**
+     * Pops the top literal and pushes the integer 1 if it's a missing
+     * field or a string having no non-white-space characters, 0
+     * otherwise.
+     */
+    private void bstEmpty(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L429">            throw new BstVMException(&quot;Not enough operands on stack for operation empty$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L431">        Object o1 = stack.pop();</span>
+
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        if (o1 == null) {</span>
+<span class="fc" id="L434">            stack.push(BstVM.TRUE);</span>
+<span class="fc" id="L435">            return;</span>
+        }
+
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">        if (!(o1 instanceof String s)) {</span>
+<span class="nc" id="L439">            throw new BstVMException(&quot;Operand does not match function empty$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc bfc" id="L442" title="All 2 branches covered.">        stack.push(&quot;&quot;.equals(s.trim()) ? BstVM.TRUE : BstVM.FALSE);</span>
+<span class="fc" id="L443">    }</span>
+
+    /**
+     * The |built_in| function {\.{format.name\$}} pops the
+     * top three literals (they are a string, an integer, and a string
+     * literal, in that order). The last string literal represents a
+     * name list (each name corresponding to a person), the integer
+     * literal specifies which name to pick from this list, and the
+     * first string literal specifies how to format this name, as
+     * described in the \BibTeX\ documentation. Finally, this function
+     * pushes the formatted name. If any of the types is incorrect, it
+     * complains and pushes the null string.
+     */
+    private void bstFormatName(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">        if (stack.size() &lt; 3) {</span>
+<span class="nc" id="L458">            throw new BstVMException(&quot;Not enough operands on stack for operation format.name$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L460">        Object o1 = stack.pop();</span>
+<span class="fc" id="L461">        Object o2 = stack.pop();</span>
+<span class="fc" id="L462">        Object o3 = stack.pop();</span>
+
+<span class="pc bpc" id="L464" title="5 of 6 branches missed.">        if (!(o1 instanceof String) &amp;&amp; !(o2 instanceof Integer) &amp;&amp; !(o3 instanceof String)) {</span>
+            // warning(&quot;A string is needed for change.case$&quot;);
+<span class="nc" id="L466">            stack.push(&quot;&quot;);</span>
+<span class="nc" id="L467">            return;</span>
+        }
+
+<span class="fc" id="L470">        String format = (String) o1;</span>
+<span class="fc" id="L471">        Integer name = (Integer) o2;</span>
+<span class="fc" id="L472">        String names = (String) o3;</span>
+
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">        if (names == null) {</span>
+<span class="nc" id="L475">            stack.push(&quot;&quot;);</span>
+        } else {
+<span class="fc" id="L477">            AuthorList a = AuthorList.parse(names);</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">            if (name &gt; a.getNumberOfAuthors()) {</span>
+<span class="nc" id="L479">                throw new BstVMException(&quot;Author Out of Bounds. Number %d invalid for %s (line %d)&quot;.formatted(name, names, ctx.start.getLine()));</span>
+            }
+<span class="fc" id="L481">            Author author = a.getAuthor(name - 1);</span>
+
+<span class="fc" id="L483">            stack.push(BstNameFormatter.formatName(author, format));</span>
+        }
+<span class="fc" id="L485">    }</span>
+
+    /**
+     * Pops the top three literals (they are two function literals and
+     * an integer literal, in that order); if the integer is greater
+     * than 0, it executes the second literal, else it executes the
+     * first.
+     */
+    private void bstIf(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">        if (stack.size() &lt; 3) {</span>
+<span class="nc" id="L495">            throw new BstVMException(&quot;Not enough operands on stack for if$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L498">        Object f1 = stack.pop();</span>
+<span class="fc" id="L499">        Object f2 = stack.pop();</span>
+<span class="fc" id="L500">        Object i = stack.pop();</span>
+
+<span class="pc bpc" id="L502" title="4 of 10 branches missed.">        if (!((f1 instanceof BstVMVisitor.Identifier) || (f1 instanceof ParseTree))</span>
+                &amp;&amp; ((f2 instanceof BstVMVisitor.Identifier) || (f2 instanceof ParseTree))
+                &amp;&amp; (i instanceof Integer)) {
+<span class="nc" id="L505">            throw new BstVMException(&quot;Expecting two functions and an integer for if$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc bfc" id="L508" title="All 2 branches covered.">        if (((Integer) i) &gt; 0) {</span>
+<span class="fc" id="L509">            callIdentifierOrTree(f2, visitor, ctx);</span>
+        } else {
+<span class="fc" id="L511">            callIdentifierOrTree(f1, visitor, ctx);</span>
+        }
+<span class="fc" id="L513">    }</span>
+
+    private void callIdentifierOrTree(Object f, BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="fc bfc" id="L516" title="All 2 branches covered.">        if (f instanceof ParseTree tree) {</span>
+<span class="fc" id="L517">            visitor.visit(tree);</span>
+<span class="fc bfc" id="L518" title="All 2 branches covered.">        } else if (f instanceof BstVMVisitor.Identifier identifier) {</span>
+<span class="fc" id="L519">            visitor.resolveIdentifier(identifier.name(), ctx);</span>
+        } else {
+<span class="fc" id="L521">            stack.push(f);</span>
+        }
+<span class="fc" id="L523">    }</span>
+
+    /**
+     * Pops the top (integer) literal, interpreted as the ASCII integer
+     * value of a single character, converts it to the corresponding
+     * single-character string, and pushes this string.
+     */
+    private void bstIntToChr(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L532">            throw new BstVMException(&quot;Not enough operands on stack for operation int.to.chr$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L534">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">        if (!(o1 instanceof Integer i)) {</span>
+<span class="nc" id="L537">            throw new BstVMException(&quot;Can only perform operation int.to.chr$ on an Integer (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L540">        stack.push(String.valueOf((char) i.intValue()));</span>
+<span class="fc" id="L541">    }</span>
+
+    /**
+     * Pops the top (integer) literal, converts it to its (unique)
+     * string equivalent, and pushes this string.
+     */
+    private void bstIntToStr(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L549">            throw new BstVMException(&quot;Not enough operands on stack for operation int.to.str$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L551">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">        if (!(o1 instanceof Integer)) {</span>
+<span class="nc" id="L554">            throw new BstVMException(&quot;Can only transform an integer to an string using int.to.str$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L557">        stack.push(o1.toString());</span>
+<span class="fc" id="L558">    }</span>
+
+    /**
+     * Pops the top literal and pushes the integer 1 if it's a missing
+     * field, 0 otherwise.
+     */
+    private void bstMissing(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L566">            throw new BstVMException(&quot;Not enough operands on stack for operation missing$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L568">        Object o1 = stack.pop();</span>
+
+<span class="fc bfc" id="L570" title="All 2 branches covered.">        if (o1 == null) {</span>
+<span class="fc" id="L571">            stack.push(BstVM.TRUE);</span>
+<span class="fc" id="L572">            return;</span>
+        }
+
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">        if (!(o1 instanceof String)) {</span>
+<span class="nc" id="L576">            LOGGER.warn(&quot;Not a string or missing field in operation missing$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+<span class="nc" id="L577">            stack.push(BstVM.TRUE);</span>
+<span class="nc" id="L578">            return;</span>
+        }
+
+<span class="fc" id="L581">        stack.push(BstVM.FALSE);</span>
+<span class="fc" id="L582">    }</span>
+
+    /**
+     * Writes onto the bbl file what is accumulated in the output buffer.
+     * It writes a blank line if and only if the output buffer is empty.
+     * Since write$ does reasonable line breaking, you should use this
+     * function only when you want a blank line or an explicit line
+     * break.
+     */
+    private void bstNewLine(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="fc" id="L592">        this.bbl.append('\n');</span>
+<span class="fc" id="L593">    }</span>
+
+    /**
+     * Pops the top (string) literal and pushes the number of names the
+     * string represents one plus the number of occurrences of the
+     * substring &quot;and&quot; (ignoring case differences) surrounded by
+     * non-null white-space at the top brace level.
+     */
+    private void bstNumNames(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L603">            throw new BstVMException(&quot;Not enough operands on stack for operation num.names$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L605">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">        if (!(o1 instanceof String s)) {</span>
+<span class="nc" id="L608">            throw new BstVMException(&quot;Need a string at the top of the stack for num.names$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L611">        stack.push(AuthorList.parse(s).getNumberOfAuthors());</span>
+<span class="fc" id="L612">    }</span>
+
+    /**
+     * Pops the top of the stack but doesn't print it; this gets rid of
+     * an unwanted stack literal.
+     */
+    private void bstPop(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="fc" id="L619">        stack.pop();</span>
+<span class="fc" id="L620">    }</span>
+
+    /**
+     * The |built_in| function {\.{preamble\$}} pushes onto the stack
+     * the concatenation of all the \.{preamble} strings read from the
+     * database files. (or the empty string if there were none)
+     * '@PREAMBLE' strings are read from the database files.
+     */
+    private void bstPreamble(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="fc" id="L629">        stack.push(preamble);</span>
+<span class="fc" id="L630">    }</span>
+
+    /**
+     * Pops the top (string) literal, removes nonalphanumeric characters
+     * except for white-space characters and hyphens and ties (these all get
+     * converted to a space), removes certain alphabetic characters
+     * contained in the control sequences associated with a \special
+     * character&quot;, and pushes the resulting string.
+     */
+    private void bstPurify(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L641">            throw new BstVMException(&quot;Not enough operands on stack for operation purify$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L643">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">        if (!(o1 instanceof String)) {</span>
+<span class="nc" id="L646">            LOGGER.warn(&quot;A string is needed for purify$&quot;);</span>
+<span class="nc" id="L647">            stack.push(&quot;&quot;);</span>
+<span class="nc" id="L648">            return;</span>
+        }
+
+<span class="fc" id="L651">        stack.push(BstPurifier.purify((String) o1));</span>
+<span class="fc" id="L652">    }</span>
+
+    /**
+     * Pushes the string consisting of the double-quote character.
+     */
+    private void bstQuote(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="fc" id="L658">        stack.push(&quot;\&quot;&quot;);</span>
+<span class="fc" id="L659">    }</span>
+
+    /**
+     * Does nothing.
+     */
+    private void bstSkip(BstVMVisitor visitor, ParserRuleContext ctx) {
+        // no-op
+<span class="fc" id="L666">    }</span>
+
+    /**
+     * Pops and prints the whole stack; it's meant to be used for style
+     * designers while debugging.
+     */
+    private void bstStack(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="nc bnc" id="L673" title="All 2 branches missed.">        while (!stack.isEmpty()) {</span>
+<span class="nc" id="L674">            LOGGER.debug(&quot;Stack entry {}&quot;, stack.pop());</span>
+        }
+<span class="nc" id="L676">    }</span>
+
+    /**
+     * Pops the top three literals (they are the two integers literals
+     * len and start, and a string literal, in that order). It pushes
+     * the substring of the (at most) len consecutive characters
+     * starting at the startth character (assuming 1-based indexing) if
+     * start is positive, and ending at the start-th character
+     * (including) from the end if start is negative (where the first
+     * character from the end is the last character).
+     */
+    private void bstSubstring(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L688" title="1 of 2 branches missed.">        if (stack.size() &lt; 3) {</span>
+<span class="nc" id="L689">            throw new BstVMException(&quot;Not enough operands on stack for operation substring$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L691">        Object o1 = stack.pop();</span>
+<span class="fc" id="L692">        Object o2 = stack.pop();</span>
+<span class="fc" id="L693">        Object o3 = stack.pop();</span>
+
+<span class="pc bpc" id="L695" title="3 of 6 branches missed.">        if (!((o1 instanceof Integer len) &amp;&amp; (o2 instanceof Integer start) &amp;&amp; (o3 instanceof String s))) {</span>
+<span class="nc" id="L696">            throw new BstVMException(&quot;Expecting two integers and a string for substring$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L699">        int lenI = len;</span>
+<span class="fc" id="L700">        int startI = start;</span>
+
+<span class="fc bfc" id="L702" title="All 2 branches covered.">        if (lenI &gt; (Integer.MAX_VALUE / 2)) {</span>
+<span class="fc" id="L703">            lenI = Integer.MAX_VALUE / 2;</span>
+        }
+
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">        if (startI &gt; (Integer.MAX_VALUE / 2)) {</span>
+<span class="nc" id="L707">            startI = Integer.MAX_VALUE / 2;</span>
+        }
+
+<span class="pc bpc" id="L710" title="1 of 2 branches missed.">        if (startI &lt; (Integer.MIN_VALUE / 2)) {</span>
+<span class="nc" id="L711">            startI = -Integer.MIN_VALUE / 2;</span>
+        }
+
+<span class="fc bfc" id="L714" title="All 2 branches covered.">        if (startI &lt; 0) {</span>
+<span class="fc" id="L715">            startI += s.length() + 1;</span>
+<span class="fc" id="L716">            startI = Math.max(1, (startI + 1) - lenI);</span>
+        }
+<span class="fc" id="L718">        stack.push(s.substring(startI - 1, Math.min((startI - 1) + lenI, s.length())));</span>
+<span class="fc" id="L719">    }</span>
+
+    /**
+     * Swaps the top two literals on the stack. text.length$ Pops the
+     * top (string) literal, and pushes the number of text characters
+     * it contains, where an accented character (more precisely, a
+     * \special character&quot;, defined in Section 4) counts as a single
+     * text character, even if it's missing its matching right brace,
+     * and where braces don't count as text characters.
+     */
+    private void bstSwap(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">        if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L731">            throw new BstVMException(&quot;Not enough operands on stack for operation swap$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L733">        Object f1 = stack.pop();</span>
+<span class="fc" id="L734">        Object f2 = stack.pop();</span>
+
+<span class="fc" id="L736">        stack.push(f1);</span>
+<span class="fc" id="L737">        stack.push(f2);</span>
+<span class="fc" id="L738">    }</span>
+
+    /**
+     * text.length$ Pops the top (string) literal, and pushes the number
+     * of text characters it contains, where an accented character (more
+     * precisely, a &quot;special character&quot;, defined in Section 4) counts as
+     * a single text character, even if it's missing its matching right
+     * brace, and where braces don't count as text characters.
+     *
+     * From BibTeXing: For the purposes of counting letters in labels,
+     * BibTEX considers everything contained inside the braces as a
+     * single letter.
+     */
+    private void bstTextLength(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L752" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L753">            throw new BstVMException(&quot;Not enough operands on stack for operation text.length$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L755">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">        if (!(o1 instanceof String s)) {</span>
+<span class="nc" id="L758">            throw new BstVMException(&quot;Can only perform operation on a string text.length$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="fc" id="L761">        char[] c = s.toCharArray();</span>
+<span class="fc" id="L762">        int result = 0;</span>
+<span class="fc" id="L763">        int i = 0;</span>
+<span class="fc" id="L764">        int n = s.length();</span>
+<span class="fc" id="L765">        int braceLevel = 0;</span>
+
+<span class="fc bfc" id="L767" title="All 2 branches covered.">        while (i &lt; n) {</span>
+<span class="fc" id="L768">            i++;</span>
+<span class="fc bfc" id="L769" title="All 2 branches covered.">            if (c[i - 1] == '{') {</span>
+<span class="fc" id="L770">                braceLevel++;</span>
+<span class="pc bpc" id="L771" title="2 of 4 branches missed.">                if ((braceLevel == 1) &amp;&amp; (i &lt; n)) {</span>
+<span class="fc bfc" id="L772" title="All 2 branches covered.">                    if (c[i] == '\\') {</span>
+<span class="fc" id="L773">                        i++; // skip over backslash</span>
+<span class="pc bpc" id="L774" title="1 of 4 branches missed.">                        while ((i &lt; n) &amp;&amp; (braceLevel &gt; 0)) {</span>
+<span class="fc bfc" id="L775" title="All 2 branches covered.">                            if (c[i] == '}') {</span>
+<span class="fc" id="L776">                                braceLevel--;</span>
+<span class="fc bfc" id="L777" title="All 2 branches covered.">                            } else if (c[i] == '{') {</span>
+<span class="fc" id="L778">                                braceLevel++;</span>
+                            }
+<span class="fc" id="L780">                            i++;</span>
+                        }
+<span class="fc" id="L782">                        result++;</span>
+                    }
+                }
+<span class="fc bfc" id="L785" title="All 2 branches covered.">            } else if (c[i - 1] == '}') {</span>
+<span class="pc bpc" id="L786" title="1 of 2 branches missed.">                if (braceLevel &gt; 0) {</span>
+<span class="fc" id="L787">                    braceLevel--;</span>
+                }
+            } else {
+<span class="fc" id="L790">                result++;</span>
+            }
+        }
+<span class="fc" id="L793">        stack.push(result);</span>
+<span class="fc" id="L794">    }</span>
+
+    /**
+     * Pops the top two literals (the integer literal len and a string
+     * literal, in that order). It pushes the substring of the (at most) len
+     * consecutive text characters starting from the beginning of the
+     * string. This function is similar to substring$, but this one
+     * considers a \special character&quot;, even if it's missing its matching
+     * right brace, to be a single text character (rather than however many
+     * ASCII characters it actually comprises), and this function doesn't
+     * consider braces to be text characters; furthermore, this function
+     * appends any needed matching right braces.
+     */
+    private void bstTextPrefix(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="nc bnc" id="L808" title="All 2 branches missed.">        if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L809">            throw new BstVMException(&quot;Not enough operands on stack for operation text.prefix$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+<span class="nc" id="L812">        Object o1 = stack.pop();</span>
+<span class="nc bnc" id="L813" title="All 2 branches missed.">        if (!(o1 instanceof Integer)) {</span>
+<span class="nc" id="L814">            LOGGER.warn(&quot;An integer is needed as first parameter to text.prefix$ (line {})&quot;, ctx.start.getLine());</span>
+<span class="nc" id="L815">            stack.push(&quot;&quot;);</span>
+<span class="nc" id="L816">            return;</span>
+        }
+
+<span class="nc" id="L819">        Object o2 = stack.pop();</span>
+<span class="nc bnc" id="L820" title="All 2 branches missed.">        if (!(o2 instanceof String)) {</span>
+<span class="nc" id="L821">            LOGGER.warn(&quot;A string is needed as second parameter to text.prefix$ (line {})&quot;, ctx.start.getLine());</span>
+<span class="nc" id="L822">            stack.push(&quot;&quot;);</span>
+<span class="nc" id="L823">            return;</span>
+        }
+
+<span class="nc" id="L826">        stack.push(BstTextPrefixer.textPrefix((Integer) o1, (String) o2));</span>
+<span class="nc" id="L827">    }</span>
+
+    /**
+     * Pops and prints the top of the stack to the log file. It's useful for debugging.
+     */
+    private void bstTop(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="fc" id="L833">        LOGGER.debug(&quot;Stack entry {} (line {})&quot;, stack.pop(), ctx.start.getLine());</span>
+<span class="fc" id="L834">    }</span>
+
+    /**
+     * Pushes the current entry's type (book, article, etc.), but pushes
+     * the null string if the type is either unknown or undefined.
+     */
+<span class="fc" id="L840">    public class BstTypeFunction implements BstFunction {</span>
+        @Override
+        public void execute(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="nc" id="L843">            throw new BstVMException(&quot;type$ need a context (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+        @Override
+        public void execute(BstVMVisitor visitor, ParserRuleContext ctx, BstEntry bstEntryContext) {
+<span class="pc bpc" id="L848" title="1 of 2 branches missed.">            if (bstEntryContext == null) {</span>
+<span class="nc" id="L849">                this.execute(visitor, ctx);</span>
+<span class="nc" id="L850">                return;</span>
+            }
+
+<span class="fc" id="L853">            stack.push(bstEntryContext.entry.getType().getName());</span>
+<span class="fc" id="L854">        }</span>
+    }
+
+    /**
+     * Pops the top (string) literal and prints it following a warning
+     * message. This also increments a count of the number of warning
+     * messages issued.
+     */
+    private void bstWarning(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="fc" id="L863">        LOGGER.warn(&quot;Warning (#{}): {}&quot;, bstWarning++, stack.pop());</span>
+<span class="fc" id="L864">    }</span>
+
+    /**
+     * Pops the top two (function) literals, and keeps executing the
+     * second as long as the (integer) literal left on the stack by
+     * executing the first is greater than 0.
+     */
+    private void bstWhile(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L872" title="1 of 2 branches missed.">        if (stack.size() &lt; 2) {</span>
+<span class="nc" id="L873">            throw new BstVMException(&quot;Not enough operands on stack for operation while$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L875">        Object f2 = stack.pop();</span>
+<span class="fc" id="L876">        Object f1 = stack.pop();</span>
+
+<span class="pc bpc" id="L878" title="6 of 8 branches missed.">        if (!((f1 instanceof BstVMVisitor.Identifier) || (f1 instanceof ParseTree))</span>
+                &amp;&amp; ((f2 instanceof BstVMVisitor.Identifier) || (f2 instanceof ParseTree))) {
+<span class="nc" id="L880">            throw new BstVMException(&quot;Expecting two functions for while$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+
+        do {
+<span class="fc" id="L884">            visitor.visit((ParseTree) f1);</span>
+
+<span class="fc" id="L886">            Object i = stack.pop();</span>
+<span class="pc bpc" id="L887" title="1 of 2 branches missed.">            if (!(i instanceof Integer)) {</span>
+<span class="nc" id="L888">                throw new BstVMException(&quot;First parameter to while has to return an integer but was %s (line %d)&quot;</span>
+<span class="nc" id="L889">                        .formatted(i.toString(), ctx.start.getLine()));</span>
+            }
+<span class="fc bfc" id="L891" title="All 2 branches covered.">            if ((Integer) i &lt;= 0) {</span>
+<span class="fc" id="L892">                break;</span>
+            }
+<span class="fc" id="L894">            visitor.visit((ParseTree) f2);</span>
+<span class="fc" id="L895">        } while (true);</span>
+<span class="fc" id="L896">    }</span>
+
+    /**
+     * The |built_in| function {\.{width\$}} pops the top (string) literal and
+     * pushes the integer that represents its width in units specified by the
+     * |char_width| array. This function takes the literal literally; that is, it
+     * assumes each character in the string is to be printed as is, regardless of
+     * whether the character has a special meaning to \TeX, except that special
+     * characters (even without their |right_brace|s) are handled specially. If the
+     * literal isn't a string, it complains and pushes~0.
+     */
+    private void bstWidth(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="pc bpc" id="L908" title="1 of 2 branches missed.">        if (stack.isEmpty()) {</span>
+<span class="nc" id="L909">            throw new BstVMException(&quot;Not enough operands on stack for operation width$ (line %d)&quot;.formatted(ctx.start.getLine()));</span>
+        }
+<span class="fc" id="L911">        Object o1 = stack.pop();</span>
+
+<span class="pc bpc" id="L913" title="1 of 2 branches missed.">        if (!(o1 instanceof String)) {</span>
+<span class="nc" id="L914">            LOGGER.warn(&quot;A string is needed for width$&quot;);</span>
+<span class="nc" id="L915">            stack.push(0);</span>
+<span class="nc" id="L916">            return;</span>
+        }
+
+<span class="fc" id="L919">        stack.push(BstWidthCalculator.width((String) o1));</span>
+<span class="fc" id="L920">    }</span>
+
+    /**
+     * Pops the top (string) literal and writes it on the output buffer
+     * (which will result in stuff being written onto the bbl file when
+     * the buffer fills up).
+     */
+    private void bstWrite(BstVMVisitor visitor, ParserRuleContext ctx) {
+<span class="fc" id="L928">        String s = (String) stack.pop();</span>
+<span class="fc" id="L929">        bbl.append(s);</span>
+<span class="fc" id="L930">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

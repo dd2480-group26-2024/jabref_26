@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParserResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer</a> &gt; <span class="el_source">ParserResult.java</span></div><h1>ParserResult.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabases;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryType;
+import org.jabref.model.metadata.MetaData;
+
+public class ParserResult {
+    private final Set&lt;BibEntryType&gt; entryTypes;
+<span class="fc" id="L22">    private final List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+    private BibDatabase database;
+    private MetaData metaData;
+    private Path file;
+    private boolean invalid;
+    private boolean toOpenTab;
+<span class="fc" id="L28">    private boolean changedOnMigration = false;</span>
+
+    public ParserResult() {
+<span class="fc" id="L31">        this(Collections.emptyList());</span>
+<span class="fc" id="L32">    }</span>
+
+    public ParserResult(Collection&lt;BibEntry&gt; entries) {
+<span class="fc" id="L35">        this(new BibDatabase(BibDatabases.purgeEmptyEntries(entries)));</span>
+<span class="fc" id="L36">    }</span>
+
+    public ParserResult(BibDatabase database) {
+<span class="fc" id="L39">        this(database, new MetaData(), new HashSet&lt;&gt;());</span>
+<span class="fc" id="L40">    }</span>
+
+<span class="fc" id="L42">    public ParserResult(BibDatabase database, MetaData metaData, Set&lt;BibEntryType&gt; entryTypes) {</span>
+<span class="fc" id="L43">        this.database = Objects.requireNonNull(database);</span>
+<span class="fc" id="L44">        this.metaData = Objects.requireNonNull(metaData);</span>
+<span class="fc" id="L45">        this.entryTypes = Objects.requireNonNull(entryTypes);</span>
+<span class="fc" id="L46">    }</span>
+
+    public static ParserResult fromErrorMessage(String message) {
+<span class="fc" id="L49">        ParserResult parserResult = new ParserResult();</span>
+<span class="fc" id="L50">        parserResult.addWarning(message);</span>
+<span class="fc" id="L51">        parserResult.setInvalid(true);</span>
+<span class="fc" id="L52">        return parserResult;</span>
+    }
+
+    private static String getErrorMessage(Exception exception) {
+<span class="fc" id="L56">        String errorMessage = exception.getLocalizedMessage();</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (exception.getCause() != null) {</span>
+<span class="nc" id="L58">            errorMessage += &quot; Caused by: &quot; + exception.getCause().getLocalizedMessage();</span>
+        }
+<span class="fc" id="L60">        return errorMessage;</span>
+    }
+
+    public static ParserResult fromError(Exception exception) {
+<span class="fc" id="L64">        return fromErrorMessage(getErrorMessage(exception));</span>
+    }
+
+    /**
+     * Check if this database is marked to be added to the currently open tab. Default is false.
+     */
+    public boolean toOpenTab() {
+<span class="nc" id="L71">        return toOpenTab;</span>
+    }
+
+    public void setToOpenTab() {
+<span class="nc" id="L75">        this.toOpenTab = true;</span>
+<span class="nc" id="L76">    }</span>
+
+    public BibDatabase getDatabase() {
+<span class="fc" id="L79">        return database;</span>
+    }
+
+    public MetaData getMetaData() {
+<span class="fc" id="L83">        return metaData;</span>
+    }
+
+    public void setMetaData(MetaData md) {
+<span class="fc" id="L87">        this.metaData = md;</span>
+<span class="fc" id="L88">    }</span>
+
+    public Set&lt;BibEntryType&gt; getEntryTypes() {
+<span class="fc" id="L91">        return entryTypes;</span>
+    }
+
+    public Optional&lt;Path&gt; getPath() {
+<span class="fc" id="L95">        return Optional.ofNullable(file);</span>
+    }
+
+    public void setPath(Path path) {
+<span class="fc" id="L99">        file = path;</span>
+<span class="fc" id="L100">    }</span>
+
+    /**
+     * Add a parser warning.
+     *
+     * @param s String Warning text. Must be pretranslated. Only added if there isn't already a dupe.
+     */
+    public void addWarning(String s) {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!warnings.contains(s)) {</span>
+<span class="fc" id="L109">            warnings.add(s);</span>
+        }
+<span class="fc" id="L111">    }</span>
+
+    public void addException(Exception exception) {
+<span class="nc" id="L114">        String errorMessage = getErrorMessage(exception);</span>
+<span class="nc" id="L115">        addWarning(errorMessage);</span>
+<span class="nc" id="L116">    }</span>
+
+    public boolean hasWarnings() {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        return !warnings.isEmpty();</span>
+    }
+
+    public List&lt;String&gt; warnings() {
+<span class="fc" id="L123">        return new ArrayList&lt;&gt;(warnings);</span>
+    }
+
+    public boolean isInvalid() {
+<span class="fc" id="L127">        return invalid;</span>
+    }
+
+    public void setInvalid(boolean invalid) {
+<span class="fc" id="L131">        this.invalid = invalid;</span>
+<span class="fc" id="L132">    }</span>
+
+    public String getErrorMessage() {
+<span class="fc" id="L135">        return String.join(&quot;\n&quot;, warnings());</span>
+    }
+
+    public BibDatabaseContext getDatabaseContext() {
+<span class="fc" id="L139">        return new BibDatabaseContext(database, metaData, file);</span>
+    }
+
+    public void setDatabaseContext(BibDatabaseContext bibDatabaseContext) {
+<span class="nc" id="L143">        Objects.requireNonNull(bibDatabaseContext);</span>
+<span class="nc" id="L144">        database = bibDatabaseContext.getDatabase();</span>
+<span class="nc" id="L145">        metaData = bibDatabaseContext.getMetaData();</span>
+<span class="nc" id="L146">        file = bibDatabaseContext.getDatabasePath().orElse(null);</span>
+<span class="nc" id="L147">    }</span>
+
+    public boolean isEmpty() {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        return !this.getDatabase().hasEntries() &amp;&amp;</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                this.getDatabase().hasNoStrings() &amp;&amp;</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                this.getDatabase().getPreamble().isEmpty() &amp;&amp;</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                this.getMetaData().isEmpty();</span>
+    }
+
+    public boolean wasChangedOnMigration() {
+<span class="fc" id="L157">        return changedOnMigration;</span>
+    }
+
+    public void setChangedOnMigration(boolean wasChangedOnMigration) {
+<span class="nc" id="L161">        this.changedOnMigration = wasChangedOnMigration;</span>
+<span class="nc" id="L162">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

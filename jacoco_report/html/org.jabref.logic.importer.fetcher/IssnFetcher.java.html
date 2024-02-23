@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IssnFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">IssnFetcher.java</span></div><h1>IssnFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.logic.importer.EntryBasedFetcher;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.IdBasedFetcher;
+import org.jabref.logic.journals.JournalInformation;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+
+/**
+ * Fetcher to generate the BibTex entry from an ISSN.
+ * As an ISSN ist just a journal identifier, so we only return journal title and publisher
+ * The idea is to use the {@link JournalInformationFetcher} to do a request for a given ISSN.
+ */
+
+public class IssnFetcher implements EntryBasedFetcher, IdBasedFetcher {
+
+    private final JournalInformationFetcher journalInformationFetcher;
+
+<span class="fc" id="L24">    public IssnFetcher() {</span>
+<span class="fc" id="L25">        this.journalInformationFetcher = new JournalInformationFetcher();</span>
+<span class="fc" id="L26">    }</span>
+
+    @Override
+    public List&lt;BibEntry&gt; performSearch(BibEntry entry) throws FetcherException {
+<span class="fc" id="L30">        Optional&lt;String&gt; issn = entry.getField(StandardField.ISSN);</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (issn.isPresent()) {</span>
+<span class="fc" id="L32">            Optional&lt;JournalInformation&gt; journalInformation = journalInformationFetcher.getJournalInformation(issn.get(), &quot;&quot;);</span>
+<span class="fc" id="L33">            return journalInformation.map(journalInfo -&gt; journalInformationToBibEntry(journalInfo, issn.get())).stream().toList();</span>
+        }
+<span class="nc" id="L35">        return Collections.emptyList();</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L40">        return &quot;ISSN&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;BibEntry&gt; performSearchById(String identifier) throws FetcherException {
+<span class="fc" id="L45">        Optional&lt;JournalInformation&gt; journalInformation = journalInformationFetcher.getJournalInformation(identifier, &quot;&quot;);</span>
+<span class="fc" id="L46">        return journalInformation.map(journalInfo -&gt; journalInformationToBibEntry(journalInfo, identifier));</span>
+    }
+
+    private BibEntry journalInformationToBibEntry(JournalInformation journalInfo, String issn) {
+<span class="fc" id="L50">        return new BibEntry().withField(StandardField.JOURNALTITLE, journalInfo.title()).withField(StandardField.PUBLISHER, journalInfo.publisher()).withField(StandardField.ISSN, issn);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JabRefIconView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.icon</a> &gt; <span class="el_source">JabRefIconView.java</span></div><h1>JabRefIconView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.icon;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.css.Size;
+import javafx.css.SizeUnits;
+
+import org.jabref.gui.icon.IconTheme.JabRefIcons;
+
+import com.tobiasdiez.easybind.EasyBind;
+import org.kordamp.ikonli.javafx.FontIcon;
+
+public class JabRefIconView extends FontIcon {
+
+    /**
+     * This property is only needed to get proper IDE support in FXML files
+     * (e.g. validation that parameter passed to &quot;icon&quot; is indeed of type {@link IconTheme.JabRefIcons}).
+     */
+    private final ObjectProperty&lt;IconTheme.JabRefIcons&gt; glyph;
+    private final ObjectProperty&lt;Number&gt; glyphSize;
+
+    public JabRefIconView(JabRefIcons icon, int size) {
+<span class="nc" id="L23">        super(icon.getIkon());</span>
+<span class="nc" id="L24">        this.glyph = new SimpleObjectProperty&lt;&gt;(icon);</span>
+<span class="nc" id="L25">        this.glyphSize = new SimpleObjectProperty&lt;&gt;(size);</span>
+
+<span class="nc" id="L27">        EasyBind.subscribe(glyph, glyph -&gt; setIconCode(glyph.getIkon()));</span>
+<span class="nc" id="L28">        EasyBind.subscribe(glyphSize, glyphsize -&gt; setIconSize(glyphsize.intValue()));</span>
+<span class="nc" id="L29">    }</span>
+
+    public JabRefIconView(IconTheme.JabRefIcons icon) {
+<span class="fc" id="L32">        super(icon.getIkon());</span>
+<span class="fc" id="L33">        Size size = new Size(1.0, SizeUnits.EM);</span>
+<span class="fc" id="L34">        this.glyph = new SimpleObjectProperty&lt;&gt;(icon);</span>
+<span class="fc" id="L35">        this.glyphSize = new SimpleObjectProperty&lt;&gt;(9);</span>
+
+<span class="fc" id="L37">        int px = (int) size.pixels(getFont());</span>
+<span class="fc" id="L38">        glyphSize.set(px);</span>
+<span class="fc" id="L39">        EasyBind.subscribe(glyph, glyph -&gt; setIconCode(glyph.getIkon()));</span>
+<span class="fc" id="L40">        EasyBind.subscribe(glyphSize, glyphsize -&gt; setIconSize(glyphsize.intValue()));</span>
+<span class="fc" id="L41">    }</span>
+
+    public JabRefIconView() {
+<span class="fc" id="L44">        this(IconTheme.JabRefIcons.ERROR);</span>
+<span class="fc" id="L45">    }</span>
+
+    public IconTheme.JabRefIcons getDefaultGlyph() {
+<span class="nc" id="L48">        return IconTheme.JabRefIcons.ERROR;</span>
+    }
+
+    public IconTheme.JabRefIcons getGlyph() {
+<span class="nc" id="L52">        return glyph.get();</span>
+    }
+
+    public void setGlyph(IconTheme.JabRefIcons icon) {
+<span class="fc" id="L56">        this.glyph.set(icon);</span>
+<span class="fc" id="L57">    }</span>
+
+    public ObjectProperty&lt;IconTheme.JabRefIcons&gt; glyphProperty() {
+<span class="nc" id="L60">        return glyph;</span>
+    }
+
+    public void setGlyphSize(Number value) {
+<span class="nc" id="L64">        this.glyphSize.set(value);</span>
+<span class="nc" id="L65">    }</span>
+
+    public ObjectProperty&lt;Number&gt; glyphSizeProperty() {
+<span class="nc" id="L68">        return glyphSize;</span>
+    }
+
+    public Number getGlyphSize() {
+<span class="nc" id="L72">        return glyphSize.getValue();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

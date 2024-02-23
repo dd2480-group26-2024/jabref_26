@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Language.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.l10n</a> &gt; <span class="el_source">Language.java</span></div><h1>Language.java</h1><pre class="source lang-java linenums">package org.jabref.logic.l10n;
+
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+/**
+ * Contains all supported languages.
+ */
+<span class="fc" id="L14">public enum Language {</span>
+<span class="fc" id="L15">    ARABIC(&quot;العربية (Arabic)&quot;, &quot;ar&quot;),</span>
+<span class="fc" id="L16">    BAHASA_INDONESIA(&quot;Bahasa Indonesia&quot;, &quot;id&quot;),</span>
+<span class="fc" id="L17">    BRAZILIAN_PORTUGUESE(&quot;Brazilian Portuguese&quot;, &quot;pt_BR&quot;),</span>
+<span class="fc" id="L18">    DANISH(&quot;Dansk&quot;, &quot;da&quot;),</span>
+<span class="fc" id="L19">    DUTCH(&quot;Nederlands&quot;, &quot;nl&quot;),</span>
+<span class="fc" id="L20">    ENGLISH(&quot;English&quot;, &quot;en&quot;),</span>
+<span class="fc" id="L21">    FINNISH(&quot;Suomi&quot;, &quot;fi&quot;),</span>
+<span class="fc" id="L22">    FRENCH(&quot;Français&quot;, &quot;fr&quot;),</span>
+<span class="fc" id="L23">    GERMAN(&quot;Deutsch&quot;, &quot;de&quot;),</span>
+<span class="fc" id="L24">    GREEK(&quot;ελληνικά (Greek)&quot;, &quot;el&quot;),</span>
+<span class="fc" id="L25">    ITALIAN(&quot;Italiano&quot;, &quot;it&quot;),</span>
+<span class="fc" id="L26">    JAPANESE(&quot;Japanese&quot;, &quot;ja&quot;),</span>
+<span class="fc" id="L27">    KOREAN(&quot;한국어 (Korean)&quot;, &quot;ko&quot;),</span>
+<span class="fc" id="L28">    NORWEGIAN(&quot;Norsk&quot;, &quot;no&quot;),</span>
+<span class="fc" id="L29">    PERSIAN(&quot;فارسی (Farsi)&quot;, &quot;fa&quot;),</span>
+<span class="fc" id="L30">    POLISH(&quot;Polish&quot;, &quot;pl&quot;),</span>
+<span class="fc" id="L31">    PORTUGUESE(&quot;Português&quot;, &quot;pt&quot;),</span>
+<span class="fc" id="L32">    RUSSIAN(&quot;Russian&quot;, &quot;ru&quot;),</span>
+<span class="fc" id="L33">    SIMPLIFIED_CHINESE(&quot;Chinese (Simplified)&quot;, &quot;zh_CN&quot;),</span>
+<span class="fc" id="L34">    SPANISH(&quot;Español&quot;, &quot;es&quot;),</span>
+<span class="fc" id="L35">    SWEDISH(&quot;Svenska&quot;, &quot;sv&quot;),</span>
+<span class="fc" id="L36">    TAGALOG(&quot;Tagalog/Filipino&quot;, &quot;tl&quot;),</span>
+<span class="fc" id="L37">    TRADITIONAL_CHINESE(&quot;Chinese (Traditional)&quot;, &quot;zh_TW&quot;),</span>
+<span class="fc" id="L38">    TURKISH(&quot;Turkish&quot;, &quot;tr&quot;),</span>
+<span class="fc" id="L39">    UKRAINIAN(&quot;украї́нська (Ukrainian)&quot;, &quot;uk&quot;),</span>
+<span class="fc" id="L40">    VIETNAMESE(&quot;Vietnamese&quot;, &quot;vi&quot;);</span>
+
+<span class="fc" id="L42">    private static final Pattern IS_NOT_LATIN = Pattern.compile(&quot;[^\\p{IsLatin}]&quot;);</span>
+    private final String displayName;
+    private final String id;
+    /**
+     * @param id Typically as 639-1 code
+     */
+<span class="fc" id="L48">    Language(String displayName, String id) {</span>
+<span class="fc" id="L49">        this.displayName = displayName;</span>
+<span class="fc" id="L50">        this.id = id;</span>
+<span class="fc" id="L51">    }</span>
+
+    public static Optional&lt;Locale&gt; convertToSupportedLocale(Language language) {
+<span class="fc" id="L54">        Objects.requireNonNull(language);</span>
+
+        // Very important to split languages like pt_BR into two parts, because otherwise the country would be treated lowercase and create problems in loading
+<span class="fc" id="L57">        String[] languageParts = language.getId().split(&quot;_&quot;);</span>
+        Locale locale;
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (languageParts.length == 1) {</span>
+<span class="fc" id="L60">            locale = Locale.of(languageParts[0]);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        } else if (languageParts.length == 2) {</span>
+<span class="fc" id="L62">            locale = Locale.of(languageParts[0], languageParts[1]);</span>
+        } else {
+<span class="nc" id="L64">            locale = Locale.ENGLISH;</span>
+        }
+
+<span class="fc" id="L67">        return Optional.of(locale);</span>
+    }
+
+    public String getDisplayName() {
+<span class="nc" id="L71">        return displayName;</span>
+    }
+
+    public String getId() {
+<span class="fc" id="L75">        return id;</span>
+    }
+
+    public static List&lt;Language&gt; getSorted() {
+<span class="nc" id="L79">        return Arrays.stream(values())</span>
+<span class="nc" id="L80">                .sorted(Comparator.comparing(language -&gt; removeNonLatinCharacters(language.getDisplayName())))</span>
+<span class="nc" id="L81">                .toList();</span>
+    }
+
+    private static String removeNonLatinCharacters(String input) {
+<span class="nc" id="L85">       return IS_NOT_LATIN.matcher(input).replaceAll(&quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

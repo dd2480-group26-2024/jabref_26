@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Medra.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">Medra.java</span></div><h1>Medra.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.stream.IntStream;
+
+import org.jabref.logic.cleanup.DoiCleanup;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.IdBasedParserFetcher;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.util.JsonReader;
+import org.jabref.logic.importer.util.MediaTypes;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONException;
+import kong.unirest.json.JSONObject;
+
+/**
+ * A class for fetching DOIs from Medra
+ *
+ * @see &lt;a href=&quot;https://data.medra.org&quot;&gt;mEDRA Content Negotiation API&lt;/a&gt; for an overview of the API
+ * &lt;p&gt;
+ * It requires &quot;Accept&quot; request Header attribute to be set to desired content-type.
+ */
+<span class="fc" id="L36">public class Medra implements IdBasedParserFetcher {</span>
+
+    public static final String API_URL = &quot;https://data.medra.org&quot;;
+
+    @Override
+    public String getName() {
+<span class="fc" id="L42">        return &quot;mEDRA&quot;;</span>
+    }
+
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L47">        return inputStream -&gt; {</span>
+<span class="fc" id="L48">            JSONObject response = JsonReader.toJsonObject(inputStream);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (response.isEmpty()) {</span>
+<span class="nc" id="L50">                return Collections.emptyList();</span>
+            }
+<span class="fc" id="L52">            return Collections.singletonList(jsonItemToBibEntry(response));</span>
+        };
+    }
+
+    private BibEntry jsonItemToBibEntry(JSONObject item) throws ParseException {
+        try {
+
+<span class="fc" id="L59">            return new BibEntry(convertType(item.getString(&quot;type&quot;)))</span>
+<span class="fc" id="L60">                    .withField(StandardField.TITLE, item.getString(&quot;title&quot;))</span>
+<span class="fc" id="L61">                    .withField(StandardField.AUTHOR, toAuthors(item.optJSONArray(&quot;author&quot;)))</span>
+<span class="fc" id="L62">                    .withField(StandardField.YEAR,</span>
+<span class="fc" id="L63">                            Optional.ofNullable(item.optJSONObject(&quot;issued&quot;))</span>
+<span class="fc" id="L64">                                    .map(array -&gt; array.optJSONArray(&quot;date-parts&quot;))</span>
+<span class="fc" id="L65">                                    .map(array -&gt; array.optJSONArray(0))</span>
+<span class="fc" id="L66">                                    .map(array -&gt; array.optInt(0))</span>
+<span class="fc" id="L67">                                    .map(year -&gt; Integer.toString(year)).orElse(&quot;&quot;))</span>
+<span class="fc" id="L68">                    .withField(StandardField.DOI, item.getString(&quot;DOI&quot;))</span>
+<span class="fc" id="L69">                    .withField(StandardField.PAGES, item.optString(&quot;page&quot;))</span>
+<span class="fc" id="L70">                    .withField(StandardField.ISSN, item.optString(&quot;ISSN&quot;))</span>
+<span class="fc" id="L71">                    .withField(StandardField.JOURNAL, item.optString(&quot;container-title&quot;))</span>
+<span class="fc" id="L72">                    .withField(StandardField.PUBLISHER, item.optString(&quot;publisher&quot;))</span>
+<span class="fc" id="L73">                    .withField(StandardField.URL, item.optString(&quot;URL&quot;))</span>
+<span class="fc" id="L74">                    .withField(StandardField.VOLUME, item.optString(&quot;volume&quot;));</span>
+<span class="nc" id="L75">        } catch (JSONException exception) {</span>
+<span class="nc" id="L76">            throw new ParseException(&quot;mEdRA API JSON format has changed&quot;, exception);</span>
+        }
+    }
+
+    private EntryType convertType(String type) {
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        return &quot;article-journal&quot;.equals(type) ? StandardEntryType.Article : StandardEntryType.Misc;</span>
+    }
+
+    private String toAuthors(JSONArray authors) {
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (authors == null) {</span>
+<span class="nc" id="L86">            return &quot;&quot;;</span>
+        }
+        // input: list of {&quot;literal&quot;:&quot;A.&quot;}
+<span class="fc" id="L89">        return IntStream.range(0, authors.length())</span>
+<span class="fc" id="L90">                        .mapToObj(authors::getJSONObject)</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                        .map(author -&gt; author.has(&quot;literal&quot;) ? // quickly route through the literal string</span>
+<span class="fc" id="L92">                                new Author(author.getString(&quot;literal&quot;), &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;) :</span>
+<span class="fc" id="L93">                                new Author(author.optString(&quot;given&quot;, &quot;&quot;), &quot;&quot;, &quot;&quot;, author.optString(&quot;family&quot;, &quot;&quot;), &quot;&quot;))</span>
+<span class="fc" id="L94">                        .collect(AuthorList.collect())</span>
+<span class="fc" id="L95">                        .getAsFirstLastNamesWithAnd();</span>
+    }
+
+    @Override
+    public URLDownload getUrlDownload(URL url) {
+<span class="fc" id="L100">        URLDownload download = new URLDownload(url);</span>
+<span class="fc" id="L101">        download.addHeader(&quot;Accept&quot;, MediaTypes.CITATIONSTYLES_JSON);</span>
+<span class="fc" id="L102">        return download;</span>
+    }
+
+    @Override
+    public URL getUrlForIdentifier(String identifier) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L107">        return new URL(API_URL + &quot;/&quot; + identifier);</span>
+    }
+
+    @Override
+    public void doPostCleanup(BibEntry entry) {
+<span class="fc" id="L112">        new DoiCleanup().cleanup(entry);</span>
+<span class="fc" id="L113">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

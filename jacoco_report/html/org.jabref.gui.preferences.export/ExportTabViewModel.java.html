@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExportTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.export</a> &gt; <span class="el_source">ExportTabViewModel.java</span></div><h1>ExportTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.export;
+
+import java.util.ArrayList;
+import java.util.Set;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.collections.FXCollections;
+
+import org.jabref.gui.commonfxcontrols.SortCriterionViewModel;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.InternalField;
+import org.jabref.model.metadata.SaveOrder;
+import org.jabref.preferences.ExportPreferences;
+
+public class ExportTabViewModel implements PreferenceTabViewModel {
+
+    // SaveOrderConfigPanel
+<span class="nc" id="L23">    private final BooleanProperty exportInOriginalProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L24">    private final BooleanProperty exportInTableOrderProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L25">    private final BooleanProperty exportInSpecifiedOrderProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L26">    private final ListProperty&lt;Field&gt; sortableFieldsProperty = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L27">    private final ListProperty&lt;SortCriterionViewModel&gt; sortCriteriaProperty = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList(new ArrayList&lt;&gt;()));</span>
+
+    private final ExportPreferences exportPreferences;
+
+<span class="nc" id="L31">    public ExportTabViewModel(ExportPreferences exportPreferences) {</span>
+<span class="nc" id="L32">        this.exportPreferences = exportPreferences;</span>
+<span class="nc" id="L33">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L37">        SaveOrder exportSaveOrder = exportPreferences.getExportSaveOrder();</span>
+<span class="nc bnc" id="L38" title="All 4 branches missed.">        switch (exportSaveOrder.getOrderType()) {</span>
+<span class="nc" id="L39">            case SPECIFIED -&gt; exportInSpecifiedOrderProperty.setValue(true);</span>
+<span class="nc" id="L40">            case ORIGINAL -&gt; exportInOriginalProperty.setValue(true);</span>
+<span class="nc" id="L41">            case TABLE -&gt; exportInTableOrderProperty.setValue(true);</span>
+        }
+<span class="nc" id="L43">        sortCriteriaProperty.addAll(exportSaveOrder.getSortCriteria().stream()</span>
+<span class="nc" id="L44">                                                   .map(SortCriterionViewModel::new)</span>
+<span class="nc" id="L45">                                                   .toList());</span>
+
+<span class="nc" id="L47">        Set&lt;Field&gt; fields = FieldFactory.getAllFieldsWithOutInternal();</span>
+<span class="nc" id="L48">        fields.add(InternalField.INTERNAL_ALL_FIELD);</span>
+<span class="nc" id="L49">        fields.add(InternalField.INTERNAL_ALL_TEXT_FIELDS_FIELD);</span>
+<span class="nc" id="L50">        fields.add(InternalField.KEY_FIELD);</span>
+<span class="nc" id="L51">        fields.add(InternalField.TYPE_HEADER);</span>
+<span class="nc" id="L52">        sortableFieldsProperty.addAll(FieldFactory.getStandardFieldsWithCitationKey());</span>
+<span class="nc" id="L53">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L57">        SaveOrder newSaveOrder = new SaveOrder(</span>
+<span class="nc" id="L58">                SaveOrder.OrderType.fromBooleans(exportInSpecifiedOrderProperty.getValue(), exportInOriginalProperty.getValue()),</span>
+<span class="nc" id="L59">                sortCriteriaProperty.stream().map(SortCriterionViewModel::getCriterion).toList());</span>
+<span class="nc" id="L60">        exportPreferences.setExportSaveOrder(newSaveOrder);</span>
+<span class="nc" id="L61">    }</span>
+
+    public BooleanProperty saveInOriginalProperty() {
+<span class="nc" id="L64">        return exportInOriginalProperty;</span>
+    }
+
+    public BooleanProperty saveInTableOrderProperty() {
+<span class="nc" id="L68">        return exportInTableOrderProperty;</span>
+    }
+
+    public BooleanProperty saveInSpecifiedOrderProperty() {
+<span class="nc" id="L72">        return exportInSpecifiedOrderProperty;</span>
+    }
+
+    public ListProperty&lt;Field&gt; sortableFieldsProperty() {
+<span class="nc" id="L76">        return sortableFieldsProperty;</span>
+    }
+
+    public ListProperty&lt;SortCriterionViewModel&gt; sortCriteriaProperty() {
+<span class="nc" id="L80">        return sortCriteriaProperty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

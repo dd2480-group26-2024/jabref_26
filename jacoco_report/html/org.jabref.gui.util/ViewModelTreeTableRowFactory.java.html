@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ViewModelTreeTableRowFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">ViewModelTreeTableRowFactory.java</span></div><h1>ViewModelTreeTableRowFactory.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+import javafx.beans.value.ObservableValue;
+import javafx.css.PseudoClass;
+import javafx.event.Event;
+import javafx.event.EventType;
+import javafx.geometry.Bounds;
+import javafx.geometry.Point2D;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.TreeTableRow;
+import javafx.scene.control.TreeTableView;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseDragEvent;
+import javafx.scene.input.MouseEvent;
+import javafx.util.Callback;
+
+import com.tobiasdiez.easybind.Subscription;
+import org.reactfx.util.TriConsumer;
+
+<span class="nc" id="L30">public class ViewModelTreeTableRowFactory&lt;S&gt; implements Callback&lt;TreeTableView&lt;S&gt;, TreeTableRow&lt;S&gt;&gt; {</span>
+    private BiConsumer&lt;S, ? super MouseEvent&gt; onMouseClickedEvent;
+    private BiConsumer&lt;S, ? super MouseEvent&gt; onMousePressedEvent;
+    private Consumer&lt;TreeTableRow&lt;S&gt;&gt; toCustomInitializer;
+    private Function&lt;S, ContextMenu&gt; contextMenuFactory;
+    private TriConsumer&lt;TreeTableRow&lt;S&gt;, S, ? super MouseEvent&gt; toOnDragDetected;
+    private TriConsumer&lt;TreeTableRow&lt;S&gt;, S, ? super DragEvent&gt; toOnDragDropped;
+    private BiConsumer&lt;S, ? super DragEvent&gt; toOnDragEntered;
+    private TriConsumer&lt;TreeTableRow&lt;S&gt;, S, ? super DragEvent&gt; toOnDragExited;
+    private TriConsumer&lt;TreeTableRow&lt;S&gt;, S, ? super DragEvent&gt; toOnDragOver;
+    private TriConsumer&lt;TreeTableRow&lt;S&gt;, S, ? super MouseDragEvent&gt; toOnMouseDragEntered;
+<span class="nc" id="L41">    private final Map&lt;EventType&lt;? extends Event&gt;, BiConsumer&lt;S, ? super Event&gt;&gt; eventFilters = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L42">    private final Map&lt;PseudoClass, Callback&lt;TreeTableRow&lt;S&gt;, ObservableValue&lt;Boolean&gt;&gt;&gt; pseudoClasses = new HashMap&lt;&gt;();</span>
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; withOnMouseClickedEvent(BiConsumer&lt;S, ? super MouseEvent&gt; event) {
+<span class="nc" id="L45">        this.onMouseClickedEvent = event;</span>
+<span class="nc" id="L46">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; withOnMousePressedEvent(BiConsumer&lt;S, ? super MouseEvent&gt; event) {
+<span class="nc" id="L50">        this.onMousePressedEvent = event;</span>
+<span class="nc" id="L51">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; withCustomInitializer(Consumer&lt;TreeTableRow&lt;S&gt;&gt; customInitializer) {
+<span class="nc" id="L55">        this.toCustomInitializer = customInitializer;</span>
+<span class="nc" id="L56">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; withContextMenu(Function&lt;S, ContextMenu&gt; contextMenuFactory) {
+<span class="nc" id="L60">        this.contextMenuFactory = contextMenuFactory;</span>
+<span class="nc" id="L61">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnDragDetected(TriConsumer&lt;TreeTableRow&lt;S&gt;, S, ? super MouseEvent&gt; toOnDragDetected) {
+<span class="nc" id="L65">        this.toOnDragDetected = toOnDragDetected;</span>
+<span class="nc" id="L66">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnDragDetected(BiConsumer&lt;S, ? super MouseEvent&gt; toOnDragDetected) {
+<span class="nc" id="L70">        this.toOnDragDetected = (row, viewModel, event) -&gt; toOnDragDetected.accept(viewModel, event);</span>
+<span class="nc" id="L71">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnDragDropped(TriConsumer&lt;TreeTableRow&lt;S&gt;, S, ? super DragEvent&gt; toOnDragDropped) {
+<span class="nc" id="L75">        this.toOnDragDropped = toOnDragDropped;</span>
+<span class="nc" id="L76">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnDragDropped(BiConsumer&lt;S, ? super DragEvent&gt; toOnDragDropped) {
+<span class="nc" id="L80">        return setOnDragDropped((row, viewModel, event) -&gt; toOnDragDropped.accept(viewModel, event));</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnDragEntered(BiConsumer&lt;S, ? super DragEvent&gt; toOnDragEntered) {
+<span class="nc" id="L84">        this.toOnDragEntered = toOnDragEntered;</span>
+<span class="nc" id="L85">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnMouseDragEntered(TriConsumer&lt;TreeTableRow&lt;S&gt;, S, ? super MouseDragEvent&gt; toOnDragEntered) {
+<span class="nc" id="L89">        this.toOnMouseDragEntered = toOnDragEntered;</span>
+<span class="nc" id="L90">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnMouseDragEntered(BiConsumer&lt;S, ? super MouseDragEvent&gt; toOnDragEntered) {
+<span class="nc" id="L94">        return setOnMouseDragEntered((row, viewModel, event) -&gt; toOnDragEntered.accept(viewModel, event));</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnDragExited(TriConsumer&lt;TreeTableRow&lt;S&gt;, S, ? super DragEvent&gt; toOnDragExited) {
+<span class="nc" id="L98">        this.toOnDragExited = toOnDragExited;</span>
+<span class="nc" id="L99">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnDragExited(BiConsumer&lt;S, ? super DragEvent&gt; toOnDragExited) {
+<span class="nc" id="L103">        return setOnDragExited((row, viewModel, event) -&gt; toOnDragExited.accept(viewModel, event));</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnDragOver(TriConsumer&lt;TreeTableRow&lt;S&gt;, S, ? super DragEvent&gt; toOnDragOver) {
+<span class="nc" id="L107">        this.toOnDragOver = toOnDragOver;</span>
+<span class="nc" id="L108">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; setOnDragOver(BiConsumer&lt;S, ? super DragEvent&gt; toOnDragOver) {
+<span class="nc" id="L112">        return setOnDragOver((row, viewModel, event) -&gt; toOnDragOver.accept(viewModel, event));</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; withPseudoClass(PseudoClass pseudoClass, Callback&lt;TreeTableRow&lt;S&gt;, ObservableValue&lt;Boolean&gt;&gt; toCondition) {
+<span class="nc" id="L116">        this.pseudoClasses.putIfAbsent(pseudoClass, toCondition);</span>
+<span class="nc" id="L117">        return this;</span>
+    }
+
+    public ViewModelTreeTableRowFactory&lt;S&gt; withEventFilter(EventType&lt;? extends Event&gt; event, BiConsumer&lt;S, ? super Event&gt; toCondition) {
+<span class="nc" id="L121">        this.eventFilters.putIfAbsent(event, toCondition);</span>
+<span class="nc" id="L122">        return this;</span>
+    }
+
+    public void install(TreeTableView&lt;S&gt; table) {
+<span class="nc" id="L126">        table.setRowFactory(this);</span>
+<span class="nc" id="L127">    }</span>
+
+    @Override
+    public TreeTableRow&lt;S&gt; call(TreeTableView&lt;S&gt; treeTableView) {
+<span class="nc" id="L131">        return new TreeTableRow&lt;&gt;() {</span>
+<span class="nc" id="L132">            final List&lt;Subscription&gt; subscriptions = new ArrayList&lt;&gt;();</span>
+
+            @Override
+            protected void updateItem(S row, boolean empty) {
+<span class="nc" id="L136">                super.updateItem(row, empty);</span>
+
+                // Remove previous subscriptions
+<span class="nc" id="L139">                subscriptions.forEach(Subscription::unsubscribe);</span>
+<span class="nc" id="L140">                subscriptions.clear();</span>
+
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                if (contextMenuFactory != null) {</span>
+                    // We only create the context menu when really necessary
+<span class="nc" id="L144">                    setOnContextMenuRequested(event -&gt; {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                        if (!isEmpty()) {</span>
+<span class="nc" id="L146">                            setContextMenu(contextMenuFactory.apply(row));</span>
+<span class="nc" id="L147">                            getContextMenu().show(this, event.getScreenX(), event.getScreenY());</span>
+                        }
+<span class="nc" id="L149">                        event.consume();</span>
+<span class="nc" id="L150">                    });</span>
+
+                    // Activate context menu if user presses the &quot;context menu&quot; key
+<span class="nc" id="L153">                    treeTableView.addEventHandler(KeyEvent.KEY_RELEASED, event -&gt; {</span>
+<span class="nc bnc" id="L154" title="All 4 branches missed.">                        boolean rowFocused = isEmpty() &amp;&amp; treeTableView.getFocusModel().getFocusedIndex() == getIndex();</span>
+<span class="nc bnc" id="L155" title="All 4 branches missed.">                        if (event.getCode() == KeyCode.CONTEXT_MENU &amp;&amp; rowFocused) {</span>
+                            // Get center of focused cell
+<span class="nc" id="L157">                            Bounds anchorBounds = getBoundsInParent();</span>
+<span class="nc" id="L158">                            double x = anchorBounds.getMinX() + anchorBounds.getWidth() / 2;</span>
+<span class="nc" id="L159">                            double y = anchorBounds.getMinY() + anchorBounds.getHeight() / 2;</span>
+<span class="nc" id="L160">                            Point2D screenPosition = getParent().localToScreen(x, y);</span>
+
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                            if (getContextMenu() == null) {</span>
+<span class="nc" id="L163">                                setContextMenu(contextMenuFactory.apply(getItem()));</span>
+                            }
+<span class="nc" id="L165">                            getContextMenu().show(this, screenPosition.getX(), screenPosition.getY());</span>
+                        }
+<span class="nc" id="L167">                    });</span>
+                }
+
+<span class="nc bnc" id="L170" title="All 4 branches missed.">                if (!empty &amp;&amp; (row != null)) {</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                    if (onMouseClickedEvent != null) {</span>
+<span class="nc" id="L172">                        setOnMouseClicked(event -&gt; onMouseClickedEvent.accept(getItem(), event));</span>
+                    }
+
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                    if (onMousePressedEvent != null) {</span>
+<span class="nc" id="L176">                        setOnMousePressed(event -&gt; onMousePressedEvent.accept(getItem(), event));</span>
+                    }
+
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                    if (toCustomInitializer != null) {</span>
+<span class="nc" id="L180">                        toCustomInitializer.accept(this);</span>
+                    }
+
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                    if (toOnDragDetected != null) {</span>
+<span class="nc" id="L184">                        setOnDragDetected(event -&gt; toOnDragDetected.accept(this, getItem(), event));</span>
+                    }
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                    if (toOnDragDropped != null) {</span>
+<span class="nc" id="L187">                        setOnDragDropped(event -&gt; toOnDragDropped.accept(this, getItem(), event));</span>
+                    }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">                    if (toOnDragEntered != null) {</span>
+<span class="nc" id="L190">                        setOnDragEntered(event -&gt; toOnDragEntered.accept(getItem(), event));</span>
+                    }
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                    if (toOnDragExited != null) {</span>
+<span class="nc" id="L193">                        setOnDragExited(event -&gt; toOnDragExited.accept(this, getItem(), event));</span>
+                    }
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                    if (toOnDragOver != null) {</span>
+<span class="nc" id="L196">                        setOnDragOver(event -&gt; toOnDragOver.accept(this, getItem(), event));</span>
+                    }
+
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                    if (toOnMouseDragEntered != null) {</span>
+<span class="nc" id="L200">                        setOnMouseDragEntered(event -&gt; toOnMouseDragEntered.accept(this, getItem(), event));</span>
+                    }
+
+<span class="nc bnc" id="L203" title="All 2 branches missed.">                    for (Map.Entry&lt;EventType&lt;?&gt;, BiConsumer&lt;S, ? super Event&gt;&gt; eventFilter : eventFilters.entrySet()) {</span>
+<span class="nc" id="L204">                        addEventFilter(eventFilter.getKey(), event -&gt; eventFilter.getValue().accept(getItem(), event));</span>
+<span class="nc" id="L205">                    }</span>
+
+<span class="nc bnc" id="L207" title="All 2 branches missed.">                    for (Map.Entry&lt;PseudoClass, Callback&lt;TreeTableRow&lt;S&gt;, ObservableValue&lt;Boolean&gt;&gt;&gt; pseudoClassWithCondition : pseudoClasses.entrySet()) {</span>
+<span class="nc" id="L208">                        ObservableValue&lt;Boolean&gt; condition = pseudoClassWithCondition.getValue().call(this);</span>
+<span class="nc" id="L209">                        subscriptions.add(BindingsHelper.includePseudoClassWhen(</span>
+                                this,
+<span class="nc" id="L211">                                pseudoClassWithCondition.getKey(),</span>
+                                condition));
+<span class="nc" id="L213">                    }</span>
+                }
+<span class="nc" id="L215">            }</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

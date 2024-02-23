@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChangeEntryTypeMenu.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.menus</a> &gt; <span class="el_source">ChangeEntryTypeMenu.java</span></div><h1>ChangeEntryTypeMenu.java</h1><pre class="source lang-java linenums">package org.jabref.gui.menus;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryType;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.types.BibtexEntryTypeDefinitions;
+import org.jabref.model.entry.types.IEEETranEntryTypeDefinitions;
+
+public class ChangeEntryTypeMenu {
+
+    private final List&lt;BibEntry&gt; entries;
+    private final BibDatabaseContext bibDatabaseContext;
+    private final UndoManager undoManager;
+    private final ActionFactory factory;
+    private final BibEntryTypesManager entryTypesManager;
+
+    public ChangeEntryTypeMenu(List&lt;BibEntry&gt; entries,
+                               BibDatabaseContext bibDatabaseContext,
+                               UndoManager undoManager,
+                               KeyBindingRepository keyBindingRepository,
+<span class="nc" id="L39">                               BibEntryTypesManager entryTypesManager) {</span>
+<span class="nc" id="L40">        this.entries = entries;</span>
+<span class="nc" id="L41">        this.bibDatabaseContext = bibDatabaseContext;</span>
+<span class="nc" id="L42">        this.undoManager = undoManager;</span>
+<span class="nc" id="L43">        this.entryTypesManager = entryTypesManager;</span>
+<span class="nc" id="L44">        this.factory = new ActionFactory(keyBindingRepository);</span>
+<span class="nc" id="L45">    }</span>
+
+    public ContextMenu asContextMenu() {
+<span class="nc" id="L48">        ContextMenu menu = new ContextMenu();</span>
+<span class="nc" id="L49">        menu.getItems().setAll(getMenuItems(entries, bibDatabaseContext, undoManager));</span>
+<span class="nc" id="L50">        return menu;</span>
+    }
+
+    public Menu asSubMenu() {
+<span class="nc" id="L54">        Menu menu = new Menu(Localization.lang(&quot;Change entry type&quot;));</span>
+<span class="nc" id="L55">        menu.getItems().setAll(getMenuItems(entries, bibDatabaseContext, undoManager));</span>
+<span class="nc" id="L56">        return menu;</span>
+    }
+
+    private ObservableList&lt;MenuItem&gt; getMenuItems(List&lt;BibEntry&gt; entries, BibDatabaseContext bibDatabaseContext, UndoManager undoManager) {
+<span class="nc" id="L60">        ObservableList&lt;MenuItem&gt; items = FXCollections.observableArrayList();</span>
+
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (bibDatabaseContext.isBiblatexMode()) {</span>
+            // Default BibLaTeX
+<span class="nc" id="L64">            items.addAll(fromEntryTypes(entryTypesManager.getAllTypes(BibDatabaseMode.BIBLATEX), entries, undoManager));</span>
+
+            // Custom types
+<span class="nc" id="L67">            createSubMenu(Localization.lang(&quot;Custom&quot;), entryTypesManager.getAllCustomTypes(BibDatabaseMode.BIBLATEX), entries, undoManager)</span>
+<span class="nc" id="L68">                    .ifPresent(subMenu -&gt;</span>
+<span class="nc" id="L69">                            items.addAll(new SeparatorMenuItem(),</span>
+                            subMenu
+                    ));
+        } else {
+            // Default BibTeX
+<span class="nc" id="L74">            createSubMenu(BibDatabaseMode.BIBTEX.getFormattedName(), BibtexEntryTypeDefinitions.ALL, entries, undoManager)</span>
+<span class="nc" id="L75">                    .ifPresent(items::add);</span>
+
+            // IEEETran
+<span class="nc" id="L78">            createSubMenu(&quot;IEEETran&quot;, IEEETranEntryTypeDefinitions.ALL, entries, undoManager)</span>
+<span class="nc" id="L79">                    .ifPresent(subMenu -&gt; items.addAll(</span>
+                            new SeparatorMenuItem(),
+                            subMenu
+                    ));
+
+            // Custom types
+<span class="nc" id="L85">            createSubMenu(Localization.lang(&quot;Custom&quot;), entryTypesManager.getAllCustomTypes(BibDatabaseMode.BIBTEX), entries, undoManager)</span>
+<span class="nc" id="L86">                    .ifPresent(subMenu -&gt; items.addAll(</span>
+                            new SeparatorMenuItem(),
+                            subMenu
+                    ));
+        }
+
+<span class="nc" id="L92">        return items;</span>
+    }
+
+    private Optional&lt;Menu&gt; createSubMenu(String text, List&lt;BibEntryType&gt; entryTypes, List&lt;BibEntry&gt; entries, UndoManager undoManager) {
+<span class="nc" id="L96">        Menu subMenu = null;</span>
+
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (!entryTypes.isEmpty()) {</span>
+<span class="nc" id="L99">            subMenu = factory.createMenu(() -&gt; text);</span>
+<span class="nc" id="L100">            subMenu.getItems().addAll(fromEntryTypes(entryTypes, entries, undoManager));</span>
+        }
+
+<span class="nc" id="L103">        return Optional.ofNullable(subMenu);</span>
+    }
+
+    private List&lt;MenuItem&gt; fromEntryTypes(Collection&lt;BibEntryType&gt; types, List&lt;BibEntry&gt; entries, UndoManager undoManager) {
+<span class="nc" id="L107">        return types.stream()</span>
+<span class="nc" id="L108">                    .map(BibEntryType::getType)</span>
+<span class="nc" id="L109">                    .map(type -&gt; factory.createMenuItem(type::getDisplayName, new ChangeEntryTypeAction(type, entries, undoManager)))</span>
+<span class="nc" id="L110">                    .toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

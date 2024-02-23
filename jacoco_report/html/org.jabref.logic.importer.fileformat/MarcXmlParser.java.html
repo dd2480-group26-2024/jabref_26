@@ -1,0 +1,502 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MarcXmlParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fileformat</a> &gt; <span class="el_source">MarcXmlParser.java</span></div><h1>MarcXmlParser.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fileformat;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.time.DateTimeException;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.jabref.logic.importer.AuthorListParser;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.Date;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+
+/**
+ * A parser for the bavarian flavour (Bibliotheksverbund Bayern) of the marc xml standard
+ * &lt;p&gt;
+ * See &lt;a href=&quot;https://www.dnb.de/DE/Professionell/Metadatendienste/Exportformate/MARC21/marc21_node.html&quot;&gt;Feldbeschreibung
+ * der Titeldaten bei der Deutschen Nationalbibliothek&lt;/a&gt;
+ * &lt;p&gt;
+ *
+ * &lt;p&gt;
+ * For further information see
+ * &lt;ul&gt;
+ * &lt;li&gt;https://www.bib-bvb.de/web/kkb-online/rda-felderverzeichnis-des-b3kat-aseq&lt;/li&gt;
+ * &lt;li&gt;https://www.loc.gov/marc/bibliographic/ for detailed documentation&lt;/li&gt;
+ * &lt;li&gt;for modifications in B3Kat https://www.bib-bvb.de/documents/10792/9f51a033-5ca1-42e2-b2d3-a75e7f1512d4&lt;/li&gt;
+ * &lt;li&gt;https://www.dnb.de/DE/Professionell/Metadatendienste/Exportformate/MARC21/marc21_node.html&lt;/li&gt;
+ * &lt;li&gt;https://www.dnb.de/SharedDocs/Downloads/DE/Professionell/Standardisierung/AGV/marc21VereinbarungDatentauschTeil1.pdf?__blob=publicationFile&amp;v=2&lt;/li&gt;
+ * &lt;li&gt;about multiple books in a series https://www.dnb.de/SharedDocs/Downloads/DE/Professionell/Standardisierung/marc21FormatumstiegAbbildungBegrenzterWerke2008.pdf?__blob=publicationFile&amp;v=2&gt;&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+<span class="fc" id="L55">public class MarcXmlParser implements Parser {</span>
+<span class="fc" id="L56">    private static final Logger LOGGER = LoggerFactory.getLogger(MarcXmlParser.class);</span>
+
+    @Override
+    public List&lt;BibEntry&gt; parseEntries(InputStream inputStream) throws ParseException {
+        try {
+<span class="fc" id="L61">            DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();</span>
+<span class="fc" id="L62">            Document content = documentBuilder.parse(inputStream);</span>
+<span class="fc" id="L63">            return this.parseEntries(content);</span>
+<span class="nc" id="L64">        } catch (ParserConfigurationException | SAXException | IOException exception) {</span>
+<span class="nc" id="L65">            throw new ParseException(exception);</span>
+        }
+    }
+
+    private List&lt;BibEntry&gt; parseEntries(Document content) {
+<span class="fc" id="L70">        List&lt;BibEntry&gt; result = new LinkedList&lt;&gt;();</span>
+
+<span class="fc" id="L72">        Element root = (Element) content.getElementsByTagName(&quot;zs:searchRetrieveResponse&quot;).item(0);</span>
+<span class="fc" id="L73">        Element srwrecords = getChild(&quot;zs:records&quot;, root);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (srwrecords == null) {</span>
+            // no records found, so return the empty list
+<span class="nc" id="L76">            return result;</span>
+        }
+<span class="fc" id="L78">        List&lt;Element&gt; records = getChildren(&quot;zs:record&quot;, srwrecords);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (Element element : records) {</span>
+<span class="fc" id="L80">            Element e = getChild(&quot;zs:recordData&quot;, element);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            if (e != null) {</span>
+<span class="fc" id="L82">                e = getChild(&quot;record&quot;, e);</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                if (e != null) {</span>
+<span class="fc" id="L84">                    result.add(parseEntry(e));</span>
+                }
+            }
+<span class="fc" id="L87">        }</span>
+<span class="fc" id="L88">        return result;</span>
+    }
+
+    private BibEntry parseEntry(Element element) {
+<span class="fc" id="L92">        BibEntry bibEntry = new BibEntry(BibEntry.DEFAULT_TYPE);</span>
+
+<span class="fc" id="L94">        List&lt;Element&gt; datafields = getChildren(&quot;datafield&quot;, element);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (Element datafield : datafields) {</span>
+<span class="fc" id="L96">            String tag = datafield.getAttribute(&quot;tag&quot;);</span>
+<span class="fc" id="L97">            LOGGER.debug(&quot;tag: &quot; + tag);</span>
+
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (&quot;020&quot;.equals(tag)) {</span>
+<span class="fc" id="L100">                putIsbn(bibEntry, datafield);</span>
+<span class="fc bfc" id="L101" title="All 6 branches covered.">            } else if (&quot;100&quot;.equals(tag) || &quot;700&quot;.equals(tag) || &quot;710&quot;.equals(tag)) {</span>
+<span class="fc" id="L102">                putPersonalName(bibEntry, datafield); // Author, Editor, Publisher</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            } else if (&quot;111&quot;.equals(tag)) {</span>
+                // FixMe: Conference Information also in Subtitle (245) &amp; Author (710)
+<span class="fc" id="L105">                putConferenceDetail(bibEntry, datafield);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            } else if (&quot;245&quot;.equals(tag)) {</span>
+<span class="fc" id="L107">                putTitle(bibEntry, datafield);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            } else if (&quot;250&quot;.equals(tag)) {</span>
+<span class="fc" id="L109">                putEdition(bibEntry, datafield);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            } else if (&quot;264&quot;.equals(tag)) {</span>
+<span class="fc" id="L111">                putPublication(bibEntry, datafield);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            } else if (&quot;300&quot;.equals(tag)) {</span>
+<span class="fc" id="L113">                putPhysicalDescription(bibEntry, datafield);</span>
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">            } else if (&quot;490&quot;.equals(tag) || &quot;830&quot;.equals(tag)) {</span>
+<span class="fc" id="L115">                putSeries(bibEntry, datafield);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            } else if (&quot;502&quot;.equals(tag)) {</span>
+<span class="nc" id="L117">                putThesisDescription(bibEntry, datafield); // Master's thesis, PhD thesis, Thesis</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            } else if (&quot;520&quot;.equals(tag)) {</span>
+<span class="fc" id="L119">                putSummary(bibEntry, datafield);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            } else if (&quot;653&quot;.equals(tag)) {</span>
+<span class="fc" id="L121">                putKeywords(bibEntry, datafield);</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            } else if (&quot;773&quot;.equals(tag)) {</span>
+<span class="nc" id="L123">                putIssue(bibEntry, datafield);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            } else if (&quot;856&quot;.equals(tag)) {</span>
+<span class="fc" id="L125">                putElectronicLocation(bibEntry, datafield);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            } else if (&quot;966&quot;.equals(tag)) {</span>
+<span class="fc" id="L127">                putDoi(bibEntry, datafield);</span>
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">            } else if (Integer.parseInt(tag) &gt;= 546 &amp;&amp; Integer.parseInt(tag) &lt;= 599) {</span>
+                // Notes
+                // FixMe: Some notes seem to have tags lower than 546
+<span class="nc" id="L131">                putNotes(bibEntry, datafield);</span>
+            } else {
+<span class="fc" id="L133">                LOGGER.debug(&quot;Unparsed tag: {}&quot;, tag);</span>
+            }
+<span class="fc" id="L135">        }</span>
+<span class="fc" id="L136">        return bibEntry;</span>
+    }
+
+    private void putIsbn(BibEntry bibEntry, Element datafield) {
+<span class="fc" id="L140">        String isbn = getSubfield(&quot;a&quot;, datafield);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (StringUtil.isNullOrEmpty(isbn)) {</span>
+<span class="nc" id="L142">            LOGGER.debug(&quot;Empty ISBN recieved&quot;);</span>
+<span class="nc" id="L143">            return;</span>
+        }
+
+<span class="fc" id="L146">        int length = isbn.length();</span>
+<span class="fc bfc" id="L147" title="All 4 branches covered.">        if (length != 10 &amp;&amp; length != 13) {</span>
+<span class="fc" id="L148">            LOGGER.debug(&quot;Malformed ISBN recieved, length: &quot; + length);</span>
+<span class="fc" id="L149">            return;</span>
+        }
+
+<span class="fc" id="L152">        Optional&lt;String&gt; field = bibEntry.getField(StandardField.ISBN);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (field.isPresent()) {</span>
+            // Only overwrite the field, if it's ISBN13
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (field.get().length() == 13) {</span>
+<span class="fc" id="L156">                bibEntry.setField(StandardField.ISBN, isbn);</span>
+            }
+        } else {
+<span class="fc" id="L159">            bibEntry.setField(StandardField.ISBN, isbn);</span>
+        }
+<span class="fc" id="L161">    }</span>
+
+    private void putPersonalName(BibEntry bibEntry, Element datafield) {
+<span class="fc" id="L164">        String author = getSubfield(&quot;a&quot;, datafield);</span>
+<span class="fc" id="L165">        String relation = getSubfield(&quot;4&quot;, datafield);</span>
+        AuthorList name;
+
+<span class="pc bpc" id="L168" title="2 of 4 branches missed.">        if (StringUtil.isNotBlank(author) &amp;&amp; StringUtil.isNotBlank(relation)) {</span>
+<span class="fc" id="L169">            name = new AuthorListParser().parse(author);</span>
+<span class="fc" id="L170">            Optional&lt;StandardField&gt; field = Optional.ofNullable(</span>
+<span class="fc bfc" id="L171" title="All 4 branches covered.">                    switch (relation) {</span>
+                        case &quot;aut&quot; -&gt;
+<span class="fc" id="L173">                                StandardField.AUTHOR;</span>
+                        case &quot;edt&quot; -&gt;
+<span class="fc" id="L175">                                StandardField.EDITOR;</span>
+                        case &quot;pbl&quot; -&gt;
+<span class="fc" id="L177">                                StandardField.PUBLISHER;</span>
+                        default -&gt;
+<span class="fc" id="L179">                                null;</span>
+                    });
+
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (field.isPresent()) {</span>
+<span class="fc" id="L183">                String ind1 = datafield.getAttribute(&quot;ind1&quot;);</span>
+                String brackedName;
+<span class="pc bpc" id="L185" title="2 of 6 branches missed.">                if (field.get() == StandardField.PUBLISHER &amp;&amp; StringUtil.isNotBlank(ind1) &amp;&amp; &quot;2&quot;.equals(ind1)) {</span>
+                    // ind == 2 -&gt; Corporate publisher
+<span class="fc" id="L187">                    brackedName = &quot;{&quot; + name.getAsFirstLastNamesWithAnd() + &quot;}&quot;;</span>
+                } else {
+<span class="fc" id="L189">                    brackedName = name.getAsLastFirstNamesWithAnd(false);</span>
+                }
+
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                if (bibEntry.getField(field.get()).isPresent()) {</span>
+<span class="fc" id="L193">                    bibEntry.setField(field.get(), bibEntry.getField(field.get()).get().concat(&quot; and &quot; + brackedName));</span>
+                } else {
+<span class="fc" id="L195">                    bibEntry.setField(field.get(), brackedName);</span>
+                }
+            }
+        }
+<span class="fc" id="L199">    }</span>
+
+    private void putConferenceDetail(BibEntry bibEntry, Element datafield) {
+<span class="fc" id="L202">        String conference = getSubfield(&quot;a&quot;, datafield);</span>
+<span class="fc" id="L203">        bibEntry.setType(StandardEntryType.Proceedings);</span>
+
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (StringUtil.isNotBlank(conference)) {</span>
+<span class="fc" id="L206">            bibEntry.setField(StandardField.EVENTTITLE, conference);</span>
+        }
+<span class="fc" id="L208">    }</span>
+
+    private void putTitle(BibEntry bibEntry, Element datafield) {
+<span class="fc" id="L211">        String title = getSubfield(&quot;a&quot;, datafield);</span>
+<span class="fc" id="L212">        String subtitle = getSubfield(&quot;b&quot;, datafield);</span>
+<span class="fc" id="L213">        String responsibility = getSubfield(&quot;c&quot;, datafield);</span>
+<span class="fc" id="L214">        String number = getSubfield(&quot;n&quot;, datafield);</span>
+<span class="fc" id="L215">        String part = getSubfield(&quot;p&quot;, datafield);</span>
+
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (StringUtil.isNotBlank(title)) {</span>
+<span class="fc" id="L218">            bibEntry.setField(StandardField.TITLE, title);</span>
+        }
+
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (StringUtil.isNotBlank(subtitle)) {</span>
+<span class="fc" id="L222">            bibEntry.setField(StandardField.SUBTITLE, subtitle);</span>
+        }
+
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (StringUtil.isNotBlank(responsibility)) {</span>
+<span class="fc" id="L226">            bibEntry.setField(StandardField.TITLEADDON, responsibility);</span>
+        }
+
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (StringUtil.isNotBlank(number)) {</span>
+<span class="nc" id="L230">            bibEntry.setField(StandardField.NUMBER, number);</span>
+        }
+
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (StringUtil.isNotBlank(part)) {</span>
+<span class="nc" id="L234">            bibEntry.setField(StandardField.PART, part);</span>
+        }
+<span class="fc" id="L236">    }</span>
+
+    private void putEdition(BibEntry bibEntry, Element datafield) {
+<span class="fc" id="L239">        String edition = getSubfield(&quot;a&quot;, datafield); // e.g. '1st ed. 2020'</span>
+<span class="fc" id="L240">        String editionAddendum = getSubfield(&quot;b&quot;, datafield); // e.g. 'revised by N.N.'</span>
+
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (StringUtil.isNullOrEmpty(edition)) {</span>
+<span class="nc" id="L243">            return;</span>
+        }
+
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">        if (StringUtil.isNotBlank(editionAddendum)) {</span>
+<span class="nc" id="L247">            edition = edition.concat(&quot;, &quot; + editionAddendum);</span>
+        }
+
+<span class="fc" id="L250">        bibEntry.setField(StandardField.EDITION, edition);</span>
+<span class="fc" id="L251">    }</span>
+
+    private void putPublication(BibEntry bibEntry, Element datafield) {
+<span class="fc" id="L254">        String ind2 = datafield.getAttribute(&quot;ind2&quot;);</span>
+<span class="pc bpc" id="L255" title="1 of 4 branches missed.">        if (StringUtil.isNotBlank(ind2) &amp;&amp; &quot;1&quot;.equals(ind2)) { // Publisher</span>
+<span class="fc" id="L256">            String place = getSubfield(&quot;a&quot;, datafield);</span>
+<span class="fc" id="L257">            String name = getSubfield(&quot;b&quot;, datafield);</span>
+<span class="fc" id="L258">            String date = getSubfield(&quot;c&quot;, datafield);</span>
+
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (StringUtil.isNotBlank(place)) {</span>
+<span class="fc" id="L261">                bibEntry.setField(StandardField.ADDRESS, place);</span>
+            }
+
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            if (StringUtil.isNotBlank(name)) {</span>
+<span class="fc" id="L265">                bibEntry.setField(StandardField.PUBLISHER, &quot;{&quot; + name + &quot;}&quot;);</span>
+            }
+
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            if (StringUtil.isNotBlank(date)) {</span>
+<span class="fc" id="L269">                String strippedDate = StringUtil.stripBrackets(date);</span>
+                try {
+<span class="fc" id="L271">                    Date.parse(strippedDate).ifPresent(bibEntry::setDate);</span>
+<span class="nc" id="L272">                } catch (DateTimeException exception) {</span>
+                    // cannot read date value, just copy it in plain text
+<span class="nc" id="L274">                    LOGGER.info(&quot;Cannot parse date '{}'&quot;, strippedDate);</span>
+<span class="nc" id="L275">                    bibEntry.setField(StandardField.DATE, StringUtil.stripBrackets(strippedDate));</span>
+<span class="fc" id="L276">                }</span>
+            }
+        }
+<span class="fc" id="L279">    }</span>
+
+    private void putPhysicalDescription(BibEntry bibEntry, Element datafield) {
+<span class="fc" id="L282">        String pagetotal = getSubfield(&quot;a&quot;, datafield);</span>
+
+<span class="pc bpc" id="L284" title="6 of 10 branches missed.">        if (StringUtil.isNotBlank(pagetotal) &amp;&amp; (pagetotal.contains(&quot;pages&quot;) || pagetotal.contains(&quot;p.&quot;) || pagetotal.contains(&quot;S&quot;) || pagetotal.contains(&quot;Seiten&quot;))) {</span>
+<span class="fc" id="L285">            pagetotal = pagetotal.replaceAll(&quot;.*?(\\d+)(?:\\s*Seiten|\\s*S|\\s*pages|\\s*p).*&quot;, &quot;$1&quot;);</span>
+<span class="fc" id="L286">            bibEntry.setField(StandardField.PAGETOTAL, pagetotal);</span>
+        }
+<span class="fc" id="L288">    }</span>
+
+    private void putSeries(BibEntry bibEntry, Element datafield) {
+        // tag 490 - Series
+        // tag 830 - Series Added Entry
+
+<span class="fc" id="L294">        String name = getSubfield(&quot;a&quot;, datafield);</span>
+<span class="fc" id="L295">        String volume = getSubfield(&quot;v&quot;, datafield);</span>
+<span class="fc" id="L296">        String issn = getSubfield(&quot;x&quot;, datafield);</span>
+
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (StringUtil.isNotBlank(name)) {</span>
+<span class="fc" id="L299">            bibEntry.setField(StandardField.SERIES, name);</span>
+        }
+
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (StringUtil.isNotBlank(volume)) {</span>
+<span class="nc" id="L303">            bibEntry.setField(StandardField.VOLUME, volume);</span>
+        }
+
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">        if (StringUtil.isNotBlank(issn)) {</span>
+<span class="nc" id="L307">            bibEntry.setField(StandardField.ISSN, issn);</span>
+        }
+<span class="fc" id="L309">    }</span>
+
+    private void putThesisDescription(BibEntry bibEntry, Element datafield) {
+<span class="nc" id="L312">        String thesisDegree = getSubfield(&quot;b&quot;, datafield);</span>
+<span class="nc" id="L313">        String school = getSubfield(&quot;c&quot;, datafield);</span>
+<span class="nc" id="L314">        bibEntry.setType(StandardEntryType.MastersThesis);</span>
+
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (StringUtil.isNotBlank(school)) {</span>
+<span class="nc" id="L317">            bibEntry.setField(StandardField.SCHOOL, school);</span>
+        }
+
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        if (&quot;Dissertation&quot;.equals(thesisDegree)) {</span>
+<span class="nc" id="L321">            bibEntry.setType(StandardEntryType.PhdThesis);</span>
+        }
+<span class="nc" id="L323">    }</span>
+
+    private void putSummary(BibEntry bibEntry, Element datafield) {
+<span class="fc" id="L326">        String summary = getSubfield(&quot;a&quot;, datafield);</span>
+
+<span class="fc" id="L328">        String ind1 = datafield.getAttribute(&quot;ind1&quot;);</span>
+<span class="pc bpc" id="L329" title="4 of 6 branches missed.">        if (StringUtil.isNotBlank(summary) &amp;&amp; StringUtil.isNotBlank(ind1) &amp;&amp; &quot;3&quot;.equals(ind1)) { // Abstract</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">            if (bibEntry.getField(StandardField.ABSTRACT).isPresent()) {</span>
+<span class="nc" id="L331">                bibEntry.setField(StandardField.ABSTRACT, bibEntry.getField(StandardField.ABSTRACT).get().concat(summary));</span>
+            } else {
+<span class="nc" id="L333">                bibEntry.setField(StandardField.ABSTRACT, summary);</span>
+            }
+        }
+<span class="fc" id="L336">    }</span>
+
+    private void putKeywords(BibEntry bibEntry, Element datafield) {
+<span class="fc" id="L339">        String keyword = getSubfield(&quot;a&quot;, datafield);</span>
+
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        if (StringUtil.isNotBlank(keyword)) {</span>
+<span class="fc" id="L342">            Optional&lt;String&gt; keywords = bibEntry.getField(StandardField.KEYWORDS);</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">            if (keywords.isPresent()) {</span>
+<span class="fc" id="L344">                bibEntry.setField(StandardField.KEYWORDS, keywords.get() + &quot;, &quot; + keyword);</span>
+            } else {
+<span class="fc" id="L346">                bibEntry.setField(StandardField.KEYWORDS, keyword);</span>
+            }
+        }
+<span class="fc" id="L349">    }</span>
+
+    private void putIssue(BibEntry bibEntry, Element datafield) {
+<span class="nc" id="L352">        bibEntry.setType(StandardEntryType.Article);</span>
+
+<span class="nc" id="L354">        List&lt;String&gt; issues = getSubfields(&quot;g&quot;, datafield);</span>
+
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        for (String issue : issues) {</span>
+<span class="nc" id="L357">            String[] parts = issue.split(&quot;:&quot;);</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">            if (parts.length == 2) {</span>
+<span class="nc" id="L359">                String key = parts[0].trim();</span>
+<span class="nc" id="L360">                String value = parts[1].trim();</span>
+
+<span class="nc bnc" id="L362" title="All 2 branches missed.">                if (StringUtil.isNotBlank(value)) {</span>
+<span class="nc bnc" id="L363" title="All 7 branches missed.">                    switch (key) {</span>
+<span class="nc" id="L364">                        case &quot;number&quot; -&gt; bibEntry.setField(StandardField.NUMBER, value);</span>
+<span class="nc" id="L365">                        case &quot;year&quot; -&gt; bibEntry.setField(StandardField.YEAR, value);</span>
+<span class="nc" id="L366">                        case &quot;pages&quot; -&gt; bibEntry.setField(StandardField.PAGES, value);</span>
+<span class="nc" id="L367">                        case &quot;volume&quot; -&gt; bibEntry.setField(StandardField.VOLUME, value);</span>
+<span class="nc" id="L368">                        case &quot;day&quot; -&gt; bibEntry.setField(StandardField.DAY, value);</span>
+<span class="nc" id="L369">                        case &quot;month&quot; -&gt; bibEntry.setField(StandardField.MONTH, value);</span>
+                    }
+                }
+            }
+<span class="nc" id="L373">        }</span>
+<span class="nc" id="L374">    }</span>
+
+    private void putDoi(BibEntry bibEntry, Element datafield) {
+<span class="fc" id="L377">        String ind1 = datafield.getAttribute(&quot;ind1&quot;);</span>
+<span class="fc" id="L378">        String resource = getSubfield(&quot;u&quot;, datafield);</span>
+
+<span class="pc bpc" id="L380" title="3 of 6 branches missed.">        if (&quot;e&quot;.equals(ind1) &amp;&amp; StringUtil.isNotBlank(&quot;u&quot;) &amp;&amp; StringUtil.isNotBlank(resource)) { // DOI</span>
+<span class="fc" id="L381">            String fulltext = getSubfield(&quot;3&quot;, datafield);</span>
+
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">            if (&quot;Volltext&quot;.equals(fulltext)) {</span>
+                try {
+<span class="fc" id="L385">                    LinkedFile linkedFile = new LinkedFile(new URL(resource), &quot;PDF&quot;);</span>
+<span class="fc" id="L386">                    bibEntry.setField(StandardField.FILE, linkedFile.toString());</span>
+<span class="nc" id="L387">                } catch (</span>
+                        MalformedURLException e) {
+<span class="nc" id="L389">                    LOGGER.info(&quot;Malformed URL: {}&quot;, resource);</span>
+<span class="pc" id="L390">                }</span>
+            } else {
+<span class="nc" id="L392">                bibEntry.setField(StandardField.DOI, resource);</span>
+            }
+        }
+<span class="fc" id="L395">    }</span>
+
+    private void putElectronicLocation(BibEntry bibEntry, Element datafield) {
+        // 856 - fulltext pdf url
+<span class="fc" id="L399">        String ind1 = datafield.getAttribute(&quot;ind1&quot;);</span>
+<span class="fc" id="L400">        String ind2 = datafield.getAttribute(&quot;ind2&quot;);</span>
+
+<span class="pc bpc" id="L402" title="1 of 4 branches missed.">        if (&quot;4&quot;.equals(ind1) &amp;&amp; &quot;0&quot;.equals(ind2)) {</span>
+<span class="fc" id="L403">            String fulltext = getSubfield(&quot;3&quot;, datafield);</span>
+<span class="fc" id="L404">            String resource = getSubfield(&quot;u&quot;, datafield);</span>
+
+<span class="pc bpc" id="L406" title="2 of 4 branches missed.">            if (&quot;Volltext&quot;.equals(fulltext) &amp;&amp; StringUtil.isNotBlank(resource)) {</span>
+                try {
+<span class="fc" id="L408">                    LinkedFile linkedFile = new LinkedFile(new URL(resource), &quot;PDF&quot;);</span>
+<span class="fc" id="L409">                    bibEntry.setField(StandardField.FILE, linkedFile.toString());</span>
+<span class="nc" id="L410">                } catch (</span>
+                        MalformedURLException e) {
+<span class="nc" id="L412">                    LOGGER.info(&quot;Malformed URL: {}&quot;, resource);</span>
+<span class="pc" id="L413">                }</span>
+            } else {
+<span class="nc" id="L415">                bibEntry.setField(StandardField.URL, resource);</span>
+            }
+        }
+<span class="fc" id="L418">    }</span>
+
+    private void putNotes(BibEntry bibEntry, Element datafield) {
+<span class="nc" id="L421">        String[] notes = new String[] {</span>
+<span class="nc" id="L422">                getSubfield(&quot;a&quot;, datafield),</span>
+<span class="nc" id="L423">                getSubfield(&quot;0&quot;, datafield),</span>
+<span class="nc" id="L424">                getSubfield(&quot;h&quot;, datafield),</span>
+<span class="nc" id="L425">                getSubfield(&quot;S&quot;, datafield),</span>
+<span class="nc" id="L426">                getSubfield(&quot;c&quot;, datafield),</span>
+<span class="nc" id="L427">                getSubfield(&quot;f&quot;, datafield),</span>
+<span class="nc" id="L428">                getSubfield(&quot;i&quot;, datafield),</span>
+<span class="nc" id="L429">                getSubfield(&quot;k&quot;, datafield),</span>
+<span class="nc" id="L430">                getSubfield(&quot;l&quot;, datafield),</span>
+<span class="nc" id="L431">                getSubfield(&quot;z&quot;, datafield),</span>
+<span class="nc" id="L432">                getSubfield(&quot;3&quot;, datafield),</span>
+<span class="nc" id="L433">                getSubfield(&quot;5&quot;, datafield)</span>
+        };
+
+<span class="nc" id="L436">        String notesJoined = Arrays.stream(notes)</span>
+<span class="nc" id="L437">                                   .filter(StringUtil::isNotBlank)</span>
+<span class="nc" id="L438">                                   .collect(Collectors.joining(&quot;\n\n&quot;));</span>
+
+<span class="nc bnc" id="L440" title="All 2 branches missed.">        if (bibEntry.getField(StandardField.NOTE).isPresent()) {</span>
+<span class="nc" id="L441">            bibEntry.setField(StandardField.NOTE, bibEntry.getField(StandardField.NOTE).get().concat(notesJoined));</span>
+        } else {
+<span class="nc" id="L443">            bibEntry.setField(StandardField.NOTE, notesJoined);</span>
+        }
+<span class="nc" id="L445">    }</span>
+
+    private String getSubfield(String a, Element datafield) {
+<span class="fc" id="L448">        List&lt;Element&gt; subfields = getChildren(&quot;subfield&quot;, datafield);</span>
+
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        for (Element subfield : subfields) {</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">            if (subfield.getAttribute(&quot;code&quot;).equals(a)) {</span>
+<span class="fc" id="L452">                return subfield.getTextContent();</span>
+            }
+<span class="fc" id="L454">        }</span>
+
+<span class="fc" id="L456">        return null;</span>
+    }
+
+    private List&lt;String&gt; getSubfields(String a, Element datafield) {
+<span class="nc" id="L460">        List&lt;Element&gt; subfields = getChildren(&quot;subfield&quot;, datafield);</span>
+
+<span class="nc" id="L462">        return subfields.stream().filter(field -&gt; field.getAttribute(&quot;code&quot;).equals(a)).map(Node::getTextContent).toList();</span>
+    }
+
+    private Element getChild(String name, Element e) {
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">        if (e == null) {</span>
+<span class="nc" id="L467">            return null;</span>
+        }
+<span class="fc" id="L469">        NodeList children = e.getChildNodes();</span>
+
+<span class="fc" id="L471">        int j = children.getLength();</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">        for (int i = 0; i &lt; j; i++) {</span>
+<span class="fc" id="L473">            Node test = children.item(i);</span>
+<span class="fc bfc" id="L474" title="All 2 branches covered.">            if (test.getNodeType() == Node.ELEMENT_NODE) {</span>
+<span class="fc" id="L475">                Element entry = (Element) test;</span>
+<span class="fc bfc" id="L476" title="All 2 branches covered.">                if (entry.getTagName().equals(name)) {</span>
+<span class="fc" id="L477">                    return entry;</span>
+                }
+            }
+        }
+<span class="nc" id="L481">        return null;</span>
+    }
+
+    private List&lt;Element&gt; getChildren(String name, Element e) {
+<span class="fc" id="L485">        List&lt;Element&gt; result = new LinkedList&lt;&gt;();</span>
+<span class="fc" id="L486">        NodeList children = e.getChildNodes();</span>
+
+<span class="fc" id="L488">        int j = children.getLength();</span>
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        for (int i = 0; i &lt; j; i++) {</span>
+<span class="fc" id="L490">            Node test = children.item(i);</span>
+<span class="fc bfc" id="L491" title="All 2 branches covered.">            if (test.getNodeType() == Node.ELEMENT_NODE) {</span>
+<span class="fc" id="L492">                Element entry = (Element) test;</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">                if (entry.getTagName().equals(name)) {</span>
+<span class="fc" id="L494">                    result.add(entry);</span>
+                }
+            }
+        }
+
+<span class="fc" id="L499">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

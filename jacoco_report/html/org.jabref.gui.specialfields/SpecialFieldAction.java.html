@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpecialFieldAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.specialfields</a> &gt; <span class="el_source">SpecialFieldAction.java</span></div><h1>SpecialFieldAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.specialfields;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Supplier;
+
+import javax.swing.undo.UndoManager;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.gui.undo.UndoableFieldChange;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.UpdateField;
+import org.jabref.model.FieldChange;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class SpecialFieldAction extends SimpleCommand {
+
+<span class="nc" id="L30">    private static final Logger LOGGER = LoggerFactory.getLogger(SpecialFieldAction.class);</span>
+    private final Supplier&lt;LibraryTab&gt; tabSupplier;
+    private final SpecialField specialField;
+    private final String value;
+    private final boolean nullFieldIfValueIsTheSame;
+    private final String undoText;
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+    private final UndoManager undoManager;
+    private final StateManager stateManager;
+
+    /**
+     * @param nullFieldIfValueIsTheSame - false also causes that doneTextPattern has two place holders %0 for the value and %1 for the sum of entries
+     */
+    public SpecialFieldAction(Supplier&lt;LibraryTab&gt; tabSupplier,
+                              SpecialField specialField,
+                              String value,
+                              boolean nullFieldIfValueIsTheSame,
+                              String undoText,
+                              DialogService dialogService,
+                              PreferencesService preferencesService,
+                              UndoManager undoManager,
+<span class="nc" id="L52">                              StateManager stateManager) {</span>
+<span class="nc" id="L53">        this.tabSupplier = tabSupplier;</span>
+<span class="nc" id="L54">        this.specialField = specialField;</span>
+<span class="nc" id="L55">        this.value = value;</span>
+<span class="nc" id="L56">        this.nullFieldIfValueIsTheSame = nullFieldIfValueIsTheSame;</span>
+<span class="nc" id="L57">        this.undoText = undoText;</span>
+<span class="nc" id="L58">        this.dialogService = dialogService;</span>
+<span class="nc" id="L59">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L60">        this.undoManager = undoManager;</span>
+<span class="nc" id="L61">        this.stateManager = stateManager;</span>
+
+<span class="nc" id="L63">        this.executable.bind(ActionHelper.needsEntriesSelected(stateManager));</span>
+<span class="nc" id="L64">    }</span>
+
+    @Override
+    public void execute() {
+        try {
+<span class="nc" id="L69">            List&lt;BibEntry&gt; bes = stateManager.getSelectedEntries();</span>
+<span class="nc bnc" id="L70" title="All 4 branches missed.">            if ((bes == null) || bes.isEmpty()) {</span>
+<span class="nc" id="L71">                return;</span>
+            }
+<span class="nc" id="L73">            NamedCompound ce = new NamedCompound(undoText);</span>
+<span class="nc" id="L74">            List&lt;BibEntry&gt; besCopy = new ArrayList&lt;&gt;(bes);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">            for (BibEntry bibEntry : besCopy) {</span>
+                // if (value==null) and then call nullField has been omitted as updatefield also handles value==null
+<span class="nc" id="L77">                Optional&lt;FieldChange&gt; change = UpdateField.updateField(bibEntry, specialField, value, nullFieldIfValueIsTheSame);</span>
+
+<span class="nc" id="L79">                change.ifPresent(fieldChange -&gt; ce.addEdit(new UndoableFieldChange(fieldChange)));</span>
+<span class="nc" id="L80">            }</span>
+<span class="nc" id="L81">            ce.end();</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (ce.hasEdits()) {</span>
+<span class="nc" id="L83">                undoManager.addEdit(ce);</span>
+<span class="nc" id="L84">                tabSupplier.get().markBaseChanged();</span>
+<span class="nc" id="L85">                tabSupplier.get().updateEntryEditorIfShowing();</span>
+                String outText;
+<span class="nc bnc" id="L87" title="All 4 branches missed.">                if (nullFieldIfValueIsTheSame || value == null) {</span>
+<span class="nc" id="L88">                    outText = getTextDone(specialField, Integer.toString(bes.size()));</span>
+                } else {
+<span class="nc" id="L90">                    outText = getTextDone(specialField, value, Integer.toString(bes.size()));</span>
+                }
+<span class="nc" id="L92">                dialogService.notify(outText);</span>
+            }
+
+            // if user does not change anything with his action, we do not do anything either, even no output message
+<span class="nc" id="L96">        } catch (Throwable ex) {</span>
+<span class="nc" id="L97">            LOGGER.error(&quot;Problem setting special fields&quot;, ex);</span>
+<span class="nc" id="L98">        }</span>
+<span class="nc" id="L99">    }</span>
+
+    private String getTextDone(SpecialField field, String... params) {
+<span class="nc" id="L102">        Objects.requireNonNull(params);</span>
+
+<span class="nc" id="L104">        SpecialFieldViewModel viewModel = new SpecialFieldViewModel(field, preferencesService, undoManager);</span>
+
+<span class="nc bnc" id="L106" title="All 6 branches missed.">        if (field.isSingleValueField() &amp;&amp; (params.length == 1) &amp;&amp; (params[0] != null)) {</span>
+            // Single value fields can be toggled only
+<span class="nc" id="L108">            return Localization.lang(&quot;Toggled '%0' for %1 entries&quot;, viewModel.getLocalization(), params[0]);</span>
+<span class="nc bnc" id="L109" title="All 8 branches missed.">        } else if (!field.isSingleValueField() &amp;&amp; (params.length == 2) &amp;&amp; (params[0] != null) &amp;&amp; (params[1] != null)) {</span>
+            // setting a multi value special field - the setted value is displayed, too
+<span class="nc" id="L111">            String[] allParams = {viewModel.getLocalization(), params[0], params[1]};</span>
+<span class="nc" id="L112">            return Localization.lang(&quot;Set '%0' to '%1' for %2 entries&quot;, allParams);</span>
+<span class="nc bnc" id="L113" title="All 6 branches missed.">        } else if (!field.isSingleValueField() &amp;&amp; (params.length == 1) &amp;&amp; (params[0] != null)) {</span>
+            // clearing a multi value specialfield
+<span class="nc" id="L115">            return Localization.lang(&quot;Cleared '%0' for %1 entries&quot;, viewModel.getLocalization(), params[0]);</span>
+        } else {
+            // invalid usage
+<span class="nc" id="L118">            LOGGER.info(&quot;Creation of special field status change message failed: illegal argument combination.&quot;);</span>
+<span class="nc" id="L119">            return &quot;&quot;;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

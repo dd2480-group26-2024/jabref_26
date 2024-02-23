@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThemeManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.theme</a> &gt; <span class="el_source">ThemeManager.java</span></div><h1>ThemeManager.java</h1><pre class="source lang-java linenums">package org.jabref.gui.theme;
+
+import java.io.IOException;
+import java.net.URL;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.function.Consumer;
+
+import javafx.scene.Scene;
+import javafx.scene.web.WebEngine;
+
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.model.util.FileUpdateListener;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.WorkspacePreferences;
+
+import com.jthemedetecor.OsThemeDetector;
+import com.tobiasdiez.easybind.EasyBind;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Installs and manages style files and provides live reloading. JabRef provides two inbuilt themes and a user
+ * customizable one: Light, Dark and Custom. The Light theme is basically the base.css theme. Every other theme is
+ * loaded as an addition to base.css.
+ * &lt;p&gt;
+ * For type Custom, Theme will protect against removal of the CSS file, degrading as gracefully as possible. If the file
+ * becomes unavailable while the application is running, some Scenes that have not yet had the CSS installed may not be
+ * themed. The PreviewViewer, which uses WebEngine, supports data URLs and so generally is not affected by removal of
+ * the file; however Theme package will not attempt to URL-encode large style sheets so as to protect memory usage (see
+ * {@link StyleSheetFile#MAX_IN_MEMORY_CSS_LENGTH}).
+ *
+ * @see &lt;a href=&quot;https://docs.jabref.org/advanced/custom-themes&quot;&gt;Custom themes&lt;/a&gt; in the Jabref documentation.
+ */
+public class ThemeManager {
+
+<span class="fc" id="L42">    private static final Logger LOGGER = LoggerFactory.getLogger(ThemeManager.class);</span>
+
+    private final WorkspacePreferences workspacePreferences;
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final Consumer&lt;Runnable&gt; updateRunner;
+
+    private final StyleSheet baseStyleSheet;
+    private Theme theme;
+
+    private OsThemeDetector detector;
+
+    private Scene mainWindowScene;
+<span class="fc" id="L54">    private final Set&lt;WebEngine&gt; webEngines = Collections.newSetFromMap(new WeakHashMap&lt;&gt;());</span>
+
+    public ThemeManager(WorkspacePreferences workspacePreferences,
+                        FileUpdateMonitor fileUpdateMonitor,
+<span class="fc" id="L58">                        Consumer&lt;Runnable&gt; updateRunner) {</span>
+<span class="fc" id="L59">        this.workspacePreferences = Objects.requireNonNull(workspacePreferences);</span>
+<span class="fc" id="L60">        this.fileUpdateMonitor = Objects.requireNonNull(fileUpdateMonitor);</span>
+<span class="fc" id="L61">        this.updateRunner = Objects.requireNonNull(updateRunner);</span>
+
+<span class="fc" id="L63">        this.baseStyleSheet = StyleSheet.create(Theme.BASE_CSS).get();</span>
+<span class="fc" id="L64">        this.theme = workspacePreferences.getTheme();</span>
+
+        // Watching base CSS only works in development and test scenarios, where the build system exposes the CSS as a
+        // file (e.g. for Gradle run task it will be in build/resources/main/org/jabref/gui/Base.css)
+<span class="fc" id="L68">        addStylesheetToWatchlist(this.baseStyleSheet, this::baseCssLiveUpdate);</span>
+<span class="fc" id="L69">        baseCssLiveUpdate();</span>
+
+<span class="fc" id="L71">        EasyBind.subscribe(workspacePreferences.themeProperty(), theme -&gt; updateThemeSettings());</span>
+<span class="fc" id="L72">        EasyBind.subscribe(workspacePreferences.themeSyncOsProperty(), theme -&gt; updateThemeSettings());</span>
+<span class="fc" id="L73">        EasyBind.subscribe(workspacePreferences.shouldOverrideDefaultFontSizeProperty(), should -&gt; updateFontSettings());</span>
+<span class="fc" id="L74">        EasyBind.subscribe(workspacePreferences.mainFontSizeProperty(), size -&gt; updateFontSettings());</span>
+
+        try {
+<span class="fc" id="L77">            detector = OsThemeDetector.getDetector();</span>
+<span class="pc" id="L78">            detector.registerListener(isDark -&gt; updateThemeSettings());</span>
+<span class="nc" id="L79">        } catch (Exception ex) {</span>
+<span class="nc" id="L80">            LOGGER.error(&quot;Could not initialize Theme detector!&quot;, ex);</span>
+<span class="nc" id="L81">            workspacePreferences.setThemeSyncOs(false);</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">    }</span>
+
+    private void updateThemeSettings() {
+<span class="fc" id="L86">        Theme newTheme = Objects.requireNonNull(workspacePreferences.getTheme());</span>
+
+<span class="pc bpc" id="L88" title="3 of 4 branches missed.">        if (workspacePreferences.themeSyncOsProperty().getValue() &amp;&amp; detector != null) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            if (detector.isDark()) {</span>
+<span class="nc" id="L90">                newTheme = Theme.dark();</span>
+            } else {
+<span class="nc" id="L92">                newTheme = Theme.light();</span>
+            }
+        }
+
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (newTheme.equals(theme)) {</span>
+<span class="fc" id="L97">            LOGGER.info(&quot;Not updating theme because it hasn't changed&quot;);</span>
+        } else {
+<span class="nc" id="L99">            theme.getAdditionalStylesheet().ifPresent(this::removeStylesheetFromWatchList);</span>
+        }
+
+<span class="fc" id="L102">        this.theme = newTheme;</span>
+<span class="fc" id="L103">        LOGGER.info(&quot;Theme set to {} with base css {}&quot;, newTheme, baseStyleSheet);</span>
+
+<span class="fc" id="L105">        this.theme.getAdditionalStylesheet().ifPresent(</span>
+<span class="fc" id="L106">                styleSheet -&gt; addStylesheetToWatchlist(styleSheet, this::additionalCssLiveUpdate));</span>
+
+<span class="fc" id="L108">        additionalCssLiveUpdate();</span>
+<span class="fc" id="L109">    }</span>
+
+    private void updateFontSettings() {
+<span class="fc" id="L112">        DefaultTaskExecutor.runInJavaFXThread(() -&gt; updateRunner.accept(() -&gt; getMainWindowScene().ifPresent(this::updateFontStyle)));</span>
+<span class="fc" id="L113">    }</span>
+
+    private void removeStylesheetFromWatchList(StyleSheet styleSheet) {
+<span class="nc" id="L116">        Path oldPath = styleSheet.getWatchPath();</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (oldPath != null) {</span>
+<span class="nc" id="L118">            fileUpdateMonitor.removeListener(oldPath, this::additionalCssLiveUpdate);</span>
+<span class="nc" id="L119">            LOGGER.info(&quot;No longer watch css {} for live updates&quot;, oldPath);</span>
+        }
+<span class="nc" id="L121">    }</span>
+
+    private void addStylesheetToWatchlist(StyleSheet styleSheet, FileUpdateListener updateMethod) {
+<span class="fc" id="L124">        Path watchPath = styleSheet.getWatchPath();</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (watchPath != null) {</span>
+            try {
+<span class="fc" id="L127">                fileUpdateMonitor.addListenerForFile(watchPath, updateMethod);</span>
+<span class="fc" id="L128">                LOGGER.info(&quot;Watching css {} for live updates&quot;, watchPath);</span>
+<span class="nc" id="L129">            } catch (IOException e) {</span>
+<span class="nc" id="L130">                LOGGER.warn(&quot;Cannot watch css path {} for live updates&quot;, watchPath, e);</span>
+<span class="fc" id="L131">            }</span>
+        }
+<span class="fc" id="L133">    }</span>
+
+    private void baseCssLiveUpdate() {
+<span class="fc" id="L136">        baseStyleSheet.reload();</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (baseStyleSheet.getSceneStylesheet() == null) {</span>
+<span class="nc" id="L138">            LOGGER.error(&quot;Base stylesheet does not exist.&quot;);</span>
+        } else {
+<span class="fc" id="L140">            LOGGER.debug(&quot;Updating base CSS for main window scene&quot;);</span>
+        }
+
+<span class="fc" id="L143">        DefaultTaskExecutor.runInJavaFXThread(() -&gt; updateRunner.accept(this::updateBaseCss));</span>
+<span class="fc" id="L144">    }</span>
+
+    private void additionalCssLiveUpdate() {
+<span class="fc" id="L147">        final String newStyleSheetLocation = this.theme.getAdditionalStylesheet().map(styleSheet -&gt; {</span>
+<span class="fc" id="L148">            styleSheet.reload();</span>
+<span class="fc" id="L149">            return styleSheet.getWebEngineStylesheet();</span>
+<span class="fc" id="L150">        }).orElse(&quot;&quot;);</span>
+
+<span class="fc" id="L152">        LOGGER.debug(&quot;Updating additional CSS for main window scene and {} web engines&quot;, webEngines.size());</span>
+
+<span class="fc" id="L154">        DefaultTaskExecutor.runInJavaFXThread(() -&gt;</span>
+<span class="fc" id="L155">                updateRunner.accept(() -&gt; {</span>
+<span class="fc" id="L156">                    updateAdditionalCss();</span>
+
+<span class="fc" id="L158">                    webEngines.forEach(webEngine -&gt; {</span>
+                        // force refresh by unloading style sheet, if the location hasn't changed
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                        if (newStyleSheetLocation.equals(webEngine.getUserStyleSheetLocation())) {</span>
+<span class="nc" id="L161">                            webEngine.setUserStyleSheetLocation(null);</span>
+                        }
+<span class="nc" id="L163">                        webEngine.setUserStyleSheetLocation(newStyleSheetLocation);</span>
+<span class="nc" id="L164">                    });</span>
+<span class="fc" id="L165">                })</span>
+        );
+<span class="fc" id="L167">    }</span>
+
+    private void updateBaseCss() {
+<span class="fc" id="L170">        getMainWindowScene().ifPresent(scene -&gt; {</span>
+<span class="fc" id="L171">            List&lt;String&gt; stylesheets = scene.getStylesheets();</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (!stylesheets.isEmpty()) {</span>
+<span class="nc" id="L173">                stylesheets.removeFirst();</span>
+            }
+
+<span class="fc" id="L176">            stylesheets.addFirst(baseStyleSheet.getSceneStylesheet().toExternalForm());</span>
+<span class="fc" id="L177">        });</span>
+<span class="fc" id="L178">    }</span>
+
+    private void updateAdditionalCss() {
+<span class="fc" id="L181">        getMainWindowScene().ifPresent(scene -&gt; scene.getStylesheets().setAll(List.of(</span>
+<span class="fc" id="L182">                baseStyleSheet.getSceneStylesheet().toExternalForm(),</span>
+<span class="fc" id="L183">                theme.getAdditionalStylesheet().map(styleSheet -&gt; {</span>
+<span class="fc" id="L184">                         URL stylesheetUrl = styleSheet.getSceneStylesheet();</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                         if (stylesheetUrl != null) {</span>
+<span class="fc" id="L186">                             return stylesheetUrl.toExternalForm();</span>
+                         } else {
+<span class="nc" id="L188">                             return &quot;&quot;;</span>
+                         }
+                     })
+<span class="fc" id="L191">                     .orElse(&quot;&quot;)</span>
+        )));
+<span class="fc" id="L193">    }</span>
+
+    /**
+     * Installs the base css file as a stylesheet in the given scene. Changes in the css file lead to a redraw of the
+     * scene using the new css file.
+     *
+     * @param mainWindowScene the scene to install the css into
+     */
+    public void installCss(Scene mainWindowScene) {
+<span class="fc" id="L202">        Objects.requireNonNull(mainWindowScene, &quot;scene is required&quot;);</span>
+<span class="fc" id="L203">        updateRunner.accept(() -&gt; {</span>
+<span class="fc" id="L204">            this.mainWindowScene = mainWindowScene;</span>
+<span class="fc" id="L205">            updateBaseCss();</span>
+<span class="fc" id="L206">            updateAdditionalCss();</span>
+<span class="fc" id="L207">        });</span>
+<span class="fc" id="L208">    }</span>
+
+    /**
+     * Installs the css file as a stylesheet in the given web engine. Changes in the css file lead to a redraw of the
+     * web engine using the new css file.
+     *
+     * @param webEngine the web engine to install the css into
+     */
+    public void installCss(WebEngine webEngine) {
+<span class="fc" id="L217">        updateRunner.accept(() -&gt; {</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (this.webEngines.add(webEngine)) {</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                webEngine.setUserStyleSheetLocation(this.theme.getAdditionalStylesheet().isPresent() ?</span>
+<span class="pc" id="L220">                        this.theme.getAdditionalStylesheet().get().getWebEngineStylesheet() : &quot;&quot;);</span>
+            }
+<span class="fc" id="L222">        });</span>
+<span class="fc" id="L223">    }</span>
+
+    /**
+     * Updates the font size settings of a scene. This method needs to be called from every custom dialog constructor,
+     * since javafx overwrites the style if applied before showing the dialog
+     *
+     * @param scene is the scene, the font size should be applied to
+     */
+    public void updateFontStyle(Scene scene) {
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (workspacePreferences.shouldOverrideDefaultFontSize()) {</span>
+<span class="nc" id="L233">            scene.getRoot().setStyle(&quot;-fx-font-size: &quot; + workspacePreferences.getMainFontSize() + &quot;pt;&quot;);</span>
+        } else {
+<span class="nc" id="L235">            scene.getRoot().setStyle(&quot;-fx-font-size: &quot; + workspacePreferences.getDefaultFontSize() + &quot;pt;&quot;);</span>
+        }
+<span class="nc" id="L237">    }</span>
+
+    /**
+     * @return the currently active theme
+     */
+    public Theme getActiveTheme() {
+<span class="fc" id="L243">        return this.theme;</span>
+    }
+
+    public Optional&lt;Scene&gt; getMainWindowScene() {
+<span class="fc" id="L247">        return Optional.ofNullable(mainWindowScene);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

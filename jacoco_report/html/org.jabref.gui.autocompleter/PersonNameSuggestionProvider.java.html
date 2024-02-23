@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PersonNameSuggestionProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.autocompleter</a> &gt; <span class="el_source">PersonNameSuggestionProvider.java</span></div><h1>PersonNameSuggestionProvider.java</h1><pre class="source lang-java linenums">package org.jabref.gui.autocompleter;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
+
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.strings.StringUtil;
+
+import com.google.common.base.Equivalence;
+import org.controlsfx.control.textfield.AutoCompletionBinding;
+
+/**
+ * Delivers possible completions as a list of {@link Author}s.
+ */
+public class PersonNameSuggestionProvider extends SuggestionProvider&lt;Author&gt; {
+
+    private final Collection&lt;Field&gt; fields;
+    private final BibDatabase database;
+
+    PersonNameSuggestionProvider(Field field, BibDatabase database) {
+<span class="fc" id="L29">        this(Collections.singletonList(Objects.requireNonNull(field)), database);</span>
+<span class="fc" id="L30">    }</span>
+
+    public PersonNameSuggestionProvider(Collection&lt;Field&gt; fields, BibDatabase database) {
+<span class="fc" id="L33">        super();</span>
+
+<span class="fc" id="L35">        this.fields = Objects.requireNonNull(fields);</span>
+<span class="fc" id="L36">        this.database = database;</span>
+<span class="fc" id="L37">    }</span>
+
+    public Stream&lt;Author&gt; getAuthors(BibEntry entry) {
+<span class="fc" id="L40">        return entry.getFieldMap()</span>
+<span class="fc" id="L41">                    .entrySet()</span>
+<span class="fc" id="L42">                    .stream()</span>
+<span class="fc" id="L43">                    .filter(fieldValuePair -&gt; fields.contains(fieldValuePair.getKey()))</span>
+<span class="fc" id="L44">                    .map(Map.Entry::getValue)</span>
+<span class="fc" id="L45">                    .map(AuthorList::parse)</span>
+<span class="fc" id="L46">                    .flatMap(authors -&gt; authors.getAuthors().stream());</span>
+    }
+
+    @Override
+    protected Equivalence&lt;Author&gt; getEquivalence() {
+<span class="fc" id="L51">        return Equivalence.equals().onResultOf(Author::getLastOnly);</span>
+    }
+
+    @Override
+    protected Comparator&lt;Author&gt; getComparator() {
+<span class="fc" id="L56">        return Comparator.comparing(Author::getNameForAlphabetization);</span>
+    }
+
+    @Override
+    protected boolean isMatch(Author candidate, AutoCompletionBinding.ISuggestionRequest request) {
+<span class="fc" id="L61">        return StringUtil.containsIgnoreCase(candidate.getLastFirst(false), request.getUserText());</span>
+    }
+
+    @Override
+    public Stream&lt;Author&gt; getSource() {
+<span class="fc" id="L66">        return database.getEntries()</span>
+<span class="fc" id="L67">                       .parallelStream()</span>
+<span class="fc" id="L68">                       .flatMap(this::getAuthors);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

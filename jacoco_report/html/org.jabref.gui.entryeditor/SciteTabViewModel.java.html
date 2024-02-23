@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SciteTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor</a> &gt; <span class="el_source">SciteTabViewModel.java</span></div><h1>SciteTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.Optional;
+import java.util.concurrent.Future;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+import org.jabref.gui.AbstractViewModel;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.identifier.DOI;
+import org.jabref.preferences.PreferencesService;
+
+import kong.unirest.json.JSONObject;
+import org.tinylog.Logger;
+
+public class SciteTabViewModel extends AbstractViewModel {
+
+    /**
+     * Status enum for Scite tab
+     */
+<span class="fc" id="L34">    public enum SciteStatus {</span>
+<span class="fc" id="L35">        IN_PROGRESS,</span>
+<span class="fc" id="L36">        FOUND,</span>
+<span class="fc" id="L37">        ERROR</span>
+    }
+
+    private static final String BASE_URL = &quot;https://api.scite.ai/&quot;;
+    private final PreferencesService preferencesService;
+    private final TaskExecutor taskExecutor;
+    private final ObjectProperty&lt;SciteStatus&gt; status;
+    private final StringProperty searchError;
+<span class="fc" id="L45">    private Optional&lt;SciteTallyModel&gt; currentResult = Optional.empty();</span>
+
+    private Future&lt;?&gt; searchTask;
+
+<span class="fc" id="L49">    public SciteTabViewModel(PreferencesService preferencesService, TaskExecutor taskExecutor) {</span>
+<span class="fc" id="L50">        this.preferencesService = preferencesService;</span>
+<span class="fc" id="L51">        this.taskExecutor = taskExecutor;</span>
+<span class="fc" id="L52">        this.status = new SimpleObjectProperty&lt;&gt;(SciteStatus.IN_PROGRESS);</span>
+<span class="fc" id="L53">        this.searchError = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L54">    }</span>
+
+    public boolean shouldShow() {
+<span class="nc" id="L57">        return preferencesService.getEntryEditorPreferences().shouldShowSciteTab();</span>
+    }
+
+    public void bindToEntry(BibEntry entry) {
+        // If a search is already running, cancel it
+<span class="nc" id="L62">        cancelSearch();</span>
+
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (entry == null) {</span>
+<span class="nc" id="L65">            searchError.set(Localization.lang(&quot;No active entry&quot;));</span>
+<span class="nc" id="L66">            status.set(SciteStatus.ERROR);</span>
+<span class="nc" id="L67">            return;</span>
+        }
+
+        // The scite.ai api requires a DOI
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (entry.getDOI().isEmpty()) {</span>
+<span class="nc" id="L72">            searchError.set(Localization.lang(&quot;This entry does not have a DOI&quot;));</span>
+<span class="nc" id="L73">            status.set(SciteStatus.ERROR);</span>
+<span class="nc" id="L74">            return;</span>
+        }
+
+<span class="nc" id="L77">        searchTask = BackgroundTask.wrap(() -&gt; fetchTallies(entry.getDOI().get()))</span>
+<span class="nc" id="L78">                                   .onRunning(() -&gt; status.set(SciteStatus.IN_PROGRESS))</span>
+<span class="nc" id="L79">                                   .onSuccess(result -&gt; {</span>
+<span class="nc" id="L80">                                       currentResult = Optional.of(result);</span>
+<span class="nc" id="L81">                                       status.set(SciteStatus.FOUND);</span>
+<span class="nc" id="L82">                                   })</span>
+<span class="nc" id="L83">                                   .onFailure(error -&gt; {</span>
+<span class="nc" id="L84">                                       searchError.set(error.getMessage());</span>
+<span class="nc" id="L85">                                       status.set(SciteStatus.ERROR);</span>
+<span class="nc" id="L86">                                   })</span>
+<span class="nc" id="L87">                                   .executeWith(taskExecutor);</span>
+<span class="nc" id="L88">    }</span>
+
+    private void cancelSearch() {
+<span class="nc bnc" id="L91" title="All 6 branches missed.">        if (searchTask == null || searchTask.isCancelled() || searchTask.isDone()) {</span>
+<span class="nc" id="L92">            return;</span>
+        }
+
+<span class="nc" id="L95">        status.set(SciteStatus.IN_PROGRESS);</span>
+<span class="nc" id="L96">        searchTask.cancel(true);</span>
+<span class="nc" id="L97">    }</span>
+
+    public SciteTallyModel fetchTallies(DOI doi) throws FetcherException {
+        try {
+<span class="fc" id="L101">            URL url = new URI(BASE_URL + &quot;tallies/&quot; + doi.getDOI()).toURL();</span>
+<span class="fc" id="L102">            URLDownload download = new URLDownload(url);</span>
+<span class="fc" id="L103">            String response = download.asString();</span>
+<span class="fc" id="L104">            Logger.debug(&quot;Response {}&quot;, response);</span>
+<span class="fc" id="L105">            JSONObject tallies = new JSONObject(response);</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            if (tallies.has(&quot;detail&quot;)) {</span>
+<span class="nc" id="L107">                String message = tallies.getString(&quot;detail&quot;);</span>
+<span class="nc" id="L108">                throw new FetcherException(message);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            } else if (!tallies.has(&quot;total&quot;)) {</span>
+<span class="nc" id="L110">                throw new FetcherException(&quot;Unexpected result data!&quot;);</span>
+            }
+<span class="fc" id="L112">            return SciteTallyModel.fromJSONObject(tallies);</span>
+<span class="nc" id="L113">        } catch (MalformedURLException | URISyntaxException ex) {</span>
+<span class="nc" id="L114">            throw new FetcherException(&quot;Malformed url for DOs&quot;, ex);</span>
+<span class="nc" id="L115">        } catch (IOException ioex) {</span>
+<span class="nc" id="L116">            throw new FetcherException(&quot;Failed to retrieve tallies for DOI - IO Exception&quot;, ioex);</span>
+        }
+    }
+
+    public ObjectProperty&lt;SciteStatus&gt; statusProperty() {
+<span class="nc" id="L121">        return status;</span>
+    }
+
+    public StringProperty searchErrorProperty() {
+<span class="nc" id="L125">        return searchError;</span>
+    }
+
+    public Optional&lt;SciteTallyModel&gt; getCurrentResult() {
+<span class="nc" id="L129">        return currentResult;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

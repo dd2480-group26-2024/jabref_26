@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StudyFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.crawler</a> &gt; <span class="el_source">StudyFetcher.java</span></div><h1>StudyFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.crawler;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.PagedSearchBasedFetcher;
+import org.jabref.logic.importer.SearchBasedFetcher;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.study.FetchResult;
+import org.jabref.model.study.QueryResult;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Delegates the search of the provided set of targeted E-Libraries with the provided queries to the E-Library specific fetchers,
+ * and aggregates the results returned by the fetchers by query and E-Library.
+ */
+class StudyFetcher {
+<span class="fc" id="L24">    private static final Logger LOGGER = LoggerFactory.getLogger(StudyFetcher.class);</span>
+    private static final int MAX_AMOUNT_OF_RESULTS_PER_FETCHER = 100;
+
+    private final List&lt;SearchBasedFetcher&gt; activeFetchers;
+    private final List&lt;String&gt; searchQueries;
+
+<span class="fc" id="L30">    StudyFetcher(List&lt;SearchBasedFetcher&gt; activeFetchers, List&lt;String&gt; searchQueries) throws IllegalArgumentException {</span>
+<span class="fc" id="L31">        this.searchQueries = searchQueries;</span>
+<span class="fc" id="L32">        this.activeFetchers = activeFetchers;</span>
+<span class="fc" id="L33">    }</span>
+
+    /**
+     * Each Map Entry contains the results for one search term for all libraries.
+     * Each entry of the internal map contains the results for a given library.
+     * If any library API is not available, its corresponding entry is missing from the internal map.
+     */
+    public List&lt;QueryResult&gt; crawl() {
+<span class="fc" id="L41">        return searchQueries.parallelStream()</span>
+<span class="fc" id="L42">                            .map(this::getQueryResult)</span>
+<span class="fc" id="L43">                            .collect(Collectors.toList());</span>
+    }
+
+    private QueryResult getQueryResult(String searchQuery) {
+<span class="fc" id="L47">        return new QueryResult(searchQuery, performSearchOnQuery(searchQuery));</span>
+    }
+
+    /**
+     * Queries all catalogs on the given searchQuery.
+     *
+     * @param searchQuery The query the search is performed for.
+     * @return Mapping of each fetcher by name and all their retrieved publications as a BibDatabase
+     */
+    private List&lt;FetchResult&gt; performSearchOnQuery(String searchQuery) {
+<span class="fc" id="L57">        return activeFetchers.parallelStream()</span>
+<span class="fc" id="L58">                             .map(fetcher -&gt; performSearchOnQueryForFetcher(searchQuery, fetcher))</span>
+<span class="fc" id="L59">                             .filter(Objects::nonNull)</span>
+<span class="fc" id="L60">                             .collect(Collectors.toList());</span>
+    }
+
+    private FetchResult performSearchOnQueryForFetcher(String searchQuery, SearchBasedFetcher fetcher) {
+        try {
+<span class="fc" id="L65">            List&lt;BibEntry&gt; fetchResult = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (fetcher instanceof PagedSearchBasedFetcher basedFetcher) {</span>
+<span class="fc" id="L67">                int pages = (int) Math.ceil(((double) MAX_AMOUNT_OF_RESULTS_PER_FETCHER) / basedFetcher.getPageSize());</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                for (int page = 0; page &lt; pages; page++) {</span>
+<span class="fc" id="L69">                    fetchResult.addAll(basedFetcher.performSearchPaged(searchQuery, page).getContent());</span>
+                }
+<span class="fc" id="L71">            } else {</span>
+<span class="nc" id="L72">                fetchResult = fetcher.performSearch(searchQuery);</span>
+            }
+<span class="fc" id="L74">            return new FetchResult(fetcher.getName(), new BibDatabase(fetchResult));</span>
+<span class="fc" id="L75">        } catch (FetcherException e) {</span>
+<span class="fc" id="L76">            LOGGER.warn(&quot;%s API request failed&quot;.formatted(fetcher.getName()), e);</span>
+<span class="fc" id="L77">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

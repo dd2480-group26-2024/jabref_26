@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibEntryTypesManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry</a> &gt; <span class="el_source">BibEntryTypesManager.java</span></div><h1>BibEntryTypesManager.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.types.BiblatexAPAEntryTypeDefinitions;
+import org.jabref.model.entry.types.BiblatexEntryTypeDefinitions;
+import org.jabref.model.entry.types.BiblatexSoftwareEntryTypeDefinitions;
+import org.jabref.model.entry.types.BibtexEntryTypeDefinitions;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.EntryTypeFactory;
+import org.jabref.model.entry.types.IEEETranEntryTypeDefinitions;
+
+public class BibEntryTypesManager {
+<span class="fc" id="L22">    private final InternalEntryTypes BIBTEX_ENTRYTYPES = new InternalEntryTypes(</span>
+<span class="fc" id="L23">            Stream.concat(BibtexEntryTypeDefinitions.ALL.stream(), IEEETranEntryTypeDefinitions.ALL.stream())</span>
+<span class="fc" id="L24">                  .collect(Collectors.toList()));</span>
+
+<span class="fc" id="L26">    private final InternalEntryTypes BIBLATEX_ENTRYTYPES = new InternalEntryTypes(</span>
+<span class="fc" id="L27">            Stream.concat(BiblatexEntryTypeDefinitions.ALL.stream(),</span>
+<span class="fc" id="L28">                          Stream.concat(BiblatexSoftwareEntryTypeDefinitions.ALL.stream(), BiblatexAPAEntryTypeDefinitions.ALL.stream()))</span>
+<span class="fc" id="L29">                  .collect(Collectors.toList()));</span>
+
+<span class="fc" id="L31">    public BibEntryTypesManager() {</span>
+<span class="fc" id="L32">    }</span>
+
+    private InternalEntryTypes getEntryTypes(BibDatabaseMode mode) {
+<span class="pc bpc" id="L35" title="1 of 3 branches missed.">        return switch (mode) {</span>
+<span class="fc" id="L36">            case BIBTEX -&gt; BIBTEX_ENTRYTYPES;</span>
+<span class="fc" id="L37">            case BIBLATEX -&gt; BIBLATEX_ENTRYTYPES;</span>
+        };
+    }
+
+    /**
+     * For a given database mode, determine all custom entry types, i.e. types that are not overwritten standard types but real custom types.
+     * For example, a modified &quot;article&quot; type will not be included in the list, but an entry type like &quot;MyCustomType&quot; will be included.
+     *
+     * @param mode the BibDatabaseMode to be checked
+     * @return the list of all found custom types
+     */
+    public List&lt;BibEntryType&gt; getAllCustomTypes(BibDatabaseMode mode) {
+<span class="fc" id="L49">        return getEntryTypes(mode).getAllCustomTypes();</span>
+    }
+
+    /**
+     * Returns true if the type is a custom type, or if it is a standard type which has customized fields
+     */
+    public boolean isCustomOrModifiedType(BibEntryType type, BibDatabaseMode mode) {
+<span class="fc" id="L56">        return getEntryTypes(mode).isCustomOrModifiedType(type);</span>
+    }
+
+    /**
+     * Sets the given custom entry types for BibTeX and biblatex mode
+     */
+    public void addCustomOrModifiedTypes(List&lt;BibEntryType&gt; customizedEntryTypes, BibDatabaseMode mode) {
+<span class="nc" id="L63">        InternalEntryTypes entryTypes = getEntryTypes(mode);</span>
+<span class="nc" id="L64">        customizedEntryTypes.forEach(entryTypes::addCustomOrModifiedType);</span>
+<span class="nc" id="L65">    }</span>
+
+    public void addCustomOrModifiedType(BibEntryType entryType, BibDatabaseMode mode) {
+<span class="fc" id="L68">        getEntryTypes(mode).addCustomOrModifiedType(entryType);</span>
+<span class="fc" id="L69">    }</span>
+
+    public void removeCustomOrModifiedEntryType(BibEntryType entryType, BibDatabaseMode mode) {
+<span class="nc" id="L72">        getEntryTypes(mode).removeCustomOrModifiedEntryType(entryType);</span>
+<span class="nc" id="L73">    }</span>
+
+    public void clearAllCustomEntryTypes(BibDatabaseMode mode) {
+<span class="nc" id="L76">        getEntryTypes(mode).clearAllCustomEntryTypes();</span>
+<span class="nc" id="L77">    }</span>
+
+    public Collection&lt;BibEntryType&gt; getAllTypes(BibDatabaseMode mode) {
+<span class="fc" id="L80">        return getEntryTypes(mode).getAllTypes();</span>
+    }
+
+    public boolean isCustomType(EntryType type, BibDatabaseMode mode) {
+<span class="fc" id="L84">        return getAllCustomTypes(mode).stream().anyMatch(customType -&gt; customType.getType().equals(type));</span>
+    }
+
+    /**
+     * This method returns the BibEntryType for the entry type.
+     *
+     * @param mode the mode of the BibDatabase, may be null
+     */
+    public Optional&lt;BibEntryType&gt; enrich(EntryType type, BibDatabaseMode mode) {
+<span class="fc" id="L93">        return getEntryTypes(mode).enrich(type);</span>
+    }
+
+    public boolean isDifferentCustomOrModifiedType(BibEntryType type, BibDatabaseMode mode) {
+<span class="nc" id="L97">        Optional&lt;BibEntryType&gt; currentlyStoredType = enrich(type.getType(), mode);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (currentlyStoredType.isEmpty()) {</span>
+            // new customization
+<span class="nc" id="L100">            return true;</span>
+        } else {
+            // different customization
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            return !EntryTypeFactory.nameAndFieldsAreEqual(type, currentlyStoredType.get());</span>
+        }
+    }
+
+    /**
+     * This class is used to specify entry types for either BIBTEX and BIBLATEX.
+     */
+    private static class InternalEntryTypes {
+<span class="fc" id="L111">        private final SortedSet&lt;BibEntryType&gt; customOrModifiedType = new TreeSet&lt;&gt;();</span>
+        private final SortedSet&lt;BibEntryType&gt; standardTypes;
+
+<span class="fc" id="L114">        private InternalEntryTypes(List&lt;BibEntryType&gt; standardTypes) {</span>
+<span class="fc" id="L115">            this.standardTypes = new TreeSet&lt;&gt;(standardTypes);</span>
+<span class="fc" id="L116">        }</span>
+
+        private List&lt;BibEntryType&gt; getAllCustomTypes() {
+<span class="fc" id="L119">            Collection&lt;BibEntryType&gt; customizedTypes = getAllTypes();</span>
+<span class="fc" id="L120">            return customizedTypes.stream()</span>
+<span class="fc" id="L121">                                  .filter(bibEntryType -&gt; standardTypes.stream()</span>
+<span class="fc" id="L122">                                                                       .noneMatch(item -&gt; item.getType().equals(bibEntryType.getType())))</span>
+<span class="fc" id="L123">                                  .toList();</span>
+        }
+
+        /**
+         * This method returns the BibtexEntryType for the name of a type,
+         * or an empty optional if it does not exist.
+         */
+        private Optional&lt;BibEntryType&gt; enrich(EntryType type) {
+<span class="fc" id="L131">            Optional&lt;BibEntryType&gt; enrichedType = customOrModifiedType.stream()</span>
+<span class="fc" id="L132">                                                                      .filter(typeEquals(type))</span>
+<span class="fc" id="L133">                                                                      .findFirst();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (enrichedType.isPresent()) {</span>
+<span class="fc" id="L135">                return enrichedType;</span>
+            } else {
+<span class="fc" id="L137">                return standardTypes.stream()</span>
+<span class="fc" id="L138">                                    .filter(typeEquals(type))</span>
+<span class="fc" id="L139">                                    .findFirst();</span>
+            }
+        }
+
+        private Predicate&lt;BibEntryType&gt; typeEquals(EntryType toCompare) {
+<span class="fc" id="L144">            return item -&gt; item.getType().equals(toCompare);</span>
+        }
+
+        private void addCustomOrModifiedType(BibEntryType type) {
+<span class="fc" id="L148">            customOrModifiedType.remove(type);</span>
+<span class="fc" id="L149">            customOrModifiedType.add(type);</span>
+<span class="fc" id="L150">        }</span>
+
+        private void removeCustomOrModifiedEntryType(BibEntryType type) {
+<span class="nc" id="L153">            customOrModifiedType.remove(type);</span>
+<span class="nc" id="L154">        }</span>
+
+        private void clearAllCustomEntryTypes() {
+<span class="nc" id="L157">            customOrModifiedType.clear();</span>
+<span class="nc" id="L158">        }</span>
+
+        private SortedSet&lt;BibEntryType&gt; getAllTypes() {
+<span class="fc" id="L161">            SortedSet&lt;BibEntryType&gt; allTypes = new TreeSet&lt;&gt;(customOrModifiedType);</span>
+<span class="fc" id="L162">            allTypes.addAll(standardTypes);</span>
+<span class="fc" id="L163">            return allTypes;</span>
+        }
+
+        private boolean isCustomOrModifiedType(BibEntryType entryType) {
+<span class="fc" id="L167">            return customOrModifiedType.stream()</span>
+<span class="fc" id="L168">                                       .anyMatch(customizedType -&gt; customizedType.equals(entryType));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

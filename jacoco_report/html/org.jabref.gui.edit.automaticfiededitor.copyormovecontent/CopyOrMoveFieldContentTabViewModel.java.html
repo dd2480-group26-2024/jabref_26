@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CopyOrMoveFieldContentTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.edit.automaticfiededitor.copyormovecontent</a> &gt; <span class="el_source">CopyOrMoveFieldContentTabViewModel.java</span></div><h1>CopyOrMoveFieldContentTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.edit.automaticfiededitor.copyormovecontent;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+
+import org.jabref.gui.StateManager;
+import org.jabref.gui.edit.automaticfiededitor.AbstractAutomaticFieldEditorTabViewModel;
+import org.jabref.gui.edit.automaticfiededitor.LastAutomaticFieldEditorEdit;
+import org.jabref.gui.edit.automaticfiededitor.MoveFieldValueAction;
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.gui.undo.UndoableFieldChange;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.strings.StringUtil;
+
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+
+public class CopyOrMoveFieldContentTabViewModel extends AbstractAutomaticFieldEditorTabViewModel {
+    public static final int TAB_INDEX = 1;
+<span class="fc" id="L31">    private final ObjectProperty&lt;Field&gt; fromField = new SimpleObjectProperty&lt;&gt;(StandardField.ABSTRACT);</span>
+
+<span class="fc" id="L33">    private final ObjectProperty&lt;Field&gt; toField = new SimpleObjectProperty&lt;&gt;(StandardField.AUTHOR);</span>
+
+<span class="fc" id="L35">    private final BooleanProperty overwriteFieldContent = new SimpleBooleanProperty(Boolean.FALSE);</span>
+    private final List&lt;BibEntry&gt; selectedEntries;
+
+    private final Validator toFieldValidator;
+
+    private final BooleanBinding canMove;
+
+    private final BooleanBinding canSwap;
+
+    public CopyOrMoveFieldContentTabViewModel(List&lt;BibEntry&gt; selectedEntries, BibDatabase bibDatabase, StateManager stateManager) {
+<span class="fc" id="L45">        super(bibDatabase, stateManager);</span>
+<span class="fc" id="L46">        this.selectedEntries = new ArrayList&lt;&gt;(selectedEntries);</span>
+
+<span class="fc" id="L48">        toFieldValidator = new FunctionBasedValidator&lt;&gt;(toField, field -&gt; {</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (StringUtil.isBlank(field.getName())) {</span>
+<span class="nc" id="L50">                return ValidationMessage.error(&quot;Field name cannot be empty&quot;);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            } else if (StringUtil.containsWhitespace(field.getName())) {</span>
+<span class="nc" id="L52">                return ValidationMessage.error(&quot;Field name cannot have whitespace characters&quot;);</span>
+            }
+<span class="fc" id="L54">            return null;</span>
+        });
+
+<span class="fc" id="L57">        canMove = BooleanBinding.booleanExpression(toFieldValidationStatus().validProperty())</span>
+<span class="fc" id="L58">                                .and(overwriteFieldContentProperty());</span>
+
+<span class="fc" id="L60">        canSwap = BooleanBinding.booleanExpression(toFieldValidationStatus().validProperty())</span>
+<span class="fc" id="L61">                                .and(overwriteFieldContentProperty());</span>
+<span class="fc" id="L62">    }</span>
+
+    public ValidationStatus toFieldValidationStatus() {
+<span class="fc" id="L65">        return toFieldValidator.getValidationStatus();</span>
+    }
+
+    public BooleanBinding canMoveProperty() {
+<span class="nc" id="L69">        return canMove;</span>
+    }
+
+    public BooleanBinding canSwapProperty() {
+<span class="nc" id="L73">        return canSwap;</span>
+    }
+
+    public Field getFromField() {
+<span class="nc" id="L77">        return fromField.get();</span>
+    }
+
+    public ObjectProperty&lt;Field&gt; fromFieldProperty() {
+<span class="fc" id="L81">        return fromField;</span>
+    }
+
+    public Field getToField() {
+<span class="nc" id="L85">        return toField.get();</span>
+    }
+
+    public ObjectProperty&lt;Field&gt; toFieldProperty() {
+<span class="fc" id="L89">        return toField;</span>
+    }
+
+    public boolean isOverwriteFieldContent() {
+<span class="nc" id="L93">        return overwriteFieldContent.get();</span>
+    }
+
+    public BooleanProperty overwriteFieldContentProperty() {
+<span class="fc" id="L97">        return overwriteFieldContent;</span>
+    }
+
+    public void copyValue() {
+<span class="fc" id="L101">        NamedCompound copyFieldValueEdit = new NamedCompound(&quot;COPY_FIELD_VALUE&quot;);</span>
+<span class="fc" id="L102">        int affectedEntriesCount = 0;</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (BibEntry entry : selectedEntries) {</span>
+<span class="fc" id="L104">            String fromFieldValue = entry.getField(fromField.get()).orElse(&quot;&quot;);</span>
+<span class="fc" id="L105">            String toFieldValue = entry.getField(toField.get()).orElse(&quot;&quot;);</span>
+
+<span class="pc bpc" id="L107" title="3 of 4 branches missed.">            if (overwriteFieldContent.get() || StringUtil.isBlank(toFieldValue)) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                if (StringUtil.isNotBlank(fromFieldValue)) {</span>
+<span class="fc" id="L109">                    entry.setField(toField.get(), fromFieldValue);</span>
+<span class="fc" id="L110">                    copyFieldValueEdit.addEdit(new UndoableFieldChange(entry,</span>
+<span class="fc" id="L111">                            toField.get(),</span>
+                            toFieldValue,
+                            fromFieldValue));
+<span class="fc" id="L114">                    affectedEntriesCount++;</span>
+                }
+            }
+<span class="fc" id="L117">        }</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (copyFieldValueEdit.hasEdits()) {</span>
+<span class="fc" id="L119">            copyFieldValueEdit.end();</span>
+        }
+<span class="fc" id="L121">        stateManager.setLastAutomaticFieldEditorEdit(new LastAutomaticFieldEditorEdit(</span>
+<span class="fc" id="L122">                affectedEntriesCount, TAB_INDEX, copyFieldValueEdit</span>
+        ));
+<span class="fc" id="L124">    }</span>
+
+    public void moveValue() {
+<span class="fc" id="L127">        NamedCompound moveEdit = new NamedCompound(&quot;MOVE_EDIT&quot;);</span>
+<span class="fc" id="L128">        int affectedEntriesCount = 0;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (overwriteFieldContent.get()) {</span>
+<span class="fc" id="L130">            affectedEntriesCount = new MoveFieldValueAction(fromField.get(),</span>
+<span class="fc" id="L131">                    toField.get(),</span>
+                    selectedEntries,
+<span class="fc" id="L133">                    moveEdit).executeAndGetAffectedEntriesCount();</span>
+
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (moveEdit.hasEdits()) {</span>
+<span class="fc" id="L136">                moveEdit.end();</span>
+            }
+        }
+<span class="fc" id="L139">        stateManager.setLastAutomaticFieldEditorEdit(new LastAutomaticFieldEditorEdit(</span>
+<span class="fc" id="L140">                affectedEntriesCount, TAB_INDEX, moveEdit</span>
+        ));
+<span class="fc" id="L142">    }</span>
+
+    public void swapValues() {
+<span class="fc" id="L145">        NamedCompound swapFieldValuesEdit = new NamedCompound(&quot;SWAP_FIELD_VALUES&quot;);</span>
+<span class="fc" id="L146">        int affectedEntriesCount = 0;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (BibEntry entry : selectedEntries) {</span>
+<span class="fc" id="L148">            String fromFieldValue = entry.getField(fromField.get()).orElse(&quot;&quot;);</span>
+<span class="fc" id="L149">            String toFieldValue = entry.getField(toField.get()).orElse(&quot;&quot;);</span>
+
+<span class="pc bpc" id="L151" title="2 of 6 branches missed.">            if (overwriteFieldContent.get() &amp;&amp; StringUtil.isNotBlank(fromFieldValue) &amp;&amp; StringUtil.isNotBlank(toFieldValue)) {</span>
+<span class="fc" id="L152">                entry.setField(toField.get(), fromFieldValue);</span>
+<span class="fc" id="L153">                entry.setField(fromField.get(), toFieldValue);</span>
+
+<span class="fc" id="L155">                swapFieldValuesEdit.addEdit(new UndoableFieldChange(</span>
+                        entry,
+<span class="fc" id="L157">                        toField.get(),</span>
+                        toFieldValue,
+                        fromFieldValue
+                ));
+
+<span class="fc" id="L162">                swapFieldValuesEdit.addEdit(new UndoableFieldChange(</span>
+                        entry,
+<span class="fc" id="L164">                        fromField.get(),</span>
+                        fromFieldValue,
+                        toFieldValue
+                ));
+<span class="fc" id="L168">                affectedEntriesCount++;</span>
+            }
+<span class="fc" id="L170">        }</span>
+
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (swapFieldValuesEdit.hasEdits()) {</span>
+<span class="fc" id="L173">            swapFieldValuesEdit.end();</span>
+        }
+<span class="fc" id="L175">        stateManager.setLastAutomaticFieldEditorEdit(new LastAutomaticFieldEditorEdit(</span>
+<span class="fc" id="L176">                affectedEntriesCount, TAB_INDEX, swapFieldValuesEdit</span>
+        ));
+<span class="fc" id="L178">    }</span>
+
+    public List&lt;BibEntry&gt; getSelectedEntries() {
+<span class="nc" id="L181">        return selectedEntries;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

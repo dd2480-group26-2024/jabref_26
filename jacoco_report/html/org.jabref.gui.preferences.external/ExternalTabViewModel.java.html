@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.external</a> &gt; <span class="el_source">ExternalTabViewModel.java</span></div><h1>ExternalTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.external;
+
+import java.util.HashMap;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.DialogPane;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.gui.push.PushToApplication;
+import org.jabref.gui.push.PushToApplicationSettings;
+import org.jabref.gui.push.PushToApplications;
+import org.jabref.gui.push.PushToEmacs;
+import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.push.CitationCommandString;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.preferences.ExternalApplicationsPreferences;
+import org.jabref.preferences.PreferencesService;
+import org.jabref.preferences.PushToApplicationPreferences;
+
+import de.saxsys.mvvmfx.utils.validation.CompositeValidator;
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+
+public class ExternalTabViewModel implements PreferenceTabViewModel {
+
+<span class="nc" id="L39">    private final StringProperty eMailReferenceSubjectProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L40">    private final BooleanProperty autoOpenAttachedFoldersProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L41">    private final ListProperty&lt;PushToApplication&gt; pushToApplicationsListProperty = new SimpleListProperty&lt;&gt;();</span>
+<span class="nc" id="L42">    private final ObjectProperty&lt;PushToApplication&gt; selectedPushToApplicationProperty = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="nc" id="L43">    private final StringProperty citeCommandProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L44">    private final BooleanProperty useCustomTerminalProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L45">    private final StringProperty customTerminalCommandProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L46">    private final BooleanProperty useCustomFileBrowserProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L47">    private final StringProperty customFileBrowserCommandProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L48">    private final StringProperty kindleEmailProperty = new SimpleStringProperty(&quot;&quot;);</span>
+
+    private final Validator terminalCommandValidator;
+    private final Validator fileBrowserCommandValidator;
+
+    private final DialogService dialogService;
+    private final PreferencesService preferences;
+
+<span class="nc" id="L56">    private final FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder().build();</span>
+
+    private final ExternalApplicationsPreferences initialExternalApplicationPreferences;
+    private final PushToApplicationPreferences initialPushToApplicationPreferences;
+    private final PushToApplicationPreferences workingPushToApplicationPreferences;
+
+<span class="nc" id="L62">    public ExternalTabViewModel(DialogService dialogService, PreferencesService preferencesService) {</span>
+<span class="nc" id="L63">        this.dialogService = dialogService;</span>
+<span class="nc" id="L64">        this.preferences = preferencesService;</span>
+<span class="nc" id="L65">        this.initialExternalApplicationPreferences = preferences.getExternalApplicationsPreferences();</span>
+<span class="nc" id="L66">        this.initialPushToApplicationPreferences = preferences.getPushToApplicationPreferences();</span>
+<span class="nc" id="L67">        this.workingPushToApplicationPreferences = new PushToApplicationPreferences(</span>
+<span class="nc" id="L68">                initialPushToApplicationPreferences.getActiveApplicationName(),</span>
+<span class="nc" id="L69">                new HashMap&lt;&gt;(initialPushToApplicationPreferences.getCommandPaths()),</span>
+<span class="nc" id="L70">                initialPushToApplicationPreferences.getEmacsArguments(),</span>
+<span class="nc" id="L71">                initialPushToApplicationPreferences.getVimServer());</span>
+
+<span class="nc" id="L73">        terminalCommandValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                customTerminalCommandProperty,
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                input -&gt; !StringUtil.isNullOrEmpty(input),</span>
+<span class="nc" id="L76">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L77">                        Localization.lang(&quot;External programs&quot;),</span>
+<span class="nc" id="L78">                        Localization.lang(&quot;Custom applications&quot;),</span>
+<span class="nc" id="L79">                        Localization.lang(&quot;Please specify a terminal application.&quot;))));</span>
+
+<span class="nc" id="L81">        fileBrowserCommandValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                customFileBrowserCommandProperty,
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                input -&gt; !StringUtil.isNullOrEmpty(input),</span>
+<span class="nc" id="L84">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L85">                        Localization.lang(&quot;External programs&quot;),</span>
+<span class="nc" id="L86">                        Localization.lang(&quot;Custom applications&quot;),</span>
+<span class="nc" id="L87">                        Localization.lang(&quot;Please specify a file browser.&quot;))));</span>
+<span class="nc" id="L88">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L92">        eMailReferenceSubjectProperty.setValue(initialExternalApplicationPreferences.getEmailSubject());</span>
+<span class="nc" id="L93">        autoOpenAttachedFoldersProperty.setValue(initialExternalApplicationPreferences.shouldAutoOpenEmailAttachmentsFolder());</span>
+
+<span class="nc" id="L95">        pushToApplicationsListProperty.setValue(</span>
+<span class="nc" id="L96">                FXCollections.observableArrayList(PushToApplications.getAllApplications(dialogService, preferences)));</span>
+<span class="nc" id="L97">        selectedPushToApplicationProperty.setValue(</span>
+<span class="nc" id="L98">                PushToApplications.getApplicationByName(initialPushToApplicationPreferences.getActiveApplicationName(), dialogService, preferences)</span>
+<span class="nc" id="L99">                                  .orElse(new PushToEmacs(dialogService, preferences)));</span>
+
+<span class="nc" id="L101">        citeCommandProperty.setValue(initialExternalApplicationPreferences.getCiteCommand().toString());</span>
+
+<span class="nc" id="L103">        useCustomTerminalProperty.setValue(initialExternalApplicationPreferences.useCustomTerminal());</span>
+<span class="nc" id="L104">        customTerminalCommandProperty.setValue(initialExternalApplicationPreferences.getCustomTerminalCommand());</span>
+<span class="nc" id="L105">        useCustomFileBrowserProperty.setValue(initialExternalApplicationPreferences.useCustomFileBrowser());</span>
+<span class="nc" id="L106">        customFileBrowserCommandProperty.setValue(initialExternalApplicationPreferences.getCustomFileBrowserCommand());</span>
+<span class="nc" id="L107">        kindleEmailProperty.setValue(initialExternalApplicationPreferences.getKindleEmail());</span>
+<span class="nc" id="L108">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L112">        ExternalApplicationsPreferences externalPreferences = preferences.getExternalApplicationsPreferences();</span>
+<span class="nc" id="L113">        externalPreferences.setEMailSubject(eMailReferenceSubjectProperty.getValue());</span>
+<span class="nc" id="L114">        externalPreferences.setAutoOpenEmailAttachmentsFolder(autoOpenAttachedFoldersProperty.getValue());</span>
+<span class="nc" id="L115">        externalPreferences.setCiteCommand(CitationCommandString.from(citeCommandProperty.getValue()));</span>
+<span class="nc" id="L116">        externalPreferences.setUseCustomTerminal(useCustomTerminalProperty.getValue());</span>
+<span class="nc" id="L117">        externalPreferences.setCustomTerminalCommand(customTerminalCommandProperty.getValue());</span>
+<span class="nc" id="L118">        externalPreferences.setUseCustomFileBrowser(useCustomFileBrowserProperty.getValue());</span>
+<span class="nc" id="L119">        externalPreferences.setCustomFileBrowserCommand(customFileBrowserCommandProperty.getValue());</span>
+<span class="nc" id="L120">        externalPreferences.setKindleEmail(kindleEmailProperty.getValue());</span>
+
+<span class="nc" id="L122">        PushToApplicationPreferences pushPreferences = preferences.getPushToApplicationPreferences();</span>
+<span class="nc" id="L123">        pushPreferences.setActiveApplicationName(selectedPushToApplicationProperty.getValue().getDisplayName());</span>
+<span class="nc" id="L124">        pushPreferences.setCommandPaths(workingPushToApplicationPreferences.getCommandPaths());</span>
+<span class="nc" id="L125">        pushPreferences.setEmacsArguments(workingPushToApplicationPreferences.getEmacsArguments());</span>
+<span class="nc" id="L126">        pushPreferences.setVimServer(workingPushToApplicationPreferences.getVimServer());</span>
+<span class="nc" id="L127">    }</span>
+
+    public ValidationStatus terminalCommandValidationStatus() {
+<span class="nc" id="L130">        return terminalCommandValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus fileBrowserCommandValidationStatus() {
+<span class="nc" id="L134">        return fileBrowserCommandValidator.getValidationStatus();</span>
+    }
+
+    @Override
+    public boolean validateSettings() {
+<span class="nc" id="L139">        CompositeValidator validator = new CompositeValidator();</span>
+
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (useCustomTerminalProperty.getValue()) {</span>
+<span class="nc" id="L142">            validator.addValidators(terminalCommandValidator);</span>
+        }
+
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (useCustomFileBrowserProperty.getValue()) {</span>
+<span class="nc" id="L146">            validator.addValidators(fileBrowserCommandValidator);</span>
+        }
+
+<span class="nc" id="L149">        ValidationStatus validationStatus = validator.getValidationStatus();</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (!validationStatus.isValid()) {</span>
+<span class="nc" id="L151">            validationStatus.getHighestMessage().ifPresent(message -&gt;</span>
+<span class="nc" id="L152">                    dialogService.showErrorDialogAndWait(message.getMessage()));</span>
+<span class="nc" id="L153">            return false;</span>
+        }
+<span class="nc" id="L155">        return true;</span>
+    }
+
+    public void pushToApplicationSettings() {
+<span class="nc" id="L159">        PushToApplication selectedApplication = selectedPushToApplicationProperty.getValue();</span>
+<span class="nc" id="L160">        PushToApplicationSettings settings = selectedApplication.getSettings(selectedApplication, workingPushToApplicationPreferences);</span>
+
+<span class="nc" id="L162">        DialogPane dialogPane = new DialogPane();</span>
+<span class="nc" id="L163">        dialogPane.setContent(settings.getSettingsPane());</span>
+
+<span class="nc" id="L165">        dialogService.showCustomDialogAndWait(</span>
+<span class="nc" id="L166">                Localization.lang(&quot;Application settings&quot;),</span>
+                dialogPane,
+                ButtonType.OK, ButtonType.CANCEL)
+<span class="nc" id="L169">                     .ifPresent(btn -&gt; {</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                                 if (btn == ButtonType.OK) {</span>
+<span class="nc" id="L171">                                     settings.storeSettings();</span>
+                                 }
+<span class="nc" id="L173">                             }</span>
+                     );
+<span class="nc" id="L175">    }</span>
+
+    public void customTerminalBrowse() {
+<span class="nc" id="L178">        dialogService.showFileOpenDialog(fileDialogConfiguration)</span>
+<span class="nc" id="L179">                     .ifPresent(file -&gt; customTerminalCommandProperty.setValue(file.toAbsolutePath().toString()));</span>
+<span class="nc" id="L180">    }</span>
+
+    public void customFileBrowserBrowse() {
+<span class="nc" id="L183">        dialogService.showFileOpenDialog(fileDialogConfiguration)</span>
+<span class="nc" id="L184">                     .ifPresent(file -&gt; customFileBrowserCommandProperty.setValue(file.toAbsolutePath().toString()));</span>
+<span class="nc" id="L185">    }</span>
+
+    // EMail
+
+    public StringProperty eMailReferenceSubjectProperty() {
+<span class="nc" id="L190">        return this.eMailReferenceSubjectProperty;</span>
+    }
+
+    public StringProperty kindleEmailProperty() {
+<span class="nc" id="L194">        return this.kindleEmailProperty;</span>
+    }
+
+    public BooleanProperty autoOpenAttachedFoldersProperty() {
+<span class="nc" id="L198">        return this.autoOpenAttachedFoldersProperty;</span>
+    }
+
+    // Push-To-Application
+
+    public ListProperty&lt;PushToApplication&gt; pushToApplicationsListProperty() {
+<span class="nc" id="L204">        return this.pushToApplicationsListProperty;</span>
+    }
+
+    public ObjectProperty&lt;PushToApplication&gt; selectedPushToApplication() {
+<span class="nc" id="L208">        return this.selectedPushToApplicationProperty;</span>
+    }
+
+    public StringProperty citeCommandProperty() {
+<span class="nc" id="L212">        return this.citeCommandProperty;</span>
+    }
+
+    public BooleanProperty useCustomTerminalProperty() {
+<span class="nc" id="L216">        return this.useCustomTerminalProperty;</span>
+    }
+
+    public StringProperty customTerminalCommandProperty() {
+<span class="nc" id="L220">        return this.customTerminalCommandProperty;</span>
+    }
+
+    // Open File Browser
+
+    public BooleanProperty useCustomFileBrowserProperty() {
+<span class="nc" id="L226">        return this.useCustomFileBrowserProperty;</span>
+    }
+
+    public StringProperty customFileBrowserCommandProperty() {
+<span class="nc" id="L230">        return this.customFileBrowserCommandProperty;</span>
+    }
+
+    public void resetCiteCommandToDefault() {
+<span class="nc" id="L234">        this.citeCommandProperty.setValue(preferences.getExternalApplicationsPreferences().getDefaultCiteCommand().toString());</span>
+<span class="nc" id="L235">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

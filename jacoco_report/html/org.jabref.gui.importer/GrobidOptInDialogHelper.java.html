@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GrobidOptInDialogHelper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.importer</a> &gt; <span class="el_source">GrobidOptInDialogHelper.java</span></div><h1>GrobidOptInDialogHelper.java</h1><pre class="source lang-java linenums">package org.jabref.gui.importer;
+
+import org.jabref.gui.DialogService;
+import org.jabref.logic.importer.fetcher.GrobidPreferences;
+import org.jabref.logic.l10n.Localization;
+
+/**
+ * Metadata extraction from PDFs and plaintext works very well using Grobid, but we do not want to enable it by default
+ * due to data privacy concerns.
+ * To make users aware of the feature, we ask each time before querying Grobid, giving the option to opt-out.
+ */
+<span class="nc" id="L12">public class GrobidOptInDialogHelper {</span>
+
+    /**
+     * If Grobid is not enabled but the user has not explicitly opted-out of Grobid, we ask for permission to send data
+     * to Grobid using a dialog and giving an opt-out option.
+     *
+     * @param dialogService the DialogService to use
+     * @return if the user enabled Grobid, either in the past or after being asked by the dialog.
+     */
+    public static boolean showAndWaitIfUserIsUndecided(DialogService dialogService, GrobidPreferences preferences) {
+<span class="nc bnc" id="L22" title="All 2 branches missed.">        if (preferences.isGrobidEnabled()) {</span>
+<span class="nc" id="L23">            return true;</span>
+        }
+<span class="nc bnc" id="L25" title="All 2 branches missed.">        if (preferences.isGrobidOptOut()) {</span>
+<span class="nc" id="L26">            return false;</span>
+        }
+<span class="nc" id="L28">        boolean grobidEnabled = dialogService.showConfirmationDialogWithOptOutAndWait(</span>
+<span class="nc" id="L29">                Localization.lang(&quot;Remote services&quot;),</span>
+<span class="nc" id="L30">                Localization.lang(&quot;Allow sending PDF files and raw citation strings to a JabRef online service (Grobid) to determine Metadata. This produces better results.&quot;),</span>
+<span class="nc" id="L31">                Localization.lang(&quot;Do not ask again&quot;),</span>
+<span class="nc" id="L32">                optOut -&gt; preferences.grobidOptOutProperty().setValue(optOut));</span>
+<span class="nc" id="L33">        preferences.grobidEnabledProperty().setValue(grobidEnabled);</span>
+<span class="nc" id="L34">        return grobidEnabled;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

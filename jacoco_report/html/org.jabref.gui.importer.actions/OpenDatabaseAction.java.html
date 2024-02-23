@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenDatabaseAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.importer.actions</a> &gt; <span class="el_source">OpenDatabaseAction.java</span></div><h1>OpenDatabaseAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.importer.actions;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.Telemetry;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.autosaveandbackup.BackupManager;
+import org.jabref.gui.dialogs.BackupUIManager;
+import org.jabref.gui.shared.SharedDatabaseUIManager;
+import org.jabref.gui.undo.CountingUndoManager;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.importer.OpenDatabase;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.shared.DatabaseNotSupportedException;
+import org.jabref.logic.shared.exception.InvalidDBMSConnectionPropertiesException;
+import org.jabref.logic.shared.exception.NotASharedDatabaseException;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.logic.util.io.FileHistory;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+// The action concerned with opening an existing database.
+public class OpenDatabaseAction extends SimpleCommand {
+
+<span class="fc" id="L48">    private static final Logger LOGGER = LoggerFactory.getLogger(OpenDatabaseAction.class);</span>
+
+    // List of actions that may need to be called after opening the file. Such as
+    // upgrade actions etc. that may depend on the JabRef version that wrote the file:
+<span class="fc" id="L52">    private static final List&lt;GUIPostOpenAction&gt; POST_OPEN_ACTIONS = List.of(</span>
+            // Migrations:
+            // Warning for migrating the Review into the Comment field
+            new MergeReviewIntoCommentAction(),
+            // Check for new custom entry types loaded from the BIB file:
+            new CheckForNewEntryTypesAction());
+
+    private final LibraryTabContainer tabContainer;
+    private final PreferencesService preferencesService;
+    private final StateManager stateManager;
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final DialogService dialogService;
+    private final BibEntryTypesManager entryTypesManager;
+    private final CountingUndoManager undoManager;
+    private final TaskExecutor taskExecutor;
+
+    public OpenDatabaseAction(LibraryTabContainer tabContainer,
+                              PreferencesService preferencesService,
+                              DialogService dialogService,
+                              StateManager stateManager,
+                              FileUpdateMonitor fileUpdateMonitor,
+                              BibEntryTypesManager entryTypesManager,
+                              CountingUndoManager undoManager,
+<span class="nc" id="L75">                              TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L76">        this.tabContainer = tabContainer;</span>
+<span class="nc" id="L77">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L78">        this.dialogService = dialogService;</span>
+<span class="nc" id="L79">        this.stateManager = stateManager;</span>
+<span class="nc" id="L80">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="nc" id="L81">        this.entryTypesManager = entryTypesManager;</span>
+<span class="nc" id="L82">        this.undoManager = undoManager;</span>
+<span class="nc" id="L83">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L84">    }</span>
+
+    /**
+     * Go through the list of post open actions, and perform those that need to be performed.
+     *
+     * @param result     The result of the BIB file parse operation.
+     */
+    public static void performPostOpenActions(ParserResult result, DialogService dialogService) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        for (GUIPostOpenAction action : OpenDatabaseAction.POST_OPEN_ACTIONS) {</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (action.isActionNecessary(result)) {</span>
+<span class="nc" id="L94">                action.performAction(result, dialogService);</span>
+            }
+<span class="nc" id="L96">        }</span>
+<span class="nc" id="L97">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc" id="L101">        FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()</span>
+<span class="nc" id="L102">                .addExtensionFilter(StandardFileType.BIBTEX_DB)</span>
+<span class="nc" id="L103">                .withDefaultExtension(StandardFileType.BIBTEX_DB)</span>
+<span class="nc" id="L104">                .withInitialDirectory(getInitialDirectory())</span>
+<span class="nc" id="L105">                .build();</span>
+
+<span class="nc" id="L107">        List&lt;Path&gt; filesToOpen = dialogService.showFileOpenDialogAndGetMultipleFiles(fileDialogConfiguration);</span>
+<span class="nc" id="L108">        openFiles(filesToOpen);</span>
+<span class="nc" id="L109">    }</span>
+
+    /**
+     * @return Path of current panel database directory or the working directory
+     */
+    private Path getInitialDirectory() {
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (tabContainer.getLibraryTabs().isEmpty()) {</span>
+<span class="nc" id="L116">            return preferencesService.getFilePreferences().getWorkingDirectory();</span>
+        } else {
+<span class="nc" id="L118">            Optional&lt;Path&gt; databasePath = tabContainer.getCurrentLibraryTab().getBibDatabaseContext().getDatabasePath();</span>
+<span class="nc" id="L119">            return databasePath.map(Path::getParent).orElse(preferencesService.getFilePreferences().getWorkingDirectory());</span>
+        }
+    }
+
+    /**
+     * Opens the given file. If null or 404, nothing happens.
+     * In case the file is already opened, that panel is raised.
+     *
+     * @param file the file, may be null or not existing
+     */
+    public void openFile(Path file) {
+<span class="nc" id="L130">        openFiles(new ArrayList&lt;&gt;(List.of(file)));</span>
+<span class="nc" id="L131">    }</span>
+
+    /**
+     * Opens the given files. If one of it is null or 404, nothing happens.
+     * In case the file is already opened, that panel is raised.
+     *
+     * @param filesToOpen the filesToOpen, may be null or not existing
+     */
+    public void openFiles(List&lt;Path&gt; filesToOpen) {
+<span class="nc" id="L140">        LibraryTab toRaise = null;</span>
+<span class="nc" id="L141">        int initialCount = filesToOpen.size();</span>
+<span class="nc" id="L142">        int removed = 0;</span>
+
+        // Check if any of the files are already open:
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        for (Iterator&lt;Path&gt; iterator = filesToOpen.iterator(); iterator.hasNext(); ) {</span>
+<span class="nc" id="L146">            Path file = iterator.next();</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            for (LibraryTab libraryTab : tabContainer.getLibraryTabs()) {</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                if ((libraryTab.getBibDatabaseContext().getDatabasePath().isPresent())</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                        &amp;&amp; libraryTab.getBibDatabaseContext().getDatabasePath().get().equals(file)) {</span>
+<span class="nc" id="L150">                    iterator.remove();</span>
+<span class="nc" id="L151">                    removed++;</span>
+                    // See if we removed the final one. If so, we must perhaps
+                    // raise the LibraryTab in question:
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                    if (removed == initialCount) {</span>
+<span class="nc" id="L155">                        toRaise = libraryTab;</span>
+                    }
+                    // no more LibraryTabs to check, we found a matching one
+                    break;
+                }
+<span class="nc" id="L160">            }</span>
+<span class="nc" id="L161">        }</span>
+
+        // Run the actual open in a thread to prevent the program
+        // locking until the file is loaded.
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (!filesToOpen.isEmpty()) {</span>
+<span class="nc" id="L166">            FileHistory fileHistory = preferencesService.getGuiPreferences().getFileHistory();</span>
+<span class="nc" id="L167">            filesToOpen.forEach(theFile -&gt; {</span>
+                // This method will execute the concrete file opening and loading in a background thread
+<span class="nc" id="L169">                openTheFile(theFile);</span>
+<span class="nc" id="L170">                fileHistory.newFile(theFile);</span>
+<span class="nc" id="L171">            });</span>
+<span class="nc bnc" id="L172" title="All 4 branches missed.">        } else if (toRaise != null &amp;&amp; tabContainer.getCurrentLibraryTab() == null) {</span>
+            // If no files are remaining to open, this could mean that a file was
+            // already open. If so, we may have to raise the correct tab:
+            // If there is already a library focused, do not show this library
+<span class="nc" id="L176">            tabContainer.showLibraryTab(toRaise);</span>
+        }
+<span class="nc" id="L178">    }</span>
+
+    /**
+     * This is the real file opening. Should be called via {@link #openFile(Path)}
+     *
+     * Similar method: {@link org.jabref.gui.JabRefFrame#addTab(org.jabref.model.database.BibDatabaseContext, boolean)}.
+     *
+     * @param file the file, may be NOT null, but may not be existing
+     */
+    private void openTheFile(Path file) {
+<span class="nc" id="L188">        Objects.requireNonNull(file);</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (!Files.exists(file)) {</span>
+<span class="nc" id="L190">            return;</span>
+        }
+
+<span class="nc" id="L193">        BackgroundTask&lt;ParserResult&gt; backgroundTask = BackgroundTask.wrap(() -&gt; loadDatabase(file));</span>
+        // The backgroundTask is executed within the method createLibraryTab
+<span class="nc" id="L195">        LibraryTab newTab = LibraryTab.createLibraryTab(</span>
+                backgroundTask,
+                file,
+                dialogService,
+                preferencesService,
+                stateManager,
+                tabContainer,
+                fileUpdateMonitor,
+                entryTypesManager,
+                undoManager,
+                taskExecutor);
+<span class="nc" id="L206">        backgroundTask.onFinished(() -&gt; trackOpenNewDatabase(newTab));</span>
+<span class="nc" id="L207">        tabContainer.addTab(newTab, true);</span>
+<span class="nc" id="L208">    }</span>
+
+    private ParserResult loadDatabase(Path file) throws Exception {
+<span class="nc" id="L211">        Path fileToLoad = file.toAbsolutePath();</span>
+
+<span class="nc" id="L213">        dialogService.notify(Localization.lang(&quot;Opening&quot;) + &quot;: '&quot; + file + &quot;'&quot;);</span>
+
+<span class="nc" id="L215">        preferencesService.getFilePreferences().setWorkingDirectory(fileToLoad.getParent());</span>
+<span class="nc" id="L216">        Path backupDir = preferencesService.getFilePreferences().getBackupDirectory();</span>
+
+<span class="nc" id="L218">        ParserResult parserResult = null;</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (BackupManager.backupFileDiffers(fileToLoad, backupDir)) {</span>
+            // In case the backup differs, ask the user what to do.
+            // In case the user opted for restoring a backup, the content of the backup is contained in parserResult.
+<span class="nc" id="L222">            parserResult = BackupUIManager.showRestoreBackupDialog(dialogService, fileToLoad, preferencesService, fileUpdateMonitor)</span>
+<span class="nc" id="L223">                                          .orElse(null);</span>
+        }
+
+        try {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            if (parserResult == null) {</span>
+                // No backup was restored, do the &quot;normal&quot; loading
+<span class="nc" id="L229">                parserResult = OpenDatabase.loadDatabase(fileToLoad,</span>
+<span class="nc" id="L230">                        preferencesService.getImportFormatPreferences(),</span>
+                        fileUpdateMonitor);
+            }
+
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            if (parserResult.hasWarnings()) {</span>
+<span class="nc" id="L235">                String content = Localization.lang(&quot;Please check your library file for wrong syntax.&quot;)</span>
+<span class="nc" id="L236">                        + &quot;\n\n&quot; + parserResult.getErrorMessage();</span>
+<span class="nc" id="L237">                DefaultTaskExecutor.runInJavaFXThread(() -&gt;</span>
+<span class="nc" id="L238">                        dialogService.showWarningDialogAndWait(Localization.lang(&quot;Open library error&quot;), content));</span>
+            }
+<span class="nc" id="L240">        } catch (IOException e) {</span>
+<span class="nc" id="L241">            parserResult = ParserResult.fromError(e);</span>
+<span class="nc" id="L242">            LOGGER.error(&quot;Error opening file '{}'&quot;, fileToLoad, e);</span>
+<span class="nc" id="L243">        }</span>
+
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        if (parserResult.getDatabase().isShared()) {</span>
+<span class="nc" id="L246">                         openSharedDatabase(</span>
+                                 parserResult,
+                                 tabContainer,
+                                 dialogService,
+                                 preferencesService,
+                                 stateManager,
+                                 entryTypesManager,
+                                 fileUpdateMonitor,
+                                 undoManager,
+                                 taskExecutor);
+        }
+<span class="nc" id="L257">        return parserResult;</span>
+    }
+
+    private void trackOpenNewDatabase(LibraryTab libraryTab) {
+<span class="nc" id="L261">        Telemetry.getTelemetryClient().ifPresent(client -&gt; client.trackEvent(</span>
+                &quot;OpenNewDatabase&quot;,
+<span class="nc" id="L263">                Map.of(),</span>
+<span class="nc" id="L264">                Map.of(&quot;NumberOfEntries&quot;, (double) libraryTab.getBibDatabaseContext().getDatabase().getEntryCount())));</span>
+<span class="nc" id="L265">    }</span>
+
+    public static void openSharedDatabase(ParserResult parserResult,
+                                          LibraryTabContainer tabContainer,
+                                          DialogService dialogService,
+                                          PreferencesService preferencesService,
+                                          StateManager stateManager,
+                                          BibEntryTypesManager entryTypesManager,
+                                          FileUpdateMonitor fileUpdateMonitor,
+                                          UndoManager undoManager,
+                                          TaskExecutor taskExecutor)
+            throws SQLException, DatabaseNotSupportedException, InvalidDBMSConnectionPropertiesException, NotASharedDatabaseException {
+        try {
+<span class="nc" id="L278">            new SharedDatabaseUIManager(</span>
+                    tabContainer,
+                    dialogService,
+                    preferencesService,
+                    stateManager,
+                    entryTypesManager,
+                    fileUpdateMonitor,
+                    undoManager,
+                    taskExecutor)
+<span class="nc" id="L287">                    .openSharedDatabaseFromParserResult(parserResult);</span>
+<span class="nc" id="L288">        } catch (SQLException | DatabaseNotSupportedException | InvalidDBMSConnectionPropertiesException |</span>
+                 NotASharedDatabaseException e) {
+<span class="nc" id="L290">            parserResult.getDatabaseContext().clearDatabasePath(); // do not open the original file</span>
+<span class="nc" id="L291">            parserResult.getDatabase().clearSharedDatabaseID();</span>
+
+<span class="nc" id="L293">            throw e;</span>
+<span class="nc" id="L294">        }</span>
+<span class="nc" id="L295">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

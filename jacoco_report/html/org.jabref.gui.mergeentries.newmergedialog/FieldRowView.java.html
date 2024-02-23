@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldRowView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries.newmergedialog</a> &gt; <span class="el_source">FieldRowView.java</span></div><h1>FieldRowView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries.newmergedialog;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.layout.GridPane;
+
+import org.jabref.gui.mergeentries.newmergedialog.FieldRowViewModel.Selection;
+import org.jabref.gui.mergeentries.newmergedialog.cell.FieldNameCell;
+import org.jabref.gui.mergeentries.newmergedialog.cell.FieldValueCell;
+import org.jabref.gui.mergeentries.newmergedialog.cell.MergedFieldCell;
+import org.jabref.gui.mergeentries.newmergedialog.cell.sidebuttons.ToggleMergeUnmergeButton;
+import org.jabref.gui.mergeentries.newmergedialog.diffhighlighter.SplitDiffHighlighter;
+import org.jabref.gui.mergeentries.newmergedialog.diffhighlighter.UnifiedDiffHighlighter;
+import org.jabref.gui.mergeentries.newmergedialog.fieldsmerger.FieldMergerFactory;
+import org.jabref.gui.mergeentries.newmergedialog.toolbar.ThreeWayMergeToolbar;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+import org.fxmisc.richtext.StyleClassedTextArea;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A controller class to control left, right and merged field values
+ */
+public class FieldRowView {
+<span class="nc" id="L32">    private static final Logger LOGGER = LoggerFactory.getLogger(FieldRowView.class);</span>
+
+    protected final FieldRowViewModel viewModel;
+
+<span class="nc" id="L36">    protected final BooleanProperty shouldShowDiffs = new SimpleBooleanProperty(true);</span>
+    private final FieldNameCell fieldNameCell;
+    private final FieldValueCell leftValueCell;
+    private final FieldValueCell rightValueCell;
+    private final MergedFieldCell mergedValueCell;
+
+<span class="nc" id="L42">    private final ToggleGroup toggleGroup = new ToggleGroup();</span>
+
+    private GridPane parent;
+
+<span class="nc" id="L46">    public FieldRowView(Field field, BibEntry leftEntry, BibEntry rightEntry, BibEntry mergedEntry, FieldMergerFactory fieldMergerFactory, PreferencesService preferencesService, int rowIndex) {</span>
+<span class="nc" id="L47">        viewModel = new FieldRowViewModel(field, leftEntry, rightEntry, mergedEntry, fieldMergerFactory);</span>
+
+<span class="nc" id="L49">        fieldNameCell = new FieldNameCell(field.getDisplayName(), rowIndex);</span>
+<span class="nc" id="L50">        leftValueCell = new FieldValueCell(viewModel.getLeftFieldValue(), rowIndex, preferencesService);</span>
+<span class="nc" id="L51">        rightValueCell = new FieldValueCell(viewModel.getRightFieldValue(), rowIndex, preferencesService);</span>
+<span class="nc" id="L52">        mergedValueCell = new MergedFieldCell(viewModel.getMergedFieldValue(), rowIndex);</span>
+
+        // As a workaround we need to have a reference to the parent grid pane to be able to show/hide the row.
+        // This won't be necessary when https://bugs.openjdk.org/browse/JDK-8136901 is fixed.
+<span class="nc" id="L56">        leftValueCell.parentProperty().addListener(e -&gt; {</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            if (leftValueCell.getParent() instanceof GridPane grid) {</span>
+<span class="nc" id="L58">                parent = grid;</span>
+            }
+<span class="nc" id="L60">        });</span>
+
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (FieldMergerFactory.canMerge(field)) {</span>
+<span class="nc" id="L63">            ToggleMergeUnmergeButton toggleMergeUnmergeButton = new ToggleMergeUnmergeButton(field);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            toggleMergeUnmergeButton.setCanMerge(!viewModel.hasEqualLeftAndRightValues());</span>
+<span class="nc" id="L65">            fieldNameCell.addSideButton(toggleMergeUnmergeButton);</span>
+
+<span class="nc" id="L67">            EasyBind.listen(toggleMergeUnmergeButton.fieldStateProperty(), ((observableValue, old, fieldState) -&gt; {</span>
+<span class="nc" id="L68">                LOGGER.debug(&quot;Field merge state is {} for field {}&quot;, fieldState, field);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                if (fieldState == ToggleMergeUnmergeButton.FieldState.MERGED) {</span>
+<span class="nc" id="L70">                    viewModel.mergeFields();</span>
+                } else {
+<span class="nc" id="L72">                    viewModel.unmergeFields();</span>
+                }
+<span class="nc" id="L74">            }));</span>
+        }
+
+<span class="nc" id="L77">        toggleGroup.getToggles().addAll(leftValueCell, rightValueCell);</span>
+
+<span class="nc" id="L79">        mergedValueCell.textProperty().bindBidirectional(viewModel.mergedFieldValueProperty());</span>
+<span class="nc" id="L80">        leftValueCell.textProperty().bindBidirectional(viewModel.leftFieldValueProperty());</span>
+<span class="nc" id="L81">        rightValueCell.textProperty().bindBidirectional(viewModel.rightFieldValueProperty());</span>
+
+<span class="nc" id="L83">        EasyBind.subscribe(viewModel.selectionProperty(), selection -&gt; {</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            if (selection == Selection.LEFT) {</span>
+<span class="nc" id="L85">                toggleGroup.selectToggle(leftValueCell);</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            } else if (selection == Selection.RIGHT) {</span>
+<span class="nc" id="L87">                toggleGroup.selectToggle(rightValueCell);</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            } else if (selection == Selection.NONE) {</span>
+<span class="nc" id="L89">                toggleGroup.selectToggle(null);</span>
+            }
+<span class="nc" id="L91">        });</span>
+
+<span class="nc" id="L93">        EasyBind.subscribe(toggleGroup.selectedToggleProperty(), selectedToggle -&gt; {</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            if (selectedToggle == leftValueCell) {</span>
+<span class="nc" id="L95">                selectLeftValue();</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            } else if (selectedToggle == rightValueCell) {</span>
+<span class="nc" id="L97">                selectRightValue();</span>
+            } else {
+<span class="nc" id="L99">                selectNone();</span>
+            }
+<span class="nc" id="L101">        });</span>
+
+        // Hide rightValueCell and extend leftValueCell to 2 columns when fields are merged
+<span class="nc" id="L104">        EasyBind.subscribe(viewModel.isFieldsMergedProperty(), isFieldsMerged -&gt; {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (isFieldsMerged) {</span>
+<span class="nc" id="L106">                rightValueCell.setVisible(false);</span>
+<span class="nc" id="L107">                GridPane.setColumnSpan(leftValueCell, 2);</span>
+            } else {
+<span class="nc" id="L109">                rightValueCell.setVisible(true);</span>
+<span class="nc" id="L110">                GridPane.setColumnSpan(leftValueCell, 1);</span>
+            }
+<span class="nc" id="L112">        });</span>
+
+<span class="nc" id="L114">        EasyBind.listen(viewModel.hasEqualLeftAndRightBinding(), (obs, old, isEqual) -&gt; {</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (isEqual) {</span>
+<span class="nc" id="L116">                LOGGER.debug(&quot;Left and right values are equal, LEFT==RIGHT=={}&quot;, viewModel.getLeftFieldValue());</span>
+<span class="nc" id="L117">                hideDiff();</span>
+            }
+<span class="nc" id="L119">        });</span>
+<span class="nc" id="L120">    }</span>
+
+    public void selectLeftValue() {
+<span class="nc" id="L123">        viewModel.selectLeftValue();</span>
+<span class="nc" id="L124">    }</span>
+
+    public void selectRightValue() {
+<span class="nc" id="L127">        viewModel.selectRightValue();</span>
+<span class="nc" id="L128">    }</span>
+
+    public void selectNone() {
+<span class="nc" id="L131">        viewModel.selectNone();</span>
+<span class="nc" id="L132">    }</span>
+
+    public String getMergedValue() {
+<span class="nc" id="L135">        return mergedValueProperty().getValue();</span>
+    }
+
+    public ReadOnlyStringProperty mergedValueProperty() {
+<span class="nc" id="L139">        return viewModel.mergedFieldValueProperty();</span>
+    }
+
+    public FieldNameCell getFieldNameCell() {
+<span class="nc" id="L143">        return fieldNameCell;</span>
+    }
+
+    public FieldValueCell getLeftValueCell() {
+<span class="nc" id="L147">        return leftValueCell;</span>
+    }
+
+    public FieldValueCell getRightValueCell() {
+<span class="nc" id="L151">        return rightValueCell;</span>
+    }
+
+    public MergedFieldCell getMergedValueCell() {
+<span class="nc" id="L155">        return mergedValueCell;</span>
+    }
+
+    public void showDiff(ShowDiffConfig diffConfig) {
+<span class="nc bnc" id="L159" title="All 6 branches missed.">        if (!rightValueCell.isVisible() || StringUtil.isNullOrEmpty(viewModel.getLeftFieldValue()) || StringUtil.isNullOrEmpty(viewModel.getRightFieldValue())) {</span>
+<span class="nc" id="L160">            return;</span>
+        }
+<span class="nc" id="L162">        LOGGER.debug(&quot;Showing diffs...&quot;);</span>
+
+<span class="nc" id="L164">        StyleClassedTextArea leftLabel = leftValueCell.getStyleClassedLabel();</span>
+<span class="nc" id="L165">        StyleClassedTextArea rightLabel = rightValueCell.getStyleClassedLabel();</span>
+        // Clearing old diff styles based on previous diffConfig
+<span class="nc" id="L167">        hideDiff();</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (shouldShowDiffs.get()) {</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (diffConfig.diffView() == ThreeWayMergeToolbar.DiffView.UNIFIED) {</span>
+<span class="nc" id="L170">                new UnifiedDiffHighlighter(leftLabel, rightLabel, diffConfig.diffHighlightingMethod()).highlight();</span>
+            } else {
+<span class="nc" id="L172">                new SplitDiffHighlighter(leftLabel, rightLabel, diffConfig.diffHighlightingMethod()).highlight();</span>
+            }
+        }
+<span class="nc" id="L175">    }</span>
+
+    public void hide() {
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (parent != null) {</span>
+<span class="nc" id="L179">            parent.getChildren().removeAll(leftValueCell, rightValueCell, mergedValueCell, fieldNameCell);</span>
+        }
+<span class="nc" id="L181">    }</span>
+
+    public void show() {
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        if (parent != null) {</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            if (!parent.getChildren().contains(leftValueCell)) {</span>
+<span class="nc" id="L186">                parent.getChildren().addAll(leftValueCell, rightValueCell, mergedValueCell, fieldNameCell);</span>
+            }
+        }
+<span class="nc" id="L189">    }</span>
+
+    public void hideDiff() {
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (!rightValueCell.isVisible()) {</span>
+<span class="nc" id="L193">            return;</span>
+        }
+
+<span class="nc" id="L196">        LOGGER.debug(&quot;Hiding diffs...&quot;);</span>
+
+<span class="nc" id="L198">        int leftValueLength = getLeftValueCell().getStyleClassedLabel().getLength();</span>
+<span class="nc" id="L199">        getLeftValueCell().getStyleClassedLabel().clearStyle(0, leftValueLength);</span>
+<span class="nc" id="L200">        getLeftValueCell().getStyleClassedLabel().replaceText(viewModel.getLeftFieldValue());</span>
+
+<span class="nc" id="L202">        int rightValueLength = getRightValueCell().getStyleClassedLabel().getLength();</span>
+<span class="nc" id="L203">        getRightValueCell().getStyleClassedLabel().clearStyle(0, rightValueLength);</span>
+<span class="nc" id="L204">        getRightValueCell().getStyleClassedLabel().replaceText(viewModel.getRightFieldValue());</span>
+<span class="nc" id="L205">    }</span>
+
+    public boolean hasEqualLeftAndRightValues() {
+<span class="nc" id="L208">        return viewModel.hasEqualLeftAndRightValues();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L213">        return &quot;FieldRowView [shouldShowDiffs=&quot; + shouldShowDiffs.get() + &quot;, fieldNameCell=&quot; + fieldNameCell + &quot;, leftValueCell=&quot; + leftValueCell + &quot;, rightValueCell=&quot; + rightValueCell + &quot;, mergedValueCell=&quot; + mergedValueCell + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitationGroups.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.style</a> &gt; <span class="el_source">CitationGroups.java</span></div><h1>CitationGroups.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.style;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Consumer;
+
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.openoffice.util.OOListUtil;
+import org.jabref.model.openoffice.util.OOPair;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * CitationGroups : the set of citation groups in the document.
+ * &lt;p&gt;
+ * This is the main input (as well as output) for creating citation markers and bibliography.
+ */
+public class CitationGroups {
+
+<span class="nc" id="L27">    private static final Logger LOGGER = LoggerFactory.getLogger(CitationGroups.class);</span>
+
+    private final Map&lt;CitationGroupId, CitationGroup&gt; citationGroupsUnordered;
+
+    /**
+     * Provides order of appearance for the citation groups.
+     */
+    private Optional&lt;List&lt;CitationGroupId&gt;&gt; globalOrder;
+
+    /**
+     * This is going to be the bibliography
+     */
+    private Optional&lt;CitedKeys&gt; bibliography;
+
+    /**
+     * Constructor
+     */
+<span class="nc" id="L44">    public CitationGroups(Map&lt;CitationGroupId, CitationGroup&gt; citationGroups) {</span>
+<span class="nc" id="L45">        this.citationGroupsUnordered = citationGroups;</span>
+
+<span class="nc" id="L47">        this.globalOrder = Optional.empty();</span>
+<span class="nc" id="L48">        this.bibliography = Optional.empty();</span>
+<span class="nc" id="L49">    }</span>
+
+    public int numberOfCitationGroups() {
+<span class="nc" id="L52">        return citationGroupsUnordered.size();</span>
+    }
+
+    /**
+     * For each citation in {@code where} call {@code fun.accept(new Pair(citation, value));}
+     */
+    public &lt;T&gt; void distributeToCitations(List&lt;CitationPath&gt; where,
+                                          Consumer&lt;OOPair&lt;Citation, T&gt;&gt; fun,
+                                          T value) {
+
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        for (CitationPath p : where) {</span>
+<span class="nc" id="L63">            CitationGroup group = citationGroupsUnordered.get(p.group);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            if (group == null) {</span>
+<span class="nc" id="L65">                LOGGER.warn(&quot;CitationGroups.distributeToCitations: group missing&quot;);</span>
+<span class="nc" id="L66">                continue;</span>
+            }
+<span class="nc" id="L68">            Citation cit = group.citationsInStorageOrder.get(p.storageIndexInGroup);</span>
+<span class="nc" id="L69">            fun.accept(new OOPair&lt;&gt;(cit, value));</span>
+<span class="nc" id="L70">        }</span>
+<span class="nc" id="L71">    }</span>
+
+    /*
+     * Look up each Citation in databases.
+     */
+    public void lookupCitations(List&lt;BibDatabase&gt; databases) {
+        /*
+         * It is not clear which of the two solutions below is better.
+         */
+
+        // (1) collect-lookup-distribute
+        //
+        // CitationDatabaseLookupResult for the same citation key is the same object. Until we
+        // insert a new citation from the GUI.
+<span class="nc" id="L85">        CitedKeys cks = getCitedKeysUnordered();</span>
+<span class="nc" id="L86">        cks.lookupInDatabases(databases);</span>
+<span class="nc" id="L87">        cks.distributeLookupResults(this);</span>
+
+        // (2) lookup each citation directly
+        //
+        // CitationDatabaseLookupResult for the same citation key may be a different object:
+        // CitedKey.addPath has to use equals, so CitationDatabaseLookupResult has to override
+        // Object.equals, which depends on BibEntry.equals and BibDatabase.equals doing the
+        // right thing. Seems to work. But what we gained from avoiding collect-and-distribute
+        // may be lost in more complicated consistency checking in addPath.
+        //
+        ///            for (CitationGroup group : getCitationGroupsUnordered()) {
+        ///                for (Citation cit : group.citationsInStorageOrder) {
+        ///                    cit.lookupInDatabases(databases);
+        ///                }
+        ///            }
+<span class="nc" id="L102">    }</span>
+
+    public List&lt;CitationGroup&gt; getCitationGroupsUnordered() {
+<span class="nc" id="L105">        return new ArrayList&lt;&gt;(citationGroupsUnordered.values());</span>
+    }
+
+    /**
+     * Citation groups in {@code globalOrder}
+     */
+    public List&lt;CitationGroup&gt; getCitationGroupsInGlobalOrder() {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (globalOrder.isEmpty()) {</span>
+<span class="nc" id="L113">            throw new IllegalStateException(&quot;getCitationGroupsInGlobalOrder: not ordered yet&quot;);</span>
+        }
+<span class="nc" id="L115">        return OOListUtil.map(globalOrder.get(), citationGroupsUnordered::get);</span>
+    }
+
+    /**
+     * Impose an order of citation groups by providing the order of their citation group idendifiers.
+     * &lt;p&gt;
+     * Also set indexInGlobalOrder for each citation group.
+     */
+    public void setGlobalOrder(List&lt;CitationGroupId&gt; globalOrder) {
+<span class="nc" id="L124">        Objects.requireNonNull(globalOrder);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (globalOrder.size() != numberOfCitationGroups()) {</span>
+<span class="nc" id="L126">            throw new IllegalStateException(&quot;setGlobalOrder: globalOrder.size() != numberOfCitationGroups()&quot;);</span>
+        }
+<span class="nc" id="L128">        this.globalOrder = Optional.of(globalOrder);</span>
+
+        // Propagate to each CitationGroup
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        for (int i = 0; i &lt; globalOrder.size(); i++) {</span>
+<span class="nc" id="L132">            CitationGroupId groupId = globalOrder.get(i);</span>
+<span class="nc" id="L133">            citationGroupsUnordered.get(groupId).setIndexInGlobalOrder(Optional.of(i));</span>
+        }
+<span class="nc" id="L135">    }</span>
+
+    public boolean hasGlobalOrder() {
+<span class="nc" id="L138">        return globalOrder.isPresent();</span>
+    }
+
+    /**
+     * Impose an order for citations within each group.
+     */
+    public void imposeLocalOrder(Comparator&lt;BibEntry&gt; entryComparator) {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        for (CitationGroup group : citationGroupsUnordered.values()) {</span>
+<span class="nc" id="L146">            group.imposeLocalOrder(entryComparator);</span>
+<span class="nc" id="L147">        }</span>
+<span class="nc" id="L148">    }</span>
+
+    /**
+     * Collect citations into a list of cited sources using neither CitationGroup.globalOrder or Citation.localOrder
+     */
+    public CitedKeys getCitedKeysUnordered() {
+<span class="nc" id="L154">        LinkedHashMap&lt;String, CitedKey&gt; res = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        for (CitationGroup group : citationGroupsUnordered.values()) {</span>
+<span class="nc" id="L156">            int storageIndexInGroup = 0;</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            for (Citation cit : group.citationsInStorageOrder) {</span>
+<span class="nc" id="L158">                String key = cit.citationKey;</span>
+<span class="nc" id="L159">                CitationPath path = new CitationPath(group.groupId, storageIndexInGroup);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                if (res.containsKey(key)) {</span>
+<span class="nc" id="L161">                    res.get(key).addPath(path, cit);</span>
+                } else {
+<span class="nc" id="L163">                    res.put(key, new CitedKey(key, path, cit));</span>
+                }
+<span class="nc" id="L165">                storageIndexInGroup++;</span>
+<span class="nc" id="L166">            }</span>
+<span class="nc" id="L167">        }</span>
+<span class="nc" id="L168">        return new CitedKeys(res);</span>
+    }
+
+    /**
+     * CitedKeys created iterating citations in (globalOrder,localOrder)
+     */
+    public CitedKeys getCitedKeysSortedInOrderOfAppearance() {
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (!hasGlobalOrder()) {</span>
+<span class="nc" id="L176">            throw new IllegalStateException(&quot;getSortedCitedKeys: no globalOrder&quot;);</span>
+        }
+<span class="nc" id="L178">        LinkedHashMap&lt;String, CitedKey&gt; res = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        for (CitationGroup group : getCitationGroupsInGlobalOrder()) {</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            for (int i : group.getLocalOrder()) {</span>
+<span class="nc" id="L181">                Citation cit = group.citationsInStorageOrder.get(i);</span>
+<span class="nc" id="L182">                String citationKey = cit.citationKey;</span>
+<span class="nc" id="L183">                CitationPath path = new CitationPath(group.groupId, i);</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                if (res.containsKey(citationKey)) {</span>
+<span class="nc" id="L185">                    res.get(citationKey).addPath(path, cit);</span>
+                } else {
+<span class="nc" id="L187">                    res.put(citationKey, new CitedKey(citationKey, path, cit));</span>
+                }
+<span class="nc" id="L189">            }</span>
+<span class="nc" id="L190">        }</span>
+<span class="nc" id="L191">        return new CitedKeys(res);</span>
+    }
+
+    public Optional&lt;CitedKeys&gt; getBibliography() {
+<span class="nc" id="L195">        return bibliography;</span>
+    }
+
+    /**
+     * @return Citation keys where lookupCitations() failed.
+     */
+    public List&lt;String&gt; getUnresolvedKeys() {
+<span class="nc" id="L202">        CitedKeys bib = getBibliography().orElse(getCitedKeysUnordered());</span>
+
+<span class="nc" id="L204">        List&lt;String&gt; unresolvedKeys = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        for (CitedKey ck : bib.values()) {</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (ck.getLookupResult().isEmpty()) {</span>
+<span class="nc" id="L207">                unresolvedKeys.add(ck.citationKey);</span>
+            }
+<span class="nc" id="L209">        }</span>
+<span class="nc" id="L210">        return unresolvedKeys;</span>
+    }
+
+    public void createNumberedBibliographySortedInOrderOfAppearance() {
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (bibliography.isPresent()) {</span>
+<span class="nc" id="L215">            throw new IllegalStateException(&quot;createNumberedBibliographySortedInOrderOfAppearance:&quot;</span>
+                    + &quot; already have a bibliography&quot;);
+        }
+<span class="nc" id="L218">        CitedKeys citedKeys = getCitedKeysSortedInOrderOfAppearance();</span>
+<span class="nc" id="L219">        citedKeys.numberCitedKeysInCurrentOrder();</span>
+<span class="nc" id="L220">        citedKeys.distributeNumbers(this);</span>
+<span class="nc" id="L221">        bibliography = Optional.of(citedKeys);</span>
+<span class="nc" id="L222">    }</span>
+
+    /**
+     * precondition: database lookup already performed (otherwise we just sort citation keys)
+     */
+    public void createPlainBibliographySortedByComparator(Comparator&lt;BibEntry&gt; entryComparator) {
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (bibliography.isPresent()) {</span>
+<span class="nc" id="L229">            throw new IllegalStateException(&quot;createPlainBibliographySortedByComparator: already have a bibliography&quot;);</span>
+        }
+<span class="nc" id="L231">        CitedKeys citedKeys = getCitedKeysUnordered();</span>
+<span class="nc" id="L232">        citedKeys.sortByComparator(entryComparator);</span>
+<span class="nc" id="L233">        bibliography = Optional.of(citedKeys);</span>
+<span class="nc" id="L234">    }</span>
+
+    /**
+     * precondition: database lookup already performed (otherwise we just sort citation keys)
+     */
+    public void createNumberedBibliographySortedByComparator(Comparator&lt;BibEntry&gt; entryComparator) {
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (bibliography.isPresent()) {</span>
+<span class="nc" id="L241">            throw new IllegalStateException(&quot;createNumberedBibliographySortedByComparator: already have a bibliography&quot;);</span>
+        }
+<span class="nc" id="L243">        CitedKeys citedKeys = getCitedKeysUnordered();</span>
+<span class="nc" id="L244">        citedKeys.sortByComparator(entryComparator);</span>
+<span class="nc" id="L245">        citedKeys.numberCitedKeysInCurrentOrder();</span>
+<span class="nc" id="L246">        citedKeys.distributeNumbers(this);</span>
+<span class="nc" id="L247">        bibliography = Optional.of(citedKeys);</span>
+<span class="nc" id="L248">    }</span>
+
+    /*
+     * Query by CitationGroupId
+     */
+
+    public Optional&lt;CitationGroup&gt; getCitationGroup(CitationGroupId groupId) {
+<span class="nc" id="L255">        CitationGroup group = citationGroupsUnordered.get(groupId);</span>
+<span class="nc" id="L256">        return Optional.ofNullable(group);</span>
+    }
+
+    /**
+     * @return true if all citation groups have referenceMarkNameForLinking
+     */
+    public boolean citationGroupsProvideReferenceMarkNameForLinking() {
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        for (CitationGroup group : citationGroupsUnordered.values()) {</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (group.getReferenceMarkNameForLinking().isEmpty()) {</span>
+<span class="nc" id="L265">                return false;</span>
+            }
+<span class="nc" id="L267">        }</span>
+<span class="nc" id="L268">        return true;</span>
+    }
+
+    /*
+     * Callbacks.
+     */
+
+    public void afterCreateCitationGroup(CitationGroup group) {
+<span class="nc" id="L276">        citationGroupsUnordered.put(group.groupId, group);</span>
+
+<span class="nc" id="L278">        globalOrder = Optional.empty();</span>
+<span class="nc" id="L279">        bibliography = Optional.empty();</span>
+<span class="nc" id="L280">    }</span>
+
+    public void afterRemoveCitationGroup(CitationGroup group) {
+<span class="nc" id="L283">        citationGroupsUnordered.remove(group.groupId);</span>
+<span class="nc" id="L284">        globalOrder.map(l -&gt; l.remove(group.groupId));</span>
+
+<span class="nc" id="L286">        bibliography = Optional.empty();</span>
+<span class="nc" id="L287">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

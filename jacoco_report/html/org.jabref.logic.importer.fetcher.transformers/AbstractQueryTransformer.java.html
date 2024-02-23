@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractQueryTransformer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher.transformers</a> &gt; <span class="el_source">AbstractQueryTransformer.java</span></div><h1>AbstractQueryTransformer.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher.transformers;
+
+import java.util.Optional;
+import java.util.StringJoiner;
+import java.util.stream.Collectors;
+
+import org.jabref.model.strings.StringUtil;
+
+import org.apache.lucene.queryparser.flexible.core.nodes.BooleanQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.FieldQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.GroupQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.ModifierQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.OrQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * In case the transformer contains state for a query transformation (such as the {@link IEEEQueryTransformer}), it has to be noted at the JavaDoc.
+ * Otherwise, a single instance QueryTransformer can be used.
+ */
+<span class="fc" id="L22">public abstract class AbstractQueryTransformer {</span>
+    public static final String NO_EXPLICIT_FIELD = &quot;default&quot;;
+<span class="fc" id="L24">    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractQueryTransformer.class);</span>
+
+    // These can be used for filtering in post processing
+<span class="fc" id="L27">    protected int startYear = Integer.MAX_VALUE;</span>
+<span class="fc" id="L28">    protected int endYear = Integer.MIN_VALUE;</span>
+
+    /**
+     * Transforms a and b and c to (a AND b AND c), where
+     * a, b, and c can be complex expressions.
+     */
+    protected Optional&lt;String&gt; transform(BooleanQueryNode query) {
+        String delimiter;
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (query instanceof OrQueryNode) {</span>
+<span class="fc" id="L37">            delimiter = getLogicalOrOperator();</span>
+        } else {
+            // We define the logical AND operator as the default implementation
+<span class="fc" id="L40">            delimiter = getLogicalAndOperator();</span>
+        }
+
+<span class="fc" id="L43">        String result = query.getChildren().stream()</span>
+<span class="fc" id="L44">                             .map(this::transform)</span>
+<span class="fc" id="L45">                             .flatMap(Optional::stream)</span>
+<span class="fc" id="L46">                             .collect(Collectors.joining(delimiter, &quot;(&quot;, &quot;)&quot;));</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (&quot;()&quot;.equals(result)) {</span>
+<span class="nc" id="L48">            return Optional.empty();</span>
+        }
+<span class="fc" id="L50">        return Optional.of(result);</span>
+    }
+
+    /**
+     * Returns the logical AND operator used by the library
+     * Note: whitespaces have to be included around the operator
+     *
+     * Example: &lt;code&gt;&quot; AND &quot;&lt;/code&gt;
+     */
+    protected abstract String getLogicalAndOperator();
+
+    /**
+     * Returns the logical OR operator used by the library
+     * Note: whitespaces have to be included around the operator
+     *
+     * Example: &lt;code&gt;&quot; OR &quot;&lt;/code&gt;
+     */
+    protected abstract String getLogicalOrOperator();
+
+    /**
+     * Returns the logical NOT operator used by the library
+     *
+     * Example: &lt;code&gt;&quot;!&quot;&lt;/code&gt;
+     */
+    protected abstract String getLogicalNotOperator();
+
+    private Optional&lt;String&gt; transform(FieldQueryNode query) {
+<span class="fc" id="L77">        String term = query.getTextAsString();</span>
+<span class="pc bpc" id="L78" title="1 of 8 branches missed.">        switch (query.getFieldAsString()) {</span>
+            case &quot;author&quot; -&gt; {
+<span class="fc" id="L80">                return Optional.of(handleAuthor(term));</span>
+            }
+            case &quot;title&quot; -&gt; {
+<span class="fc" id="L83">                return Optional.of(handleTitle(term));</span>
+            }
+            case &quot;journal&quot; -&gt; {
+<span class="fc" id="L86">                return Optional.of(handleJournal(term));</span>
+            }
+            case &quot;year&quot; -&gt; {
+<span class="fc" id="L89">                String s = handleYear(term);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                return s.isEmpty() ? Optional.empty() : Optional.of(s);</span>
+            }
+            case &quot;year-range&quot; -&gt; {
+<span class="fc" id="L93">                String s = handleYearRange(term);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                return s.isEmpty() ? Optional.empty() : Optional.of(s);</span>
+            }
+            case &quot;doi&quot; -&gt; {
+<span class="nc" id="L97">                String s = handleDoi(term);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                return s.isEmpty() ? Optional.empty() : Optional.of(s);</span>
+            }
+            case NO_EXPLICIT_FIELD -&gt; {
+<span class="fc" id="L101">                return handleUnFieldedTerm(term);</span>
+            }
+            default -&gt; {
+                // Just add unknown fields as default
+<span class="fc" id="L105">                return handleOtherField(query.getFieldAsString(), term);</span>
+            }
+        }
+    }
+
+    protected String handleDoi(String term) {
+<span class="nc" id="L111">        return &quot;doi:&quot; + term;</span>
+    }
+
+    /**
+     * Handles the not modifier, all other cases are silently ignored
+     */
+    private Optional&lt;String&gt; transform(ModifierQueryNode query) {
+<span class="fc" id="L118">        ModifierQueryNode.Modifier modifier = query.getModifier();</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (modifier == ModifierQueryNode.Modifier.MOD_NOT) {</span>
+<span class="fc" id="L120">            return transform(query.getChild()).map(s -&gt; getLogicalNotOperator() + s);</span>
+        } else {
+<span class="nc" id="L122">            return transform(query.getChild());</span>
+        }
+    }
+
+    /**
+     * Return a string representation of the author fielded term
+     */
+    protected abstract String handleAuthor(String author);
+
+    /**
+     * Return a string representation of the title fielded term
+     */
+    protected abstract String handleTitle(String title);
+
+    /**
+     * Return a string representation of the journal fielded term
+     */
+    protected abstract String handleJournal(String journalTitle);
+
+    /**
+     * Return a string representation of the year fielded term
+     */
+    protected abstract String handleYear(String year);
+
+    /**
+     * Parses the year range and fills startYear and endYear.
+     * Ensures that startYear &lt;= endYear
+     */
+    protected void parseYearRange(String yearRange) {
+<span class="fc" id="L151">        String[] split = yearRange.split(&quot;-&quot;);</span>
+<span class="fc" id="L152">        int parsedStartYear = Integer.parseInt(split[0]);</span>
+<span class="fc" id="L153">        startYear = parsedStartYear;</span>
+<span class="fc" id="L154">        int parsedEndYear = Integer.parseInt(split[1]);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (parsedEndYear &gt;= parsedStartYear) {</span>
+<span class="fc" id="L156">            endYear = parsedEndYear;</span>
+        } else {
+<span class="nc" id="L158">            startYear = parsedEndYear;</span>
+<span class="nc" id="L159">            endYear = parsedStartYear;</span>
+        }
+<span class="fc" id="L161">    }</span>
+
+    /**
+     * Return a string representation of the year-range fielded term
+     * Should follow the structure yyyy-yyyy
+     *
+     * Example: &lt;code&gt;2015-2021&lt;/code&gt;
+     */
+    protected String handleYearRange(String yearRange) {
+<span class="nc" id="L170">        parseYearRange(yearRange);</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (endYear == Integer.MAX_VALUE) {</span>
+            // invalid year range
+<span class="nc" id="L173">            return yearRange;</span>
+        }
+<span class="nc" id="L175">        StringJoiner resultBuilder = new StringJoiner(getLogicalOrOperator());</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        for (int i = startYear; i &lt;= endYear; i++) {</span>
+<span class="nc" id="L177">            resultBuilder.add(handleYear(String.valueOf(i)));</span>
+        }
+<span class="nc" id="L179">        return resultBuilder.toString();</span>
+    }
+
+    /**
+     * Return a string representation of the un-fielded (default fielded) term
+     * &lt;p&gt;
+     * Default implementation: just return the term (in quotes if a space is contained)
+     */
+    protected Optional&lt;String&gt; handleUnFieldedTerm(String term) {
+<span class="fc" id="L188">        return Optional.of(StringUtil.quoteStringIfSpaceIsContained(term));</span>
+    }
+
+    protected String createKeyValuePair(String fieldAsString, String term) {
+<span class="fc" id="L192">        return createKeyValuePair(fieldAsString, term, &quot;:&quot;);</span>
+    }
+
+    protected String createKeyValuePair(String fieldAsString, String term, String separator) {
+<span class="fc" id="L196">        return &quot;%s%s%s&quot;.formatted(fieldAsString, separator, StringUtil.quoteStringIfSpaceIsContained(term));</span>
+    }
+
+    /**
+     * Return a string representation of the provided field
+     * If it is not supported return an empty optional.
+     */
+    protected Optional&lt;String&gt; handleOtherField(String fieldAsString, String term) {
+<span class="fc" id="L204">        return Optional.of(createKeyValuePair(fieldAsString, term));</span>
+    }
+
+    protected Optional&lt;String&gt; transform(QueryNode query) {
+<span class="pc bpc" id="L208" title="1 of 5 branches missed.">        switch (query) {</span>
+<span class="fc" id="L209">            case BooleanQueryNode booleanQueryNode -&gt; {</span>
+<span class="fc" id="L210">                return transform(booleanQueryNode);</span>
+            }
+<span class="fc" id="L212">            case FieldQueryNode fieldQueryNode -&gt; {</span>
+<span class="fc" id="L213">                return transform(fieldQueryNode);</span>
+            }
+<span class="fc" id="L215">            case GroupQueryNode groupQueryNode -&gt; {</span>
+<span class="fc" id="L216">                return transform(groupQueryNode.getChild());</span>
+            }
+<span class="fc" id="L218">            case ModifierQueryNode modifierQueryNode -&gt; {</span>
+<span class="fc" id="L219">                return transform(modifierQueryNode);</span>
+            }
+            case null, default -&gt; {
+<span class="nc" id="L222">                LOGGER.error(&quot;Unsupported case when transforming the query:\n {}&quot;, query);</span>
+<span class="nc" id="L223">                return Optional.empty();</span>
+            }
+        }
+    }
+
+    /**
+     * Parses the given query string into a complex query using lucene.
+     * Note: For unique fields, the alphabetically and numerically first instance in the query string is used in the complex query.
+     *
+     * @param luceneQuery The lucene query tp transform
+     * @return A query string containing all fields that are contained in the original lucene query and
+     * that are expressible in the library specific query language, other information either is discarded or
+     * stored as part of the state of the transformer if it can be used e.g. as a URL parameter for the query.
+     */
+    public Optional&lt;String&gt; transformLuceneQuery(QueryNode luceneQuery) {
+<span class="fc" id="L238">        Optional&lt;String&gt; transformedQuery = transform(luceneQuery);</span>
+<span class="fc" id="L239">        transformedQuery = transformedQuery.map(this::removeOuterBraces);</span>
+<span class="fc" id="L240">        return transformedQuery;</span>
+    }
+
+    /**
+     * Removes the outer braces as they are unnecessary
+     */
+    private String removeOuterBraces(String query) {
+<span class="pc bpc" id="L247" title="1 of 4 branches missed.">        if (query.startsWith(&quot;(&quot;) &amp;&amp; query.endsWith(&quot;)&quot;)) {</span>
+<span class="fc" id="L248">            return query.substring(1, query.length() - 1);</span>
+        }
+<span class="fc" id="L250">        return query;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

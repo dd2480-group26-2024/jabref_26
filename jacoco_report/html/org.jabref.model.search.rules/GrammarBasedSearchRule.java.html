@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GrammarBasedSearchRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.search.rules</a> &gt; <span class="el_source">GrammarBasedSearchRule.java</span></div><h1>GrammarBasedSearchRule.java</h1><pre class="source lang-java linenums">package org.jabref.model.search.rules;
+
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import org.jabref.architecture.AllowedToUseLogic;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.Keyword;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.InternalField;
+import org.jabref.model.pdf.search.SearchResult;
+import org.jabref.model.search.rules.SearchRules.SearchFlags;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.search.SearchBaseVisitor;
+import org.jabref.search.SearchLexer;
+import org.jabref.search.SearchParser;
+
+import org.antlr.v4.runtime.ANTLRInputStream;
+import org.antlr.v4.runtime.BailErrorStrategy;
+import org.antlr.v4.runtime.BaseErrorListener;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.RecognitionException;
+import org.antlr.v4.runtime.Recognizer;
+import org.antlr.v4.runtime.misc.ParseCancellationException;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * The search query must be specified in an expression that is acceptable by the Search.g4 grammar.
+ * &lt;p&gt;
+ * This class implements the &quot;Advanced Search Mode&quot; described in the help
+ */
+@AllowedToUseLogic(&quot;Because access to the lucene index is needed&quot;)
+public class GrammarBasedSearchRule extends FullTextSearchRule {
+
+<span class="fc" id="L45">    private static final Logger LOGGER = LoggerFactory.getLogger(GrammarBasedSearchRule.class);</span>
+
+    private final EnumSet&lt;SearchFlags&gt; searchFlags;
+
+    private ParseTree tree;
+    private String query;
+<span class="fc" id="L51">    private List&lt;SearchResult&gt; searchResults = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L53">    public static class ThrowingErrorListener extends BaseErrorListener {</span>
+
+<span class="fc" id="L55">        public static final ThrowingErrorListener INSTANCE = new ThrowingErrorListener();</span>
+
+        @Override
+        public void syntaxError(Recognizer&lt;?, ?&gt; recognizer, Object offendingSymbol,
+                                int line, int charPositionInLine, String msg, RecognitionException e)
+                throws ParseCancellationException {
+<span class="nc" id="L61">            throw new ParseCancellationException(&quot;line &quot; + line + &quot;:&quot; + charPositionInLine + &quot; &quot; + msg);</span>
+        }
+    }
+
+    public GrammarBasedSearchRule(EnumSet&lt;SearchFlags&gt; searchFlags) throws RecognitionException {
+<span class="fc" id="L66">        super(searchFlags);</span>
+<span class="fc" id="L67">        this.searchFlags = searchFlags;</span>
+<span class="fc" id="L68">    }</span>
+
+    public static boolean isValid(EnumSet&lt;SearchFlags&gt; searchFlags, String query) {
+<span class="nc" id="L71">        return new GrammarBasedSearchRule(searchFlags).validateSearchStrings(query);</span>
+    }
+
+    public ParseTree getTree() {
+<span class="nc" id="L75">        return this.tree;</span>
+    }
+
+    public String getQuery() {
+<span class="nc" id="L79">        return this.query;</span>
+    }
+
+    private void init(String query) throws ParseCancellationException {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (Objects.equals(this.query, query)) {</span>
+<span class="fc" id="L84">            return;</span>
+        }
+
+<span class="fc" id="L87">        SearchLexer lexer = new SearchLexer(new ANTLRInputStream(query));</span>
+<span class="fc" id="L88">        lexer.removeErrorListeners(); // no infos on file system</span>
+<span class="fc" id="L89">        lexer.addErrorListener(ThrowingErrorListener.INSTANCE);</span>
+<span class="fc" id="L90">        SearchParser parser = new SearchParser(new CommonTokenStream(lexer));</span>
+<span class="fc" id="L91">        parser.removeErrorListeners(); // no infos on file system</span>
+<span class="fc" id="L92">        parser.addErrorListener(ThrowingErrorListener.INSTANCE);</span>
+<span class="fc" id="L93">        parser.setErrorHandler(new BailErrorStrategy()); // ParseCancellationException on parse errors</span>
+<span class="fc" id="L94">        tree = parser.start();</span>
+<span class="fc" id="L95">        this.query = query;</span>
+<span class="fc" id="L96">    }</span>
+
+    @Override
+    public boolean applyRule(String query, BibEntry bibEntry) {
+        try {
+<span class="fc" id="L101">            return new BibtexSearchVisitor(searchFlags, bibEntry).visit(tree);</span>
+<span class="fc" id="L102">        } catch (Exception e) {</span>
+<span class="fc" id="L103">            LOGGER.info(&quot;Search failed&quot;, e);</span>
+<span class="fc" id="L104">            return false;</span>
+        }
+    }
+
+    @Override
+    public boolean validateSearchStrings(String query) {
+        try {
+<span class="fc" id="L111">            init(query);</span>
+<span class="fc" id="L112">            return true;</span>
+<span class="fc" id="L113">        } catch (ParseCancellationException e) {</span>
+<span class="fc" id="L114">            LOGGER.debug(&quot;Search query invalid&quot;, e);</span>
+<span class="fc" id="L115">            return false;</span>
+        }
+    }
+
+    public EnumSet&lt;SearchFlags&gt; getSearchFlags() {
+<span class="nc" id="L120">        return searchFlags;</span>
+    }
+
+<span class="fc" id="L123">    public enum ComparisonOperator {</span>
+<span class="fc" id="L124">        EXACT, CONTAINS, DOES_NOT_CONTAIN;</span>
+
+        public static ComparisonOperator build(String value) {
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">            if (&quot;CONTAINS&quot;.equalsIgnoreCase(value) || &quot;=&quot;.equals(value)) {</span>
+<span class="fc" id="L128">                return CONTAINS;</span>
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">            } else if (&quot;MATCHES&quot;.equalsIgnoreCase(value) || &quot;==&quot;.equals(value)) {</span>
+<span class="fc" id="L130">                return EXACT;</span>
+            } else {
+<span class="fc" id="L132">                return DOES_NOT_CONTAIN;</span>
+            }
+        }
+    }
+
+    public static class Comparator {
+
+        private final ComparisonOperator operator;
+        private final Pattern fieldPattern;
+        private final Pattern valuePattern;
+
+<span class="fc" id="L143">        public Comparator(String field, String value, ComparisonOperator operator, EnumSet&lt;SearchFlags&gt; searchFlags) {</span>
+<span class="fc" id="L144">            this.operator = operator;</span>
+
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            int option = searchFlags.contains(SearchRules.SearchFlags.CASE_SENSITIVE) ? 0 : Pattern.CASE_INSENSITIVE;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            this.fieldPattern = Pattern.compile(searchFlags.contains(SearchRules.SearchFlags.REGULAR_EXPRESSION) ? StringUtil.stripAccents(field) : &quot;\\Q&quot; + StringUtil.stripAccents(field) + &quot;\\E&quot;, option);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            this.valuePattern = Pattern.compile(searchFlags.contains(SearchRules.SearchFlags.REGULAR_EXPRESSION) ? StringUtil.stripAccents(value) : &quot;\\Q&quot; + StringUtil.stripAccents(value) + &quot;\\E&quot;, option);</span>
+<span class="fc" id="L149">        }</span>
+
+        public boolean compare(BibEntry entry) {
+            // special case for searching for entrytype=phdthesis
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            if (fieldPattern.matcher(InternalField.TYPE_HEADER.getName()).matches()) {</span>
+<span class="fc" id="L154">                return matchFieldValue(entry.getType().getName());</span>
+            }
+
+            // special case for searching a single keyword
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (fieldPattern.matcher(&quot;anykeyword&quot;).matches()) {</span>
+<span class="fc" id="L159">                return entry.getKeywords(',').stream().map(Keyword::toString).anyMatch(this::matchFieldValue);</span>
+            }
+
+            // specification of fieldsKeys to search is done in the search expression itself
+<span class="fc" id="L163">            Set&lt;Field&gt; fieldsKeys = entry.getFields();</span>
+
+            // special case for searching allfields=cat and title=dog
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (!fieldPattern.matcher(&quot;anyfield&quot;).matches()) {</span>
+                // Filter out the requested fields
+<span class="fc" id="L168">                fieldsKeys = fieldsKeys.stream().filter(matchFieldKey()).collect(Collectors.toSet());</span>
+            }
+
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            for (Field field : fieldsKeys) {</span>
+<span class="fc" id="L172">                Optional&lt;String&gt; fieldValue = entry.getFieldLatexFree(field);</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                if (fieldValue.isPresent()) {</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                    if (matchFieldValue(StringUtil.stripAccents(fieldValue.get()))) {</span>
+<span class="fc" id="L175">                        return true;</span>
+                    }
+                }
+<span class="fc" id="L178">            }</span>
+
+            // special case of asdf!=whatever and entry does not contain asdf
+<span class="pc bpc" id="L181" title="1 of 4 branches missed.">            return fieldsKeys.isEmpty() &amp;&amp; (operator == ComparisonOperator.DOES_NOT_CONTAIN);</span>
+        }
+
+        private Predicate&lt;Field&gt; matchFieldKey() {
+<span class="fc" id="L185">            return field -&gt; fieldPattern.matcher(field.getName()).matches();</span>
+        }
+
+        public boolean matchFieldValue(String content) {
+<span class="fc" id="L189">            Matcher matcher = valuePattern.matcher(content);</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (operator == ComparisonOperator.CONTAINS) {</span>
+<span class="fc" id="L191">                return matcher.find();</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            } else if (operator == ComparisonOperator.EXACT) {</span>
+<span class="fc" id="L193">                return matcher.matches();</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            } else if (operator == ComparisonOperator.DOES_NOT_CONTAIN) {</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                return !matcher.find();</span>
+            } else {
+<span class="nc" id="L197">                throw new IllegalStateException(&quot;MUST NOT HAPPEN&quot;);</span>
+            }
+        }
+    }
+
+    /**
+     * Search results in boolean. It may be later on converted to an int.
+     */
+    static class BibtexSearchVisitor extends SearchBaseVisitor&lt;Boolean&gt; {
+
+        private final EnumSet&lt;SearchFlags&gt; searchFlags;
+
+        private final BibEntry entry;
+
+<span class="fc" id="L211">        public BibtexSearchVisitor(EnumSet&lt;SearchFlags&gt; searchFlags, BibEntry bibEntry) {</span>
+<span class="fc" id="L212">            this.searchFlags = searchFlags;</span>
+<span class="fc" id="L213">            this.entry = bibEntry;</span>
+<span class="fc" id="L214">        }</span>
+
+        public boolean comparison(String field, ComparisonOperator operator, String value) {
+<span class="fc" id="L217">            return new Comparator(field, value, operator, searchFlags).compare(entry);</span>
+        }
+
+        @Override
+        public Boolean visitStart(SearchParser.StartContext ctx) {
+<span class="fc" id="L222">            return visit(ctx.expression());</span>
+        }
+
+        @Override
+        public Boolean visitComparison(SearchParser.ComparisonContext context) {
+            // remove possible enclosing &quot; symbols
+<span class="fc" id="L228">            String right = context.right.getText();</span>
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">            if (right.startsWith(&quot;\&quot;&quot;) &amp;&amp; right.endsWith(&quot;\&quot;&quot;)) {</span>
+<span class="fc" id="L230">                right = right.substring(1, right.length() - 1);</span>
+            }
+
+<span class="fc" id="L233">            Optional&lt;SearchParser.NameContext&gt; fieldDescriptor = Optional.ofNullable(context.left);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (fieldDescriptor.isPresent()) {</span>
+<span class="fc" id="L235">                return comparison(fieldDescriptor.get().getText(), ComparisonOperator.build(context.operator.getText()), right);</span>
+            } else {
+<span class="fc" id="L237">                return SearchRules.getSearchRule(searchFlags).applyRule(right, entry);</span>
+            }
+        }
+
+        @Override
+        public Boolean visitUnaryExpression(SearchParser.UnaryExpressionContext ctx) {
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            return !visit(ctx.expression()); // negate</span>
+        }
+
+        @Override
+        public Boolean visitParenExpression(SearchParser.ParenExpressionContext ctx) {
+<span class="fc" id="L248">            return visit(ctx.expression()); // ignore parenthesis</span>
+        }
+
+        @Override
+        public Boolean visitBinaryExpression(SearchParser.BinaryExpressionContext ctx) {
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            if (&quot;AND&quot;.equalsIgnoreCase(ctx.operator.getText())) {</span>
+<span class="fc bfc" id="L254" title="All 4 branches covered.">                return visit(ctx.left) &amp;&amp; visit(ctx.right); // and</span>
+            } else {
+<span class="pc bpc" id="L256" title="2 of 4 branches missed.">                return visit(ctx.left) || visit(ctx.right); // or</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

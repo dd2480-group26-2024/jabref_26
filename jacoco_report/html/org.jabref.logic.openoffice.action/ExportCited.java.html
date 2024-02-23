@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExportCited.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice.action</a> &gt; <span class="el_source">ExportCited.java</span></div><h1>ExportCited.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice.action;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import org.jabref.logic.openoffice.frontend.OOFrontend;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.openoffice.style.CitedKey;
+import org.jabref.model.openoffice.style.CitedKeys;
+import org.jabref.model.openoffice.uno.NoDocumentException;
+
+import com.sun.star.lang.WrappedTargetException;
+import com.sun.star.text.XTextDocument;
+
+public class ExportCited {
+
+    private ExportCited() {
+    }
+
+    public static class GenerateDatabaseResult {
+        /**
+         * null: not done; isEmpty: no unresolved
+         */
+        public final List&lt;String&gt; unresolvedKeys;
+        public final BibDatabase newDatabase;
+
+<span class="nc" id="L31">        GenerateDatabaseResult(List&lt;String&gt; unresolvedKeys, BibDatabase newDatabase) {</span>
+<span class="nc" id="L32">            this.unresolvedKeys = unresolvedKeys;</span>
+<span class="nc" id="L33">            this.newDatabase = newDatabase;</span>
+<span class="nc" id="L34">        }</span>
+    }
+
+    /**
+     * @param databases The databases to look up the citation keys in the document from.
+     * @return A new database, with cloned entries.
+     * If a key is not found, it is added to result.unresolvedKeys
+     * &lt;p&gt;
+     * Cross references (in StandardField.CROSSREF) are followed (not recursively): If the referenced entry is found, it is included in the result. If it is not found, it is silently ignored.
+     */
+    public static GenerateDatabaseResult generateDatabase(XTextDocument doc, List&lt;BibDatabase&gt; databases)
+            throws
+            NoDocumentException,
+            WrappedTargetException {
+
+<span class="nc" id="L49">        OOFrontend frontend = new OOFrontend(doc);</span>
+<span class="nc" id="L50">        CitedKeys citationKeys = frontend.citationGroups.getCitedKeysUnordered();</span>
+<span class="nc" id="L51">        citationKeys.lookupInDatabases(databases);</span>
+
+<span class="nc" id="L53">        List&lt;String&gt; unresolvedKeys = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L54">        BibDatabase resultDatabase = new BibDatabase();</span>
+
+<span class="nc" id="L56">        List&lt;BibEntry&gt; entriesToInsert = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L57">        Set&lt;String&gt; seen = new HashSet&lt;&gt;(); // Only add crossReference once.</span>
+
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        for (CitedKey citation : citationKeys.values()) {</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            if (citation.getLookupResult().isEmpty()) {</span>
+<span class="nc" id="L61">                unresolvedKeys.add(citation.citationKey);</span>
+            } else {
+<span class="nc" id="L63">                BibEntry entry = citation.getLookupResult().get().entry;</span>
+<span class="nc" id="L64">                BibDatabase loopDatabase = citation.getLookupResult().get().database;</span>
+
+                // If entry found
+<span class="nc" id="L67">                BibEntry clonedEntry = (BibEntry) entry.clone();</span>
+
+                // Insert a copy of the entry
+<span class="nc" id="L70">                entriesToInsert.add(clonedEntry);</span>
+
+                // Check if the cloned entry has a cross-reference field
+<span class="nc" id="L73">                clonedEntry</span>
+<span class="nc" id="L74">                        .getField(StandardField.CROSSREF)</span>
+<span class="nc" id="L75">                        .ifPresent(crossReference -&gt; {</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                            boolean isNew = !seen.contains(crossReference);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                            if (isNew) {</span>
+                                // Add it if it is in the current library
+<span class="nc" id="L79">                                loopDatabase</span>
+<span class="nc" id="L80">                                        .getEntryByCitationKey(crossReference)</span>
+<span class="nc" id="L81">                                        .ifPresent(entriesToInsert::add);</span>
+<span class="nc" id="L82">                                seen.add(crossReference);</span>
+                            }
+<span class="nc" id="L84">                        });</span>
+            }
+<span class="nc" id="L86">        }</span>
+
+<span class="nc" id="L88">        resultDatabase.insertEntries(entriesToInsert);</span>
+<span class="nc" id="L89">        return new GenerateDatabaseResult(unresolvedKeys, resultDatabase);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

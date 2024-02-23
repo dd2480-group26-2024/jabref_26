@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManageKeywordsDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.edit</a> &gt; <span class="el_source">ManageKeywordsDialog.java</span></div><h1>ManageKeywordsDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui.edit;
+
+import java.util.List;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.cell.TextFieldTableCell;
+
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.BindingsHelper;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import jakarta.inject.Inject;
+
+public class ManageKeywordsDialog extends BaseDialog&lt;Void&gt; {
+    private final List&lt;BibEntry&gt; entries;
+    @FXML private TableColumn&lt;String, String&gt; keywordsTableMainColumn;
+    @FXML private TableColumn&lt;String, Boolean&gt; keywordsTableEditColumn;
+    @FXML private TableColumn&lt;String, Boolean&gt; keywordsTableDeleteColumn;
+    @FXML private TableView&lt;String&gt; keywordsTable;
+    @FXML private ToggleGroup displayType;
+    @Inject private PreferencesService preferences;
+    private ManageKeywordsViewModel viewModel;
+
+<span class="nc" id="L34">    public ManageKeywordsDialog(List&lt;BibEntry&gt; entries) {</span>
+<span class="nc" id="L35">        this.entries = entries;</span>
+<span class="nc" id="L36">        this.setTitle(Localization.lang(&quot;Manage keywords&quot;));</span>
+
+<span class="nc" id="L38">        ViewLoader.view(this)</span>
+<span class="nc" id="L39">                  .load()</span>
+<span class="nc" id="L40">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L42">        setResultConverter(button -&gt; {</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            if (button == ButtonType.APPLY) {</span>
+<span class="nc" id="L44">                viewModel.saveChanges();</span>
+            }
+<span class="nc" id="L46">            return null;</span>
+        });
+<span class="nc" id="L48">    }</span>
+
+    @FXML
+    public void initialize() {
+<span class="nc" id="L52">        viewModel = new ManageKeywordsViewModel(preferences.getBibEntryPreferences(), entries);</span>
+
+<span class="nc" id="L54">        viewModel.displayTypeProperty().bind(</span>
+<span class="nc" id="L55">                EasyBind.map(displayType.selectedToggleProperty(), toggle -&gt; {</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">                    if (toggle != null) {</span>
+<span class="nc" id="L57">                        return (ManageKeywordsDisplayType) toggle.getUserData();</span>
+                    } else {
+<span class="nc" id="L59">                        return ManageKeywordsDisplayType.CONTAINED_IN_ALL_ENTRIES;</span>
+                    }
+                })
+        );
+
+<span class="nc" id="L64">        keywordsTable.setItems(viewModel.getKeywords());</span>
+<span class="nc" id="L65">        keywordsTableMainColumn.setCellValueFactory(data -&gt; BindingsHelper.constantOf(data.getValue()));</span>
+<span class="nc" id="L66">        keywordsTableMainColumn.setOnEditCommit(event -&gt; {</span>
+            // Poor mans reverse databinding (necessary because we use a constant value above)
+<span class="nc" id="L68">            viewModel.getKeywords().set(event.getTablePosition().getRow(), event.getNewValue());</span>
+<span class="nc" id="L69">        });</span>
+<span class="nc" id="L70">        keywordsTableMainColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+<span class="nc" id="L71">        keywordsTableEditColumn.setCellValueFactory(data -&gt; BindingsHelper.constantOf(true));</span>
+<span class="nc" id="L72">        keywordsTableDeleteColumn.setCellValueFactory(data -&gt; BindingsHelper.constantOf(true));</span>
+<span class="nc" id="L73">        new ValueTableCellFactory&lt;String, Boolean&gt;()</span>
+<span class="nc" id="L74">                .withGraphic(none -&gt; IconTheme.JabRefIcons.EDIT.getGraphicNode())</span>
+<span class="nc" id="L75">                .withOnMouseClickedEvent(none -&gt; event -&gt; keywordsTable.edit(keywordsTable.getFocusModel().getFocusedIndex(), keywordsTableMainColumn))</span>
+<span class="nc" id="L76">                .install(keywordsTableEditColumn);</span>
+<span class="nc" id="L77">        new ValueTableCellFactory&lt;String, Boolean&gt;()</span>
+<span class="nc" id="L78">                .withGraphic(none -&gt; IconTheme.JabRefIcons.REMOVE.getGraphicNode())</span>
+<span class="nc" id="L79">                .withOnMouseClickedEvent((keyword, none) -&gt; event -&gt; viewModel.removeKeyword(keyword))</span>
+<span class="nc" id="L80">                .install(keywordsTableDeleteColumn);</span>
+<span class="nc" id="L81">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

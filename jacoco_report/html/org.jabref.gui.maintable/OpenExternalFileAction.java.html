@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenExternalFileAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.maintable</a> &gt; <span class="el_source">OpenExternalFileAction.java</span></div><h1>OpenExternalFileAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.maintable;
+
+import java.util.LinkedList;
+import java.util.List;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.fieldeditors.LinkedFileViewModel;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.preferences.PreferencesService;
+
+public class OpenExternalFileAction extends SimpleCommand {
+
+<span class="nc" id="L19">    private final int FILES_LIMIT = 10;</span>
+
+    private final DialogService dialogService;
+    private final StateManager stateManager;
+    private final PreferencesService preferencesService;
+
+    private final BibEntry entry;
+    private final LinkedFile linkedFile;
+    private final TaskExecutor taskExecutor;
+
+    public OpenExternalFileAction(DialogService dialogService,
+                                  StateManager stateManager,
+                                  PreferencesService preferencesService,
+                                  TaskExecutor taskExecutor) {
+<span class="nc" id="L33">        this(dialogService, stateManager, preferencesService, null, null, taskExecutor);</span>
+<span class="nc" id="L34">    }</span>
+
+    public OpenExternalFileAction(DialogService dialogService,
+                                  StateManager stateManager,
+                                  PreferencesService preferencesService,
+                                  BibEntry entry,
+                                  LinkedFile linkedFile,
+<span class="nc" id="L41">                                  TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L42">        this.dialogService = dialogService;</span>
+<span class="nc" id="L43">        this.stateManager = stateManager;</span>
+<span class="nc" id="L44">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L45">        this.entry = entry;</span>
+<span class="nc" id="L46">        this.linkedFile = linkedFile;</span>
+<span class="nc" id="L47">        this.taskExecutor = taskExecutor;</span>
+
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (this.linkedFile == null) {</span>
+<span class="nc" id="L50">            this.executable.bind(ActionHelper.hasLinkedFileForSelectedEntries(stateManager)</span>
+<span class="nc" id="L51">                                             .and(ActionHelper.needsEntriesSelected(stateManager))</span>
+            );
+        } else {
+<span class="nc" id="L54">            this.setExecutable(true);</span>
+        }
+<span class="nc" id="L56">    }</span>
+
+    /**
+     * Open all linked files of the selected entries. If opening too many files, pop out a dialog to ask the user if to continue.
+     * &lt;br&gt;
+     * If some selected entries have linked file and others do not, ignore the latter.
+     */
+    @Override
+    public void execute() {
+<span class="nc" id="L65">        stateManager.getActiveDatabase().ifPresent(databaseContext -&gt; {</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            if (entry == null) {</span>
+<span class="nc" id="L67">                final List&lt;BibEntry&gt; selectedEntries = stateManager.getSelectedEntries();</span>
+
+<span class="nc" id="L69">                List&lt;LinkedFileViewModel&gt; linkedFileViewModelList = new LinkedList&lt;&gt;();</span>
+                LinkedFileViewModel linkedFileViewModel;
+
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                for (BibEntry entry : selectedEntries) {</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                    for (LinkedFile linkedFile : entry.getFiles()) {</span>
+<span class="nc" id="L74">                        linkedFileViewModel = new LinkedFileViewModel(</span>
+                                linkedFile,
+                                entry,
+                                databaseContext,
+                                taskExecutor,
+                                dialogService,
+                                preferencesService);
+
+<span class="nc" id="L82">                        linkedFileViewModelList.add(linkedFileViewModel);</span>
+<span class="nc" id="L83">                    }</span>
+<span class="nc" id="L84">                }</span>
+
+                // ask the user when detecting # of files &gt; FILES_LIMIT
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                if (linkedFileViewModelList.size() &gt; FILES_LIMIT) {</span>
+<span class="nc" id="L88">                    boolean continueOpening = dialogService.showConfirmationDialogAndWait(Localization.lang(&quot;Opening large number of files&quot;),</span>
+<span class="nc" id="L89">                            Localization.lang(&quot;You are about to open %0 files. Continue?&quot;, linkedFileViewModelList.size()),</span>
+<span class="nc" id="L90">                            Localization.lang(&quot;Continue&quot;), Localization.lang(&quot;Cancel&quot;));</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                    if (!continueOpening) {</span>
+<span class="nc" id="L92">                        return;</span>
+                    }
+                }
+
+<span class="nc" id="L96">                linkedFileViewModelList.forEach(LinkedFileViewModel::open);</span>
+<span class="nc" id="L97">            } else {</span>
+<span class="nc" id="L98">                LinkedFileViewModel linkedFileViewModel = new LinkedFileViewModel(</span>
+                        linkedFile,
+                        entry,
+                        databaseContext,
+                        taskExecutor,
+                        dialogService,
+                        preferencesService);
+<span class="nc" id="L105">                linkedFileViewModel.open();</span>
+            }
+<span class="nc" id="L107">        });</span>
+<span class="nc" id="L108">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

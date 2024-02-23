@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MrDLibFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">MrDLibFetcher.java</span></div><h1>MrDLibFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.logic.importer.EntryBasedFetcher;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.importer.fileformat.MrDLibImporter;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.logic.util.Version;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.preferences.MrDlibPreferences;
+
+import org.apache.http.client.utils.URIBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class is responsible for getting the recommendations from Mr. DLib
+ */
+public class MrDLibFetcher implements EntryBasedFetcher {
+<span class="fc" id="L31">    private static final Logger LOGGER = LoggerFactory.getLogger(MrDLibFetcher.class);</span>
+    private static final String NAME = &quot;MDL_FETCHER&quot;;
+    private static final String MDL_JABREF_PARTNER_ID = &quot;1&quot;;
+    private static final String MDL_URL = &quot;api.mr-dlib.org&quot;;
+<span class="fc" id="L35">    private static final String DEFAULT_MRDLIB_ERROR_MESSAGE = Localization.lang(&quot;Error while fetching recommendations from Mr.DLib.&quot;);</span>
+    private final String LANGUAGE;
+    private final Version VERSION;
+    private String heading;
+    private String description;
+    private String recommendationSetId;
+    private final MrDlibPreferences preferences;
+
+<span class="fc" id="L43">    public MrDLibFetcher(String language, Version version, MrDlibPreferences preferences) {</span>
+<span class="fc" id="L44">        LANGUAGE = language;</span>
+<span class="fc" id="L45">        VERSION = version;</span>
+<span class="fc" id="L46">        this.preferences = preferences;</span>
+<span class="fc" id="L47">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L51">        return NAME;</span>
+    }
+
+    @Override
+    public List&lt;BibEntry&gt; performSearch(BibEntry entry) throws FetcherException {
+<span class="fc" id="L56">        Optional&lt;String&gt; title = entry.getFieldLatexFree(StandardField.TITLE);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (title.isPresent()) {</span>
+<span class="fc" id="L58">            String response = makeServerRequest(title.get());</span>
+<span class="fc" id="L59">            MrDLibImporter importer = new MrDLibImporter();</span>
+            ParserResult parserResult;
+            try {
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                if (importer.isRecognizedFormat(response)) {</span>
+<span class="fc" id="L63">                    parserResult = importer.importDatabase(response);</span>
+<span class="fc" id="L64">                    heading = importer.getRecommendationsHeading();</span>
+<span class="fc" id="L65">                    description = importer.getRecommendationsDescription();</span>
+<span class="fc" id="L66">                    recommendationSetId = importer.getRecommendationSetId();</span>
+                } else {
+                    // For displaying An ErrorMessage
+<span class="nc" id="L69">                    description = DEFAULT_MRDLIB_ERROR_MESSAGE;</span>
+<span class="nc" id="L70">                    BibDatabase errorBibDataBase = new BibDatabase();</span>
+<span class="nc" id="L71">                    parserResult = new ParserResult(errorBibDataBase);</span>
+                }
+<span class="nc" id="L73">            } catch (IOException e) {</span>
+<span class="nc" id="L74">                LOGGER.error(e.getMessage(), e);</span>
+<span class="nc" id="L75">                throw new FetcherException(&quot;JSON Parser IOException.&quot;);</span>
+<span class="fc" id="L76">            }</span>
+<span class="fc" id="L77">            return parserResult.getDatabase().getEntries();</span>
+        } else {
+            // without a title there is no reason to ask MrDLib
+<span class="nc" id="L80">            return new ArrayList&lt;&gt;(0);</span>
+        }
+    }
+
+    public String getHeading() {
+<span class="nc" id="L85">        return heading;</span>
+    }
+
+    public String getDescription() {
+<span class="nc" id="L89">        return description;</span>
+    }
+
+    /**
+     * Contact the server with the title of the selected item
+     *
+     * @param queryByTitle the query holds the title of the selected entry. Used to make a query to the MDL Server
+     * @return Returns the server response. This is an XML document as a String.
+     */
+    private String makeServerRequest(String queryByTitle) throws FetcherException {
+        try {
+<span class="fc" id="L100">            URLDownload urlDownload = new URLDownload(constructQuery(queryByTitle));</span>
+<span class="fc" id="L101">            String response = urlDownload.asString();</span>
+
+            // Conversion of &lt; and &gt;
+<span class="fc" id="L104">            response = response.replace(&quot;&amp;gt;&quot;, &quot;&gt;&quot;);</span>
+<span class="fc" id="L105">            response = response.replace(&quot;&amp;lt;&quot;, &quot;&lt;&quot;);</span>
+<span class="fc" id="L106">            return response;</span>
+<span class="nc" id="L107">        } catch (IOException e) {</span>
+<span class="nc" id="L108">            throw new FetcherException(&quot;Problem downloading&quot;, e);</span>
+        }
+    }
+
+    /**
+     * Constructs the query based on title of the BibEntry. Adds statistical stuff to the url.
+     *
+     * @param queryWithTitle the title of the bib entry.
+     * @return the string used to make the query at mdl server
+     */
+    private String constructQuery(String queryWithTitle) {
+        // The encoding does not work for / so we convert them by our own
+<span class="fc" id="L120">        queryWithTitle = queryWithTitle.replace(&quot;/&quot;, &quot; &quot;);</span>
+<span class="fc" id="L121">        URIBuilder builder = new URIBuilder();</span>
+<span class="fc" id="L122">        builder.setScheme(&quot;http&quot;);</span>
+<span class="fc" id="L123">        builder.setHost(MDL_URL);</span>
+<span class="fc" id="L124">        builder.setPath(&quot;/v2/documents/&quot; + queryWithTitle + &quot;/related_documents&quot;);</span>
+<span class="fc" id="L125">        builder.addParameter(&quot;partner_id&quot;, MDL_JABREF_PARTNER_ID);</span>
+<span class="fc" id="L126">        builder.addParameter(&quot;app_id&quot;, &quot;jabref_desktop&quot;);</span>
+<span class="fc" id="L127">        builder.addParameter(&quot;app_version&quot;, VERSION.getFullVersion());</span>
+
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (preferences.shouldSendLanguage()) {</span>
+<span class="nc" id="L130">            builder.addParameter(&quot;app_lang&quot;, LANGUAGE);</span>
+        }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (preferences.shouldSendOs()) {</span>
+<span class="nc" id="L133">            builder.addParameter(&quot;os&quot;, System.getProperty(&quot;os.name&quot;));</span>
+        }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (preferences.shouldSendTimezone()) {</span>
+<span class="nc" id="L136">            builder.addParameter(&quot;timezone&quot;, Calendar.getInstance().getTimeZone().getID());</span>
+        }
+
+        try {
+<span class="fc" id="L140">            URI uri = builder.build();</span>
+<span class="fc" id="L141">            LOGGER.trace(&quot;Request: &quot; + uri.toString());</span>
+<span class="fc" id="L142">            return uri.toString();</span>
+<span class="nc" id="L143">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L144">            LOGGER.error(e.getMessage(), e);</span>
+        }
+<span class="nc" id="L146">        return &quot;&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

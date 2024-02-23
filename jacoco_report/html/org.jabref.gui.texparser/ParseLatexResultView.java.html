@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParseLatexResultView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.texparser</a> &gt; <span class="el_source">ParseLatexResultView.java</span></div><h1>ParseLatexResultView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.texparser;
+
+import java.nio.file.Path;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ListView;
+import javafx.scene.text.Text;
+
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.ControlHelper;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.texparser.LatexBibEntriesResolverResult;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import jakarta.inject.Inject;
+
+public class ParseLatexResultView extends BaseDialog&lt;Void&gt; {
+
+    private final LatexBibEntriesResolverResult resolverResult;
+    private final BibDatabaseContext databaseContext;
+    private final Path basePath;
+    @FXML private ListView&lt;ReferenceViewModel&gt; referenceListView;
+    @FXML private CitationsDisplay citationsDisplay;
+    @FXML private ButtonType importButtonType;
+    @Inject private ThemeManager themeManager;
+    private ParseLatexResultViewModel viewModel;
+
+<span class="nc" id="L34">    public ParseLatexResultView(LatexBibEntriesResolverResult resolverResult, BibDatabaseContext databaseContext, Path basePath) {</span>
+<span class="nc" id="L35">        this.resolverResult = resolverResult;</span>
+<span class="nc" id="L36">        this.databaseContext = databaseContext;</span>
+<span class="nc" id="L37">        this.basePath = basePath;</span>
+
+<span class="nc" id="L39">        setTitle(Localization.lang(&quot;LaTeX Citations Search Results&quot;));</span>
+
+<span class="nc" id="L41">        ViewLoader.view(this).load().setAsDialogPane(this);</span>
+
+<span class="nc" id="L43">        ControlHelper.setAction(importButtonType, getDialogPane(), event -&gt; {</span>
+<span class="nc" id="L44">            viewModel.importButtonClicked();</span>
+<span class="nc" id="L45">            close();</span>
+<span class="nc" id="L46">        });</span>
+<span class="nc" id="L47">        Button importButton = (Button) getDialogPane().lookupButton(importButtonType);</span>
+<span class="nc" id="L48">        importButton.disableProperty().bind(viewModel.importButtonDisabledProperty());</span>
+
+<span class="nc" id="L50">        themeManager.updateFontStyle(getDialogPane().getScene());</span>
+<span class="nc" id="L51">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L55">        viewModel = new ParseLatexResultViewModel(resolverResult, databaseContext);</span>
+
+<span class="nc" id="L57">        referenceListView.setItems(viewModel.getReferenceList());</span>
+<span class="nc" id="L58">        referenceListView.getSelectionModel().selectFirst();</span>
+<span class="nc" id="L59">        new ViewModelListCellFactory&lt;ReferenceViewModel&gt;()</span>
+<span class="nc" id="L60">                .withGraphic(reference -&gt; {</span>
+<span class="nc" id="L61">                    Text referenceText = new Text(reference.getDisplayText());</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                    if (reference.isHighlighted()) {</span>
+<span class="nc" id="L63">                        referenceText.setStyle(&quot;-fx-fill: -fx-accent&quot;);</span>
+                    }
+<span class="nc" id="L65">                    return referenceText;</span>
+                })
+<span class="nc" id="L67">                .install(referenceListView);</span>
+
+<span class="nc" id="L69">        EasyBind.subscribe(referenceListView.getSelectionModel().selectedItemProperty(),</span>
+<span class="nc" id="L70">                viewModel::activeReferenceChanged);</span>
+
+<span class="nc" id="L72">        citationsDisplay.basePathProperty().set(basePath);</span>
+<span class="nc" id="L73">        citationsDisplay.setItems(viewModel.getCitationListByReference());</span>
+<span class="nc" id="L74">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

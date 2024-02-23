@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EditFieldContentTabView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.edit.automaticfiededitor.editfieldcontent</a> &gt; <span class="el_source">EditFieldContentTabView.java</span></div><h1>EditFieldContentTabView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.edit.automaticfiededitor.editfieldcontent;
+
+import java.util.List;
+
+import javafx.application.Platform;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.TextField;
+
+import org.jabref.gui.StateManager;
+import org.jabref.gui.edit.automaticfiededitor.AbstractAutomaticFieldEditorTabView;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+
+import static org.jabref.gui.util.FieldsUtil.FIELD_STRING_CONVERTER;
+
+public class EditFieldContentTabView extends AbstractAutomaticFieldEditorTabView {
+    public Button appendValueButton;
+    public Button clearFieldButton;
+    public Button setValueButton;
+    @FXML
+    private ComboBox&lt;Field&gt; fieldComboBox;
+
+    @FXML
+    private TextField fieldValueTextField;
+
+    @FXML
+    private CheckBox overwriteFieldContentCheckBox;
+
+    private final List&lt;BibEntry&gt; selectedEntries;
+    private final BibDatabase database;
+
+    private EditFieldContentViewModel viewModel;
+
+    private final StateManager stateManager;
+
+<span class="nc" id="L45">    private final ControlsFxVisualizer visualizer = new ControlsFxVisualizer();</span>
+
+<span class="nc" id="L47">    public EditFieldContentTabView(BibDatabase database, StateManager stateManager) {</span>
+<span class="nc" id="L48">        this.selectedEntries = stateManager.getSelectedEntries();</span>
+<span class="nc" id="L49">        this.database = database;</span>
+<span class="nc" id="L50">        this.stateManager = stateManager;</span>
+
+<span class="nc" id="L52">        ViewLoader.view(this)</span>
+<span class="nc" id="L53">                  .root(this)</span>
+<span class="nc" id="L54">                  .load();</span>
+<span class="nc" id="L55">    }</span>
+
+    @FXML
+    public void initialize() {
+<span class="nc" id="L59">        viewModel = new EditFieldContentViewModel(database, selectedEntries, stateManager);</span>
+<span class="nc" id="L60">        fieldComboBox.setConverter(FIELD_STRING_CONVERTER);</span>
+
+<span class="nc" id="L62">        fieldComboBox.getItems().setAll(viewModel.getAllFields());</span>
+
+<span class="nc" id="L64">        fieldComboBox.getSelectionModel().selectFirst();</span>
+
+<span class="nc" id="L66">        fieldComboBox.valueProperty().bindBidirectional(viewModel.selectedFieldProperty());</span>
+<span class="nc" id="L67">        EasyBind.listen(fieldComboBox.getEditor().textProperty(), observable -&gt; fieldComboBox.commitValue());</span>
+
+<span class="nc" id="L69">        fieldValueTextField.textProperty().bindBidirectional(viewModel.fieldValueProperty());</span>
+
+<span class="nc" id="L71">        overwriteFieldContentCheckBox.selectedProperty().bindBidirectional(viewModel.overwriteFieldContentProperty());</span>
+
+<span class="nc" id="L73">        appendValueButton.disableProperty().bind(viewModel.canAppendProperty().not());</span>
+<span class="nc" id="L74">        setValueButton.disableProperty().bind(viewModel.fieldValidationStatus().validProperty().not());</span>
+<span class="nc" id="L75">        clearFieldButton.disableProperty().bind(viewModel.fieldValidationStatus().validProperty().not());</span>
+<span class="nc" id="L76">        overwriteFieldContentCheckBox.disableProperty().bind(viewModel.fieldValidationStatus().validProperty().not());</span>
+
+<span class="nc" id="L78">        Platform.runLater(() -&gt; visualizer.initVisualization(viewModel.fieldValidationStatus(), fieldComboBox, true));</span>
+<span class="nc" id="L79">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L83">        return Localization.lang(&quot;Edit content&quot;);</span>
+    }
+
+    @FXML
+    void appendToFieldValue() {
+<span class="nc" id="L88">        viewModel.appendToFieldValue();</span>
+<span class="nc" id="L89">    }</span>
+
+    @FXML
+    void clearField() {
+<span class="nc" id="L93">        viewModel.clearSelectedField();</span>
+<span class="nc" id="L94">    }</span>
+
+    @FXML
+    void setFieldValue() {
+<span class="nc" id="L98">        viewModel.setFieldValue();</span>
+<span class="nc" id="L99">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

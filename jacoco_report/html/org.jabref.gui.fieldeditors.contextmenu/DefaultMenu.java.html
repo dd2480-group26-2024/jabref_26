@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultMenu.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors.contextmenu</a> &gt; <span class="el_source">DefaultMenu.java</span></div><h1>DefaultMenu.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors.contextmenu;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Supplier;
+
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TextInputControl;
+
+import org.jabref.logic.cleanup.Formatter;
+import org.jabref.logic.formatter.Formatters;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.strings.StringUtil;
+
+import com.tobiasdiez.easybind.EasyBind;
+
+public class DefaultMenu implements Supplier&lt;List&lt;MenuItem&gt;&gt; {
+
+    TextInputControl textInputControl;
+
+    /**
+     * The default menu that contains functions for changing the case of text and doing several conversions.
+     *
+     * @param textInputControl that this menu will be connected to
+     */
+<span class="nc" id="L28">    public DefaultMenu(TextInputControl textInputControl) {</span>
+<span class="nc" id="L29">        this.textInputControl = textInputControl;</span>
+<span class="nc" id="L30">    }</span>
+
+    public List&lt;MenuItem&gt; get() {
+<span class="nc" id="L33">        return List.of(</span>
+<span class="nc" id="L34">                getCaseChangeMenu(textInputControl),</span>
+<span class="nc" id="L35">                getConversionMenu(textInputControl),</span>
+                new SeparatorMenuItem(),
+                new ProtectedTermsMenu(textInputControl),
+                new SeparatorMenuItem(),
+<span class="nc" id="L39">                getClearFieldMenuItem(textInputControl));</span>
+    }
+
+    private static Menu getCaseChangeMenu(TextInputControl textInputControl) {
+<span class="nc" id="L43">        Objects.requireNonNull(textInputControl.textProperty());</span>
+<span class="nc" id="L44">        Menu submenu = new Menu(Localization.lang(&quot;Change case&quot;));</span>
+
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        for (final Formatter caseChanger : Formatters.getCaseChangers()) {</span>
+<span class="nc" id="L47">            MenuItem menuItem = new MenuItem(caseChanger.getName());</span>
+<span class="nc" id="L48">            EasyBind.subscribe(textInputControl.textProperty(), value -&gt; menuItem.setDisable(StringUtil.isNullOrEmpty(value)));</span>
+<span class="nc" id="L49">            menuItem.setOnAction(event -&gt;</span>
+<span class="nc" id="L50">                    textInputControl.textProperty().set(caseChanger.format(textInputControl.textProperty().get())));</span>
+<span class="nc" id="L51">            submenu.getItems().add(menuItem);</span>
+<span class="nc" id="L52">        }</span>
+
+<span class="nc" id="L54">        return submenu;</span>
+    }
+
+    private static Menu getConversionMenu(TextInputControl textInputControl) {
+<span class="nc" id="L58">        Menu submenu = new Menu(Localization.lang(&quot;Convert&quot;));</span>
+
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        for (Formatter converter : Formatters.getConverters()) {</span>
+<span class="nc" id="L61">            MenuItem menuItem = new MenuItem(converter.getName());</span>
+<span class="nc" id="L62">            EasyBind.subscribe(textInputControl.textProperty(), value -&gt; menuItem.setDisable(StringUtil.isNullOrEmpty(value)));</span>
+<span class="nc" id="L63">            menuItem.setOnAction(event -&gt;</span>
+<span class="nc" id="L64">                    textInputControl.textProperty().set(converter.format(textInputControl.textProperty().get())));</span>
+<span class="nc" id="L65">            submenu.getItems().add(menuItem);</span>
+<span class="nc" id="L66">        }</span>
+
+<span class="nc" id="L68">        return submenu;</span>
+    }
+
+    // Icon: DELETE_SWEEP
+    private static MenuItem getClearFieldMenuItem(TextInputControl textInputControl) {
+<span class="nc" id="L73">        MenuItem menuItem = new MenuItem(Localization.lang(&quot;Clear&quot;));</span>
+<span class="nc" id="L74">        menuItem.setOnAction(event -&gt; textInputControl.setText(&quot;&quot;));</span>
+
+<span class="nc" id="L76">        return menuItem;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

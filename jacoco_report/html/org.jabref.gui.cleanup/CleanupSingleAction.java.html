@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CleanupSingleAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.cleanup</a> &gt; <span class="el_source">CleanupSingleAction.java</span></div><h1>CleanupSingleAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.cleanup;
+
+import java.util.List;
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.gui.undo.UndoableFieldChange;
+import org.jabref.logic.cleanup.CleanupWorker;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.FieldChange;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.CleanupPreferences;
+import org.jabref.preferences.PreferencesService;
+
+public class CleanupSingleAction extends SimpleCommand {
+
+    private final PreferencesService preferences;
+    private final DialogService dialogService;
+    private final StateManager stateManager;
+    private final BibEntry entry;
+    private final UndoManager undoManager;
+
+    private boolean isCanceled;
+    private int modifiedEntriesCount;
+
+<span class="nc" id="L33">    public CleanupSingleAction(BibEntry entry, PreferencesService preferences, DialogService dialogService, StateManager stateManager, UndoManager undoManager) {</span>
+<span class="nc" id="L34">        this.entry = entry;</span>
+<span class="nc" id="L35">        this.preferences = preferences;</span>
+<span class="nc" id="L36">        this.dialogService = dialogService;</span>
+<span class="nc" id="L37">        this.stateManager = stateManager;</span>
+<span class="nc" id="L38">        this.undoManager = undoManager;</span>
+
+<span class="nc" id="L40">        this.executable.bind(ActionHelper.needsEntriesSelected(stateManager));</span>
+<span class="nc" id="L41">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc" id="L45">        isCanceled = false;</span>
+
+<span class="nc" id="L47">        CleanupDialog cleanupDialog = new CleanupDialog(</span>
+<span class="nc" id="L48">                stateManager.getActiveDatabase().get(),</span>
+<span class="nc" id="L49">                preferences.getCleanupPreferences(),</span>
+<span class="nc" id="L50">                preferences.getFilePreferences()</span>
+        );
+
+<span class="nc" id="L53">        Optional&lt;CleanupPreferences&gt; chosenPreset = dialogService.showCustomDialogAndWait(cleanupDialog);</span>
+
+<span class="nc" id="L55">        chosenPreset.ifPresent(preset -&gt; {</span>
+<span class="nc bnc" id="L56" title="All 4 branches missed.">            if (preset.isActive(CleanupPreferences.CleanupStep.RENAME_PDF) &amp;&amp; preferences.getAutoLinkPreferences().shouldAskAutoNamingPdfs()) {</span>
+<span class="nc" id="L57">                boolean confirmed = dialogService.showConfirmationDialogWithOptOutAndWait(Localization.lang(&quot;Autogenerate PDF Names&quot;),</span>
+<span class="nc" id="L58">                        Localization.lang(&quot;Auto-generating PDF-Names does not support undo. Continue?&quot;),</span>
+<span class="nc" id="L59">                        Localization.lang(&quot;Autogenerate PDF Names&quot;),</span>
+<span class="nc" id="L60">                        Localization.lang(&quot;Cancel&quot;),</span>
+<span class="nc" id="L61">                        Localization.lang(&quot;Do not ask again&quot;),</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                        optOut -&gt; preferences.getAutoLinkPreferences().setAskAutoNamingPdfs(!optOut));</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">                if (!confirmed) {</span>
+<span class="nc" id="L64">                    isCanceled = true;</span>
+<span class="nc" id="L65">                    return;</span>
+                }
+            }
+
+<span class="nc" id="L69">            preferences.getCleanupPreferences().setActiveJobs(preset.getActiveJobs());</span>
+<span class="nc" id="L70">            preferences.getCleanupPreferences().setFieldFormatterCleanups(preset.getFieldFormatterCleanups());</span>
+
+<span class="nc" id="L72">            cleanup(stateManager.getActiveDatabase().get(), preset);</span>
+<span class="nc" id="L73">        });</span>
+<span class="nc" id="L74">    }</span>
+
+    /**
+     * Runs the cleanup on the entry and records the change.
+     */
+    private void doCleanup(BibDatabaseContext databaseContext, CleanupPreferences preset, BibEntry entry, NamedCompound ce) {
+        // Create and run cleaner
+<span class="nc" id="L81">        CleanupWorker cleaner = new CleanupWorker(</span>
+                databaseContext,
+<span class="nc" id="L83">                preferences.getFilePreferences(),</span>
+<span class="nc" id="L84">                preferences.getTimestampPreferences());</span>
+
+<span class="nc" id="L86">        List&lt;FieldChange&gt; changes = cleaner.cleanup(preset, entry);</span>
+
+        // Register undo action
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        for (FieldChange change : changes) {</span>
+<span class="nc" id="L90">            ce.addEdit(new UndoableFieldChange(change));</span>
+<span class="nc" id="L91">        }</span>
+<span class="nc" id="L92">    }</span>
+
+    private void cleanup(BibDatabaseContext databaseContext, CleanupPreferences cleanupPreferences) {
+            // undo granularity is on entry level
+<span class="nc" id="L96">            NamedCompound ce = new NamedCompound(Localization.lang(&quot;Cleanup entry&quot;));</span>
+
+<span class="nc" id="L98">            doCleanup(databaseContext, cleanupPreferences, entry, ce);</span>
+
+<span class="nc" id="L100">            ce.end();</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (ce.hasEdits()) {</span>
+<span class="nc" id="L102">                undoManager.addEdit(ce);</span>
+            }
+<span class="nc" id="L104">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

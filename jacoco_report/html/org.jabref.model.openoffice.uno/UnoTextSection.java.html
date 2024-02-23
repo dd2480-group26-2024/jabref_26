@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnoTextSection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.uno</a> &gt; <span class="el_source">UnoTextSection.java</span></div><h1>UnoTextSection.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.uno;
+
+import java.util.Optional;
+
+import com.sun.star.container.NoSuchElementException;
+import com.sun.star.container.XNameAccess;
+import com.sun.star.container.XNamed;
+import com.sun.star.lang.DisposedException;
+import com.sun.star.lang.WrappedTargetException;
+import com.sun.star.text.XTextContent;
+import com.sun.star.text.XTextDocument;
+import com.sun.star.text.XTextRange;
+import com.sun.star.text.XTextSection;
+import com.sun.star.text.XTextSectionsSupplier;
+import com.sun.star.uno.Any;
+
+<span class="nc" id="L17">public class UnoTextSection {</span>
+
+    /**
+     * @return An XNameAccess to find sections by name.
+     */
+    public static XNameAccess getNameAccess(XTextDocument doc)
+            throws
+            NoDocumentException {
+
+<span class="nc" id="L26">        XTextSectionsSupplier supplier = UnoCast.cast(XTextSectionsSupplier.class, doc).get();</span>
+        try {
+<span class="nc" id="L28">            return supplier.getTextSections();</span>
+<span class="nc" id="L29">        } catch (DisposedException ex) {</span>
+<span class="nc" id="L30">            throw new NoDocumentException(&quot;UnoTextSection.getNameAccess failed with&quot; + ex);</span>
+        }
+    }
+
+    /**
+     * Get an XTextSection by name.
+     */
+    public static Optional&lt;XTextSection&gt; getByName(XTextDocument doc, String name)
+            throws
+            WrappedTargetException,
+            NoDocumentException {
+<span class="nc" id="L41">        XNameAccess nameAccess = getNameAccess(doc);</span>
+        try {
+<span class="nc" id="L43">            return Optional.ofNullable((XTextSection) ((Any) nameAccess.getByName(name)).getObject());</span>
+<span class="nc" id="L44">        } catch (NoSuchElementException ex) {</span>
+<span class="nc" id="L45">            return Optional.empty();</span>
+        }
+    }
+
+    /**
+     * Get the XTextRange covering to the named section.
+     *
+     * @param name The name of the section to find.
+     * @return The XTextRange for the section, or Optional.empty().
+     */
+    public static Optional&lt;XTextRange&gt; getAnchor(XTextDocument doc, String name)
+            throws
+            WrappedTargetException,
+            NoDocumentException {
+
+<span class="nc" id="L60">        XNameAccess nameAccess = getNameAccess(doc);</span>
+<span class="nc" id="L61">        return UnoNameAccess.getTextContentByName(nameAccess, name).map(XTextContent::getAnchor);</span>
+    }
+
+    /**
+     * Create a text section with the provided name and insert it at the provided cursor.
+     *
+     * @param name  The desired name for the section.
+     * @param range The location to insert at.
+     *              &lt;p&gt;
+     *              If an XTextSection by that name already exists, LibreOffice (6.4.6.2) creates a section with a name different from what we requested, in &quot;Section {number}&quot; format.
+     */
+    public static XNamed create(XTextDocument doc, String name, XTextRange range, boolean absorb)
+            throws
+            CreationException {
+
+<span class="nc" id="L76">        return UnoNamed.insertNamedTextContent(doc, &quot;com.sun.star.text.TextSection&quot;, name, range, absorb);</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DuplicateResolverDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.duplicationFinder</a> &gt; <span class="el_source">DuplicateResolverDialog.java</span></div><h1>DuplicateResolverDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui.duplicationFinder;
+
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonBar.ButtonData;
+import javafx.scene.control.ButtonType;
+import javafx.scene.layout.BorderPane;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.duplicationFinder.DuplicateResolverDialog.DuplicateResolverResult;
+import org.jabref.gui.help.HelpAction;
+import org.jabref.gui.mergeentries.newmergedialog.ThreeWayMergeView;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.DialogWindowState;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.PreferencesService;
+
+public class DuplicateResolverDialog extends BaseDialog&lt;DuplicateResolverResult&gt; {
+
+    private final BibDatabaseContext database;
+    private final StateManager stateManager;
+
+<span class="nc" id="L29">    public enum DuplicateResolverType {</span>
+<span class="nc" id="L30">        DUPLICATE_SEARCH,</span>
+<span class="nc" id="L31">        IMPORT_CHECK,</span>
+<span class="nc" id="L32">        DUPLICATE_SEARCH_WITH_EXACT</span>
+    }
+
+<span class="fc" id="L35">    public enum DuplicateResolverResult {</span>
+<span class="fc" id="L36">        KEEP_BOTH(Localization.lang(&quot;Keep both&quot;)),</span>
+<span class="fc" id="L37">        KEEP_LEFT(Localization.lang(&quot;Keep existing entry&quot;)),</span>
+<span class="fc" id="L38">        KEEP_RIGHT(Localization.lang(&quot;Keep from import&quot;)),</span>
+<span class="fc" id="L39">        AUTOREMOVE_EXACT(Localization.lang(&quot;Automatically remove exact duplicates&quot;)),</span>
+<span class="fc" id="L40">        KEEP_MERGE(Localization.lang(&quot;Keep merged&quot;)),</span>
+<span class="fc" id="L41">        BREAK(Localization.lang(&quot;Ask every time&quot;));</span>
+
+        final String defaultTranslationForImport;
+
+<span class="fc" id="L45">        DuplicateResolverResult(String defaultTranslationForImport) {</span>
+<span class="fc" id="L46">            this.defaultTranslationForImport = defaultTranslationForImport;</span>
+<span class="fc" id="L47">        }</span>
+
+        public String getDefaultTranslationForImport() {
+<span class="nc" id="L50">            return defaultTranslationForImport;</span>
+        }
+
+        public static DuplicateResolverResult parse(String name) {
+            try {
+<span class="nc" id="L55">                return DuplicateResolverResult.valueOf(name);</span>
+<span class="nc" id="L56">            } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L57">                return BREAK; // default</span>
+            }
+        }
+    }
+
+    private ThreeWayMergeView threeWayMerge;
+    private final DialogService dialogService;
+    private final ActionFactory actionFactory;
+    private final PreferencesService preferencesService;
+
+    public DuplicateResolverDialog(BibEntry one,
+                                   BibEntry two,
+                                   DuplicateResolverType type,
+                                   BibDatabaseContext database,
+                                   StateManager stateManager,
+                                   DialogService dialogService,
+<span class="nc" id="L73">                                   PreferencesService preferencesService) {</span>
+<span class="nc" id="L74">        this.setTitle(Localization.lang(&quot;Possible duplicate entries&quot;));</span>
+<span class="nc" id="L75">        this.database = database;</span>
+<span class="nc" id="L76">        this.stateManager = stateManager;</span>
+<span class="nc" id="L77">        this.dialogService = dialogService;</span>
+<span class="nc" id="L78">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L79">        this.actionFactory = new ActionFactory(preferencesService.getKeyBindingRepository());</span>
+<span class="nc" id="L80">        init(one, two, type);</span>
+<span class="nc" id="L81">    }</span>
+
+    private void init(BibEntry one, BibEntry two, DuplicateResolverType type) {
+<span class="nc" id="L84">        ButtonType cancel = ButtonType.CANCEL;</span>
+<span class="nc" id="L85">        ButtonType merge = new ButtonType(Localization.lang(&quot;Keep merged&quot;), ButtonData.OK_DONE);</span>
+
+        ButtonType both;
+        ButtonType second;
+        ButtonType first;
+<span class="nc" id="L90">        ButtonType removeExact = new ButtonType(Localization.lang(&quot;Automatically remove exact duplicates&quot;), ButtonData.LEFT);</span>
+<span class="nc" id="L91">        boolean removeExactVisible = false;</span>
+
+<span class="nc bnc" id="L93" title="All 4 branches missed.">        switch (type) {</span>
+            case DUPLICATE_SEARCH -&gt; {
+<span class="nc" id="L95">                first = new ButtonType(Localization.lang(&quot;Keep left&quot;), ButtonData.LEFT);</span>
+<span class="nc" id="L96">                second = new ButtonType(Localization.lang(&quot;Keep right&quot;), ButtonData.LEFT);</span>
+<span class="nc" id="L97">                both = new ButtonType(Localization.lang(&quot;Keep both&quot;), ButtonData.LEFT);</span>
+<span class="nc" id="L98">                threeWayMerge = new ThreeWayMergeView(one, two, preferencesService);</span>
+<span class="nc" id="L99">            }</span>
+            case DUPLICATE_SEARCH_WITH_EXACT -&gt; {
+<span class="nc" id="L101">                first = new ButtonType(Localization.lang(&quot;Keep left&quot;), ButtonData.LEFT);</span>
+<span class="nc" id="L102">                second = new ButtonType(Localization.lang(&quot;Keep right&quot;), ButtonData.LEFT);</span>
+<span class="nc" id="L103">                both = new ButtonType(Localization.lang(&quot;Keep both&quot;), ButtonData.LEFT);</span>
+<span class="nc" id="L104">                removeExactVisible = true;</span>
+<span class="nc" id="L105">                threeWayMerge = new ThreeWayMergeView(one, two, preferencesService);</span>
+<span class="nc" id="L106">            }</span>
+            case IMPORT_CHECK -&gt; {
+<span class="nc" id="L108">                first = new ButtonType(Localization.lang(&quot;Keep existing entry&quot;), ButtonData.LEFT);</span>
+<span class="nc" id="L109">                second = new ButtonType(Localization.lang(&quot;Keep from import&quot;), ButtonData.LEFT);</span>
+<span class="nc" id="L110">                both = new ButtonType(Localization.lang(&quot;Keep both&quot;), ButtonData.LEFT);</span>
+<span class="nc" id="L111">                threeWayMerge = new ThreeWayMergeView(one, two, Localization.lang(&quot;Existing entry&quot;),</span>
+<span class="nc" id="L112">                        Localization.lang(&quot;From import&quot;), preferencesService);</span>
+<span class="nc" id="L113">            }</span>
+<span class="nc" id="L114">            default -&gt; throw new IllegalStateException(&quot;Switch expression should be exhaustive&quot;);</span>
+        }
+
+<span class="nc" id="L117">        this.getDialogPane().getButtonTypes().addAll(first, second, both, merge, cancel);</span>
+<span class="nc" id="L118">        this.getDialogPane().setFocusTraversable(false);</span>
+
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (removeExactVisible) {</span>
+<span class="nc" id="L121">            this.getDialogPane().getButtonTypes().add(removeExact);</span>
+
+            // This will prevent all dialog buttons from having the same size
+            // Read more: https://stackoverflow.com/questions/45866249/javafx-8-alert-different-button-sizes
+<span class="nc" id="L125">            getDialogPane().getButtonTypes().stream()</span>
+<span class="nc" id="L126">                           .map(getDialogPane()::lookupButton)</span>
+<span class="nc" id="L127">                           .forEach(btn -&gt; ButtonBar.setButtonUniformSize(btn, false));</span>
+        }
+
+        // Retrieves the previous window state and sets the new dialog window size and position to match it
+<span class="nc" id="L131">        DialogWindowState state = stateManager.getDialogWindowState(getClass().getSimpleName());</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (state != null) {</span>
+<span class="nc" id="L133">            this.getDialogPane().setPrefSize(state.getWidth(), state.getHeight());</span>
+<span class="nc" id="L134">            this.setX(state.getX());</span>
+<span class="nc" id="L135">            this.setY(state.getY());</span>
+        }
+
+<span class="nc" id="L138">        BorderPane borderPane = new BorderPane(threeWayMerge);</span>
+
+<span class="nc" id="L140">        this.setResultConverter(button -&gt; {</span>
+            // Updates the window state on button press
+<span class="nc" id="L142">            stateManager.setDialogWindowState(getClass().getSimpleName(), new DialogWindowState(this.getX(), this.getY(), this.getDialogPane().getHeight(), this.getDialogPane().getWidth()));</span>
+<span class="nc" id="L143">            threeWayMerge.saveConfiguration();</span>
+
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (button.equals(first)) {</span>
+<span class="nc" id="L146">                return DuplicateResolverResult.KEEP_LEFT;</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            } else if (button.equals(second)) {</span>
+<span class="nc" id="L148">                return DuplicateResolverResult.KEEP_RIGHT;</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            } else if (button.equals(both)) {</span>
+<span class="nc" id="L150">                return DuplicateResolverResult.KEEP_BOTH;</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            } else if (button.equals(merge)) {</span>
+<span class="nc" id="L152">                return DuplicateResolverResult.KEEP_MERGE;</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            } else if (button.equals(removeExact)) {</span>
+<span class="nc" id="L154">                return DuplicateResolverResult.AUTOREMOVE_EXACT;</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            } else if (button.equals(cancel)) {</span>
+<span class="nc" id="L156">                return DuplicateResolverResult.KEEP_LEFT;</span>
+            }
+<span class="nc" id="L158">            return null;</span>
+        });
+
+<span class="nc" id="L161">        HelpAction helpCommand = new HelpAction(HelpFile.FIND_DUPLICATES, dialogService, preferencesService.getFilePreferences());</span>
+<span class="nc" id="L162">        Button helpButton = actionFactory.createIconButton(StandardActions.HELP, helpCommand);</span>
+<span class="nc" id="L163">        borderPane.setRight(helpButton);</span>
+
+<span class="nc" id="L165">        getDialogPane().setContent(borderPane);</span>
+<span class="nc" id="L166">    }</span>
+
+    public BibEntry getMergedEntry() {
+<span class="nc" id="L169">        return threeWayMerge.getMergedEntry();</span>
+    }
+
+    public BibEntry getNewLeftEntry() {
+<span class="nc" id="L173">        return threeWayMerge.getLeftEntry();</span>
+    }
+
+    public BibEntry getNewRightEntry() {
+<span class="nc" id="L177">        return threeWayMerge.getRightEntry();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

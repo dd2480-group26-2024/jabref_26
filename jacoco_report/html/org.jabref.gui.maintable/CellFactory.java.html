@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CellFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.maintable</a> &gt; <span class="el_source">CellFactory.java</span></div><h1>CellFactory.java</h1><pre class="source lang-java linenums">package org.jabref.gui.maintable;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.scene.Node;
+
+import org.jabref.gui.externalfiletype.ExternalFileType;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.gui.specialfields.SpecialFieldViewModel;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.preferences.PreferencesService;
+
+public class CellFactory {
+
+<span class="nc" id="L22">    private final Map&lt;Field, JabRefIcon&gt; TABLE_ICONS = new HashMap&lt;&gt;();</span>
+
+<span class="nc" id="L24">    public CellFactory(PreferencesService preferencesService, UndoManager undoManager) {</span>
+        JabRefIcon icon;
+<span class="nc" id="L26">        icon = IconTheme.JabRefIcons.PDF_FILE;</span>
+        // icon.setToo(Localization.lang(&quot;Open&quot;) + &quot; PDF&quot;);
+<span class="nc" id="L28">        TABLE_ICONS.put(StandardField.PDF, icon);</span>
+
+<span class="nc" id="L30">        icon = IconTheme.JabRefIcons.WWW;</span>
+        // icon.setToolTipText(Localization.lang(&quot;Open&quot;) + &quot; URL&quot;);
+<span class="nc" id="L32">        TABLE_ICONS.put(StandardField.URL, icon);</span>
+
+<span class="nc" id="L34">        icon = IconTheme.JabRefIcons.WWW;</span>
+        // icon.setToolTipText(Localization.lang(&quot;Open&quot;) + &quot; CiteSeer URL&quot;);
+<span class="nc" id="L36">        TABLE_ICONS.put(new UnknownField(&quot;citeseerurl&quot;), icon);</span>
+
+<span class="nc" id="L38">        icon = IconTheme.JabRefIcons.WWW;</span>
+        // icon.setToolTipText(Localization.lang(&quot;Open&quot;) + &quot; ArXivFetcher URL&quot;);
+<span class="nc" id="L40">        TABLE_ICONS.put(StandardField.EPRINT, icon);</span>
+
+<span class="nc" id="L42">        icon = IconTheme.JabRefIcons.DOI;</span>
+        // icon.setToolTipText(Localization.lang(&quot;Open&quot;) + &quot; DOI &quot; + Localization.lang(&quot;web link&quot;));
+<span class="nc" id="L44">        TABLE_ICONS.put(StandardField.DOI, icon);</span>
+
+<span class="nc" id="L46">        icon = IconTheme.JabRefIcons.FILE;</span>
+        // icon.setToolTipText(Localization.lang(&quot;Open&quot;) + &quot; PS&quot;);
+<span class="nc" id="L48">        TABLE_ICONS.put(StandardField.PS, icon);</span>
+
+<span class="nc" id="L50">        icon = IconTheme.JabRefIcons.FOLDER;</span>
+        // icon.setToolTipText(Localization.lang(&quot;Open folder&quot;));
+<span class="nc" id="L52">        TABLE_ICONS.put(StandardField.FOLDER, icon);</span>
+
+<span class="nc" id="L54">        icon = IconTheme.JabRefIcons.FILE;</span>
+        // icon.setToolTipText(Localization.lang(&quot;Open file&quot;));
+<span class="nc" id="L56">        TABLE_ICONS.put(StandardField.FILE, icon);</span>
+
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        for (ExternalFileType fileType : preferencesService.getFilePreferences().getExternalFileTypes()) {</span>
+<span class="nc" id="L59">            icon = fileType.getIcon();</span>
+            // icon.setToolTipText(Localization.lang(&quot;Open %0 file&quot;, fileType.getName()));
+<span class="nc" id="L61">            TABLE_ICONS.put(fileType.getField(), icon);</span>
+<span class="nc" id="L62">        }</span>
+
+<span class="nc" id="L64">        SpecialFieldViewModel relevanceViewModel = new SpecialFieldViewModel(SpecialField.RELEVANCE, preferencesService, undoManager);</span>
+<span class="nc" id="L65">        icon = relevanceViewModel.getIcon();</span>
+        // icon.setToolTipText(relevanceViewModel.getLocalization());
+<span class="nc" id="L67">        TABLE_ICONS.put(SpecialField.RELEVANCE, icon);</span>
+
+<span class="nc" id="L69">        SpecialFieldViewModel qualityViewModel = new SpecialFieldViewModel(SpecialField.QUALITY, preferencesService, undoManager);</span>
+<span class="nc" id="L70">        icon = qualityViewModel.getIcon();</span>
+        // icon.setToolTipText(qualityViewModel.getLocalization());
+<span class="nc" id="L72">        TABLE_ICONS.put(SpecialField.QUALITY, icon);</span>
+
+        // Ranking item in the menu uses one star
+<span class="nc" id="L75">        SpecialFieldViewModel rankViewModel = new SpecialFieldViewModel(SpecialField.RANKING, preferencesService, undoManager);</span>
+<span class="nc" id="L76">        icon = rankViewModel.getIcon();</span>
+        // icon.setToolTipText(rankViewModel.getLocalization());
+<span class="nc" id="L78">        TABLE_ICONS.put(SpecialField.RANKING, icon);</span>
+
+        // Priority icon used for the menu
+<span class="nc" id="L81">        SpecialFieldViewModel priorityViewModel = new SpecialFieldViewModel(SpecialField.PRIORITY, preferencesService, undoManager);</span>
+<span class="nc" id="L82">        icon = priorityViewModel.getIcon();</span>
+        // icon.setToolTipText(priorityViewModel.getLocalization());
+<span class="nc" id="L84">        TABLE_ICONS.put(SpecialField.PRIORITY, icon);</span>
+
+        // Read icon used for menu
+<span class="nc" id="L87">        SpecialFieldViewModel readViewModel = new SpecialFieldViewModel(SpecialField.READ_STATUS, preferencesService, undoManager);</span>
+<span class="nc" id="L88">        icon = readViewModel.getIcon();</span>
+        // icon.setToolTipText(readViewModel.getLocalization());
+<span class="nc" id="L90">        TABLE_ICONS.put(SpecialField.READ_STATUS, icon);</span>
+
+        // Print icon used for menu
+<span class="nc" id="L93">        SpecialFieldViewModel printedViewModel = new SpecialFieldViewModel(SpecialField.PRINTED, preferencesService, undoManager);</span>
+<span class="nc" id="L94">        icon = printedViewModel.getIcon();</span>
+        // icon.setToolTipText(printedViewModel.getLocalization());
+<span class="nc" id="L96">        TABLE_ICONS.put(SpecialField.PRINTED, icon);</span>
+<span class="nc" id="L97">    }</span>
+
+    public Node getTableIcon(Field field) {
+<span class="nc" id="L100">        JabRefIcon icon = TABLE_ICONS.get(field);</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (icon == null) {</span>
+            // LOGGER.info(&quot;Error: no table icon defined for type '&quot; + field + &quot;'.&quot;);
+<span class="nc" id="L103">            return null;</span>
+        } else {
+            // node should be generated for each call, as nodes can be added to the scene graph only once
+<span class="nc" id="L106">            return icon.getGraphicNode();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

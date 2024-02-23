@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JournalAbbreviationLoader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.journals</a> &gt; <span class="el_source">JournalAbbreviationLoader.java</span></div><h1>JournalAbbreviationLoader.java</h1><pre class="source lang-java linenums">package org.jabref.logic.journals;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * &lt;p&gt;
+ *   This class loads abbreviations from a CSV file and stores them into a MV file ({@link #readAbbreviationsFromCsvFile(Path)}
+ *   It can also create an {@link JournalAbbreviationRepository} based on an MV file ({@link #loadRepository(JournalAbbreviationPreferences)}.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ *   Abbreviations are available at &lt;a href=&quot;https://github.com/JabRef/abbrv.jabref.org/&quot;&gt;https://github.com/JabRef/abbrv.jabref.org/&lt;/a&gt;.
+ * &lt;/p&gt;
+ */
+<span class="nc" id="L23">public class JournalAbbreviationLoader {</span>
+
+<span class="fc" id="L25">    private static final Logger LOGGER = LoggerFactory.getLogger(JournalAbbreviationLoader.class);</span>
+
+    public static Collection&lt;Abbreviation&gt; readAbbreviationsFromCsvFile(Path file) throws IOException {
+<span class="fc" id="L28">        LOGGER.debug(&quot;Reading journal list from file {}&quot;, file);</span>
+<span class="fc" id="L29">        AbbreviationParser parser = new AbbreviationParser();</span>
+<span class="fc" id="L30">        parser.readJournalListFromFile(file);</span>
+<span class="fc" id="L31">        return parser.getAbbreviations();</span>
+    }
+
+    public static JournalAbbreviationRepository loadRepository(JournalAbbreviationPreferences journalAbbreviationPreferences) {
+        JournalAbbreviationRepository repository;
+
+        // Initialize with built-in list
+<span class="fc" id="L38">        try (InputStream resourceAsStream = JournalAbbreviationRepository.class.getResourceAsStream(&quot;/journals/journal-list.mv&quot;)) {</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (resourceAsStream == null) {</span>
+<span class="fc" id="L40">                LOGGER.warn(&quot;There is no journal-list.mv. We use a default journal list&quot;);</span>
+<span class="fc" id="L41">                repository = new JournalAbbreviationRepository();</span>
+            } else {
+<span class="nc" id="L43">                Path tempDir = Files.createTempDirectory(&quot;jabref-journal&quot;);</span>
+<span class="nc" id="L44">                Path tempJournalList = tempDir.resolve(&quot;journal-list.mv&quot;);</span>
+<span class="nc" id="L45">                Files.copy(resourceAsStream, tempJournalList);</span>
+<span class="nc" id="L46">                repository = new JournalAbbreviationRepository(tempJournalList);</span>
+<span class="nc" id="L47">                tempDir.toFile().deleteOnExit();</span>
+<span class="nc" id="L48">                tempJournalList.toFile().deleteOnExit();</span>
+            }
+<span class="nc" id="L50">        } catch (IOException e) {</span>
+<span class="nc" id="L51">            LOGGER.error(&quot;Error while copying journal list&quot;, e);</span>
+<span class="nc" id="L52">            return null;</span>
+<span class="fc" id="L53">        }</span>
+
+        // Read external lists
+<span class="fc" id="L56">        List&lt;String&gt; lists = journalAbbreviationPreferences.getExternalJournalLists();</span>
+        // might produce NPE in tests
+<span class="pc bpc" id="L58" title="1 of 4 branches missed.">        if (lists != null &amp;&amp; !lists.isEmpty()) {</span>
+            // reversing ensures that the latest lists overwrites the former one
+<span class="nc" id="L60">            Collections.reverse(lists);</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            for (String filename : lists) {</span>
+                try {
+<span class="nc" id="L63">                    repository.addCustomAbbreviations(readAbbreviationsFromCsvFile(Path.of(filename)));</span>
+<span class="nc" id="L64">                } catch (IOException e) {</span>
+<span class="nc" id="L65">                    LOGGER.error(&quot;Cannot read external journal list file {}&quot;, filename, e);</span>
+<span class="nc" id="L66">                }</span>
+<span class="nc" id="L67">            }</span>
+        }
+<span class="fc" id="L69">        return repository;</span>
+    }
+
+    public static JournalAbbreviationRepository loadBuiltInRepository() {
+<span class="fc" id="L73">        return loadRepository(new JournalAbbreviationPreferences(Collections.emptyList(), true));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

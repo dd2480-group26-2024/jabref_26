@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UiThreadObservableList.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util.uithreadaware</a> &gt; <span class="el_source">UiThreadObservableList.java</span></div><h1>UiThreadObservableList.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util.uithreadaware;
+
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
+
+import javafx.beans.InvalidationListener;
+import javafx.collections.ListChangeListener;
+import javafx.collections.ObservableList;
+
+/**
+ * This class can be used to wrap an @see ObservableList inside it. When wrapped, any Listener listening for updates to the wrapped ObservableList (for example because of a binding to it) is ensured to be notified on the JavaFX Application Thread. It should be used to implement bindings where updates come in from a background thread but should be reflected in the UI where it is necessary that changes to the UI are performed on the JavaFX Application thread.
+ *
+ * @param &lt;E&gt; the type of the elements of the wrapped ObservableList.
+ */
+public class UiThreadObservableList&lt;E&gt; implements ObservableList&lt;E&gt; {
+
+    private final ObservableList&lt;E&gt; delegate;
+
+<span class="nc" id="L21">    public UiThreadObservableList(ObservableList&lt;E&gt; delegate) {</span>
+<span class="nc" id="L22">        this.delegate = delegate;</span>
+<span class="nc" id="L23">    }</span>
+
+    @Override
+    public void addListener(ListChangeListener&lt;? super E&gt; listener) {
+<span class="nc" id="L27">        delegate.addListener(new UiThreadListChangeListener(listener));</span>
+<span class="nc" id="L28">    }</span>
+
+    @Override
+    public void removeListener(ListChangeListener&lt;? super E&gt; listener) {
+<span class="nc" id="L32">        delegate.removeListener(listener);</span>
+<span class="nc" id="L33">    }</span>
+
+    @Override
+    public boolean addAll(E... elements) {
+<span class="nc" id="L37">        return delegate.addAll(elements);</span>
+    }
+
+    @Override
+    public boolean setAll(E... elements) {
+<span class="nc" id="L42">        return delegate.setAll(elements);</span>
+    }
+
+    @Override
+    public boolean setAll(Collection&lt;? extends E&gt; col) {
+<span class="nc" id="L47">        return delegate.setAll(col);</span>
+    }
+
+    @Override
+    public boolean removeAll(E... elements) {
+<span class="nc" id="L52">        return delegate.removeAll(elements);</span>
+    }
+
+    @Override
+    public boolean retainAll(E... elements) {
+<span class="nc" id="L57">        return delegate.retainAll(elements);</span>
+    }
+
+    @Override
+    public void remove(int from, int to) {
+<span class="nc" id="L62">        delegate.remove(from, to);</span>
+<span class="nc" id="L63">    }</span>
+
+    @Override
+    public int size() {
+<span class="nc" id="L67">        return delegate.size();</span>
+    }
+
+    @Override
+    public boolean isEmpty() {
+<span class="nc" id="L72">        return delegate.isEmpty();</span>
+    }
+
+    @Override
+    public boolean contains(Object o) {
+<span class="nc" id="L77">        return delegate.contains(o);</span>
+    }
+
+    @Override
+    public Iterator&lt;E&gt; iterator() {
+<span class="nc" id="L82">        return delegate.iterator();</span>
+    }
+
+    @Override
+    public Object[] toArray() {
+<span class="nc" id="L87">        return delegate.toArray();</span>
+    }
+
+    @Override
+    public &lt;T&gt; T[] toArray(T[] a) {
+<span class="nc" id="L92">        return delegate.toArray(a);</span>
+    }
+
+    @Override
+    public boolean add(E e) {
+<span class="nc" id="L97">        return delegate.add(e);</span>
+    }
+
+    @Override
+    public boolean remove(Object o) {
+<span class="nc" id="L102">        return delegate.remove(o);</span>
+    }
+
+    @Override
+    public boolean containsAll(Collection&lt;?&gt; c) {
+<span class="nc" id="L107">        return delegate.containsAll(c);</span>
+    }
+
+    @Override
+    public boolean addAll(Collection&lt;? extends E&gt; c) {
+<span class="nc" id="L112">        return delegate.addAll(c);</span>
+    }
+
+    @Override
+    public boolean addAll(int index, Collection&lt;? extends E&gt; c) {
+<span class="nc" id="L117">        return delegate.addAll(index, c);</span>
+    }
+
+    @Override
+    public boolean removeAll(Collection&lt;?&gt; c) {
+<span class="nc" id="L122">        return delegate.removeAll(c);</span>
+    }
+
+    @Override
+    public boolean retainAll(Collection&lt;?&gt; c) {
+<span class="nc" id="L127">        return delegate.retainAll(c);</span>
+    }
+
+    @Override
+    public void clear() {
+<span class="nc" id="L132">        delegate.clear();</span>
+<span class="nc" id="L133">    }</span>
+
+    @Override
+    public E get(int index) {
+<span class="nc" id="L137">        return delegate.get(index);</span>
+    }
+
+    @Override
+    public E set(int index, E element) {
+<span class="nc" id="L142">        return delegate.set(index, element);</span>
+    }
+
+    @Override
+    public void add(int index, E element) {
+<span class="nc" id="L147">        delegate.add(index, element);</span>
+<span class="nc" id="L148">    }</span>
+
+    @Override
+    public E remove(int index) {
+<span class="nc" id="L152">        return delegate.remove(index);</span>
+    }
+
+    @Override
+    public int indexOf(Object o) {
+<span class="nc" id="L157">        return delegate.indexOf(o);</span>
+    }
+
+    @Override
+    public int lastIndexOf(Object o) {
+<span class="nc" id="L162">        return delegate.lastIndexOf(o);</span>
+    }
+
+    @Override
+    public ListIterator&lt;E&gt; listIterator() {
+<span class="nc" id="L167">        return delegate.listIterator();</span>
+    }
+
+    @Override
+    public ListIterator&lt;E&gt; listIterator(int index) {
+<span class="nc" id="L172">        return delegate.listIterator(index);</span>
+    }
+
+    @Override
+    public List&lt;E&gt; subList(int fromIndex, int toIndex) {
+<span class="nc" id="L177">        return delegate.subList(fromIndex, toIndex);</span>
+    }
+
+    @Override
+    public void addListener(InvalidationListener listener) {
+<span class="nc" id="L182">        delegate.addListener(new UiThreadInvalidationListener(listener));</span>
+<span class="nc" id="L183">    }</span>
+
+    @Override
+    public void removeListener(InvalidationListener listener) {
+<span class="nc" id="L187">        delegate.removeListener(listener);</span>
+<span class="nc" id="L188">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

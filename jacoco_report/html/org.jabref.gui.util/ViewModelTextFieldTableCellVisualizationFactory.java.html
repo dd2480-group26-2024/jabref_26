@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ViewModelTextFieldTableCellVisualizationFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.util</a> &gt; <span class="el_source">ViewModelTextFieldTableCellVisualizationFactory.java</span></div><h1>ViewModelTextFieldTableCellVisualizationFactory.java</h1><pre class="source lang-java linenums">package org.jabref.gui.util;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+
+import javafx.application.Platform;
+import javafx.css.PseudoClass;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.layout.HBox;
+import javafx.util.Callback;
+import javafx.util.StringConverter;
+
+import com.tobiasdiez.easybind.Subscription;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+
+<span class="nc" id="L22">public class ViewModelTextFieldTableCellVisualizationFactory&lt;S, T&gt; implements Callback&lt;TableColumn&lt;S, T&gt;, TableCell&lt;S, T&gt;&gt; {</span>
+
+<span class="nc" id="L24">    private static final PseudoClass INVALID_PSEUDO_CLASS = PseudoClass.getPseudoClass(&quot;invalid&quot;);</span>
+
+    private Function&lt;S, ValidationStatus&gt; validationStatusProperty;
+    private StringConverter&lt;T&gt; stringConverter;
+
+    public ViewModelTextFieldTableCellVisualizationFactory&lt;S, T&gt; withValidation(Function&lt;S, ValidationStatus&gt; validationStatusProperty) {
+<span class="nc" id="L30">        this.validationStatusProperty = validationStatusProperty;</span>
+<span class="nc" id="L31">        return this;</span>
+    }
+
+    public void install(TableColumn&lt;S, T&gt; column, StringConverter&lt;T&gt; stringConverter) {
+<span class="nc" id="L35">        column.setCellFactory(this);</span>
+<span class="nc" id="L36">        this.stringConverter = stringConverter;</span>
+<span class="nc" id="L37">    }</span>
+
+    @Override
+    public TextFieldTableCell&lt;S, T&gt; call(TableColumn&lt;S, T&gt; param) {
+<span class="nc" id="L41">        return new TextFieldTableCell&lt;&gt;(stringConverter) {</span>
+<span class="nc" id="L42">            final List&lt;Subscription&gt; subscriptions = new ArrayList&lt;&gt;();</span>
+
+            @Override
+            public void startEdit() {
+<span class="nc" id="L46">                super.startEdit();</span>
+
+                // The textfield is lazily created and not already present when a TableCell is created.
+<span class="nc" id="L49">                lookupTextField().ifPresent(textField -&gt; Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L50">                    textField.requestFocus();</span>
+<span class="nc" id="L51">                    textField.selectAll();</span>
+<span class="nc" id="L52">                }));</span>
+<span class="nc" id="L53">            }</span>
+
+            /**
+             * As 'textfield' is a private member of TextFieldTableCell we need need to get to it through the backdoor.
+             *
+             * @return The TextField containing the editable content of the TableCell
+             */
+            private Optional&lt;TextField&gt; lookupTextField() {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                if (getGraphic() instanceof TextField) {</span>
+<span class="nc" id="L62">                    return Optional.of((TextField) getGraphic());</span>
+                } else {
+                    // Could be an HBox with some graphic and a TextField if a graphic is specified for the TableCell
+<span class="nc bnc" id="L65" title="All 2 branches missed.">                    if (getGraphic() instanceof HBox) {</span>
+<span class="nc" id="L66">                        HBox hbox = (HBox) getGraphic();</span>
+<span class="nc bnc" id="L67" title="All 4 branches missed.">                        if ((hbox.getChildren().size() &gt; 1) &amp;&amp; hbox.getChildren().get(1) instanceof TextField) {</span>
+<span class="nc" id="L68">                            return Optional.of((TextField) hbox.getChildren().get(1));</span>
+                        }
+                    }
+<span class="nc" id="L71">                    return Optional.empty();</span>
+                }
+            }
+
+            @Override
+            public void updateItem(T item, boolean empty) {
+<span class="nc" id="L77">                super.updateItem(item, empty);</span>
+
+<span class="nc" id="L79">                subscriptions.forEach(Subscription::unsubscribe);</span>
+<span class="nc" id="L80">                subscriptions.clear();</span>
+
+<span class="nc bnc" id="L82" title="All 6 branches missed.">                if (empty || getTableRow() == null || getTableRow().getItem() == null) {</span>
+<span class="nc" id="L83">                    setText(null);</span>
+<span class="nc" id="L84">                    setGraphic(null);</span>
+<span class="nc" id="L85">                    setOnMouseClicked(null);</span>
+<span class="nc" id="L86">                    setTooltip(null);</span>
+<span class="nc" id="L87">                    pseudoClassStateChanged(INVALID_PSEUDO_CLASS, false);</span>
+                } else {
+<span class="nc" id="L89">                    S viewModel = getTableRow().getItem();</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                    if (validationStatusProperty != null) {</span>
+<span class="nc" id="L91">                        validationStatusProperty.apply(viewModel)</span>
+<span class="nc" id="L92">                                                .getHighestMessage()</span>
+<span class="nc" id="L93">                                                .ifPresent(message -&gt; setTooltip(new Tooltip(message.getMessage())));</span>
+
+<span class="nc" id="L95">                        subscriptions.add(BindingsHelper.includePseudoClassWhen(</span>
+                                this,
+                                INVALID_PSEUDO_CLASS,
+<span class="nc" id="L98">                                validationStatusProperty.apply(viewModel).validProperty().not()));</span>
+                    }
+                }
+<span class="nc" id="L101">            }</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

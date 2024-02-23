@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldColumn.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.maintable.columns</a> &gt; <span class="el_source">FieldColumn.java</span></div><h1>FieldColumn.java</h1><pre class="source lang-java linenums">package org.jabref.gui.maintable.columns;
+
+import javafx.beans.value.ObservableValue;
+
+import org.jabref.gui.maintable.BibEntryTableViewModel;
+import org.jabref.gui.maintable.MainTableColumnModel;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.gui.util.comparator.NumericFieldComparator;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.OrFields;
+import org.jabref.model.entry.field.UnknownField;
+
+import com.google.common.collect.MoreCollectors;
+
+/**
+ * A column that displays the text-value of the field
+ */
+public class FieldColumn extends MainTableColumn&lt;String&gt; {
+
+    private final OrFields fields;
+
+    public FieldColumn(MainTableColumnModel model) {
+<span class="nc" id="L24">        super(model);</span>
+<span class="nc" id="L25">        this.fields = FieldFactory.parseOrFields(model.getQualifier());</span>
+
+<span class="nc" id="L27">        setText(getDisplayName());</span>
+<span class="nc" id="L28">        setCellValueFactory(param -&gt; getFieldValue(param.getValue()));</span>
+
+<span class="nc" id="L30">        new ValueTableCellFactory&lt;BibEntryTableViewModel, String&gt;()</span>
+<span class="nc" id="L31">                .withText(text -&gt; text)</span>
+<span class="nc" id="L32">                .install(this);</span>
+
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        if (fields.hasExactlyOne()) {</span>
+            // comparator can't parse more than one value
+<span class="nc" id="L36">            Field field = fields.getFields().stream().collect(MoreCollectors.onlyElement());</span>
+
+<span class="nc bnc" id="L38" title="All 4 branches missed.">            if ((field instanceof UnknownField) || field.isNumeric()) {</span>
+<span class="nc" id="L39">                this.setComparator(new NumericFieldComparator());</span>
+            }
+        }
+
+<span class="nc" id="L43">        this.setSortable(true);</span>
+<span class="nc" id="L44">    }</span>
+
+    /**
+     * Get the table column name to be displayed in the UI
+     *
+     * @return name to be displayed. null if field is empty.
+     */
+    @Override
+    public String getDisplayName() {
+<span class="nc" id="L53">        return fields.getDisplayName();</span>
+    }
+
+    private ObservableValue&lt;String&gt; getFieldValue(BibEntryTableViewModel entry) {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (fields.isEmpty()) {</span>
+<span class="nc" id="L58">            return null;</span>
+        } else {
+<span class="nc" id="L60">            return entry.getFields(fields);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

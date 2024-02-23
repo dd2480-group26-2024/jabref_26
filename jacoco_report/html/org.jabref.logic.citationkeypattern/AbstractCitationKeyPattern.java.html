@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractCitationKeyPattern.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.citationkeypattern</a> &gt; <span class="el_source">AbstractCitationKeyPattern.java</span></div><h1>AbstractCitationKeyPattern.java</h1><pre class="source lang-java linenums">package org.jabref.logic.citationkeypattern;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.StringTokenizer;
+import java.util.stream.Collectors;
+
+import org.jabref.model.entry.types.EntryType;
+
+/**
+ * A small table, where an entry type is associated with a Bibtex key pattern (an
+ * &lt;code&gt;ArrayList&lt;/code&gt;). A parent CitationKeyPattern can be set.
+ */
+<span class="fc" id="L18">public abstract class AbstractCitationKeyPattern {</span>
+
+<span class="fc" id="L20">    protected List&lt;String&gt; defaultPattern = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L22">    protected Map&lt;EntryType, List&lt;String&gt;&gt; data = new HashMap&lt;&gt;();</span>
+
+    /**
+     * This method takes a string of the form [field1]spacer[field2]spacer[field3]..., where the fields are the
+     * (required) fields of a BibTex entry. The string is split into fields and spacers by recognizing the [ and ].
+     *
+     * @param bibtexKeyPattern a &lt;code&gt;String&lt;/code&gt;
+     * @return an &lt;code&gt;ArrayList&lt;/code&gt; The first item of the list is a string representation of the key pattern (the
+     * parameter), the remaining items are the fields
+     */
+    public static List&lt;String&gt; split(String bibtexKeyPattern) {
+        // A holder for fields of the entry to be used for the key
+<span class="fc" id="L34">        List&lt;String&gt; fieldList = new ArrayList&lt;&gt;();</span>
+
+        // Before we do anything, we add the parameter to the ArrayLIst
+<span class="fc" id="L37">        fieldList.add(bibtexKeyPattern);</span>
+
+<span class="fc" id="L39">        StringTokenizer tok = new StringTokenizer(bibtexKeyPattern, &quot;[]&quot;, true);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        while (tok.hasMoreTokens()) {</span>
+<span class="fc" id="L41">            fieldList.add(tok.nextToken());</span>
+        }
+<span class="fc" id="L43">        return fieldList;</span>
+    }
+
+    public void addCitationKeyPattern(EntryType type, String pattern) {
+<span class="fc" id="L47">        data.put(type, AbstractCitationKeyPattern.split(pattern));</span>
+<span class="fc" id="L48">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L52">        final StringBuilder sb = new StringBuilder(&quot;AbstractCitationKeyPattern{&quot;);</span>
+<span class="nc" id="L53">        sb.append(&quot;defaultPattern=&quot;).append(defaultPattern);</span>
+<span class="nc" id="L54">        sb.append(&quot;, data=&quot;).append(data);</span>
+<span class="nc" id="L55">        sb.append('}');</span>
+<span class="nc" id="L56">        return sb.toString();</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L62">            return true;</span>
+        }
+<span class="pc bpc" id="L64" title="2 of 4 branches missed.">        if ((o == null) || (getClass() != o.getClass())) {</span>
+<span class="nc" id="L65">            return false;</span>
+        }
+<span class="fc" id="L67">        AbstractCitationKeyPattern that = (AbstractCitationKeyPattern) o;</span>
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">        return Objects.equals(defaultPattern, that.defaultPattern) &amp;&amp; Objects.equals(data, that.data);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L73">        return Objects.hash(defaultPattern, data);</span>
+    }
+
+    /**
+     * Gets an object for a desired key from this CitationKeyPattern or one of it's parents (in the case of
+     * DatabaseCitationKeyPattern). This method first tries to obtain the object from this CitationKeyPattern via the
+     * &lt;code&gt;get&lt;/code&gt; method of &lt;code&gt;Hashtable&lt;/code&gt;. If this fails, we try the default.&lt;br /&gt; If that fails, we try
+     * the parent.&lt;br /&gt; If that fails, we return the DEFAULT_LABELPATTERN&lt;br /&gt;
+     *
+     * @param entryType a &lt;code&gt;String&lt;/code&gt;
+     * @return the list of Strings for the given key. First entry: the complete key
+     */
+    public List&lt;String&gt; getValue(EntryType entryType) {
+<span class="fc" id="L86">        List&lt;String&gt; result = data.get(entryType);</span>
+        //  Test to see if we found anything
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (result == null) {</span>
+            // check default value
+<span class="fc" id="L90">            result = getDefaultValue();</span>
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">            if (result == null || result.isEmpty()) {</span>
+                // we are the &quot;last&quot; to ask
+                // we don't have anything left
+<span class="fc" id="L94">                return getLastLevelCitationKeyPattern(entryType);</span>
+            }
+        }
+<span class="fc" id="L97">        return result;</span>
+    }
+
+    /**
+     * Checks whether this pattern is customized or the default value.
+     */
+    public final boolean isDefaultValue(EntryType entryType) {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        return data.get(entryType) == null;</span>
+    }
+
+    /**
+     * This method is called &quot;...Value&quot; to be in line with the other methods
+     *
+     * @return null if not available.
+     */
+    public List&lt;String&gt; getDefaultValue() {
+<span class="fc" id="L113">        return this.defaultPattern;</span>
+    }
+
+    /**
+     * Sets the DEFAULT PATTERN for this key pattern
+     *
+     * @param bibtexKeyPattern the pattern to store
+     */
+    public void setDefaultValue(String bibtexKeyPattern) {
+<span class="fc" id="L122">        Objects.requireNonNull(bibtexKeyPattern);</span>
+<span class="fc" id="L123">        this.defaultPattern = AbstractCitationKeyPattern.split(bibtexKeyPattern);</span>
+<span class="fc" id="L124">    }</span>
+
+    public Set&lt;EntryType&gt; getAllKeys() {
+<span class="fc" id="L127">        return data.keySet();</span>
+    }
+
+    public Map&lt;EntryType, List&lt;String&gt;&gt; getPatterns() {
+<span class="fc" id="L131">        return data.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));</span>
+    }
+
+    public abstract List&lt;String&gt; getLastLevelCitationKeyPattern(EntryType key);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

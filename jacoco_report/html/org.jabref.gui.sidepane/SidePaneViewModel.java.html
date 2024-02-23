@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SidePaneViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.sidepane</a> &gt; <span class="el_source">SidePaneViewModel.java</span></div><h1>SidePaneViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.sidepane;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.IntStream;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.collections.ListChangeListener;
+import javafx.collections.ObservableList;
+
+import org.jabref.gui.AbstractViewModel;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+import org.jabref.preferences.SidePanePreferences;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class SidePaneViewModel extends AbstractViewModel {
+<span class="fc" id="L32">    private static final Logger LOGGER = LoggerFactory.getLogger(SidePaneViewModel.class);</span>
+
+<span class="fc" id="L34">    private final Map&lt;SidePaneType, SidePaneComponent&gt; sidePaneComponentLookup = new HashMap&lt;&gt;();</span>
+
+    private final PreferencesService preferencesService;
+    private final StateManager stateManager;
+    private final SidePaneContentFactory sidePaneContentFactory;
+    private final DialogService dialogService;
+
+    public SidePaneViewModel(LibraryTabContainer tabContainer,
+                             PreferencesService preferencesService,
+                             JournalAbbreviationRepository abbreviationRepository,
+                             StateManager stateManager,
+                             TaskExecutor taskExecutor,
+                             DialogService dialogService,
+                             FileUpdateMonitor fileUpdateMonitor,
+                             BibEntryTypesManager entryTypesManager,
+<span class="fc" id="L49">                             UndoManager undoManager) {</span>
+<span class="fc" id="L50">        this.preferencesService = preferencesService;</span>
+<span class="fc" id="L51">        this.stateManager = stateManager;</span>
+<span class="fc" id="L52">        this.dialogService = dialogService;</span>
+<span class="fc" id="L53">        this.sidePaneContentFactory = new SidePaneContentFactory(</span>
+                tabContainer,
+                preferencesService,
+                abbreviationRepository,
+                taskExecutor,
+                dialogService,
+                stateManager,
+                fileUpdateMonitor,
+                entryTypesManager,
+                undoManager);
+
+<span class="fc" id="L64">        preferencesService.getSidePanePreferences().visiblePanes().forEach(this::show);</span>
+<span class="fc" id="L65">        getPanes().addListener((ListChangeListener&lt;? super SidePaneType&gt;) change -&gt; {</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            while (change.next()) {</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                if (change.wasAdded()) {</span>
+<span class="nc" id="L68">                    preferencesService.getSidePanePreferences().visiblePanes().add(change.getAddedSubList().get(0));</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                } else if (change.wasRemoved()) {</span>
+<span class="nc" id="L70">                    preferencesService.getSidePanePreferences().visiblePanes().remove(change.getRemoved().get(0));</span>
+                }
+            }
+<span class="fc" id="L73">        });</span>
+<span class="fc" id="L74">    }</span>
+
+    protected SidePaneComponent getSidePaneComponent(SidePaneType pane) {
+<span class="nc" id="L77">        SidePaneComponent sidePaneComponent = sidePaneComponentLookup.get(pane);</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (sidePaneComponent == null) {</span>
+<span class="nc bnc" id="L79" title="All 3 branches missed.">            sidePaneComponent = switch (pane) {</span>
+<span class="nc" id="L80">                case GROUPS -&gt; new GroupsSidePaneComponent(</span>
+                        new ClosePaneAction(pane),
+                        new MoveUpAction(pane),
+                        new MoveDownAction(pane),
+                        sidePaneContentFactory,
+<span class="nc" id="L85">                        preferencesService.getGroupsPreferences(),</span>
+                        dialogService);
+<span class="nc" id="L87">                case WEB_SEARCH, OPEN_OFFICE -&gt; new SidePaneComponent(pane,</span>
+                        new ClosePaneAction(pane),
+                        new MoveUpAction(pane),
+                        new MoveDownAction(pane),
+                        sidePaneContentFactory);
+            };
+<span class="nc" id="L93">            sidePaneComponentLookup.put(pane, sidePaneComponent);</span>
+        }
+<span class="nc" id="L95">        return sidePaneComponent;</span>
+    }
+
+    /**
+     * Stores the current configuration of visible panes in the preferences, so that we show panes at the preferred
+     * position next time.
+     */
+    private void updatePreferredPositions() {
+<span class="fc" id="L103">        Map&lt;SidePaneType, Integer&gt; preferredPositions = new HashMap&lt;&gt;(preferencesService.getSidePanePreferences()</span>
+<span class="fc" id="L104">                                                                                        .getPreferredPositions());</span>
+<span class="fc" id="L105">        IntStream.range(0, getPanes().size()).forEach(i -&gt; preferredPositions.put(getPanes().get(i), i));</span>
+<span class="fc" id="L106">        preferencesService.getSidePanePreferences().setPreferredPositions(preferredPositions);</span>
+<span class="fc" id="L107">    }</span>
+
+    public void moveUp(SidePaneType pane) {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (getPanes().contains(pane)) {</span>
+<span class="fc" id="L111">            int currentPosition = getPanes().indexOf(pane);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            if (currentPosition &gt; 0) {</span>
+<span class="fc" id="L113">                int newPosition = currentPosition - 1;</span>
+<span class="fc" id="L114">                swap(getPanes(), currentPosition, newPosition);</span>
+<span class="fc" id="L115">                updatePreferredPositions();</span>
+<span class="fc" id="L116">            } else {</span>
+<span class="fc" id="L117">                LOGGER.debug(&quot;SidePaneComponent is already at the bottom&quot;);</span>
+            }
+<span class="fc" id="L119">        } else {</span>
+<span class="nc" id="L120">            LOGGER.warn(&quot;SidePaneComponent {} not visible&quot;, pane.getTitle());</span>
+        }
+<span class="fc" id="L122">    }</span>
+
+    public void moveDown(SidePaneType pane) {
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (getPanes().contains(pane)) {</span>
+<span class="fc" id="L126">            int currentPosition = getPanes().indexOf(pane);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (currentPosition &lt; (getPanes().size() - 1)) {</span>
+<span class="fc" id="L128">                int newPosition = currentPosition + 1;</span>
+<span class="fc" id="L129">                swap(getPanes(), currentPosition, newPosition);</span>
+<span class="fc" id="L130">                updatePreferredPositions();</span>
+<span class="fc" id="L131">            } else {</span>
+<span class="fc" id="L132">                LOGGER.debug(&quot;SidePaneComponent {} is already at the top&quot;, pane.getTitle());</span>
+            }
+<span class="fc" id="L134">        } else {</span>
+<span class="nc" id="L135">            LOGGER.warn(&quot;SidePaneComponent {} not visible&quot;, pane.getTitle());</span>
+        }
+<span class="fc" id="L137">    }</span>
+
+    private void show(SidePaneType pane) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (!getPanes().contains(pane)) {</span>
+<span class="fc" id="L141">            getPanes().add(pane);</span>
+<span class="fc" id="L142">            getPanes().sort(new PreferredIndexSort(preferencesService.getSidePanePreferences()));</span>
+        } else {
+<span class="nc" id="L144">            LOGGER.warn(&quot;SidePaneComponent {} not visible&quot;, pane.getTitle());</span>
+        }
+<span class="fc" id="L146">    }</span>
+
+    private ObservableList&lt;SidePaneType&gt; getPanes() {
+<span class="fc" id="L149">        return stateManager.getVisibleSidePaneComponents();</span>
+    }
+
+    private &lt;T&gt; void swap(ObservableList&lt;T&gt; observableList, int i, int j) {
+<span class="fc" id="L153">        List&lt;T&gt; placeholder = new ArrayList&lt;&gt;(observableList);</span>
+<span class="fc" id="L154">        Collections.swap(placeholder, i, j);</span>
+<span class="fc" id="L155">        observableList.sort(Comparator.comparingInt(placeholder::indexOf));</span>
+<span class="fc" id="L156">    }</span>
+
+    /**
+     * Helper class for sorting visible side panes based on their preferred position.
+     */
+    protected static class PreferredIndexSort implements Comparator&lt;SidePaneType&gt; {
+
+        private final Map&lt;SidePaneType, Integer&gt; preferredPositions;
+
+<span class="fc" id="L165">        public PreferredIndexSort(SidePanePreferences sidePanePreferences) {</span>
+<span class="fc" id="L166">            this.preferredPositions = sidePanePreferences.getPreferredPositions();</span>
+<span class="fc" id="L167">        }</span>
+
+        @Override
+        public int compare(SidePaneType type1, SidePaneType type2) {
+<span class="fc" id="L171">            int pos1 = preferredPositions.getOrDefault(type1, 0);</span>
+<span class="fc" id="L172">            int pos2 = preferredPositions.getOrDefault(type2, 0);</span>
+<span class="fc" id="L173">            return Integer.compare(pos1, pos2);</span>
+        }
+    }
+
+    private class MoveUpAction extends SimpleCommand {
+        private final SidePaneType toMoveUpPane;
+
+<span class="nc" id="L180">        public MoveUpAction(SidePaneType toMoveUpPane) {</span>
+<span class="nc" id="L181">            this.toMoveUpPane = toMoveUpPane;</span>
+<span class="nc" id="L182">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc" id="L186">            moveUp(toMoveUpPane);</span>
+<span class="nc" id="L187">        }</span>
+    }
+
+    private class MoveDownAction extends SimpleCommand {
+        private final SidePaneType toMoveDownPane;
+
+<span class="nc" id="L193">        public MoveDownAction(SidePaneType toMoveDownPane) {</span>
+<span class="nc" id="L194">            this.toMoveDownPane = toMoveDownPane;</span>
+<span class="nc" id="L195">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc" id="L199">            moveDown(toMoveDownPane);</span>
+<span class="nc" id="L200">        }</span>
+    }
+
+    public class ClosePaneAction extends SimpleCommand {
+        private final SidePaneType toClosePane;
+
+<span class="nc" id="L206">        public ClosePaneAction(SidePaneType toClosePane) {</span>
+<span class="nc" id="L207">            this.toClosePane = toClosePane;</span>
+<span class="nc" id="L208">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc" id="L212">            stateManager.getVisibleSidePaneComponents().remove(toClosePane);</span>
+<span class="nc" id="L213">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

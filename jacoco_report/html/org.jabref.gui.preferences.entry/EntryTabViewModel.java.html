@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.entry</a> &gt; <span class="el_source">EntryTabViewModel.java</span></div><h1>EntryTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.entry;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.logic.bibtex.FieldPreferences;
+import org.jabref.logic.preferences.OwnerPreferences;
+import org.jabref.logic.preferences.TimestampPreferences;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.preferences.BibEntryPreferences;
+import org.jabref.preferences.PreferencesService;
+
+public class EntryTabViewModel implements PreferenceTabViewModel {
+
+<span class="nc" id="L18">    private final StringProperty keywordSeparatorProperty = new SimpleStringProperty(&quot;&quot;);</span>
+
+<span class="nc" id="L20">    private final BooleanProperty resolveStringsProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L21">    private final StringProperty resolveStringsForFieldsProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L22">    private final StringProperty nonWrappableFieldsProperty = new SimpleStringProperty(&quot;&quot;);</span>
+
+<span class="nc" id="L24">    private final BooleanProperty markOwnerProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L25">    private final StringProperty markOwnerNameProperty = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L26">    private final BooleanProperty markOwnerOverwriteProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L27">    private final BooleanProperty addCreationDateProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L28">    private final BooleanProperty addModificationDateProperty = new SimpleBooleanProperty();</span>
+
+    private final FieldPreferences fieldPreferences;
+    private final BibEntryPreferences bibEntryPreferences;
+    private final OwnerPreferences ownerPreferences;
+    private final TimestampPreferences timestampPreferences;
+
+<span class="nc" id="L35">    public EntryTabViewModel(PreferencesService preferencesService) {</span>
+<span class="nc" id="L36">        this.bibEntryPreferences = preferencesService.getBibEntryPreferences();</span>
+<span class="nc" id="L37">        this.fieldPreferences = preferencesService.getFieldPreferences();</span>
+<span class="nc" id="L38">        this.ownerPreferences = preferencesService.getOwnerPreferences();</span>
+<span class="nc" id="L39">        this.timestampPreferences = preferencesService.getTimestampPreferences();</span>
+<span class="nc" id="L40">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L44">        keywordSeparatorProperty.setValue(bibEntryPreferences.getKeywordSeparator().toString());</span>
+
+<span class="nc" id="L46">        resolveStringsProperty.setValue(fieldPreferences.shouldResolveStrings());</span>
+<span class="nc" id="L47">        resolveStringsForFieldsProperty.setValue(FieldFactory.serializeFieldsList(fieldPreferences.getResolvableFields()));</span>
+<span class="nc" id="L48">        nonWrappableFieldsProperty.setValue(FieldFactory.serializeFieldsList(fieldPreferences.getNonWrappableFields()));</span>
+
+<span class="nc" id="L50">        markOwnerProperty.setValue(ownerPreferences.isUseOwner());</span>
+<span class="nc" id="L51">        markOwnerNameProperty.setValue(ownerPreferences.getDefaultOwner());</span>
+<span class="nc" id="L52">        markOwnerOverwriteProperty.setValue(ownerPreferences.isOverwriteOwner());</span>
+
+<span class="nc" id="L54">        addCreationDateProperty.setValue(timestampPreferences.shouldAddCreationDate());</span>
+<span class="nc" id="L55">        addModificationDateProperty.setValue(timestampPreferences.shouldAddModificationDate());</span>
+<span class="nc" id="L56">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L60">        bibEntryPreferences.keywordSeparatorProperty().setValue(keywordSeparatorProperty.getValue().charAt(0));</span>
+
+<span class="nc" id="L62">        fieldPreferences.setResolveStrings(resolveStringsProperty.getValue());</span>
+<span class="nc" id="L63">        fieldPreferences.setResolvableFields(FieldFactory.parseFieldList(resolveStringsForFieldsProperty.getValue().trim()));</span>
+<span class="nc" id="L64">        fieldPreferences.setNonWrappableFields(FieldFactory.parseFieldList(nonWrappableFieldsProperty.getValue().trim()));</span>
+
+<span class="nc" id="L66">        ownerPreferences.setUseOwner(markOwnerProperty.getValue());</span>
+<span class="nc" id="L67">        ownerPreferences.setDefaultOwner(markOwnerNameProperty.getValue());</span>
+<span class="nc" id="L68">        ownerPreferences.setOverwriteOwner(markOwnerOverwriteProperty.getValue());</span>
+
+<span class="nc" id="L70">        timestampPreferences.setAddCreationDate(addCreationDateProperty.getValue());</span>
+<span class="nc" id="L71">        timestampPreferences.setAddModificationDate(addModificationDateProperty.getValue());</span>
+<span class="nc" id="L72">    }</span>
+
+    public StringProperty keywordSeparatorProperty() {
+<span class="nc" id="L75">        return keywordSeparatorProperty;</span>
+    }
+
+    public BooleanProperty resolveStringsProperty() {
+<span class="nc" id="L79">        return resolveStringsProperty;</span>
+    }
+
+    public StringProperty resolveStringsForFieldsProperty() {
+<span class="nc" id="L83">        return resolveStringsForFieldsProperty;</span>
+    }
+
+    public StringProperty nonWrappableFieldsProperty() {
+<span class="nc" id="L87">        return nonWrappableFieldsProperty;</span>
+    }
+
+    // Entry owner
+
+    public BooleanProperty markOwnerProperty() {
+<span class="nc" id="L93">        return this.markOwnerProperty;</span>
+    }
+
+    public StringProperty markOwnerNameProperty() {
+<span class="nc" id="L97">        return this.markOwnerNameProperty;</span>
+    }
+
+    public BooleanProperty markOwnerOverwriteProperty() {
+<span class="nc" id="L101">        return this.markOwnerOverwriteProperty;</span>
+    }
+
+    // Time stamp
+
+    public BooleanProperty addCreationDateProperty() {
+<span class="nc" id="L107">        return addCreationDateProperty;</span>
+    }
+
+    public BooleanProperty addModificationDateProperty() {
+<span class="nc" id="L111">        return addModificationDateProperty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

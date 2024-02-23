@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BstVMVisitor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.bst</a> &gt; <span class="el_source">BstVMVisitor.java</span></div><h1>BstVMVisitor.java</h1><pre class="source lang-java linenums">package org.jabref.logic.bst;
+
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+
+import org.jabref.logic.bibtex.FieldPreferences;
+import org.jabref.logic.bibtex.FieldWriter;
+import org.jabref.logic.bibtex.InvalidFieldValueException;
+import org.jabref.model.entry.Month;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.StandardField;
+
+import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.TerminalNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+class BstVMVisitor extends BstBaseVisitor&lt;Integer&gt; {
+<span class="fc" id="L24">    private static final Logger LOGGER = LoggerFactory.getLogger(BstVMVisitor.class);</span>
+
+    private final BstVMContext bstVMContext;
+    private final StringBuilder bbl;
+
+<span class="fc" id="L29">    private BstEntry selectedBstEntry = null;</span>
+
+<span class="fc" id="L31">    public record Identifier(String name) {</span>
+    }
+
+<span class="fc" id="L34">    public BstVMVisitor(BstVMContext bstVMContext, StringBuilder bbl) {</span>
+<span class="fc" id="L35">        this.bstVMContext = bstVMContext;</span>
+<span class="fc" id="L36">        this.bbl = bbl;</span>
+<span class="fc" id="L37">    }</span>
+
+    @Override
+    public Integer visitStringsCommand(BstParser.StringsCommandContext ctx) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (ctx.ids.identifier().size() &gt; 20) {</span>
+<span class="nc" id="L42">            throw new BstVMException(&quot;Strings limit reached&quot;);</span>
+        }
+
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (BstParser.IdentifierContext identifierContext : ctx.ids.identifier()) {</span>
+<span class="fc" id="L46">            bstVMContext.strings().put(identifierContext.getText(), null);</span>
+<span class="fc" id="L47">        }</span>
+<span class="fc" id="L48">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitIntegersCommand(BstParser.IntegersCommandContext ctx) {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        for (BstParser.IdentifierContext identifierContext : ctx.ids.identifier()) {</span>
+<span class="fc" id="L54">            bstVMContext.integers().put(identifierContext.getText(), 0);</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitFunctionCommand(BstParser.FunctionCommandContext ctx) {
+<span class="fc" id="L61">        bstVMContext.functions().put(ctx.id.getText(),</span>
+<span class="fc" id="L62">                (visitor, functionContext) -&gt; visitor.visit(ctx.function));</span>
+<span class="fc" id="L63">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitMacroCommand(BstParser.MacroCommandContext ctx) {
+<span class="fc" id="L68">        String replacement = ctx.repl.getText().substring(1, ctx.repl.getText().length() - 1);</span>
+<span class="fc" id="L69">        bstVMContext.functions().put(ctx.id.getText(),</span>
+<span class="fc" id="L70">                (visitor, functionContext) -&gt; bstVMContext.stack().push(replacement));</span>
+<span class="fc" id="L71">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitReadCommand(BstParser.ReadCommandContext ctx) {
+<span class="fc" id="L76">        FieldWriter fieldWriter = new FieldWriter(new FieldPreferences(true, List.of(StandardField.MONTH), Collections.emptyList()));</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (BstEntry e : bstVMContext.entries()) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; mEntry : e.fields.entrySet()) {</span>
+<span class="fc" id="L79">                Field field = FieldFactory.parseField(mEntry.getKey());</span>
+<span class="fc" id="L80">                String fieldValue = e.entry.getResolvedFieldOrAlias(field, bstVMContext.bibDatabase())</span>
+<span class="fc" id="L81">                                           .map(content -&gt; {</span>
+                                               try {
+<span class="fc" id="L83">                                                   String result = fieldWriter.write(field, content);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                                                   if (result.startsWith(&quot;{&quot;)) {</span>
+                                                       // Strip enclosing {} from the output
+<span class="fc" id="L86">                                                       return result.substring(1, result.length() - 1);</span>
+                                                   }
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                                                   if (field == StandardField.MONTH) {</span>
+                                                       // We don't have the internal BibTeX strings at hand.
+                                                       // Thus, we look up the full month name in the generic table.
+<span class="fc" id="L91">                                                       return Month.parse(result)</span>
+<span class="fc" id="L92">                                                                   .map(Month::getFullName)</span>
+<span class="fc" id="L93">                                                                   .orElse(result);</span>
+                                                   }
+<span class="nc" id="L95">                                                   return result;</span>
+<span class="nc" id="L96">                                               } catch (</span>
+                                                       InvalidFieldValueException invalidFieldValueException) {
+                                                   // in case there is something wrong with the content, just return the content itself
+<span class="nc" id="L99">                                                   return content;</span>
+                                               }
+                                           })
+<span class="fc" id="L102">                                           .orElse(null);</span>
+<span class="fc" id="L103">                mEntry.setValue(fieldValue);</span>
+<span class="fc" id="L104">            }</span>
+<span class="fc" id="L105">        }</span>
+
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (BstEntry e : bstVMContext.entries()) {</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (!e.fields.containsKey(StandardField.CROSSREF.getName())) {</span>
+<span class="fc" id="L109">                e.fields.put(StandardField.CROSSREF.getName(), null);</span>
+            }
+<span class="fc" id="L111">        }</span>
+
+<span class="fc" id="L113">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitExecuteCommand(BstParser.ExecuteCommandContext ctx) {
+<span class="fc" id="L118">        this.selectedBstEntry = null;</span>
+<span class="fc" id="L119">        visit(ctx.bstFunction());</span>
+
+<span class="fc" id="L121">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitIterateCommand(BstParser.IterateCommandContext ctx) {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (BstEntry entry : bstVMContext.entries()) {</span>
+<span class="fc" id="L127">            this.selectedBstEntry = entry;</span>
+<span class="fc" id="L128">            visit(ctx.bstFunction());</span>
+<span class="fc" id="L129">        }</span>
+
+<span class="fc" id="L131">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitReverseCommand(BstParser.ReverseCommandContext ctx) {
+<span class="fc" id="L136">        ListIterator&lt;BstEntry&gt; i = bstVMContext.entries().listIterator(bstVMContext.entries().size());</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        while (i.hasPrevious()) {</span>
+<span class="fc" id="L138">            this.selectedBstEntry = i.previous();</span>
+<span class="fc" id="L139">            visit(ctx.bstFunction());</span>
+        }
+
+<span class="fc" id="L142">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitEntryCommand(BstParser.EntryCommandContext ctx) {
+        // ENTRY command contains 3 optionally filled identifier lists:
+        // Fields, Integers and Strings
+
+<span class="fc" id="L150">        BstParser.IdListOptContext entryFields = ctx.idListOpt(0);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (BstParser.IdentifierContext identifierContext : entryFields.identifier()) {</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            for (BstEntry entry : bstVMContext.entries()) {</span>
+<span class="fc" id="L153">                entry.fields.put(identifierContext.getText(), null);</span>
+<span class="fc" id="L154">            }</span>
+<span class="fc" id="L155">        }</span>
+
+<span class="fc" id="L157">        BstParser.IdListOptContext entryIntegers = ctx.idListOpt(1);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (BstParser.IdentifierContext identifierContext : entryIntegers.identifier()) {</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            for (BstEntry entry : bstVMContext.entries()) {</span>
+<span class="fc" id="L160">                entry.localIntegers.put(identifierContext.getText(), 0);</span>
+<span class="fc" id="L161">            }</span>
+<span class="fc" id="L162">        }</span>
+
+<span class="fc" id="L164">        BstParser.IdListOptContext entryStrings = ctx.idListOpt(2);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (BstParser.IdentifierContext identifierContext : entryStrings.identifier()) {</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            for (BstEntry entry : bstVMContext.entries()) {</span>
+<span class="fc" id="L167">                entry.localStrings.put(identifierContext.getText(), null);</span>
+<span class="fc" id="L168">            }</span>
+<span class="fc" id="L169">        }</span>
+
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (BstEntry entry : bstVMContext.entries()) {</span>
+<span class="fc" id="L172">            entry.localStrings.put(&quot;sort.key$&quot;, null);</span>
+<span class="fc" id="L173">        }</span>
+
+<span class="fc" id="L175">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitSortCommand(BstParser.SortCommandContext ctx) {
+<span class="fc" id="L180">        bstVMContext.entries().sort(Comparator.comparing(o -&gt; (o.localStrings.get(&quot;sort.key$&quot;))));</span>
+<span class="fc" id="L181">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitIdentifier(BstParser.IdentifierContext ctx) {
+<span class="fc" id="L186">        resolveIdentifier(ctx.IDENTIFIER().getText(), ctx);</span>
+<span class="fc" id="L187">        return BstVM.TRUE;</span>
+    }
+
+    protected void resolveIdentifier(String name, ParserRuleContext ctx) {
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (selectedBstEntry != null) {</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            if (selectedBstEntry.fields.containsKey(name)) {</span>
+<span class="fc" id="L193">                bstVMContext.stack().push(selectedBstEntry.fields.get(name));</span>
+<span class="fc" id="L194">                return;</span>
+            }
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            if (selectedBstEntry.localStrings.containsKey(name)) {</span>
+<span class="fc" id="L197">                bstVMContext.stack().push(selectedBstEntry.localStrings.get(name));</span>
+<span class="fc" id="L198">                return;</span>
+            }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (selectedBstEntry.localIntegers.containsKey(name)) {</span>
+<span class="fc" id="L201">                bstVMContext.stack().push(selectedBstEntry.localIntegers.get(name));</span>
+<span class="fc" id="L202">                return;</span>
+            }
+        }
+
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (bstVMContext.strings().containsKey(name)) {</span>
+<span class="fc" id="L207">            bstVMContext.stack().push(bstVMContext.strings().get(name));</span>
+<span class="fc" id="L208">            return;</span>
+        }
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (bstVMContext.integers().containsKey(name)) {</span>
+<span class="fc" id="L211">            bstVMContext.stack().push(bstVMContext.integers().get(name));</span>
+<span class="fc" id="L212">            return;</span>
+        }
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (bstVMContext.functions().containsKey(name)) {</span>
+<span class="fc" id="L215">            bstVMContext.functions().get(name).execute(this, ctx);</span>
+<span class="fc" id="L216">            return;</span>
+        }
+
+<span class="nc" id="L219">        throw new BstVMException(&quot;No matching identifier found: &quot; + name);</span>
+    }
+
+    @Override
+    public Integer visitBstFunction(BstParser.BstFunctionContext ctx) {
+<span class="fc" id="L224">        String name = ctx.getChild(0).getText();</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (bstVMContext.functions().containsKey(name)) {</span>
+<span class="fc" id="L226">            bstVMContext.functions().get(name).execute(this, ctx, selectedBstEntry);</span>
+        } else {
+<span class="fc" id="L228">            visit(ctx.getChild(0));</span>
+        }
+
+<span class="fc" id="L231">        return BstVM.TRUE;</span>
+    }
+
+    @Override
+    public Integer visitStackitem(BstParser.StackitemContext ctx) {
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (ParseTree childNode : ctx.children) {</span>
+            try {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">                if (childNode instanceof TerminalNode token) {</span>
+<span class="pc bpc" id="L239" title="1 of 4 branches missed.">                    switch (token.getSymbol().getType()) {</span>
+                        case BstParser.STRING -&gt; {
+<span class="fc" id="L241">                            String s = token.getText();</span>
+<span class="fc" id="L242">                            bstVMContext.stack().push(s.substring(1, s.length() - 1));</span>
+<span class="fc" id="L243">                        }</span>
+                        case BstParser.INTEGER -&gt;
+<span class="fc" id="L245">                                bstVMContext.stack().push(Integer.parseInt(token.getText().substring(1)));</span>
+                        case BstParser.QUOTED -&gt;
+<span class="fc" id="L247">                                bstVMContext.stack().push(new Identifier(token.getText().substring(1)));</span>
+                    }
+<span class="fc bfc" id="L249" title="All 2 branches covered.">                } else if (childNode instanceof BstParser.StackContext) {</span>
+<span class="fc" id="L250">                    bstVMContext.stack().push(childNode);</span>
+                } else {
+<span class="fc" id="L252">                    this.visit(childNode);</span>
+                }
+<span class="fc" id="L254">            } catch (BstVMException e) {</span>
+<span class="fc" id="L255">                bstVMContext.path().ifPresentOrElse(</span>
+<span class="nc" id="L256">                        path -&gt; LOGGER.error(&quot;{} ({})&quot;, e.getMessage(), path),</span>
+<span class="fc" id="L257">                        () -&gt; LOGGER.error(e.getMessage()));</span>
+<span class="fc" id="L258">                throw e;</span>
+<span class="fc" id="L259">            }</span>
+<span class="fc" id="L260">        }</span>
+<span class="fc" id="L261">        return BstVM.TRUE;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReferenceViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.texparser</a> &gt; <span class="el_source">ReferenceViewModel.java</span></div><h1>ReferenceViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.texparser;
+
+import java.util.Collection;
+
+import javafx.beans.property.ReadOnlyListWrapper;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.model.texparser.Citation;
+
+public class ReferenceViewModel {
+
+    private final String entry;
+    private final boolean highlighted;
+    private final ObservableList&lt;Citation&gt; citationList;
+
+<span class="nc" id="L17">    public ReferenceViewModel(String entry, boolean highlighted, Collection&lt;Citation&gt; citationColl) {</span>
+<span class="nc" id="L18">        this.entry = entry;</span>
+<span class="nc" id="L19">        this.highlighted = highlighted;</span>
+<span class="nc" id="L20">        this.citationList = FXCollections.observableArrayList();</span>
+
+<span class="nc" id="L22">        citationList.setAll(citationColl);</span>
+<span class="nc" id="L23">    }</span>
+
+    public boolean isHighlighted() {
+<span class="nc" id="L26">        return highlighted;</span>
+    }
+
+    public ObservableList&lt;Citation&gt; getCitationList() {
+<span class="nc" id="L30">        return new ReadOnlyListWrapper&lt;&gt;(citationList);</span>
+    }
+
+    /**
+     * Return a string for displaying an entry key and its number of uses.
+     */
+    public String getDisplayText() {
+<span class="nc" id="L37">        return String.format(&quot;%s (%s)&quot;, entry, citationList.size());</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L42">        return String.format(&quot;ReferenceViewModel{entry='%s', highlighted=%s, citationList=%s}&quot;,</span>
+                this.entry,
+<span class="nc" id="L44">                this.highlighted,</span>
+                this.citationList);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

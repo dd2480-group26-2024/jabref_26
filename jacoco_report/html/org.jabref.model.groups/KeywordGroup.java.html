@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KeywordGroup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.groups</a> &gt; <span class="el_source">KeywordGroup.java</span></div><h1>KeywordGroup.java</h1><pre class="source lang-java linenums">package org.jabref.model.groups;
+
+import java.util.Objects;
+
+import org.jabref.model.entry.field.Field;
+
+/**
+ * Matches entries based on a search phrase relative to the content in a specified field.
+ */
+public abstract class KeywordGroup extends AbstractGroup {
+    protected final Field searchField;
+    protected final String searchExpression;
+    protected final boolean caseSensitive;
+
+    public KeywordGroup(String name, GroupHierarchyType context, Field searchField, String searchExpression, boolean caseSensitive) {
+<span class="fc" id="L16">        super(name, context);</span>
+<span class="fc" id="L17">        this.caseSensitive = caseSensitive;</span>
+<span class="fc" id="L18">        this.searchField = searchField;</span>
+<span class="fc" id="L19">        this.searchExpression = searchExpression;</span>
+<span class="fc" id="L20">    }</span>
+
+    public boolean isCaseSensitive() {
+<span class="fc" id="L23">        return caseSensitive;</span>
+    }
+
+    public String getSearchExpression() {
+<span class="fc" id="L27">        return searchExpression;</span>
+    }
+
+    public Field getSearchField() {
+<span class="fc" id="L31">        return searchField;</span>
+    }
+
+    @Override
+    public boolean isDynamic() {
+<span class="nc" id="L36">        return true;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L42">            return true;</span>
+        }
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L45">            return false;</span>
+        }
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (!super.equals(o)) {</span>
+<span class="nc" id="L48">            return false;</span>
+        }
+<span class="fc" id="L50">        KeywordGroup that = (KeywordGroup) o;</span>
+<span class="pc bpc" id="L51" title="3 of 6 branches missed.">        return isCaseSensitive() == that.isCaseSensitive() &amp;&amp; Objects.equals(getSearchField(), that.getSearchField()) &amp;&amp; Objects.equals(getSearchExpression(), that.getSearchExpression());</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L56">        return Objects.hash(super.hashCode(), getSearchField(), getSearchExpression(), isCaseSensitive());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

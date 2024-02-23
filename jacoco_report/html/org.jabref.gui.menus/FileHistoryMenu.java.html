@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileHistoryMenu.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.menus</a> &gt; <span class="el_source">FileHistoryMenu.java</span></div><h1>FileHistoryMenu.java</h1><pre class="source lang-java linenums">package org.jabref.gui.menus;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.input.KeyEvent;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.importer.actions.OpenDatabaseAction;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.io.FileHistory;
+
+public class FileHistoryMenu extends Menu {
+
+    protected final MenuItem clearRecentLibraries;
+    private final FileHistory history;
+    private final DialogService dialogService;
+    private final OpenDatabaseAction openDatabaseAction;
+
+<span class="fc" id="L23">    public FileHistoryMenu(FileHistory fileHistory, DialogService dialogService, OpenDatabaseAction openDatabaseAction) {</span>
+<span class="fc" id="L24">        setText(Localization.lang(&quot;Recent libraries&quot;));</span>
+
+<span class="fc" id="L26">        this.clearRecentLibraries = new MenuItem();</span>
+<span class="fc" id="L27">        clearRecentLibraries.setText(Localization.lang(&quot;Clear recent libraries&quot;));</span>
+<span class="pc" id="L28">        clearRecentLibraries.setOnAction(event -&gt; clearLibrariesHistory());</span>
+
+<span class="fc" id="L30">        this.history = fileHistory;</span>
+<span class="fc" id="L31">        this.dialogService = dialogService;</span>
+<span class="fc" id="L32">        this.openDatabaseAction = openDatabaseAction;</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (history.isEmpty()) {</span>
+<span class="nc" id="L34">            setDisable(true);</span>
+        } else {
+<span class="fc" id="L36">            setItems();</span>
+        }
+<span class="fc" id="L38">    }</span>
+
+    /**
+     * This method is to use typed letters to access recent libraries in menu.
+     *
+     * @param keyEvent a KeyEvent.
+     * @return false if typed char is invalid or not a number.
+     */
+    public boolean openFileByKey(KeyEvent keyEvent) {
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (keyEvent.getCharacter() == null) {</span>
+<span class="nc" id="L48">            return false;</span>
+        }
+<span class="nc" id="L50">        char key = keyEvent.getCharacter().charAt(0);</span>
+<span class="nc" id="L51">        int num = Character.getNumericValue(key);</span>
+<span class="nc bnc" id="L52" title="All 4 branches missed.">        if (num &lt;= 0 || num &gt; history.size()) {</span>
+<span class="nc" id="L53">            return false;</span>
+        }
+<span class="nc" id="L55">        this.openFile(history.get(Integer.parseInt(keyEvent.getCharacter()) - 1));</span>
+<span class="nc" id="L56">        return true;</span>
+    }
+
+    /**
+     * Adds the filename to the top of the menu. If it already is in
+     * the menu, it is merely moved to the top.
+     */
+    public void newFile(Path file) {
+<span class="fc" id="L64">        history.newFile(file);</span>
+<span class="fc" id="L65">        setItems();</span>
+<span class="fc" id="L66">        setDisable(false);</span>
+<span class="fc" id="L67">    }</span>
+
+    private void setItems() {
+<span class="fc" id="L70">        getItems().clear();</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        for (int index = 0; index &lt; history.size(); index++) {</span>
+<span class="nc" id="L72">            addItem(history.get(index), index + 1);</span>
+        }
+<span class="fc" id="L74">        getItems().addAll(</span>
+                new SeparatorMenuItem(),
+                clearRecentLibraries
+        );
+<span class="fc" id="L78">    }</span>
+
+    private void addItem(Path file, int num) {
+<span class="nc" id="L81">        String number = Integer.toString(num);</span>
+<span class="nc" id="L82">        MenuItem item = new MenuItem(number + &quot;. &quot; + file);</span>
+        // By default mnemonic parsing is set to true for anything that is Labeled, if an underscore character
+        // is present, it would create a key combination ALT+the succeeding character (at least for Windows OS)
+        // and the underscore character will be parsed (deleted).
+        // i.e if the file name was called &quot;bib_test.bib&quot;, a key combination &quot;ALT+t&quot; will be created
+        // so to avoid this, mnemonic parsing should be set to false to print normally the underscore character.
+<span class="nc" id="L88">        item.setMnemonicParsing(false);</span>
+<span class="nc" id="L89">        item.setOnAction(event -&gt; openFile(file));</span>
+<span class="nc" id="L90">        getItems().add(item);</span>
+<span class="nc" id="L91">    }</span>
+
+    public void openFile(Path file) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (!Files.exists(file)) {</span>
+<span class="nc" id="L95">            this.dialogService.showErrorDialogAndWait(</span>
+<span class="nc" id="L96">                    Localization.lang(&quot;File not found&quot;),</span>
+<span class="nc" id="L97">                    Localization.lang(&quot;File not found&quot;) + &quot;: &quot; + file);</span>
+<span class="nc" id="L98">            history.removeItem(file);</span>
+<span class="nc" id="L99">            setItems();</span>
+<span class="nc" id="L100">            return;</span>
+        }
+<span class="nc" id="L102">        openDatabaseAction.openFile(file);</span>
+<span class="nc" id="L103">    }</span>
+
+    public void clearLibrariesHistory() {
+<span class="fc" id="L106">        history.clear();</span>
+<span class="fc" id="L107">        setDisable(true);</span>
+<span class="fc" id="L108">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

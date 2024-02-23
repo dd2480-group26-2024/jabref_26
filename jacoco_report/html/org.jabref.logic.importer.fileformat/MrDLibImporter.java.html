@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MrDLibImporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fileformat</a> &gt; <span class="el_source">MrDLibImporter.java</span></div><h1>MrDLibImporter.java</h1><pre class="source lang-java linenums">/**
+ *
+ */
+package org.jabref.logic.importer.fileformat;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.importer.Importer;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+
+import kong.unirest.json.JSONException;
+import kong.unirest.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Handles importing of recommended articles to be displayed in the Related Articles tab.
+ */
+<span class="fc" id="L28">public class MrDLibImporter extends Importer {</span>
+
+<span class="fc" id="L30">    private static final Logger LOGGER = LoggerFactory.getLogger(MrDLibImporter.class);</span>
+    public ParserResult parserResult;
+    private String recommendationsHeading;
+    private String recommendationsDescription;
+    private String recommendationSetId;
+
+    @SuppressWarnings(&quot;unused&quot;)
+    @Override
+    public boolean isRecognizedFormat(BufferedReader input) throws IOException {
+<span class="fc" id="L39">        String recommendationsAsString = convertToString(input);</span>
+        try {
+<span class="fc" id="L41">            JSONObject jsonObject = new JSONObject(recommendationsAsString);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (!jsonObject.has(&quot;recommendations&quot;)) {</span>
+<span class="nc" id="L43">                return false;</span>
+            }
+<span class="nc" id="L45">        } catch (JSONException ex) {</span>
+<span class="nc" id="L46">            return false;</span>
+<span class="fc" id="L47">        }</span>
+<span class="fc" id="L48">        return true;</span>
+    }
+
+    @Override
+    public ParserResult importDatabase(BufferedReader input) throws IOException {
+<span class="fc" id="L53">        parse(input);</span>
+<span class="fc" id="L54">        return parserResult;</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L59">        return &quot;MrDLibImporter&quot;;</span>
+    }
+
+    @Override
+    public StandardFileType getFileType() {
+<span class="fc" id="L64">        return StandardFileType.JSON;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="fc" id="L69">        return &quot;Takes valid JSON documents from the Mr. DLib API and parses them into a BibEntry&quot;;</span>
+    }
+
+    /**
+     * Convert Buffered Reader response to string for JSON parsing.
+     *
+     * @param input Takes a BufferedReader with a reference to the JSON document delivered by mdl server.
+     * @return Returns an String containing the JSON document.
+     */
+    private String convertToString(BufferedReader input) {
+        String line;
+<span class="fc" id="L80">        StringBuilder stringBuilder = new StringBuilder();</span>
+        try {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            while ((line = input.readLine()) != null) {</span>
+<span class="fc" id="L83">                stringBuilder.append(line);</span>
+            }
+<span class="nc" id="L85">        } catch (Exception e) {</span>
+<span class="nc" id="L86">            LOGGER.error(e.getMessage());</span>
+<span class="fc" id="L87">        }</span>
+<span class="fc" id="L88">        return stringBuilder.toString();</span>
+    }
+
+    /**
+     * Small pair-class to ensure the right order of the recommendations.
+     */
+    private static class RankedBibEntry {
+
+        public BibEntry entry;
+        public Integer rank;
+
+<span class="fc" id="L99">        public RankedBibEntry(BibEntry entry, Integer rank) {</span>
+<span class="fc" id="L100">            this.rank = rank;</span>
+<span class="fc" id="L101">            this.entry = entry;</span>
+<span class="fc" id="L102">        }</span>
+    }
+
+    /**
+     * Parses the input from the server to a ParserResult
+     *
+     * @param input A BufferedReader with a reference to a string with the server's response
+     */
+    private void parse(BufferedReader input) throws IOException {
+        // The Bibdatabase that gets returned in the ParserResult.
+<span class="fc" id="L112">        BibDatabase bibDatabase = new BibDatabase();</span>
+        // The document to parse
+<span class="fc" id="L114">        String recommendationSet = convertToString(input);</span>
+<span class="fc" id="L115">        JSONObject recommendationSetJson = new JSONObject(recommendationSet);</span>
+        // The sorted BibEntries gets stored here later
+<span class="fc" id="L117">        List&lt;RankedBibEntry&gt; rankedBibEntries = new ArrayList&lt;&gt;();</span>
+
+        // Get recommendations from response and populate bib entries
+<span class="fc" id="L120">        JSONObject recommendationsJson = recommendationSetJson.getJSONObject(&quot;recommendations&quot;);</span>
+<span class="fc" id="L121">        Iterator&lt;String&gt; keys = recommendationsJson.keys();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        while (keys.hasNext()) {</span>
+<span class="fc" id="L123">            String key = keys.next();</span>
+<span class="fc" id="L124">            JSONObject value = recommendationsJson.getJSONObject(key);</span>
+<span class="fc" id="L125">            rankedBibEntries.add(populateBibEntry(value));</span>
+<span class="fc" id="L126">        }</span>
+
+        // Sort bib entries according to rank
+<span class="fc" id="L129">        rankedBibEntries.sort((RankedBibEntry rankedBibEntry1,</span>
+<span class="fc" id="L130">                               RankedBibEntry rankedBibEntry2) -&gt; rankedBibEntry1.rank.compareTo(rankedBibEntry2.rank));</span>
+<span class="fc" id="L131">        List&lt;BibEntry&gt; bibEntries = rankedBibEntries.stream().map(e -&gt; e.entry).collect(Collectors.toList());</span>
+
+<span class="fc" id="L133">        bibDatabase.insertEntries(bibEntries);</span>
+<span class="fc" id="L134">        parserResult = new ParserResult(bibDatabase);</span>
+
+<span class="fc" id="L136">        JSONObject label = recommendationSetJson.getJSONObject(&quot;label&quot;);</span>
+<span class="fc" id="L137">        recommendationsHeading = label.getString(&quot;label-text&quot;);</span>
+<span class="fc" id="L138">        recommendationsDescription = label.getString(&quot;label-description&quot;);</span>
+<span class="fc" id="L139">        recommendationSetId = recommendationSetJson.getBigInteger(&quot;recommendation_set_id&quot;).toString();</span>
+<span class="fc" id="L140">    }</span>
+
+    /**
+     * Parses the JSON recommendations into bib entries
+     *
+     * @param recommendation JSON object of a single recommendation returned by Mr. DLib
+     * @return A ranked bib entry created from the recommendation input
+     */
+    private RankedBibEntry populateBibEntry(JSONObject recommendation) {
+<span class="fc" id="L149">        BibEntry current = new BibEntry();</span>
+
+        // parse each of the relevant fields into variables
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        String authors = isRecommendationFieldPresent(recommendation, &quot;authors&quot;) ? recommendation.getString(&quot;authors&quot;) : &quot;&quot;;</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        String title = isRecommendationFieldPresent(recommendation, &quot;title&quot;) ? recommendation.getString(&quot;title&quot;) : &quot;&quot;;</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        String year = isRecommendationFieldPresent(recommendation, &quot;published_year&quot;) ? Integer.toString(recommendation.getInt(&quot;published_year&quot;)) : &quot;&quot;;</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        String journal = isRecommendationFieldPresent(recommendation, &quot;published_in&quot;) ? recommendation.getString(&quot;published_in&quot;) : &quot;&quot;;</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        String url = isRecommendationFieldPresent(recommendation, &quot;url&quot;) ? recommendation.getString(&quot;url&quot;) : &quot;&quot;;</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        Integer rank = isRecommendationFieldPresent(recommendation, &quot;recommendation_id&quot;) ? recommendation.getInt(&quot;recommendation_id&quot;) : 100;</span>
+
+        // Populate bib entry with relevant data
+<span class="fc" id="L160">        current.setField(StandardField.AUTHOR, authors);</span>
+<span class="fc" id="L161">        current.setField(StandardField.TITLE, title);</span>
+<span class="fc" id="L162">        current.setField(StandardField.YEAR, year);</span>
+<span class="fc" id="L163">        current.setField(StandardField.JOURNAL, journal);</span>
+<span class="fc" id="L164">        current.setField(StandardField.URL, url);</span>
+
+<span class="fc" id="L166">        return new RankedBibEntry(current, rank);</span>
+    }
+
+    private Boolean isRecommendationFieldPresent(JSONObject recommendation, String field) {
+<span class="pc bpc" id="L170" title="1 of 4 branches missed.">        return recommendation.has(field) &amp;&amp; !recommendation.isNull(field);</span>
+    }
+
+    public ParserResult getParserResult() {
+<span class="nc" id="L174">        return parserResult;</span>
+    }
+
+    public String getRecommendationsHeading() {
+<span class="fc" id="L178">        return recommendationsHeading;</span>
+    }
+
+    public String getRecommendationsDescription() {
+<span class="fc" id="L182">        return recommendationsDescription;</span>
+    }
+
+    public String getRecommendationSetId() {
+<span class="fc" id="L186">        return recommendationSetId;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

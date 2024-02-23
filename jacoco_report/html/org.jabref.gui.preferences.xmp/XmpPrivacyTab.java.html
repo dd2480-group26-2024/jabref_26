@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmpPrivacyTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.xmp</a> &gt; <span class="el_source">XmpPrivacyTab.java</span></div><h1>XmpPrivacyTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.xmp;
+
+import javafx.application.Platform;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.gui.util.BindingsHelper;
+import org.jabref.gui.util.FieldsUtil;
+import org.jabref.gui.util.IconValidationDecorator;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.field.Field;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+
+public class XmpPrivacyTab extends AbstractPreferenceTabView&lt;XmpPrivacyTabViewModel&gt; implements PreferencesTab {
+
+    @FXML private CheckBox enableXmpFilter;
+    @FXML private TableView&lt;Field&gt; filterList;
+    @FXML private TableColumn&lt;Field, Field&gt; fieldColumn;
+    @FXML private TableColumn&lt;Field, Field&gt; actionsColumn;
+    @FXML private ComboBox&lt;Field&gt; addFieldName;
+    @FXML private Button addField;
+
+<span class="nc" id="L36">    private final ControlsFxVisualizer validationVisualizer = new ControlsFxVisualizer();</span>
+
+<span class="nc" id="L38">    public XmpPrivacyTab() {</span>
+<span class="nc" id="L39">        ViewLoader.view(this)</span>
+<span class="nc" id="L40">                  .root(this)</span>
+<span class="nc" id="L41">                  .load();</span>
+<span class="nc" id="L42">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L46">        return Localization.lang(&quot;XMP metadata&quot;);</span>
+    }
+
+    public void initialize() {
+<span class="nc" id="L50">        this.viewModel = new XmpPrivacyTabViewModel(dialogService, preferencesService.getXmpPreferences());</span>
+
+<span class="nc" id="L52">        enableXmpFilter.selectedProperty().bindBidirectional(viewModel.xmpFilterEnabledProperty());</span>
+<span class="nc" id="L53">        filterList.disableProperty().bind(viewModel.xmpFilterEnabledProperty().not());</span>
+<span class="nc" id="L54">        addFieldName.disableProperty().bind(viewModel.xmpFilterEnabledProperty().not());</span>
+<span class="nc" id="L55">        addField.disableProperty().bind(viewModel.xmpFilterEnabledProperty().not());</span>
+
+<span class="nc" id="L57">        fieldColumn.setSortable(true);</span>
+<span class="nc" id="L58">        fieldColumn.setReorderable(false);</span>
+<span class="nc" id="L59">        fieldColumn.setCellValueFactory(cellData -&gt; BindingsHelper.constantOf(cellData.getValue()));</span>
+<span class="nc" id="L60">        new ValueTableCellFactory&lt;Field, Field&gt;()</span>
+<span class="nc" id="L61">                .withText(FieldsUtil::getNameWithType)</span>
+<span class="nc" id="L62">                .install(fieldColumn);</span>
+
+<span class="nc" id="L64">        actionsColumn.setSortable(false);</span>
+<span class="nc" id="L65">        actionsColumn.setReorderable(false);</span>
+<span class="nc" id="L66">        actionsColumn.setCellValueFactory(cellData -&gt; BindingsHelper.constantOf(cellData.getValue()));</span>
+<span class="nc" id="L67">        new ValueTableCellFactory&lt;Field, Field&gt;()</span>
+<span class="nc" id="L68">                .withGraphic(item -&gt; IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode())</span>
+<span class="nc" id="L69">                .withTooltip(item -&gt; Localization.lang(&quot;Remove&quot;) + &quot; &quot; + item.getName())</span>
+<span class="nc" id="L70">                .withOnMouseClickedEvent(</span>
+<span class="nc" id="L71">                        item -&gt; evt -&gt; viewModel.removeFilter(filterList.getFocusModel().getFocusedItem()))</span>
+<span class="nc" id="L72">                .install(actionsColumn);</span>
+
+<span class="nc" id="L74">        filterList.addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; {</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">            if (event.getCode() == KeyCode.DELETE) {</span>
+<span class="nc" id="L76">                viewModel.removeFilter(filterList.getSelectionModel().getSelectedItem());</span>
+<span class="nc" id="L77">                event.consume();</span>
+            }
+<span class="nc" id="L79">        });</span>
+
+<span class="nc" id="L81">        filterList.itemsProperty().bind(viewModel.filterListProperty());</span>
+
+<span class="nc" id="L83">        addFieldName.setEditable(true);</span>
+<span class="nc" id="L84">        new ViewModelListCellFactory&lt;Field&gt;()</span>
+<span class="nc" id="L85">                .withText(FieldsUtil::getNameWithType)</span>
+<span class="nc" id="L86">                .install(addFieldName);</span>
+<span class="nc" id="L87">        addFieldName.itemsProperty().bind(viewModel.availableFieldsProperty());</span>
+<span class="nc" id="L88">        addFieldName.valueProperty().bindBidirectional(viewModel.addFieldNameProperty());</span>
+<span class="nc" id="L89">        addFieldName.setConverter(FieldsUtil.FIELD_STRING_CONVERTER);</span>
+<span class="nc" id="L90">        addFieldName.addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; {</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (event.getCode() == KeyCode.ENTER) {</span>
+<span class="nc" id="L92">                viewModel.addField();</span>
+<span class="nc" id="L93">                event.consume();</span>
+            }
+<span class="nc" id="L95">        });</span>
+
+<span class="nc" id="L97">        validationVisualizer.setDecoration(new IconValidationDecorator());</span>
+<span class="nc" id="L98">        Platform.runLater(() -&gt; validationVisualizer.initVisualization(viewModel.xmpFilterListValidationStatus(), filterList));</span>
+<span class="nc" id="L99">    }</span>
+
+    public void addField() {
+<span class="nc" id="L102">        viewModel.addField();</span>
+<span class="nc" id="L103">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

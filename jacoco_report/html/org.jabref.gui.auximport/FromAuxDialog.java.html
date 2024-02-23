@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FromAuxDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.auximport</a> &gt; <span class="el_source">FromAuxDialog.java</span></div><h1>FromAuxDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui.auximport;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import jakarta.inject.Inject;
+
+/**
+ * A wizard dialog for generating a new sub database from existing TeX AUX file
+ */
+public class FromAuxDialog extends BaseDialog&lt;Void&gt; {
+    @FXML private ButtonType generateButtonType;
+    @FXML private TextField auxFileField;
+    @FXML private ListView&lt;String&gt; notFoundList;
+    @FXML private TextArea statusInfos;
+    @FXML private ComboBox&lt;BibDatabaseContext&gt; libraryListView;
+
+    @Inject private PreferencesService preferences;
+    @Inject private DialogService dialogService;
+    @Inject private ThemeManager themeManager;
+    @Inject private StateManager stateManager;
+
+    private final LibraryTabContainer tabContainer;
+    private FromAuxDialogViewModel viewModel;
+
+<span class="nc" id="L43">    public FromAuxDialog(LibraryTabContainer tabContainer) {</span>
+<span class="nc" id="L44">        this.tabContainer = tabContainer;</span>
+<span class="nc" id="L45">        this.setTitle(Localization.lang(&quot;AUX file import&quot;));</span>
+
+<span class="nc" id="L47">        ViewLoader.view(this)</span>
+<span class="nc" id="L48">                  .load()</span>
+<span class="nc" id="L49">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L51">        Button generateButton = (Button) this.getDialogPane().lookupButton(generateButtonType);</span>
+<span class="nc" id="L52">        generateButton.disableProperty().bind(viewModel.parseFailedProperty());</span>
+<span class="nc" id="L53">        generateButton.defaultButtonProperty().bind(generateButton.disableProperty().not());</span>
+<span class="nc" id="L54">        setResultConverter(button -&gt; {</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            if (button == generateButtonType) {</span>
+<span class="nc" id="L56">                viewModel.addResultToTabContainer();</span>
+            }
+<span class="nc" id="L58">            return null;</span>
+        });
+
+<span class="nc" id="L61">        themeManager.updateFontStyle(getDialogPane().getScene());</span>
+<span class="nc" id="L62">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L66">        viewModel = new FromAuxDialogViewModel(tabContainer, dialogService, preferences, stateManager);</span>
+
+<span class="nc" id="L68">        auxFileField.textProperty().bindBidirectional(viewModel.auxFileProperty());</span>
+<span class="nc" id="L69">        statusInfos.textProperty().bindBidirectional(viewModel.statusTextProperty());</span>
+<span class="nc" id="L70">        notFoundList.itemsProperty().bind(viewModel.notFoundList());</span>
+
+<span class="nc" id="L72">        libraryListView.setEditable(false);</span>
+<span class="nc" id="L73">        libraryListView.itemsProperty().bind(viewModel.librariesProperty());</span>
+<span class="nc" id="L74">        libraryListView.valueProperty().bindBidirectional(viewModel.selectedLibraryProperty());</span>
+<span class="nc" id="L75">        new ViewModelListCellFactory&lt;BibDatabaseContext&gt;()</span>
+<span class="nc" id="L76">                .withText(viewModel::getDatabaseName)</span>
+<span class="nc" id="L77">                .install(libraryListView);</span>
+<span class="nc" id="L78">        EasyBind.listen(libraryListView.getSelectionModel().selectedItemProperty(), (obs, oldValue, newValue) -&gt; parseActionPerformed());</span>
+<span class="nc" id="L79">    }</span>
+
+    @FXML
+    private void parseActionPerformed() {
+<span class="nc" id="L83">        viewModel.parse();</span>
+<span class="nc" id="L84">    }</span>
+
+    @FXML
+    private void browseButtonClicked() {
+<span class="nc" id="L88">        viewModel.browse();</span>
+<span class="nc" id="L89">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

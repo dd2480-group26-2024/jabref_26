@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RenameFieldViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.edit.automaticfiededitor.renamefield</a> &gt; <span class="el_source">RenameFieldViewModel.java</span></div><h1>RenameFieldViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.edit.automaticfiededitor.renamefield;
+
+import java.util.List;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+import org.jabref.gui.StateManager;
+import org.jabref.gui.edit.automaticfiededitor.AbstractAutomaticFieldEditorTabViewModel;
+import org.jabref.gui.edit.automaticfiededitor.LastAutomaticFieldEditorEdit;
+import org.jabref.gui.edit.automaticfiededitor.MoveFieldValueAction;
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.strings.StringUtil;
+
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+
+public class RenameFieldViewModel extends AbstractAutomaticFieldEditorTabViewModel {
+    public static final int TAB_INDEX = 2;
+<span class="fc" id="L31">    private final StringProperty newFieldName = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="fc" id="L32">    private final ObjectProperty&lt;Field&gt; selectedField = new SimpleObjectProperty&lt;&gt;(StandardField.AUTHOR);</span>
+    private final List&lt;BibEntry&gt; selectedEntries;
+
+    private final Validator fieldValidator;
+
+    private final Validator fieldNameValidator;
+
+    private final BooleanBinding canRename;
+
+    public RenameFieldViewModel(List&lt;BibEntry&gt; selectedEntries, BibDatabase database, StateManager stateManager) {
+<span class="fc" id="L42">        super(database, stateManager);</span>
+<span class="fc" id="L43">        this.selectedEntries = selectedEntries;</span>
+
+<span class="fc" id="L45">        fieldValidator = new FunctionBasedValidator&lt;&gt;(selectedField, field -&gt; StringUtil.isNotBlank(field.getName()),</span>
+<span class="fc" id="L46">                ValidationMessage.error(&quot;Field cannot be empty&quot;));</span>
+<span class="fc" id="L47">        fieldNameValidator = new FunctionBasedValidator&lt;&gt;(newFieldName, fieldName -&gt; {</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (StringUtil.isBlank(fieldName)) {</span>
+<span class="fc" id="L49">                return ValidationMessage.error(&quot;Field name cannot be empty&quot;);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            } else if (StringUtil.containsWhitespace(fieldName)) {</span>
+<span class="fc" id="L51">                return ValidationMessage.error(&quot;Field name cannot have whitespace characters&quot;);</span>
+            }
+<span class="fc" id="L53">            return null;</span>
+        });
+
+<span class="fc" id="L56">        canRename = Bindings.and(fieldValidationStatus().validProperty(), fieldNameValidationStatus().validProperty());</span>
+<span class="fc" id="L57">    }</span>
+
+    public ValidationStatus fieldValidationStatus() {
+<span class="fc" id="L60">        return fieldValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus fieldNameValidationStatus() {
+<span class="fc" id="L64">        return fieldNameValidator.getValidationStatus();</span>
+    }
+
+    public BooleanBinding canRenameProperty() {
+<span class="nc" id="L68">        return canRename;</span>
+    }
+
+    public String getNewFieldName() {
+<span class="nc" id="L72">        return newFieldName.get();</span>
+    }
+
+    public StringProperty newFieldNameProperty() {
+<span class="fc" id="L76">        return newFieldName;</span>
+    }
+
+    public void setNewFieldName(String newName) {
+<span class="fc" id="L80">        newFieldNameProperty().set(newName);</span>
+<span class="fc" id="L81">    }</span>
+
+    public Field getSelectedField() {
+<span class="nc" id="L84">        return selectedField.get();</span>
+    }
+
+    public ObjectProperty&lt;Field&gt; selectedFieldProperty() {
+<span class="fc" id="L88">        return selectedField;</span>
+    }
+
+    public void selectField(Field field) {
+<span class="fc" id="L92">        selectedFieldProperty().set(field);</span>
+<span class="fc" id="L93">    }</span>
+
+    public void renameField() {
+<span class="fc" id="L96">        NamedCompound renameEdit = new NamedCompound(&quot;RENAME_EDIT&quot;);</span>
+<span class="fc" id="L97">        int affectedEntriesCount = 0;</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (fieldNameValidationStatus().isValid()) {</span>
+<span class="fc" id="L99">            affectedEntriesCount = new MoveFieldValueAction(selectedField.get(),</span>
+<span class="fc" id="L100">                    FieldFactory.parseField(newFieldName.get()),</span>
+                    selectedEntries,
+                    renameEdit,
+<span class="fc" id="L103">                    false).executeAndGetAffectedEntriesCount();</span>
+
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (renameEdit.hasEdits()) {</span>
+<span class="fc" id="L106">                renameEdit.end();</span>
+            }
+        }
+
+<span class="fc" id="L110">        stateManager.setLastAutomaticFieldEditorEdit(new LastAutomaticFieldEditorEdit(</span>
+<span class="fc" id="L111">                affectedEntriesCount, TAB_INDEX, renameEdit</span>
+        ));
+<span class="fc" id="L113">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

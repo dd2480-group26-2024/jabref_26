@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpecialField.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.field</a> &gt; <span class="el_source">SpecialField.java</span></div><h1>SpecialField.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.field;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+import org.jabref.model.entry.KeywordList;
+
+<span class="fc" id="L13">public enum SpecialField implements Field {</span>
+
+<span class="fc" id="L15">    PRINTED(&quot;printed&quot;,</span>
+            SpecialFieldValue.PRINTED
+    ),
+
+<span class="fc" id="L19">    PRIORITY(&quot;priority&quot;,</span>
+            SpecialFieldValue.CLEAR_PRIORITY,
+            SpecialFieldValue.PRIORITY_HIGH,
+            SpecialFieldValue.PRIORITY_MEDIUM,
+            SpecialFieldValue.PRIORITY_LOW
+    ),
+
+<span class="fc" id="L26">    QUALITY(&quot;qualityassured&quot;,</span>
+            SpecialFieldValue.QUALITY_ASSURED
+    ),
+
+<span class="fc" id="L30">    RANKING(&quot;ranking&quot;,</span>
+            SpecialFieldValue.CLEAR_RANK,
+            SpecialFieldValue.RANK_1,
+            SpecialFieldValue.RANK_2,
+            SpecialFieldValue.RANK_3,
+            SpecialFieldValue.RANK_4,
+            SpecialFieldValue.RANK_5
+    ),
+
+<span class="fc" id="L39">    READ_STATUS(&quot;readstatus&quot;,</span>
+            SpecialFieldValue.CLEAR_READ_STATUS,
+            SpecialFieldValue.READ,
+            SpecialFieldValue.SKIMMED
+    ),
+
+<span class="fc" id="L45">    RELEVANCE(&quot;relevance&quot;,</span>
+            SpecialFieldValue.RELEVANT
+    );
+
+    private final List&lt;SpecialFieldValue&gt; values;
+    private final KeywordList keywords;
+    private final HashMap&lt;String, SpecialFieldValue&gt; map;
+    private final String fieldName;
+
+<span class="fc" id="L54">    SpecialField(String fieldName, SpecialFieldValue... values) {</span>
+<span class="fc" id="L55">        this.fieldName = fieldName;</span>
+<span class="fc" id="L56">        this.values = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L57">        this.keywords = new KeywordList();</span>
+<span class="fc" id="L58">        this.map = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (SpecialFieldValue value : values) {</span>
+<span class="fc" id="L60">            this.values.add(value);</span>
+<span class="fc" id="L61">            value.getKeyword().ifPresent(keywords::add);</span>
+<span class="fc" id="L62">            value.getFieldValue().ifPresent(fieldValue -&gt; map.put(fieldValue, value));</span>
+        }
+<span class="fc" id="L64">    }</span>
+
+    public List&lt;SpecialFieldValue&gt; getValues() {
+<span class="nc" id="L67">        return this.values;</span>
+    }
+
+    public KeywordList getKeyWords() {
+<span class="fc" id="L71">        return this.keywords;</span>
+    }
+
+    public static Optional&lt;SpecialField&gt; fromName(String name) {
+<span class="fc" id="L75">        return Arrays.stream(SpecialField.values())</span>
+<span class="fc" id="L76">                     .filter(field -&gt; field.getName().equalsIgnoreCase(name))</span>
+<span class="fc" id="L77">                     .findAny();</span>
+    }
+
+    public boolean isSingleValueField() {
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        return this.values.size() == 1;</span>
+    }
+
+    public Optional&lt;SpecialFieldValue&gt; parseValue(String value) {
+<span class="nc" id="L85">        return Optional.ofNullable(map.get(value));</span>
+    }
+
+    @Override
+    public Set&lt;FieldProperty&gt; getProperties() {
+<span class="fc" id="L90">        return EnumSet.noneOf(FieldProperty.class);</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L95">        return fieldName;</span>
+    }
+
+    @Override
+    public boolean isStandardField() {
+<span class="nc" id="L100">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

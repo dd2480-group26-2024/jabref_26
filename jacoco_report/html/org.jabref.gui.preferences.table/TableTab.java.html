@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TableTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.table</a> &gt; <span class="el_source">TableTab.java</span></div><h1>TableTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.table;
+
+import javafx.application.Platform;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.help.HelpAction;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.maintable.MainTableColumnModel;
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.gui.util.IconValidationDecorator;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.l10n.Localization;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+
+public class TableTab extends AbstractPreferenceTabView&lt;TableTabViewModel&gt; implements PreferencesTab {
+
+    @FXML private TableView&lt;MainTableColumnModel&gt; columnsList;
+    @FXML private TableColumn&lt;MainTableColumnModel, String&gt; nameColumn;
+    @FXML private TableColumn&lt;MainTableColumnModel, String&gt; actionsColumn;
+    @FXML private ComboBox&lt;MainTableColumnModel&gt; addColumnName;
+    @FXML private CheckBox specialFieldsEnable;
+    @FXML private Button specialFieldsHelp;
+    @FXML private CheckBox extraFileColumnsEnable;
+    @FXML private CheckBox autoResizeColumns;
+
+    @FXML private RadioButton namesNatbib;
+    @FXML private RadioButton nameAsIs;
+    @FXML private RadioButton nameFirstLast;
+    @FXML private RadioButton nameLastFirst;
+    @FXML private RadioButton abbreviationDisabled;
+    @FXML private RadioButton abbreviationEnabled;
+    @FXML private RadioButton abbreviationLastNameOnly;
+
+<span class="nc" id="L49">    private final ControlsFxVisualizer validationVisualizer = new ControlsFxVisualizer();</span>
+
+<span class="nc" id="L51">    public TableTab() {</span>
+<span class="nc" id="L52">        ViewLoader.view(this)</span>
+<span class="nc" id="L53">                  .root(this)</span>
+<span class="nc" id="L54">                  .load();</span>
+<span class="nc" id="L55">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L59">        return Localization.lang(&quot;Entry table&quot;);</span>
+    }
+
+    public void initialize() {
+<span class="nc" id="L63">        this.viewModel = new TableTabViewModel(dialogService, preferencesService);</span>
+
+<span class="nc" id="L65">        setupTable();</span>
+<span class="nc" id="L66">        setupBindings();</span>
+
+<span class="nc" id="L68">        ActionFactory actionFactory = new ActionFactory(preferencesService.getKeyBindingRepository());</span>
+<span class="nc" id="L69">        actionFactory.configureIconButton(StandardActions.HELP_SPECIAL_FIELDS, new HelpAction(HelpFile.SPECIAL_FIELDS, dialogService, preferencesService.getFilePreferences()), specialFieldsHelp);</span>
+<span class="nc" id="L70">    }</span>
+
+    private void setupTable() {
+<span class="nc" id="L73">        nameColumn.setSortable(false);</span>
+<span class="nc" id="L74">        nameColumn.setReorderable(false);</span>
+<span class="nc" id="L75">        nameColumn.setCellValueFactory(cellData -&gt; cellData.getValue().nameProperty());</span>
+<span class="nc" id="L76">        new ValueTableCellFactory&lt;MainTableColumnModel, String&gt;()</span>
+<span class="nc" id="L77">                .withText(name -&gt; name)</span>
+<span class="nc" id="L78">                .install(nameColumn);</span>
+
+<span class="nc" id="L80">        actionsColumn.setSortable(false);</span>
+<span class="nc" id="L81">        actionsColumn.setReorderable(false);</span>
+<span class="nc" id="L82">        actionsColumn.setCellValueFactory(cellData -&gt; cellData.getValue().nameProperty());</span>
+<span class="nc" id="L83">        new ValueTableCellFactory&lt;MainTableColumnModel, String&gt;()</span>
+<span class="nc" id="L84">                .withGraphic(item -&gt; IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode())</span>
+<span class="nc" id="L85">                .withTooltip(name -&gt; Localization.lang(&quot;Remove column&quot;) + &quot; &quot; + name)</span>
+<span class="nc" id="L86">                .withOnMouseClickedEvent(item -&gt; evt -&gt;</span>
+<span class="nc" id="L87">                        viewModel.removeColumn(columnsList.getFocusModel().getFocusedItem()))</span>
+<span class="nc" id="L88">                .install(actionsColumn);</span>
+
+<span class="nc" id="L90">        viewModel.selectedColumnModelProperty().setValue(columnsList.getSelectionModel());</span>
+<span class="nc" id="L91">        columnsList.addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; {</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            if (event.getCode() == KeyCode.DELETE) {</span>
+<span class="nc" id="L93">                viewModel.removeColumn(columnsList.getSelectionModel().getSelectedItem());</span>
+<span class="nc" id="L94">                event.consume();</span>
+            }
+<span class="nc" id="L96">        });</span>
+
+<span class="nc" id="L98">        columnsList.itemsProperty().bind(viewModel.columnsListProperty());</span>
+
+<span class="nc" id="L100">        new ViewModelListCellFactory&lt;MainTableColumnModel&gt;()</span>
+<span class="nc" id="L101">                .withText(MainTableColumnModel::getDisplayName)</span>
+<span class="nc" id="L102">                .install(addColumnName);</span>
+<span class="nc" id="L103">        addColumnName.itemsProperty().bind(viewModel.availableColumnsProperty());</span>
+<span class="nc" id="L104">        addColumnName.valueProperty().bindBidirectional(viewModel.addColumnProperty());</span>
+<span class="nc" id="L105">        addColumnName.setConverter(TableTabViewModel.columnNameStringConverter);</span>
+<span class="nc" id="L106">        addColumnName.addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (event.getCode() == KeyCode.ENTER) {</span>
+<span class="nc" id="L108">                viewModel.insertColumnInList();</span>
+<span class="nc" id="L109">                event.consume();</span>
+            }
+<span class="nc" id="L111">        });</span>
+
+<span class="nc" id="L113">        validationVisualizer.setDecoration(new IconValidationDecorator());</span>
+<span class="nc" id="L114">        Platform.runLater(() -&gt; validationVisualizer.initVisualization(viewModel.columnsListValidationStatus(), columnsList));</span>
+<span class="nc" id="L115">    }</span>
+
+    private void setupBindings() {
+<span class="nc" id="L118">        specialFieldsEnable.selectedProperty().bindBidirectional(viewModel.specialFieldsEnabledProperty());</span>
+<span class="nc" id="L119">        extraFileColumnsEnable.selectedProperty().bindBidirectional(viewModel.extraFileColumnsEnabledProperty());</span>
+<span class="nc" id="L120">        autoResizeColumns.selectedProperty().bindBidirectional(viewModel.autoResizeColumnsProperty());</span>
+
+<span class="nc" id="L122">        namesNatbib.selectedProperty().bindBidirectional(viewModel.namesNatbibProperty());</span>
+<span class="nc" id="L123">        nameAsIs.selectedProperty().bindBidirectional(viewModel.nameAsIsProperty());</span>
+<span class="nc" id="L124">        nameFirstLast.selectedProperty().bindBidirectional(viewModel.nameFirstLastProperty());</span>
+<span class="nc" id="L125">        nameLastFirst.selectedProperty().bindBidirectional(viewModel.nameLastFirstProperty());</span>
+
+<span class="nc" id="L127">        abbreviationDisabled.selectedProperty().bindBidirectional(viewModel.abbreviationDisabledProperty());</span>
+<span class="nc" id="L128">        abbreviationDisabled.disableProperty().bind(namesNatbib.selectedProperty().or(nameAsIs.selectedProperty()));</span>
+<span class="nc" id="L129">        abbreviationEnabled.selectedProperty().bindBidirectional(viewModel.abbreviationEnabledProperty());</span>
+<span class="nc" id="L130">        abbreviationEnabled.disableProperty().bind(namesNatbib.selectedProperty().or(nameAsIs.selectedProperty()));</span>
+<span class="nc" id="L131">        abbreviationLastNameOnly.selectedProperty().bindBidirectional(viewModel.abbreviationLastNameOnlyProperty());</span>
+<span class="nc" id="L132">        abbreviationLastNameOnly.disableProperty().bind(namesNatbib.selectedProperty().or(nameAsIs.selectedProperty()));</span>
+<span class="nc" id="L133">    }</span>
+
+    public void updateToCurrentColumnOrder() {
+<span class="nc" id="L136">        viewModel.fillColumnList();</span>
+<span class="nc" id="L137">    }</span>
+
+    public void sortColumnUp() {
+<span class="nc" id="L140">        viewModel.moveColumnUp();</span>
+<span class="nc" id="L141">    }</span>
+
+    public void sortColumnDown() {
+<span class="nc" id="L144">        viewModel.moveColumnDown();</span>
+<span class="nc" id="L145">    }</span>
+
+    public void addColumn() {
+<span class="nc" id="L148">        viewModel.insertColumnInList();</span>
+<span class="nc" id="L149">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

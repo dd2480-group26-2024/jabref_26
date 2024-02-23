@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomEntryTypesTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.customentrytypes</a> &gt; <span class="el_source">CustomEntryTypesTabViewModel.java</span></div><h1>CustomEntryTypesTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.customentrytypes;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+import javafx.beans.Observable;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntryType;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.field.BibField;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.FieldPriority;
+import org.jabref.model.entry.field.FieldProperty;
+import org.jabref.model.entry.field.OrFields;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.UnknownEntryType;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.preferences.PreferencesService;
+
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+
+public class CustomEntryTypesTabViewModel implements PreferenceTabViewModel {
+
+<span class="nc" id="L44">    private final ObservableList&lt;Field&gt; fieldsForAdding = FXCollections.observableArrayList(FieldFactory.getStandardFieldsWithCitationKey());</span>
+<span class="nc" id="L45">    private final ObjectProperty&lt;EntryTypeViewModel&gt; selectedEntryType = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="nc" id="L46">    private final StringProperty entryTypeToAdd = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L47">    private final ObjectProperty&lt;Field&gt; newFieldToAdd = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="nc" id="L48">    private final ObservableList&lt;EntryTypeViewModel&gt; entryTypesWithFields = FXCollections.observableArrayList(extractor -&gt; new Observable[]{extractor.entryType(), extractor.fields()});</span>
+<span class="nc" id="L49">    private final List&lt;BibEntryType&gt; entryTypesToDelete = new ArrayList&lt;&gt;();</span>
+
+    private final PreferencesService preferencesService;
+    private final BibEntryTypesManager entryTypesManager;
+    private final DialogService dialogService;
+    private final BibDatabaseMode bibDatabaseMode;
+
+    private final Validator entryTypeValidator;
+    private final Validator fieldValidator;
+<span class="nc" id="L58">    private final Set&lt;Field&gt; multiLineFields = new HashSet&lt;&gt;();</span>
+
+<span class="nc bnc" id="L60" title="All 4 branches missed.">    Predicate&lt;Field&gt; isMultiline = field -&gt; this.multiLineFields.contains(field) || field.getProperties().contains(FieldProperty.MULTILINE_TEXT);</span>
+
+    public CustomEntryTypesTabViewModel(BibDatabaseMode mode,
+                                        BibEntryTypesManager entryTypesManager,
+                                        DialogService dialogService,
+<span class="nc" id="L65">                                        PreferencesService preferencesService) {</span>
+<span class="nc" id="L66">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L67">        this.entryTypesManager = entryTypesManager;</span>
+<span class="nc" id="L68">        this.dialogService = dialogService;</span>
+<span class="nc" id="L69">        this.bibDatabaseMode = mode;</span>
+
+<span class="nc" id="L71">        this.multiLineFields.addAll(preferencesService.getFieldPreferences().getNonWrappableFields());</span>
+
+<span class="nc" id="L73">        entryTypeValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                entryTypeToAdd,
+                StringUtil::isNotBlank,
+<span class="nc" id="L76">                ValidationMessage.error(Localization.lang(&quot;Entry type cannot be empty. Please enter a name.&quot;)));</span>
+<span class="nc" id="L77">        fieldValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                newFieldToAdd,
+<span class="nc bnc" id="L79" title="All 4 branches missed.">                input -&gt; (input != null) &amp;&amp; StringUtil.isNotBlank(input.getDisplayName()),</span>
+<span class="nc" id="L80">                ValidationMessage.error(Localization.lang(&quot;Field cannot be empty. Please enter a name.&quot;)));</span>
+<span class="nc" id="L81">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (!this.entryTypesWithFields.isEmpty()) {</span>
+<span class="nc" id="L86">            this.entryTypesWithFields.clear();</span>
+        }
+<span class="nc" id="L88">        Collection&lt;BibEntryType&gt; allTypes = entryTypesManager.getAllTypes(bibDatabaseMode);</span>
+
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        for (BibEntryType entryType : allTypes) {</span>
+            EntryTypeViewModel viewModel;
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            if (entryTypesManager.isCustomType(entryType.getType(), bibDatabaseMode)) {</span>
+<span class="nc" id="L93">                viewModel = new CustomEntryTypeViewModel(entryType, isMultiline);</span>
+            } else {
+<span class="nc" id="L95">                viewModel = new EntryTypeViewModel(entryType, isMultiline);</span>
+            }
+<span class="nc" id="L97">            this.entryTypesWithFields.add(viewModel);</span>
+<span class="nc" id="L98">        }</span>
+<span class="nc" id="L99">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L103">        Set&lt;Field&gt; multilineFields = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        for (EntryTypeViewModel typeViewModel : entryTypesWithFields) {</span>
+<span class="nc" id="L105">            BibEntryType type = typeViewModel.entryType().getValue();</span>
+<span class="nc" id="L106">            List&lt;FieldViewModel&gt; allFields = typeViewModel.fields();</span>
+
+<span class="nc" id="L108">            multilineFields.addAll(allFields.stream()</span>
+<span class="nc" id="L109">                                            .filter(FieldViewModel::isMultiline)</span>
+<span class="nc" id="L110">                                            .map(FieldViewModel::toField)</span>
+<span class="nc" id="L111">                                            .toList());</span>
+
+<span class="nc" id="L113">            List&lt;OrFields&gt; required = allFields.stream()</span>
+<span class="nc" id="L114">                                               .filter(FieldViewModel::isRequired)</span>
+<span class="nc" id="L115">                                               .map(FieldViewModel::toField)</span>
+<span class="nc" id="L116">                                               .map(OrFields::new)</span>
+<span class="nc" id="L117">                                               .collect(Collectors.toList());</span>
+<span class="nc" id="L118">            List&lt;BibField&gt; fields = allFields.stream().map(FieldViewModel::toBibField).collect(Collectors.toList());</span>
+
+<span class="nc" id="L120">            BibEntryType newType = new BibEntryType(type.getType(), fields, required);</span>
+<span class="nc" id="L121">            entryTypesManager.addCustomOrModifiedType(newType, bibDatabaseMode);</span>
+<span class="nc" id="L122">        }</span>
+
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        for (var entryType : entryTypesToDelete) {</span>
+<span class="nc" id="L125">            entryTypesManager.removeCustomOrModifiedEntryType(entryType, bibDatabaseMode);</span>
+<span class="nc" id="L126">        }</span>
+
+<span class="nc" id="L128">        preferencesService.getFieldPreferences().setNonWrappableFields(multilineFields);</span>
+<span class="nc" id="L129">        preferencesService.storeCustomEntryTypesRepository(entryTypesManager);</span>
+<span class="nc" id="L130">    }</span>
+
+    public EntryTypeViewModel addNewCustomEntryType() {
+<span class="nc" id="L133">        EntryType newentryType = new UnknownEntryType(entryTypeToAdd.getValue());</span>
+<span class="nc" id="L134">        BibEntryType type = new BibEntryType(newentryType, new ArrayList&lt;&gt;(), Collections.emptyList());</span>
+<span class="nc" id="L135">        EntryTypeViewModel viewModel = new CustomEntryTypeViewModel(type, isMultiline);</span>
+<span class="nc" id="L136">        this.entryTypesWithFields.add(viewModel);</span>
+<span class="nc" id="L137">        this.entryTypeToAdd.setValue(&quot;&quot;);</span>
+
+<span class="nc" id="L139">        return viewModel;</span>
+    }
+
+    public void removeEntryType(EntryTypeViewModel focusedItem) {
+<span class="nc" id="L143">        entryTypesWithFields.remove(focusedItem);</span>
+<span class="nc" id="L144">        entryTypesToDelete.add(focusedItem.entryType().getValue());</span>
+<span class="nc" id="L145">    }</span>
+
+    public void addNewField() {
+<span class="nc" id="L148">        Field field = newFieldToAdd.getValue();</span>
+<span class="nc" id="L149">        boolean fieldExists = displayNameExists(field.getDisplayName());</span>
+
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (fieldExists) {</span>
+<span class="nc" id="L152">            dialogService.showWarningDialogAndWait(</span>
+<span class="nc" id="L153">                    Localization.lang(&quot;Duplicate fields&quot;),</span>
+<span class="nc" id="L154">                    Localization.lang(&quot;Warning: You added field \&quot;%0\&quot; twice. Only one will be kept.&quot;, field.getDisplayName()));</span>
+        } else {
+<span class="nc" id="L156">            this.selectedEntryType.getValue().addField(new FieldViewModel(</span>
+                    field,
+                    FieldViewModel.Mandatory.REQUIRED,
+                    FieldPriority.IMPORTANT,
+                    false));
+        }
+<span class="nc" id="L162">        newFieldToAddProperty().setValue(null);</span>
+<span class="nc" id="L163">    }</span>
+
+    public boolean displayNameExists(String displayName) {
+<span class="nc" id="L166">        ObservableList&lt;FieldViewModel&gt; entryFields = this.selectedEntryType.getValue().fields();</span>
+<span class="nc" id="L167">        return entryFields.stream().anyMatch(fieldViewModel -&gt;</span>
+<span class="nc" id="L168">                fieldViewModel.displayNameProperty().getValue().equals(displayName));</span>
+    }
+
+    public void removeField(FieldViewModel focusedItem) {
+<span class="nc" id="L172">        selectedEntryType.getValue().removeField(focusedItem);</span>
+<span class="nc" id="L173">    }</span>
+
+    public void resetAllCustomEntryTypes() {
+<span class="nc" id="L176">        entryTypesManager.clearAllCustomEntryTypes(bibDatabaseMode);</span>
+<span class="nc" id="L177">        preferencesService.storeCustomEntryTypesRepository(entryTypesManager);</span>
+<span class="nc" id="L178">    }</span>
+
+    public ObjectProperty&lt;EntryTypeViewModel&gt; selectedEntryTypeProperty() {
+<span class="nc" id="L181">        return this.selectedEntryType;</span>
+    }
+
+    public StringProperty entryTypeToAddProperty() {
+<span class="nc" id="L185">        return this.entryTypeToAdd;</span>
+    }
+
+    public ObjectProperty&lt;Field&gt; newFieldToAddProperty() {
+<span class="nc" id="L189">        return this.newFieldToAdd;</span>
+    }
+
+    public ObservableList&lt;EntryTypeViewModel&gt; entryTypes() {
+<span class="nc" id="L193">        return this.entryTypesWithFields;</span>
+    }
+
+    public ObservableList&lt;Field&gt; fieldsForAdding() {
+<span class="nc" id="L197">        return this.fieldsForAdding;</span>
+    }
+
+    public ValidationStatus entryTypeValidationStatus() {
+<span class="nc" id="L201">        return entryTypeValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus fieldValidationStatus() {
+<span class="nc" id="L205">        return fieldValidator.getValidationStatus();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

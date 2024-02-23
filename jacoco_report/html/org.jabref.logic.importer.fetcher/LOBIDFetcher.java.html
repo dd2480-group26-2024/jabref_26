@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LOBIDFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">LOBIDFetcher.java</span></div><h1>LOBIDFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.ImporterPreferences;
+import org.jabref.logic.importer.PagedSearchBasedParserFetcher;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.fetcher.transformers.LOBIDQueryTransformer;
+import org.jabref.logic.util.OS;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONObject;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Fetches data from the LOBID API
+ *
+ * @see &lt;a href=&quot;https://lobid.org/resources/api&quot;&gt;API documentation&lt;/a&gt; for more details
+ */
+public class LOBIDFetcher implements PagedSearchBasedParserFetcher {
+
+    public static final String FETCHER_NAME = &quot;LOBID&quot;;
+
+<span class="fc" id="L43">    private static final Logger LOGGER = LoggerFactory.getLogger(LOBIDFetcher.class);</span>
+
+    private static final String API_URL = &quot;https://lobid.org/resources/search&quot;;
+
+    private final ImporterPreferences importerPreferences;
+
+<span class="fc" id="L49">    public LOBIDFetcher(ImporterPreferences importerPreferences) {</span>
+<span class="fc" id="L50">        this.importerPreferences = importerPreferences;</span>
+<span class="fc" id="L51">    }</span>
+
+    /**
+     * Gets the query URL
+     *
+     * @param luceneQuery the search query
+     * @param pageNumber  the number of the page indexed from 0
+     * @return URL
+     */
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery, int pageNumber) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L62">        URIBuilder uriBuilder = new URIBuilder(API_URL);</span>
+<span class="fc" id="L63">        uriBuilder.addParameter(&quot;q&quot;, new LOBIDQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;)); // search query</span>
+<span class="fc" id="L64">        uriBuilder.addParameter(&quot;from&quot;, String.valueOf(getPageSize() * pageNumber)); // from entry number, starts indexing at 0</span>
+<span class="fc" id="L65">        uriBuilder.addParameter(&quot;size&quot;, String.valueOf(getPageSize())); // page size</span>
+<span class="fc" id="L66">        uriBuilder.addParameter(&quot;format&quot;, &quot;json&quot;); // response format</span>
+<span class="fc" id="L67">        return uriBuilder.build().toURL();</span>
+    }
+
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L72">        return inputStream -&gt; {</span>
+<span class="fc" id="L73">            String response = new BufferedReader(new InputStreamReader(inputStream)).lines().collect(Collectors.joining(OS.NEWLINE));</span>
+<span class="fc" id="L74">            JSONObject jsonObject = new JSONObject(response);</span>
+
+<span class="fc" id="L76">            List&lt;BibEntry&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (jsonObject.has(&quot;member&quot;)) {</span>
+<span class="fc" id="L78">                JSONArray results = jsonObject.getJSONArray(&quot;member&quot;);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                for (int i = 0; i &lt; results.length(); i++) {</span>
+<span class="fc" id="L80">                    JSONObject jsonEntry = results.getJSONObject(i);</span>
+<span class="fc" id="L81">                    BibEntry entry = parseJSONtoBibtex(jsonEntry);</span>
+<span class="fc" id="L82">                    entries.add(entry);</span>
+                }
+            }
+
+<span class="fc" id="L86">            return entries;</span>
+        };
+    }
+
+    private BibEntry parseJSONtoBibtex(JSONObject jsonEntry) {
+<span class="fc" id="L91">        BibEntry entry = new BibEntry();</span>
+<span class="fc" id="L92">        Field nametype = StandardField.JOURNAL;</span>
+<span class="fc" id="L93">        EntryType entryType = StandardEntryType.InCollection;</span>
+
+        // publication type
+<span class="fc" id="L96">        JSONArray typeArray = jsonEntry.optJSONArray(&quot;type&quot;);</span>
+<span class="fc" id="L97">        String types = &quot;&quot;;</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (typeArray != null) {</span>
+<span class="fc" id="L99">            List&lt;String&gt; typeList = IntStream.range(0, typeArray.length())</span>
+<span class="fc" id="L100">                                             .mapToObj(typeArray::optString)</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                                             .filter(type -&gt; !type.isEmpty())</span>
+<span class="fc" id="L102">                                             .toList();</span>
+<span class="fc" id="L103">            types = String.join(&quot;, &quot;, typeList);</span>
+<span class="fc" id="L104">            entry.setField(StandardField.TYPE, types);</span>
+        }
+
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (types.toLowerCase().contains(&quot;book&quot;)) {</span>
+<span class="fc" id="L108">            entryType = StandardEntryType.Book;</span>
+<span class="fc" id="L109">            nametype = StandardField.BOOKTITLE;</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        } else if (types.toLowerCase().contains(&quot;article&quot;)) {</span>
+<span class="fc" id="L111">            entryType = StandardEntryType.Article;</span>
+        }
+<span class="fc" id="L113">        entry.setType(entryType);</span>
+
+        // isbn
+<span class="fc" id="L116">        String isbn = getFirstArrayElement(jsonEntry, &quot;isbn&quot;);</span>
+<span class="fc" id="L117">        entry.setField(StandardField.ISBN, isbn);</span>
+
+        // parent resource
+<span class="fc" id="L120">        String bibliographicCitation = jsonEntry.optString(&quot;bibliographicCitation&quot;, &quot;&quot;);</span>
+<span class="fc" id="L121">        String[] bibSplit = bibliographicCitation.split(&quot;/&quot;);</span>
+<span class="fc" id="L122">        String parentResource = &quot;&quot;;</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (bibSplit.length &gt; 0) {</span>
+<span class="fc" id="L124">            parentResource = bibSplit[0].trim();</span>
+<span class="fc" id="L125">            entry.setField(nametype, parentResource);</span>
+        }
+
+<span class="fc" id="L128">        entry.setField(StandardField.ISSN, getFirstArrayElement(jsonEntry, &quot;issn&quot;));</span>
+<span class="fc" id="L129">        entry.setField(StandardField.TITLE, jsonEntry.optString(&quot;title&quot;, &quot;&quot;));</span>
+<span class="fc" id="L130">        entry.setField(StandardField.ABSTRACT, getFirstArrayElement(jsonEntry, &quot;note&quot;));</span>
+<span class="fc" id="L131">        entry.setField(StandardField.TITLEADDON, getFirstArrayElement(jsonEntry, &quot;otherTitleInformation&quot;));</span>
+<span class="fc" id="L132">        entry.setField(StandardField.EDITION, getFirstArrayElement(jsonEntry, &quot;edition&quot;));</span>
+
+        // authors
+<span class="fc" id="L135">        JSONArray authors = jsonEntry.optJSONArray(&quot;contribution&quot;);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (authors != null) {</span>
+<span class="fc" id="L137">            List&lt;String&gt; authorNames = getAuthorNames(authors);</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            if (!authors.isEmpty()) {</span>
+<span class="fc" id="L139">                entry.setField(StandardField.AUTHOR, String.join(&quot; and &quot;, authorNames));</span>
+            }
+        }
+
+        // publication
+<span class="fc" id="L144">        Optional.ofNullable(jsonEntry.optJSONArray(&quot;publication&quot;))</span>
+<span class="fc" id="L145">                .map(array -&gt; array.getJSONObject(0))</span>
+<span class="fc" id="L146">                .ifPresent(publication -&gt; {</span>
+<span class="fc" id="L147">                    entry.setField(StandardField.PUBLISHER, getFirstArrayElement(publication, &quot;publishedBy&quot;));</span>
+<span class="fc" id="L148">                    entry.setField(StandardField.LOCATION, getFirstArrayElement(publication, &quot;location&quot;));</span>
+<span class="fc" id="L149">                    String date = publication.optString(&quot;startDate&quot;);</span>
+<span class="fc" id="L150">                    entry.setField(StandardField.DATE, date);</span>
+<span class="fc" id="L151">                    entry.setField(StandardField.YEAR, date);</span>
+<span class="fc" id="L152">                });</span>
+
+        // url
+<span class="fc" id="L155">        JSONObject describedBy = jsonEntry.optJSONObject(&quot;describedBy&quot;);</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (describedBy != null) {</span>
+<span class="fc" id="L157">            entry.setField(StandardField.URL, describedBy.optString(&quot;id&quot;));</span>
+        }
+
+        // language
+<span class="fc" id="L161">        JSONArray languageArray = jsonEntry.optJSONArray(&quot;language&quot;);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (languageArray != null) {</span>
+<span class="fc" id="L163">            List&lt;String&gt; languageList = IntStream.range(0, languageArray.length())</span>
+<span class="fc" id="L164">                                                 .mapToObj(languageArray::getJSONObject)</span>
+<span class="fc" id="L165">                                                 .filter(Objects::nonNull)</span>
+<span class="fc" id="L166">                                                 .map(language -&gt; language.optString(&quot;label&quot;))</span>
+<span class="fc" id="L167">                                                 .toList();</span>
+<span class="fc" id="L168">            entry.setField(StandardField.LANGUAGE, String.join(&quot; and &quot;, languageList));</span>
+        }
+
+        // keywords
+<span class="fc" id="L172">        JSONArray keywordArray = jsonEntry.optJSONArray(&quot;subjectslabels&quot;);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (keywordArray != null) {</span>
+<span class="fc" id="L174">            List&lt;String&gt; keywordList = IntStream.range(0, keywordArray.length())</span>
+<span class="fc" id="L175">                                             .mapToObj(keywordArray::optString)</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                                             .filter(keyword -&gt; !keyword.isEmpty())</span>
+<span class="fc" id="L177">                                             .toList();</span>
+<span class="fc" id="L178">            entry.setField(StandardField.KEYWORDS, String.join(&quot;, &quot;, keywordList));</span>
+        }
+
+<span class="fc" id="L181">        return entry;</span>
+    }
+
+    private static List&lt;String&gt; getAuthorNames(JSONArray authors) {
+<span class="fc" id="L185">        return IntStream.range(0, authors.length())</span>
+<span class="fc" id="L186">                        .mapToObj(authors::getJSONObject)</span>
+<span class="fc" id="L187">                        .map(author -&gt; author.optJSONObject(&quot;agent&quot;))</span>
+<span class="fc" id="L188">                        .filter(Objects::nonNull)</span>
+<span class="fc" id="L189">                        .map(agent -&gt; agent.optString(&quot;label&quot;))</span>
+<span class="fc" id="L190">                        .toList();</span>
+    }
+
+    private static String getFirstArrayElement(JSONObject jsonEntry, String key) {
+<span class="fc" id="L194">        return Optional.ofNullable(jsonEntry.optJSONArray(key))</span>
+<span class="fc" id="L195">                       .map(array -&gt; array.getString(0))</span>
+<span class="fc" id="L196">                       .orElse(&quot;&quot;);</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L201">        return FETCHER_NAME;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibEntryRelationsCache.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor.citationrelationtab</a> &gt; <span class="el_source">BibEntryRelationsCache.java</span></div><h1>BibEntryRelationsCache.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor.citationrelationtab;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.identifier.DOI;
+
+<span class="nc" id="L11">public class BibEntryRelationsCache {</span>
+<span class="nc" id="L12">    private static final Map&lt;String, List&lt;BibEntry&gt;&gt; CITATIONS_MAP = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L13">    private static final Map&lt;String, List&lt;BibEntry&gt;&gt; REFERENCES_MAP = new HashMap&lt;&gt;();</span>
+
+    public List&lt;BibEntry&gt; getCitations(BibEntry entry) {
+<span class="nc" id="L16">        return CITATIONS_MAP.getOrDefault(entry.getDOI().map(DOI::getDOI).orElse(&quot;&quot;), Collections.emptyList());</span>
+    }
+
+    public List&lt;BibEntry&gt; getReferences(BibEntry entry) {
+<span class="nc" id="L20">        return REFERENCES_MAP.getOrDefault(entry.getDOI().map(DOI::getDOI).orElse(&quot;&quot;), Collections.emptyList());</span>
+    }
+
+    public void cacheOrMergeCitations(BibEntry entry, List&lt;BibEntry&gt; citations) {
+<span class="nc" id="L24">        entry.getDOI().ifPresent(doi -&gt; CITATIONS_MAP.put(doi.getDOI(), citations));</span>
+<span class="nc" id="L25">    }</span>
+
+    public void cacheOrMergeReferences(BibEntry entry, List&lt;BibEntry&gt; references) {
+<span class="nc" id="L28">        entry.getDOI().ifPresent(doi -&gt; REFERENCES_MAP.putIfAbsent(doi.getDOI(), references));</span>
+<span class="nc" id="L29">    }</span>
+
+    public boolean citationsCached(BibEntry entry) {
+<span class="nc" id="L32">        return CITATIONS_MAP.containsKey(entry.getDOI().map(DOI::getDOI).orElse(&quot;&quot;));</span>
+    }
+
+    public boolean referencesCached(BibEntry entry) {
+<span class="nc" id="L36">        return REFERENCES_MAP.containsKey(entry.getDOI().map(DOI::getDOI).orElse(&quot;&quot;));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

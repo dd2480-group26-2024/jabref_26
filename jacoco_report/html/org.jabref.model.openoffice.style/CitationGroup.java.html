@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitationGroup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.style</a> &gt; <span class="el_source">CitationGroup.java</span></div><h1>CitationGroup.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.style;
+
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.openoffice.ootext.OOText;
+import org.jabref.model.openoffice.util.OOListUtil;
+
+/**
+ * A CitationGroup describes a group of citations.
+ */
+public class CitationGroup {
+
+    public final OODataModel dataModel;
+
+    /*
+     * Identifies this citation group.
+     */
+    public final CitationGroupId groupId;
+
+    /*
+     * The core data, stored in the document:
+     * The type of citation and citations in storage order.
+     */
+    public final CitationType citationType;
+    public final List&lt;Citation&gt; citationsInStorageOrder;
+
+    /*
+     * A name of a reference mark to link to by formatCitedOnPages.
+     * May be initially empty, if backend does not use reference marks.
+     *
+     * produceCitationMarkers might want fill it to support cross-references to citation groups from
+     * the bibliography.
+     */
+    private Optional&lt;String&gt; referenceMarkNameForLinking;
+
+    /*
+     * Indices into citations: citations[localOrder[i]] provides ith citation according to the
+     * currently imposed local order for presentation.
+     *
+     * Initialized to (0..(nCitations-1)) in the constructor.
+     */
+    private List&lt;Integer&gt; localOrder;
+
+    /*
+     * &quot;Cited on pages&quot; uses this to sort the cross-references.
+     */
+    private Optional&lt;Integer&gt; indexInGlobalOrder;
+
+    /*
+     * Citation marker.
+     */
+    private Optional&lt;OOText&gt; citationMarker;
+
+    public CitationGroup(OODataModel dataModel,
+                         CitationGroupId groupId,
+                         CitationType citationType,
+                         List&lt;Citation&gt; citationsInStorageOrder,
+<span class="nc" id="L62">                         Optional&lt;String&gt; referenceMarkNameForLinking) {</span>
+<span class="nc" id="L63">        this.dataModel = dataModel;</span>
+<span class="nc" id="L64">        this.groupId = groupId;</span>
+<span class="nc" id="L65">        this.citationType = citationType;</span>
+<span class="nc" id="L66">        this.citationsInStorageOrder = Collections.unmodifiableList(citationsInStorageOrder);</span>
+<span class="nc" id="L67">        this.localOrder = OOListUtil.makeIndices(citationsInStorageOrder.size());</span>
+<span class="nc" id="L68">        this.referenceMarkNameForLinking = referenceMarkNameForLinking;</span>
+<span class="nc" id="L69">        this.indexInGlobalOrder = Optional.empty();</span>
+<span class="nc" id="L70">        this.citationMarker = Optional.empty();</span>
+<span class="nc" id="L71">    }</span>
+
+    public int numberOfCitations() {
+<span class="nc" id="L74">        return citationsInStorageOrder.size();</span>
+    }
+
+    /*
+     * localOrder
+     */
+
+    /**
+     * Sort citations for presentation within a CitationGroup.
+     */
+    void imposeLocalOrder(Comparator&lt;BibEntry&gt; entryComparator) {
+        // For JabRef52 the single pageInfo is always in the last-in-localorder citation.
+        // We adjust here accordingly by taking it out and adding it back after sorting.
+<span class="nc" id="L87">        final int last = this.numberOfCitations() - 1;</span>
+<span class="nc" id="L88">        Optional&lt;OOText&gt; lastPageInfo = Optional.empty();</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (dataModel == OODataModel.JabRef52) {</span>
+<span class="nc" id="L90">            Citation lastCitation = getCitationsInLocalOrder().get(last);</span>
+<span class="nc" id="L91">            lastPageInfo = lastCitation.getPageInfo();</span>
+<span class="nc" id="L92">            lastCitation.setPageInfo(Optional.empty());</span>
+        }
+
+<span class="nc" id="L95">        this.localOrder = OOListUtil.order(citationsInStorageOrder,</span>
+                new CompareCitation(entryComparator, true));
+
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (dataModel == OODataModel.JabRef52) {</span>
+<span class="nc" id="L99">            getCitationsInLocalOrder().get(last).setPageInfo(lastPageInfo);</span>
+        }
+<span class="nc" id="L101">    }</span>
+
+    public List&lt;Integer&gt; getLocalOrder() {
+<span class="nc" id="L104">        return Collections.unmodifiableList(localOrder);</span>
+    }
+
+    /*
+     * citations
+     */
+
+    public List&lt;Citation&gt; getCitationsInLocalOrder() {
+<span class="nc" id="L112">        return OOListUtil.map(localOrder, citationsInStorageOrder::get);</span>
+    }
+
+    /*
+     * indexInGlobalOrder
+     */
+
+    public void setIndexInGlobalOrder(Optional&lt;Integer&gt; indexInGlobalOrder) {
+<span class="nc" id="L120">        this.indexInGlobalOrder = indexInGlobalOrder;</span>
+<span class="nc" id="L121">    }</span>
+
+    public Optional&lt;Integer&gt; getIndexInGlobalOrder() {
+<span class="nc" id="L124">        return this.indexInGlobalOrder;</span>
+    }
+
+    /*
+     * referenceMarkNameForLinking
+     */
+
+    public Optional&lt;String&gt; getReferenceMarkNameForLinking() {
+<span class="nc" id="L132">        return referenceMarkNameForLinking;</span>
+    }
+
+    public void setReferenceMarkNameForLinking(Optional&lt;String&gt; referenceMarkNameForLinking) {
+<span class="nc" id="L136">        this.referenceMarkNameForLinking = referenceMarkNameForLinking;</span>
+<span class="nc" id="L137">    }</span>
+
+    /*
+     * citationMarker
+     */
+
+    public void setCitationMarker(Optional&lt;OOText&gt; citationMarker) {
+<span class="nc" id="L144">        this.citationMarker = citationMarker;</span>
+<span class="nc" id="L145">    }</span>
+
+    public Optional&lt;OOText&gt; getCitationMarker() {
+<span class="nc" id="L148">        return this.citationMarker;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

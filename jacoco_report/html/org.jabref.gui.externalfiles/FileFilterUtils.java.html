@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileFilterUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.externalfiles</a> &gt; <span class="el_source">FileFilterUtils.java</span></div><h1>FileFilterUtils.java</h1><pre class="source lang-java linenums">package org.jabref.gui.externalfiles;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+<span class="fc" id="L16">public class FileFilterUtils {</span>
+
+<span class="fc" id="L18">    private static final Logger LOGGER = LoggerFactory.getLogger(FileFilterUtils.class);</span>
+
+    /* Returns the last edited time of a file as LocalDateTime. */
+    public static LocalDateTime getFileTime(Path path) {
+        FileTime lastEditedTime;
+        try {
+<span class="fc" id="L24">            lastEditedTime = Files.getLastModifiedTime(path);</span>
+<span class="nc" id="L25">        } catch (IOException e) {</span>
+<span class="nc" id="L26">            LOGGER.error(&quot;Could not retrieve file time&quot;, e);</span>
+<span class="nc" id="L27">            return LocalDateTime.now();</span>
+<span class="fc" id="L28">        }</span>
+<span class="fc" id="L29">        LocalDateTime localDateTime = lastEditedTime</span>
+<span class="fc" id="L30">                .toInstant()</span>
+<span class="fc" id="L31">                .atZone(ZoneId.systemDefault())</span>
+<span class="fc" id="L32">                .toLocalDateTime();</span>
+<span class="fc" id="L33">        return localDateTime;</span>
+    }
+
+    /* Returns true if a file with a specific path
+     * was edited during the last 24 hours. */
+    public boolean isDuringLastDay(LocalDateTime fileEditTime) {
+<span class="fc" id="L39">        LocalDateTime NOW = LocalDateTime.now(ZoneId.systemDefault());</span>
+<span class="fc" id="L40">        return fileEditTime.isAfter(NOW.minusHours(24));</span>
+    }
+
+    /* Returns true if a file with a specific path
+     * was edited during the last 7 days. */
+    public boolean isDuringLastWeek(LocalDateTime fileEditTime) {
+<span class="fc" id="L46">        LocalDateTime NOW = LocalDateTime.now(ZoneId.systemDefault());</span>
+<span class="fc" id="L47">        return fileEditTime.isAfter(NOW.minusDays(7));</span>
+    }
+
+    /* Returns true if a file with a specific path
+     * was edited during the last 30 days. */
+    public boolean isDuringLastMonth(LocalDateTime fileEditTime) {
+<span class="fc" id="L53">        LocalDateTime NOW = LocalDateTime.now(ZoneId.systemDefault());</span>
+<span class="fc" id="L54">        return fileEditTime.isAfter(NOW.minusDays(30));</span>
+    }
+
+    /* Returns true if a file with a specific path
+     * was edited during the last 365 days. */
+    public boolean isDuringLastYear(LocalDateTime fileEditTime) {
+<span class="fc" id="L60">        LocalDateTime NOW = LocalDateTime.now(ZoneId.systemDefault());</span>
+<span class="fc" id="L61">        return fileEditTime.isAfter(NOW.minusDays(365));</span>
+    }
+
+    /* Returns true if a file is edited in the time margin specified by the given filter. */
+    public static boolean filterByDate(Path path, DateRange filter) {
+<span class="fc" id="L66">        FileFilterUtils fileFilter = new FileFilterUtils();</span>
+<span class="fc" id="L67">        LocalDateTime fileTime = FileFilterUtils.getFileTime(path);</span>
+<span class="pc bpc" id="L68" title="5 of 6 branches missed.">        boolean isInDateRange = switch (filter) {</span>
+<span class="nc" id="L69">            case DAY -&gt; fileFilter.isDuringLastDay(fileTime);</span>
+<span class="nc" id="L70">            case WEEK -&gt; fileFilter.isDuringLastWeek(fileTime);</span>
+<span class="nc" id="L71">            case MONTH -&gt; fileFilter.isDuringLastMonth(fileTime);</span>
+<span class="nc" id="L72">            case YEAR -&gt; fileFilter.isDuringLastYear(fileTime);</span>
+<span class="fc" id="L73">            case ALL_TIME -&gt; true;</span>
+        };
+<span class="fc" id="L75">        return isInDateRange;</span>
+    }
+
+    /**
+     * Sorts a list of Path objects according to the last edited date
+     * of their corresponding files, from newest to oldest.
+     */
+    public List&lt;Path&gt; sortByDateAscending(List&lt;Path&gt; files) {
+<span class="fc" id="L83">        return files.stream()</span>
+<span class="fc" id="L84">                .sorted(Comparator.comparingLong(file -&gt; FileFilterUtils.getFileTime(file)</span>
+<span class="fc" id="L85">                        .atZone(ZoneId.systemDefault())</span>
+<span class="fc" id="L86">                        .toInstant()</span>
+<span class="fc" id="L87">                        .toEpochMilli()))</span>
+<span class="fc" id="L88">                .collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Sorts a list of Path objects according to the last edited date
+     * of their corresponding files, from oldest to newest.
+     */
+    public List&lt;Path&gt; sortByDateDescending(List&lt;Path&gt; files) {
+<span class="fc" id="L96">        return files.stream()</span>
+<span class="fc" id="L97">                .sorted(Comparator.comparingLong(file -&gt; -FileFilterUtils.getFileTime(file)</span>
+<span class="fc" id="L98">                        .atZone(ZoneId.systemDefault())</span>
+<span class="fc" id="L99">                        .toInstant()</span>
+<span class="fc" id="L100">                        .toEpochMilli()))</span>
+<span class="fc" id="L101">                .collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Sorts a list of Path objects according to the last edited date
+     * the order depends on the specified sorter type.
+     */
+    public static List&lt;Path&gt; sortByDate(List&lt;Path&gt; files, ExternalFileSorter sortType) {
+<span class="fc" id="L109">        FileFilterUtils fileFilter = new FileFilterUtils();</span>
+<span class="pc bpc" id="L110" title="3 of 4 branches missed.">        List&lt;Path&gt; sortedFiles = switch (sortType) {</span>
+<span class="fc" id="L111">            case DEFAULT -&gt; files;</span>
+<span class="nc" id="L112">            case DATE_ASCENDING -&gt; fileFilter.sortByDateDescending(files);</span>
+<span class="pc" id="L113">            case DATE_DESCENDING -&gt; fileFilter.sortByDateAscending(files);</span>
+        };
+<span class="fc" id="L115">        return sortedFiles;</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

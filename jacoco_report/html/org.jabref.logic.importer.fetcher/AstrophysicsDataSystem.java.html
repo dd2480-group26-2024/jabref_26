@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AstrophysicsDataSystem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">AstrophysicsDataSystem.java</span></div><h1>AstrophysicsDataSystem.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.cleanup.FieldFormatterCleanup;
+import org.jabref.logic.cleanup.MoveFieldCleanup;
+import org.jabref.logic.formatter.bibtexfields.ClearFormatter;
+import org.jabref.logic.formatter.bibtexfields.NormalizeMonthFormatter;
+import org.jabref.logic.formatter.bibtexfields.NormalizeNamesFormatter;
+import org.jabref.logic.formatter.bibtexfields.RemoveBracesFormatter;
+import org.jabref.logic.formatter.bibtexfields.RemoveNewlinesFormatter;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.importer.EntryBasedParserFetcher;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.IdBasedParserFetcher;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ImporterPreferences;
+import org.jabref.logic.importer.PagedSearchBasedParserFetcher;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.fetcher.transformers.DefaultQueryTransformer;
+import org.jabref.logic.importer.fileformat.BibtexParser;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.logic.util.BuildInfo;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.paging.Page;
+import org.jabref.model.strings.StringUtil;
+
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONException;
+import kong.unirest.json.JSONObject;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+
+/**
+ * Fetches data from the SAO/NASA Astrophysics Data System (&lt;a href=&quot;https://ui.adsabs.harvard.edu/&quot;&gt;https://ui.adsabs.harvard.edu/&lt;/a&gt;)
+ */
+public class AstrophysicsDataSystem
+        implements IdBasedParserFetcher, PagedSearchBasedParserFetcher, EntryBasedParserFetcher, CustomizableKeyFetcher {
+
+    private static final String API_SEARCH_URL = &quot;https://api.adsabs.harvard.edu/v1/search/query&quot;;
+    private static final String API_EXPORT_URL = &quot;https://api.adsabs.harvard.edu/v1/export/bibtexabs&quot;;
+
+<span class="fc" id="L56">    private static final String API_KEY = new BuildInfo().astrophysicsDataSystemAPIKey;</span>
+    private final ImportFormatPreferences preferences;
+    private final ImporterPreferences importerPreferences;
+
+<span class="fc" id="L60">    public AstrophysicsDataSystem(ImportFormatPreferences preferences, ImporterPreferences importerPreferences) {</span>
+<span class="fc" id="L61">        this.preferences = Objects.requireNonNull(preferences);</span>
+<span class="fc" id="L62">        this.importerPreferences = importerPreferences;</span>
+<span class="fc" id="L63">    }</span>
+
+    /**
+     * @param bibcodes collection of bibcodes for which a JSON object should be created
+     */
+    private static String buildPostData(Collection&lt;String&gt; bibcodes) {
+<span class="fc" id="L69">        JSONObject obj = new JSONObject();</span>
+<span class="fc" id="L70">        obj.put(&quot;bibcode&quot;, bibcodes);</span>
+<span class="fc" id="L71">        return obj.toString();</span>
+    }
+
+    /**
+     * @return export URL endpoint
+     */
+    private static URL getURLforExport() throws URISyntaxException, MalformedURLException {
+<span class="fc" id="L78">        return new URIBuilder(API_EXPORT_URL).build().toURL();</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L83">        return &quot;SAO/NASA ADS&quot;;</span>
+    }
+
+    /**
+     * @param luceneQuery query string, matching the apache solr format
+     * @return URL which points to a search request for given query
+     */
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery, int pageNumber) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L92">        URIBuilder builder = new URIBuilder(API_SEARCH_URL);</span>
+<span class="fc" id="L93">        builder.addParameter(&quot;q&quot;, new DefaultQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;));</span>
+<span class="fc" id="L94">        builder.addParameter(&quot;fl&quot;, &quot;bibcode&quot;);</span>
+<span class="fc" id="L95">        builder.addParameter(&quot;rows&quot;, String.valueOf(getPageSize()));</span>
+<span class="fc" id="L96">        builder.addParameter(&quot;start&quot;, String.valueOf(getPageSize() * pageNumber));</span>
+<span class="fc" id="L97">        return builder.build().toURL();</span>
+    }
+
+    /**
+     * @param entry BibEntry for which a search URL is created
+     * @return URL which points to a search request for given entry
+     */
+    @Override
+    public URL getURLForEntry(BibEntry entry) throws URISyntaxException, MalformedURLException {
+<span class="fc" id="L106">        StringBuilder stringBuilder = new StringBuilder();</span>
+
+<span class="fc" id="L108">        Optional&lt;String&gt; title = entry.getFieldOrAlias(StandardField.TITLE).map(t -&gt; &quot;title:\&quot;&quot; + t + &quot;\&quot;&quot;);</span>
+<span class="fc" id="L109">        Optional&lt;String&gt; author = entry.getFieldOrAlias(StandardField.AUTHOR).map(a -&gt; &quot;author:\&quot;&quot; + a + &quot;\&quot;&quot;);</span>
+
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (title.isPresent()) {</span>
+<span class="fc" id="L112">            stringBuilder.append(title.get())</span>
+<span class="fc" id="L113">                         .append(author.map(s -&gt; &quot; AND &quot; + s)</span>
+<span class="fc" id="L114">                                       .orElse(&quot;&quot;));</span>
+        } else {
+<span class="nc" id="L116">            stringBuilder.append(author.orElse(&quot;&quot;));</span>
+        }
+<span class="fc" id="L118">        String query = stringBuilder.toString().trim();</span>
+
+<span class="fc" id="L120">        URIBuilder builder = new URIBuilder(API_SEARCH_URL);</span>
+<span class="fc" id="L121">        builder.addParameter(&quot;q&quot;, query);</span>
+<span class="fc" id="L122">        builder.addParameter(&quot;fl&quot;, &quot;bibcode&quot;);</span>
+<span class="fc" id="L123">        builder.addParameter(&quot;rows&quot;, &quot;20&quot;);</span>
+<span class="fc" id="L124">        return builder.build().toURL();</span>
+    }
+
+    /**
+     * @param identifier bibcode or doi for which a search URL is created
+     * @return URL which points to a search URL for given identifier
+     */
+    @Override
+    public URL getUrlForIdentifier(String identifier) throws FetcherException, URISyntaxException, MalformedURLException {
+<span class="fc" id="L133">        String query = &quot;doi:\&quot;&quot; + identifier + &quot;\&quot; OR &quot; + &quot;bibcode:\&quot;&quot; + identifier + &quot;\&quot;&quot;;</span>
+<span class="fc" id="L134">        URIBuilder builder = new URIBuilder(API_SEARCH_URL);</span>
+<span class="fc" id="L135">        builder.addParameter(&quot;q&quot;, query);</span>
+<span class="fc" id="L136">        builder.addParameter(&quot;fl&quot;, &quot;bibcode&quot;);</span>
+<span class="fc" id="L137">        return builder.build().toURL();</span>
+    }
+
+    @Override
+    public Optional&lt;HelpFile&gt; getHelpPage() {
+<span class="nc" id="L142">        return Optional.of(HelpFile.FETCHER_ADS);</span>
+    }
+
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L147">        return new BibtexParser(preferences);</span>
+    }
+
+    @Override
+    public void doPostCleanup(BibEntry entry) {
+<span class="fc" id="L152">        new FieldFormatterCleanup(StandardField.ABSTRACT, new RemoveBracesFormatter()).cleanup(entry);</span>
+<span class="fc" id="L153">        new FieldFormatterCleanup(StandardField.ABSTRACT, new RemoveNewlinesFormatter()).cleanup(entry);</span>
+<span class="fc" id="L154">        new FieldFormatterCleanup(StandardField.TITLE, new RemoveBracesFormatter()).cleanup(entry);</span>
+<span class="fc" id="L155">        new FieldFormatterCleanup(StandardField.AUTHOR, new NormalizeNamesFormatter()).cleanup(entry);</span>
+<span class="fc" id="L156">        new FieldFormatterCleanup(StandardField.MONTH, new NormalizeMonthFormatter()).cleanup(entry);</span>
+
+        // Remove ADS note
+<span class="fc" id="L159">        new FieldFormatterCleanup(new UnknownField(&quot;adsnote&quot;), new ClearFormatter()).cleanup(entry);</span>
+        // Move adsurl to url field
+<span class="fc" id="L161">        new MoveFieldCleanup(new UnknownField(&quot;adsurl&quot;), StandardField.URL).cleanup(entry);</span>
+<span class="fc" id="L162">        entry.getField(StandardField.ABSTRACT)</span>
+<span class="fc" id="L163">             .filter(&quot;Not Available &lt;P /&gt;&quot;::equals)</span>
+<span class="pc" id="L164">             .ifPresent(abstractText -&gt; entry.clearField(StandardField.ABSTRACT));</span>
+
+<span class="fc" id="L166">        entry.getField(StandardField.ABSTRACT)</span>
+<span class="fc" id="L167">             .map(abstractText -&gt; abstractText.replace(&quot;&lt;P /&gt;&quot;, &quot;&quot;))</span>
+<span class="fc" id="L168">             .map(abstractText -&gt; abstractText.replace(&quot;\\textbackslash&quot;, &quot;&quot;))</span>
+<span class="fc" id="L169">             .map(String::trim)</span>
+<span class="fc" id="L170">             .ifPresent(abstractText -&gt; entry.setField(StandardField.ABSTRACT, abstractText));</span>
+        // The fetcher adds some garbage (number of found entries etc before)
+<span class="fc" id="L172">        entry.setCommentsBeforeEntry(&quot;&quot;);</span>
+<span class="fc" id="L173">    }</span>
+
+    @Override
+    public List&lt;BibEntry&gt; performSearch(BibEntry entry) throws FetcherException {
+<span class="pc bpc" id="L177" title="3 of 4 branches missed.">        if (entry.getFieldOrAlias(StandardField.TITLE).isEmpty() &amp;&amp; entry.getFieldOrAlias(StandardField.AUTHOR).isEmpty()) {</span>
+<span class="nc" id="L178">            return Collections.emptyList();</span>
+        }
+
+        try {
+<span class="fc" id="L182">            List&lt;String&gt; bibcodes = fetchBibcodes(getURLForEntry(entry));</span>
+<span class="fc" id="L183">            return performSearchByIds(bibcodes);</span>
+<span class="nc" id="L184">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L185">            throw new FetcherException(&quot;Search URI is malformed&quot;, e);</span>
+<span class="nc" id="L186">        } catch (IOException e) {</span>
+<span class="nc" id="L187">            throw new FetcherException(&quot;A network error occurred&quot;, e);</span>
+        }
+    }
+
+    /**
+     * @param url search ul for which bibcode will be returned
+     * @return list of bibcodes matching the search request. May be empty
+     */
+    private List&lt;String&gt; fetchBibcodes(URL url) throws FetcherException {
+        try {
+<span class="fc" id="L197">            URLDownload download = getUrlDownload(url);</span>
+<span class="fc" id="L198">            String content = download.asString();</span>
+<span class="fc" id="L199">            JSONObject obj = new JSONObject(content);</span>
+<span class="fc" id="L200">            JSONArray codes = obj.getJSONObject(&quot;response&quot;).getJSONArray(&quot;docs&quot;);</span>
+<span class="fc" id="L201">            List&lt;String&gt; bibcodes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            for (int i = 0; i &lt; codes.length(); i++) {</span>
+<span class="fc" id="L203">                bibcodes.add(codes.getJSONObject(i).getString(&quot;bibcode&quot;));</span>
+            }
+<span class="fc" id="L205">            return bibcodes;</span>
+<span class="nc" id="L206">        } catch (IOException e) {</span>
+<span class="nc" id="L207">            throw new FetcherException(&quot;A network error occurred&quot;, e);</span>
+<span class="nc" id="L208">        } catch (JSONException e) {</span>
+<span class="nc" id="L209">            return Collections.emptyList();</span>
+        }
+    }
+
+    @Override
+    public Optional&lt;BibEntry&gt; performSearchById(String identifier) throws FetcherException {
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (StringUtil.isBlank(identifier)) {</span>
+<span class="fc" id="L216">            return Optional.empty();</span>
+        }
+
+        try {
+<span class="fc" id="L220">            List&lt;String&gt; bibcodes = fetchBibcodes(getUrlForIdentifier(identifier));</span>
+<span class="fc" id="L221">            List&lt;BibEntry&gt; fetchedEntries = performSearchByIds(bibcodes);</span>
+
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (fetchedEntries.isEmpty()) {</span>
+<span class="fc" id="L224">                return Optional.empty();</span>
+            }
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            if (fetchedEntries.size() &gt; 1) {</span>
+<span class="nc" id="L227">                LOGGER.info(&quot;Fetcher &quot; + getName() + &quot;found more than one result for identifier &quot; + identifier</span>
+                        + &quot;. We will use the first entry.&quot;);
+            }
+<span class="fc" id="L230">            BibEntry entry = fetchedEntries.getFirst();</span>
+<span class="fc" id="L231">            return Optional.of(entry);</span>
+<span class="nc" id="L232">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L233">            throw new FetcherException(&quot;Search URI is malformed&quot;, e);</span>
+<span class="nc" id="L234">        } catch (IOException e) {</span>
+<span class="nc" id="L235">            throw new FetcherException(&quot;A network error occurred&quot;, e);</span>
+        }
+    }
+
+    /**
+     * @param identifiers bibcodes for which bibentries ahould be fetched
+     * @return list of bibentries matching the bibcodes. Can be empty and differ in size to the size of requested bibcodes
+     */
+    private List&lt;BibEntry&gt; performSearchByIds(Collection&lt;String&gt; identifiers) throws FetcherException {
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        List&lt;String&gt; ids = identifiers.stream().filter(identifier -&gt; !StringUtil.isBlank(identifier)).collect(Collectors.toList());</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (ids.isEmpty()) {</span>
+<span class="fc" id="L246">            return Collections.emptyList();</span>
+        }
+        try {
+<span class="fc" id="L249">            String postData = buildPostData(ids);</span>
+<span class="fc" id="L250">            URLDownload download = new URLDownload(getURLforExport());</span>
+<span class="fc" id="L251">            download.addHeader(&quot;Authorization&quot;, &quot;Bearer &quot; + importerPreferences.getApiKey(getName()).orElse(API_KEY));</span>
+<span class="fc" id="L252">            download.addHeader(&quot;ContentType&quot;, &quot;application/json&quot;);</span>
+<span class="fc" id="L253">            download.setPostData(postData);</span>
+<span class="fc" id="L254">            String content = download.asString();</span>
+<span class="fc" id="L255">            JSONObject obj = new JSONObject(content);</span>
+
+            try {
+<span class="fc" id="L258">                List&lt;BibEntry&gt; fetchedEntries = getParser().parseEntries(obj.optString(&quot;export&quot;));</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">                if (fetchedEntries.isEmpty()) {</span>
+<span class="nc" id="L260">                    return Collections.emptyList();</span>
+                }
+                // Post-cleanup
+<span class="fc" id="L263">                fetchedEntries.forEach(this::doPostCleanup);</span>
+
+<span class="fc" id="L265">                return fetchedEntries;</span>
+<span class="nc" id="L266">            } catch (JSONException e) {</span>
+<span class="nc" id="L267">                return Collections.emptyList();</span>
+            }
+<span class="nc" id="L269">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L270">            throw new FetcherException(&quot;Search URI is malformed&quot;, e);</span>
+<span class="nc" id="L271">        } catch (IOException e) {</span>
+<span class="nc" id="L272">            throw new FetcherException(&quot;A network error occurred&quot;, e);</span>
+<span class="nc" id="L273">        } catch (ParseException e) {</span>
+<span class="nc" id="L274">            throw new FetcherException(&quot;An internal parser error occurred&quot;, e);</span>
+        }
+    }
+
+    @Override
+    public List&lt;BibEntry&gt; performSearch(QueryNode luceneQuery) throws FetcherException {
+        URL urlForQuery;
+        try {
+<span class="fc" id="L282">            urlForQuery = getURLForQuery(luceneQuery);</span>
+<span class="nc" id="L283">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L284">            throw new FetcherException(&quot;Search URI is malformed&quot;, e);</span>
+<span class="nc" id="L285">        } catch (IOException e) {</span>
+<span class="nc" id="L286">            throw new FetcherException(&quot;A network error occurred&quot;, e);</span>
+<span class="fc" id="L287">        }</span>
+<span class="fc" id="L288">        List&lt;String&gt; bibCodes = fetchBibcodes(urlForQuery);</span>
+<span class="fc" id="L289">        return performSearchByIds(bibCodes);</span>
+    }
+
+    @Override
+    public Page&lt;BibEntry&gt; performSearchPaged(QueryNode luceneQuery, int pageNumber) throws FetcherException {
+        URL urlForQuery;
+        try {
+<span class="fc" id="L296">            urlForQuery = getURLForQuery(luceneQuery, pageNumber);</span>
+<span class="nc" id="L297">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L298">            throw new FetcherException(&quot;Search URI is malformed&quot;, e);</span>
+<span class="nc" id="L299">        } catch (IOException e) {</span>
+<span class="nc" id="L300">            throw new FetcherException(&quot;A network error occurred&quot;, e);</span>
+<span class="fc" id="L301">        }</span>
+        // This is currently just interpreting the complex query as a default string query
+<span class="fc" id="L303">        List&lt;String&gt; bibCodes = fetchBibcodes(urlForQuery);</span>
+<span class="fc" id="L304">        Collection&lt;BibEntry&gt; results = performSearchByIds(bibCodes);</span>
+<span class="fc" id="L305">        return new Page&lt;&gt;(luceneQuery.toString(), pageNumber, results);</span>
+    }
+
+    @Override
+    public URLDownload getUrlDownload(URL url) {
+<span class="fc" id="L310">        URLDownload urlDownload = new URLDownload(url);</span>
+<span class="fc" id="L311">        urlDownload.addHeader(&quot;Authorization&quot;, &quot;Bearer &quot; + importerPreferences.getApiKey(getName()).orElse(API_KEY));</span>
+<span class="fc" id="L312">        return urlDownload;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

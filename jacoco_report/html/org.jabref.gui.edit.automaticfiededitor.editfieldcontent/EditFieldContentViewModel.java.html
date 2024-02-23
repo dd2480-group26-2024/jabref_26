@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EditFieldContentViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.edit.automaticfiededitor.editfieldcontent</a> &gt; <span class="el_source">EditFieldContentViewModel.java</span></div><h1>EditFieldContentViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.edit.automaticfiededitor.editfieldcontent;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+import org.jabref.gui.StateManager;
+import org.jabref.gui.edit.automaticfiededitor.AbstractAutomaticFieldEditorTabViewModel;
+import org.jabref.gui.edit.automaticfiededitor.LastAutomaticFieldEditorEdit;
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.gui.undo.UndoableFieldChange;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.strings.StringUtil;
+
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+
+public class EditFieldContentViewModel extends AbstractAutomaticFieldEditorTabViewModel {
+    public static final int TAB_INDEX = 0;
+
+    private final List&lt;BibEntry&gt; selectedEntries;
+
+<span class="fc" id="L37">    private final StringProperty fieldValue = new SimpleStringProperty(&quot;&quot;);</span>
+
+<span class="fc" id="L39">    private final ObjectProperty&lt;Field&gt; selectedField = new SimpleObjectProperty&lt;&gt;(StandardField.AUTHOR);</span>
+
+<span class="fc" id="L41">    private final BooleanProperty overwriteFieldContent = new SimpleBooleanProperty(Boolean.FALSE);</span>
+
+    private final Validator fieldValidator;
+    private final BooleanBinding canAppend;
+
+    public EditFieldContentViewModel(BibDatabase database, List&lt;BibEntry&gt; selectedEntries, StateManager stateManager) {
+<span class="fc" id="L47">        super(database, stateManager);</span>
+<span class="fc" id="L48">        this.selectedEntries = new ArrayList&lt;&gt;(selectedEntries);</span>
+
+<span class="fc" id="L50">        fieldValidator = new FunctionBasedValidator&lt;&gt;(selectedField, field -&gt; {</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (StringUtil.isBlank(field.getName())) {</span>
+<span class="nc" id="L52">                return ValidationMessage.error(&quot;Field name cannot be empty&quot;);</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            } else if (StringUtil.containsWhitespace(field.getName())) {</span>
+<span class="nc" id="L54">                return ValidationMessage.error(&quot;Field name cannot have whitespace characters&quot;);</span>
+            }
+<span class="fc" id="L56">            return null;</span>
+        });
+
+<span class="fc" id="L59">        canAppend = Bindings.and(overwriteFieldContentProperty(), fieldValidationStatus().validProperty());</span>
+<span class="fc" id="L60">    }</span>
+
+    public ValidationStatus fieldValidationStatus() {
+<span class="fc" id="L63">        return fieldValidator.getValidationStatus();</span>
+    }
+
+    public BooleanBinding canAppendProperty() {
+<span class="nc" id="L67">        return canAppend;</span>
+    }
+
+    public void clearSelectedField() {
+<span class="fc" id="L71">        NamedCompound clearFieldEdit = new NamedCompound(&quot;CLEAR_SELECTED_FIELD&quot;);</span>
+<span class="fc" id="L72">        int affectedEntriesCount = 0;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (BibEntry entry : selectedEntries) {</span>
+<span class="fc" id="L74">            Optional&lt;String&gt; oldFieldValue = entry.getField(selectedField.get());</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (oldFieldValue.isPresent()) {</span>
+<span class="fc" id="L76">                entry.clearField(selectedField.get())</span>
+<span class="fc" id="L77">                        .ifPresent(fieldChange -&gt; clearFieldEdit.addEdit(new UndoableFieldChange(fieldChange)));</span>
+<span class="fc" id="L78">                affectedEntriesCount++;</span>
+            }
+<span class="fc" id="L80">        }</span>
+
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (clearFieldEdit.hasEdits()) {</span>
+<span class="fc" id="L83">            clearFieldEdit.end();</span>
+        }
+<span class="fc" id="L85">        stateManager.setLastAutomaticFieldEditorEdit(new LastAutomaticFieldEditorEdit(</span>
+<span class="fc" id="L86">                affectedEntriesCount,</span>
+<span class="fc" id="L87">                TAB_INDEX,</span>
+                clearFieldEdit
+        ));
+<span class="fc" id="L90">    }</span>
+
+    public void setFieldValue() {
+<span class="fc" id="L93">        NamedCompound setFieldEdit = new NamedCompound(&quot;CHANGE_SELECTED_FIELD&quot;);</span>
+<span class="fc" id="L94">        String toSetFieldValue = fieldValue.getValue();</span>
+<span class="fc" id="L95">        int affectedEntriesCount = 0;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (BibEntry entry : selectedEntries) {</span>
+<span class="fc" id="L97">            Optional&lt;String&gt; oldFieldValue = entry.getField(selectedField.get());</span>
+<span class="fc bfc" id="L98" title="All 4 branches covered.">            if (oldFieldValue.isEmpty() || overwriteFieldContent.get()) {</span>
+<span class="fc" id="L99">                entry.setField(selectedField.get(), toSetFieldValue)</span>
+<span class="fc" id="L100">                     .ifPresent(fieldChange -&gt; setFieldEdit.addEdit(new UndoableFieldChange(fieldChange)));</span>
+<span class="fc" id="L101">                fieldValue.set(&quot;&quot;);</span>
+                // TODO: increment affected entries only when UndoableFieldChange.isPresent()
+<span class="fc" id="L103">                affectedEntriesCount++;</span>
+            }
+<span class="fc" id="L105">        }</span>
+
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (setFieldEdit.hasEdits()) {</span>
+<span class="fc" id="L108">            setFieldEdit.end();</span>
+        }
+<span class="fc" id="L110">        stateManager.setLastAutomaticFieldEditorEdit(new LastAutomaticFieldEditorEdit(</span>
+<span class="fc" id="L111">                affectedEntriesCount,</span>
+<span class="fc" id="L112">                TAB_INDEX,</span>
+                setFieldEdit
+        ));
+<span class="fc" id="L115">    }</span>
+
+    public void appendToFieldValue() {
+<span class="fc" id="L118">        NamedCompound appendToFieldEdit = new NamedCompound(&quot;APPEND_TO_SELECTED_FIELD&quot;);</span>
+<span class="fc" id="L119">        String toAppendFieldValue = fieldValue.getValue();</span>
+<span class="fc" id="L120">        int affectedEntriesCount = 0;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (BibEntry entry : selectedEntries) {</span>
+<span class="fc" id="L122">            Optional&lt;String&gt; oldFieldValue = entry.getField(selectedField.get());</span>
+            // Append button should be disabled if 'overwriteNonEmptyFields' is false
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (overwriteFieldContent.get()) {</span>
+<span class="fc" id="L125">                String newFieldValue = oldFieldValue.orElse(&quot;&quot;).concat(toAppendFieldValue);</span>
+
+<span class="fc" id="L127">                entry.setField(selectedField.get(), newFieldValue)</span>
+<span class="fc" id="L128">                        .ifPresent(fieldChange -&gt; appendToFieldEdit.addEdit(new UndoableFieldChange(fieldChange)));</span>
+
+<span class="fc" id="L130">                fieldValue.set(&quot;&quot;);</span>
+<span class="fc" id="L131">                affectedEntriesCount++;</span>
+            }
+<span class="fc" id="L133">        }</span>
+
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (appendToFieldEdit.hasEdits()) {</span>
+<span class="fc" id="L136">            appendToFieldEdit.end();</span>
+        }
+<span class="fc" id="L138">        stateManager.setLastAutomaticFieldEditorEdit(new LastAutomaticFieldEditorEdit(</span>
+<span class="fc" id="L139">                affectedEntriesCount,</span>
+<span class="fc" id="L140">                TAB_INDEX,</span>
+                appendToFieldEdit
+        ));
+<span class="fc" id="L143">    }</span>
+
+    public ObjectProperty&lt;Field&gt; selectedFieldProperty() {
+<span class="fc" id="L146">        return selectedField;</span>
+    }
+
+    public Field getSelectedField() {
+<span class="fc" id="L150">        return selectedFieldProperty().get();</span>
+    }
+
+    public String getFieldValue() {
+<span class="nc" id="L154">        return fieldValue.get();</span>
+    }
+
+    public StringProperty fieldValueProperty() {
+<span class="fc" id="L158">        return fieldValue;</span>
+    }
+
+    public BooleanProperty overwriteFieldContentProperty() {
+<span class="fc" id="L162">        return overwriteFieldContent;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

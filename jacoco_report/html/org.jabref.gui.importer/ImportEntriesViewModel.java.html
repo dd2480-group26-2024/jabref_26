@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImportEntriesViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.importer</a> &gt; <span class="el_source">ImportEntriesViewModel.java</span></div><h1>ImportEntriesViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.importer;
+
+import java.io.IOException;
+import java.io.StringWriter;
+import java.util.List;
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.gui.AbstractViewModel;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.duplicationFinder.DuplicateResolverDialog;
+import org.jabref.gui.externalfiles.ImportHandler;
+import org.jabref.gui.fieldeditors.LinkedFileViewModel;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.bibtex.BibEntryWriter;
+import org.jabref.logic.bibtex.FieldWriter;
+import org.jabref.logic.database.DatabaseMerger;
+import org.jabref.logic.database.DuplicateCheck;
+import org.jabref.logic.exporter.BibWriter;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.OS;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ImportEntriesViewModel extends AbstractViewModel {
+
+<span class="nc" id="L45">    private static final Logger LOGGER = LoggerFactory.getLogger(ImportEntriesViewModel.class);</span>
+
+    private final StringProperty message;
+    private final TaskExecutor taskExecutor;
+    private final BibDatabaseContext databaseContext;
+    private final DialogService dialogService;
+    private final UndoManager undoManager;
+    private final StateManager stateManager;
+    private final FileUpdateMonitor fileUpdateMonitor;
+<span class="nc" id="L54">    private ParserResult parserResult = null;</span>
+    private final ObservableList&lt;BibEntry&gt; entries;
+    private final PreferencesService preferences;
+    private final BibEntryTypesManager entryTypesManager;
+    private final ObjectProperty&lt;BibDatabaseContext&gt; selectedDb;
+
+    /**
+     * @param databaseContext the database to import into
+     * @param task            the task executed for parsing the selected files(s).
+     */
+    public ImportEntriesViewModel(BackgroundTask&lt;ParserResult&gt; task,
+                                  TaskExecutor taskExecutor,
+                                  BibDatabaseContext databaseContext,
+                                  DialogService dialogService,
+                                  UndoManager undoManager,
+                                  PreferencesService preferences,
+                                  StateManager stateManager,
+                                  BibEntryTypesManager entryTypesManager,
+<span class="nc" id="L72">                                  FileUpdateMonitor fileUpdateMonitor) {</span>
+<span class="nc" id="L73">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L74">        this.databaseContext = databaseContext;</span>
+<span class="nc" id="L75">        this.dialogService = dialogService;</span>
+<span class="nc" id="L76">        this.undoManager = undoManager;</span>
+<span class="nc" id="L77">        this.preferences = preferences;</span>
+<span class="nc" id="L78">        this.stateManager = stateManager;</span>
+<span class="nc" id="L79">        this.entryTypesManager = entryTypesManager;</span>
+<span class="nc" id="L80">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="nc" id="L81">        this.entries = FXCollections.observableArrayList();</span>
+<span class="nc" id="L82">        this.message = new SimpleStringProperty();</span>
+<span class="nc" id="L83">        this.message.bind(task.messageProperty());</span>
+<span class="nc" id="L84">        this.selectedDb = new SimpleObjectProperty&lt;&gt;();</span>
+
+<span class="nc" id="L86">        task.onSuccess(parserResult -&gt; {</span>
+            // store the complete parser result (to import groups, ... later on)
+<span class="nc" id="L88">            this.parserResult = parserResult;</span>
+            // fill in the list for the user, where one can select the entries to import
+<span class="nc" id="L90">            entries.addAll(parserResult.getDatabase().getEntries());</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (entries.isEmpty()) {</span>
+<span class="nc" id="L92">               task.updateMessage(Localization.lang(&quot;No entries corresponding to given query&quot;));</span>
+            }
+<span class="nc" id="L94">        }).onFailure(ex -&gt; {</span>
+<span class="nc" id="L95">            LOGGER.error(&quot;Error importing&quot;, ex);</span>
+<span class="nc" id="L96">            dialogService.showErrorDialogAndWait(ex);</span>
+<span class="nc" id="L97">        }).executeWith(taskExecutor);</span>
+<span class="nc" id="L98">    }</span>
+
+    public String getMessage() {
+<span class="nc" id="L101">        return message.get();</span>
+    }
+
+    public StringProperty messageProperty() {
+<span class="nc" id="L105">        return message;</span>
+    }
+
+    public ObjectProperty&lt;BibDatabaseContext&gt; selectedDbProperty() {
+<span class="nc" id="L109">        return selectedDb;</span>
+    }
+
+    public BibDatabaseContext getSelectedDb() {
+<span class="nc" id="L113">        return selectedDb.get();</span>
+    }
+
+    public ObservableList&lt;BibEntry&gt; getEntries() {
+<span class="nc" id="L117">        return entries;</span>
+    }
+
+    public boolean hasDuplicate(BibEntry entry) {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        return findInternalDuplicate(entry).isPresent() ||</span>
+                new DuplicateCheck(entryTypesManager)
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                .containsDuplicate(selectedDb.getValue().getDatabase(), entry, selectedDb.getValue().getMode()).isPresent();</span>
+    }
+
+    public String getSourceString(BibEntry entry) {
+<span class="nc" id="L127">        StringWriter writer = new StringWriter();</span>
+<span class="nc" id="L128">        BibWriter bibWriter = new BibWriter(writer, OS.NEWLINE);</span>
+<span class="nc" id="L129">        FieldWriter fieldWriter = FieldWriter.buildIgnoreHashes(preferences.getFieldPreferences());</span>
+        try {
+<span class="nc" id="L131">            new BibEntryWriter(fieldWriter, entryTypesManager).write(entry, bibWriter, selectedDb.getValue().getMode());</span>
+<span class="nc" id="L132">        } catch (</span>
+                IOException ioException) {
+<span class="nc" id="L134">            return &quot;&quot;;</span>
+<span class="nc" id="L135">        }</span>
+<span class="nc" id="L136">        return writer.toString();</span>
+    }
+
+    /**
+     * Called after the user selected the entries to import. Does the real import stuff.
+     *
+     * @param entriesToImport subset of the entries contained in parserResult
+     */
+    public void importEntries(List&lt;BibEntry&gt; entriesToImport, boolean shouldDownloadFiles) {
+        // Check if we are supposed to warn about duplicates.
+        // If so, then see if there are duplicates, and warn if yes.
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (preferences.getImporterPreferences().shouldWarnAboutDuplicatesOnImport()) {</span>
+<span class="nc" id="L148">            BackgroundTask.wrap(() -&gt; entriesToImport.stream()</span>
+<span class="nc" id="L149">                                                     .anyMatch(this::hasDuplicate)).onSuccess(duplicateFound -&gt; {</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                if (duplicateFound) {</span>
+<span class="nc" id="L151">                    boolean continueImport = dialogService.showConfirmationDialogWithOptOutAndWait(Localization.lang(&quot;Duplicates found&quot;),</span>
+<span class="nc" id="L152">                            Localization.lang(&quot;There are possible duplicates that haven't been resolved. Continue?&quot;),</span>
+<span class="nc" id="L153">                            Localization.lang(&quot;Continue with import&quot;),</span>
+<span class="nc" id="L154">                            Localization.lang(&quot;Cancel import&quot;),</span>
+<span class="nc" id="L155">                            Localization.lang(&quot;Do not ask again&quot;),</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                            optOut -&gt; preferences.getImporterPreferences().setWarnAboutDuplicatesOnImport(!optOut));</span>
+
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                    if (!continueImport) {</span>
+<span class="nc" id="L159">                        dialogService.notify(Localization.lang(&quot;Import canceled&quot;));</span>
+                    } else {
+<span class="nc" id="L161">                        buildImportHandlerThenImportEntries(entriesToImport);</span>
+                    }
+<span class="nc" id="L163">                } else {</span>
+<span class="nc" id="L164">                    buildImportHandlerThenImportEntries(entriesToImport);</span>
+                }
+<span class="nc" id="L166">            }).executeWith(taskExecutor);</span>
+        } else {
+<span class="nc" id="L168">            buildImportHandlerThenImportEntries(entriesToImport);</span>
+        }
+
+        // Remember the selection in the dialog
+<span class="nc" id="L172">        preferences.getFilePreferences().setDownloadLinkedFiles(shouldDownloadFiles);</span>
+
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (shouldDownloadFiles) {</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            for (BibEntry bibEntry : entriesToImport) {</span>
+<span class="nc" id="L176">                bibEntry.getFiles().stream().filter(LinkedFile::isOnlineLink).forEach(linkedFile -&gt;</span>
+<span class="nc" id="L177">                        new LinkedFileViewModel(</span>
+                                linkedFile,
+                                bibEntry,
+                                databaseContext,
+                                taskExecutor,
+                                dialogService,
+<span class="nc" id="L183">                                preferences).download());</span>
+<span class="nc" id="L184">            }</span>
+        }
+
+<span class="nc" id="L187">        new DatabaseMerger(preferences.getBibEntryPreferences().getKeywordSeparator()).mergeStrings(</span>
+<span class="nc" id="L188">                databaseContext.getDatabase(),</span>
+<span class="nc" id="L189">                parserResult.getDatabase());</span>
+<span class="nc" id="L190">        new DatabaseMerger(preferences.getBibEntryPreferences().getKeywordSeparator()).mergeMetaData(</span>
+<span class="nc" id="L191">                databaseContext.getMetaData(),</span>
+<span class="nc" id="L192">                parserResult.getMetaData(),</span>
+<span class="nc" id="L193">                parserResult.getPath().map(path -&gt; path.getFileName().toString()).orElse(&quot;unknown&quot;),</span>
+<span class="nc" id="L194">                parserResult.getDatabase().getEntries());</span>
+
+//        JabRefGUI.getMainFrame().getCurrentLibraryTab().markBaseChanged();
+<span class="nc" id="L197">    }</span>
+
+    private void buildImportHandlerThenImportEntries(List&lt;BibEntry&gt; entriesToImport) {
+<span class="nc" id="L200">        ImportHandler importHandler = new ImportHandler(</span>
+<span class="nc" id="L201">                selectedDb.getValue(),</span>
+                preferences,
+                fileUpdateMonitor,
+                undoManager,
+                stateManager,
+                dialogService,
+                taskExecutor);
+<span class="nc" id="L208">        importHandler.importEntries(entriesToImport);</span>
+<span class="nc" id="L209">        dialogService.notify(Localization.lang(&quot;Number of entries successfully imported&quot;) + &quot;: &quot; + entriesToImport.size());</span>
+<span class="nc" id="L210">    }</span>
+
+    /**
+     * Checks if there are duplicates to the given entry in the list of entries to be imported.
+     *
+     * @param entry The entry to search for duplicates of.
+     * @return A possible duplicate, if any, or null if none were found.
+     */
+    private Optional&lt;BibEntry&gt; findInternalDuplicate(BibEntry entry) {
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        for (BibEntry othEntry : entries) {</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            if (othEntry.equals(entry)) {</span>
+<span class="nc" id="L221">                continue; // Don't compare the entry to itself</span>
+            }
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            if (new DuplicateCheck(entryTypesManager).isDuplicate(entry, othEntry, databaseContext.getMode())) {</span>
+<span class="nc" id="L224">                return Optional.of(othEntry);</span>
+            }
+<span class="nc" id="L226">        }</span>
+<span class="nc" id="L227">        return Optional.empty();</span>
+    }
+
+    public void resolveDuplicate(BibEntry entry) {
+        // First, try to find duplicate in the existing library
+<span class="nc" id="L232">        Optional&lt;BibEntry&gt; other = new DuplicateCheck(entryTypesManager).containsDuplicate(databaseContext.getDatabase(), entry, databaseContext.getMode());</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        if (other.isPresent()) {</span>
+<span class="nc" id="L234">            DuplicateResolverDialog dialog = new DuplicateResolverDialog(other.get(),</span>
+                    entry, DuplicateResolverDialog.DuplicateResolverType.IMPORT_CHECK, databaseContext, stateManager, dialogService, preferences);
+
+<span class="nc" id="L237">            DuplicateResolverDialog.DuplicateResolverResult result = dialogService.showCustomDialogAndWait(dialog)</span>
+<span class="nc" id="L238">                                                                                  .orElse(DuplicateResolverDialog.DuplicateResolverResult.BREAK);</span>
+
+<span class="nc bnc" id="L240" title="All 2 branches missed.">            if (result == DuplicateResolverDialog.DuplicateResolverResult.KEEP_LEFT) {</span>
+                // TODO: Remove old entry. Or... add it to a list of entries
+                // to be deleted. We only delete
+                // it after Ok is clicked.
+                // entriesToDelete.add(other.get());
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            } else if (result == DuplicateResolverDialog.DuplicateResolverResult.KEEP_RIGHT) {</span>
+                // Remove the entry from the import inspection dialog.
+<span class="nc" id="L247">                entries.remove(entry);</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">            } else if (result == DuplicateResolverDialog.DuplicateResolverResult.KEEP_BOTH) {</span>
+                // Do nothing.
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            } else if (result == DuplicateResolverDialog.DuplicateResolverResult.KEEP_MERGE) {</span>
+                // TODO: Remove old entry. Or... add it to a list of entries
+                // to be deleted. We only delete
+                // it after Ok is clicked.
+                // entriesToDelete.add(other.get());
+
+                // Replace entry by merged entry
+<span class="nc" id="L257">                entries.add(dialog.getMergedEntry());</span>
+<span class="nc" id="L258">                entries.remove(entry);</span>
+            }
+<span class="nc" id="L260">            return;</span>
+        }
+        // Second, check if the duplicate is of another entry in the import:
+<span class="nc" id="L263">        other = findInternalDuplicate(entry);</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (other.isPresent()) {</span>
+<span class="nc" id="L265">            DuplicateResolverDialog diag = new DuplicateResolverDialog(entry,</span>
+<span class="nc" id="L266">                    other.get(), DuplicateResolverDialog.DuplicateResolverType.DUPLICATE_SEARCH, databaseContext, stateManager, dialogService, preferences);</span>
+
+<span class="nc" id="L268">            DuplicateResolverDialog.DuplicateResolverResult answer = dialogService.showCustomDialogAndWait(diag)</span>
+<span class="nc" id="L269">                                                                                  .orElse(DuplicateResolverDialog.DuplicateResolverResult.BREAK);</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">            if (answer == DuplicateResolverDialog.DuplicateResolverResult.KEEP_LEFT) {</span>
+                // Remove other entry
+<span class="nc" id="L272">                entries.remove(other.get());</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            } else if (answer == DuplicateResolverDialog.DuplicateResolverResult.KEEP_RIGHT) {</span>
+                // Remove entry
+<span class="nc" id="L275">                entries.remove(entry);</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">            } else if (answer == DuplicateResolverDialog.DuplicateResolverResult.KEEP_BOTH) {</span>
+                // Do nothing
+<span class="nc bnc" id="L278" title="All 2 branches missed.">            } else if (answer == DuplicateResolverDialog.DuplicateResolverResult.KEEP_MERGE) {</span>
+                // Replace both entries by merged entry
+<span class="nc" id="L280">                entries.add(diag.getMergedEntry());</span>
+<span class="nc" id="L281">                entries.remove(entry);</span>
+<span class="nc" id="L282">                entries.remove(other.get());</span>
+            }
+        }
+<span class="nc" id="L285">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

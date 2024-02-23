@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GrobidCitationFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">GrobidCitationFetcher.java</span></div><h1>GrobidCitationFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.net.SocketTimeoutException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.SearchBasedFetcher;
+import org.jabref.logic.importer.util.GrobidService;
+import org.jabref.model.entry.BibEntry;
+
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.jooq.lambda.Unchecked;
+import org.jooq.lambda.UncheckedException;
+import org.jsoup.HttpStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class GrobidCitationFetcher implements SearchBasedFetcher {
+
+<span class="fc" id="L27">    private static final Logger LOGGER = LoggerFactory.getLogger(GrobidCitationFetcher.class);</span>
+
+    private final ImportFormatPreferences importFormatPreferences;
+    private final GrobidService grobidService;
+
+    public GrobidCitationFetcher(GrobidPreferences grobidPreferences, ImportFormatPreferences importFormatPreferences) {
+<span class="fc" id="L33">        this(importFormatPreferences, new GrobidService(grobidPreferences));</span>
+<span class="fc" id="L34">    }</span>
+
+<span class="fc" id="L36">    GrobidCitationFetcher(ImportFormatPreferences importFormatPreferences, GrobidService grobidService) {</span>
+<span class="fc" id="L37">        this.importFormatPreferences = importFormatPreferences;</span>
+<span class="fc" id="L38">        this.grobidService = grobidService;</span>
+<span class="fc" id="L39">    }</span>
+
+    /**
+     * Passes request to grobid server, using consolidateCitations option to improve result. Takes a while, since the
+     * server has to look up the entry.
+     *
+     * @return A BibTeX string if extraction is successful
+     * @throws FetcherException
+     */
+    private Optional&lt;BibEntry&gt; parseUsingGrobid(String plainText) throws FetcherException {
+        try {
+<span class="fc" id="L50">            return grobidService.processCitation(plainText, importFormatPreferences, GrobidService.ConsolidateCitations.WITH_METADATA);</span>
+<span class="nc" id="L51">        } catch (HttpStatusException e) {</span>
+<span class="nc" id="L52">            String msg = &quot;Connection failure.&quot;;</span>
+<span class="nc" id="L53">            LOGGER.debug(msg, e);</span>
+<span class="nc" id="L54">            throw new FetcherException(msg, e.getCause());</span>
+<span class="fc" id="L55">        } catch (SocketTimeoutException e) {</span>
+<span class="fc" id="L56">            String msg = &quot;Connection timed out.&quot;;</span>
+<span class="fc" id="L57">            LOGGER.debug(msg, e);</span>
+<span class="fc" id="L58">            throw new FetcherException(msg, e.getCause());</span>
+<span class="fc" id="L59">        } catch (IOException | ParseException e) {</span>
+<span class="fc" id="L60">            String msg = &quot;Could not process citation. &quot; + e.getMessage();</span>
+<span class="fc" id="L61">            LOGGER.debug(msg, e);</span>
+<span class="fc" id="L62">            return Optional.empty();</span>
+        }
+    }
+
+    @Override
+    public String getName() {
+<span class="nc" id="L68">        return &quot;GROBID&quot;;</span>
+    }
+
+    @Override
+    public List&lt;BibEntry&gt; performSearch(String searchQuery) throws FetcherException {
+        List&lt;BibEntry&gt; collect;
+        try {
+<span class="fc" id="L75">            collect = Arrays.stream(searchQuery.split(&quot;\\r\\r+|\\n\\n+|\\r\\n(\\r\\n)+&quot;))</span>
+<span class="fc" id="L76">                            .map(String::trim)</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                            .filter(str -&gt; !str.isBlank())</span>
+<span class="fc" id="L78">                            .map(Unchecked.function(this::parseUsingGrobid))</span>
+<span class="fc" id="L79">                            .flatMap(Optional::stream)</span>
+<span class="fc" id="L80">                            .collect(Collectors.toList());</span>
+<span class="fc" id="L81">        } catch (UncheckedException e) {</span>
+            // This &quot;undoes&quot; Unchecked.function(this::parseUsingGrobid))
+<span class="fc" id="L83">            throw (FetcherException) e.getCause();</span>
+<span class="fc" id="L84">        }</span>
+<span class="fc" id="L85">        return collect;</span>
+    }
+
+    /**
+     * Not used
+     */
+    @Override
+    public List&lt;BibEntry&gt; performSearch(QueryNode luceneQuery) throws FetcherException {
+<span class="nc" id="L93">        return Collections.emptyList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

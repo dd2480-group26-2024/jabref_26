@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AboutDialogViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.help</a> &gt; <span class="el_source">AboutDialogViewModel.java</span></div><h1>AboutDialogViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.help;
+
+import java.io.IOException;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import javafx.beans.property.ReadOnlyBooleanProperty;
+import javafx.beans.property.ReadOnlyBooleanWrapper;
+import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.beans.property.ReadOnlyStringWrapper;
+
+import org.jabref.gui.AbstractViewModel;
+import org.jabref.gui.ClipBoardManager;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.desktop.JabRefDesktop;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.BuildInfo;
+import org.jabref.preferences.PreferencesService;
+
+import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class AboutDialogViewModel extends AbstractViewModel {
+
+    private static final String HOMEPAGE_URL = &quot;https://www.jabref.org&quot;;
+    private static final String DONATION_URL = &quot;https://donations.jabref.org&quot;;
+    private static final String LIBRARIES_URL = &quot;https://github.com/JabRef/jabref/blob/main/external-libraries.md&quot;;
+    private static final String GITHUB_URL = &quot;https://github.com/JabRef/jabref&quot;;
+    private static final String LICENSE_URL = &quot;https://github.com/JabRef/jabref/blob/main/LICENSE.md&quot;;
+    private static final String CONTRIBUTORS_URL = &quot;https://github.com/JabRef/jabref/graphs/contributors&quot;;
+    private static final String PRIVACY_POLICY_URL = &quot;https://github.com/JabRef/jabref/blob/main/PRIVACY.md&quot;;
+    private final String changelogUrl;
+    private final String versionInfo;
+<span class="nc" id="L36">    private final ReadOnlyStringWrapper environmentInfo = new ReadOnlyStringWrapper();</span>
+<span class="nc" id="L37">    private final Logger logger = LoggerFactory.getLogger(AboutDialogViewModel.class);</span>
+<span class="nc" id="L38">    private final ReadOnlyStringWrapper heading = new ReadOnlyStringWrapper();</span>
+<span class="nc" id="L39">    private final ReadOnlyStringWrapper maintainers = new ReadOnlyStringWrapper();</span>
+<span class="nc" id="L40">    private final ReadOnlyStringWrapper license = new ReadOnlyStringWrapper();</span>
+<span class="nc" id="L41">    private final ReadOnlyBooleanWrapper isDevelopmentVersion = new ReadOnlyBooleanWrapper();</span>
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+<span class="nc" id="L44">    private final ReadOnlyStringWrapper developmentVersion = new ReadOnlyStringWrapper();</span>
+    private final ClipBoardManager clipBoardManager;
+
+<span class="nc" id="L47">    public AboutDialogViewModel(DialogService dialogService, PreferencesService preferencesService, ClipBoardManager clipBoardManager, BuildInfo buildInfo) {</span>
+<span class="nc" id="L48">        this.dialogService = Objects.requireNonNull(dialogService);</span>
+<span class="nc" id="L49">        this.preferencesService = Objects.requireNonNull(preferencesService);</span>
+<span class="nc" id="L50">        this.clipBoardManager = Objects.requireNonNull(clipBoardManager);</span>
+<span class="nc" id="L51">        String[] version = buildInfo.version.getFullVersion().split(&quot;--&quot;);</span>
+<span class="nc" id="L52">        heading.set(&quot;JabRef &quot; + version[0]);</span>
+
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (version.length == 1) {</span>
+<span class="nc" id="L55">            isDevelopmentVersion.set(false);</span>
+        } else {
+<span class="nc" id="L57">            isDevelopmentVersion.set(true);</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            String dev = Lists.newArrayList(version).stream().filter(string -&gt; !string.equals(version[0])).collect(</span>
+<span class="nc" id="L59">                    Collectors.joining(&quot;--&quot;));</span>
+<span class="nc" id="L60">            developmentVersion.set(dev);</span>
+        }
+<span class="nc" id="L62">        maintainers.set(buildInfo.maintainers);</span>
+<span class="nc" id="L63">        license.set(Localization.lang(&quot;License&quot;) + &quot;:&quot;);</span>
+<span class="nc" id="L64">        changelogUrl = buildInfo.version.getChangelogUrl();</span>
+
+<span class="nc" id="L66">        String javafx_version = System.getProperty(&quot;javafx.runtime.version&quot;, BuildInfo.UNKNOWN_VERSION).toLowerCase(Locale.ROOT);</span>
+
+<span class="nc" id="L68">        versionInfo = &quot;JabRef %s%n%s %s %s %nJava %s %nJavaFX %s&quot;.formatted(buildInfo.version, BuildInfo.OS,</span>
+                BuildInfo.OS_VERSION, BuildInfo.OS_ARCH, BuildInfo.JAVA_VERSION, javafx_version);
+<span class="nc" id="L70">    }</span>
+
+    public String getDevelopmentVersion() {
+<span class="nc" id="L73">        return developmentVersion.get();</span>
+    }
+
+    public ReadOnlyStringProperty developmentVersionProperty() {
+<span class="nc" id="L77">        return developmentVersion.getReadOnlyProperty();</span>
+    }
+
+    public boolean isIsDevelopmentVersion() {
+<span class="nc" id="L81">        return isDevelopmentVersion.get();</span>
+    }
+
+    public ReadOnlyBooleanProperty isDevelopmentVersionProperty() {
+<span class="nc" id="L85">        return isDevelopmentVersion.getReadOnlyProperty();</span>
+    }
+
+    public String getVersionInfo() {
+<span class="nc" id="L89">        return versionInfo;</span>
+    }
+
+    public ReadOnlyStringProperty maintainersProperty() {
+<span class="nc" id="L93">        return maintainers.getReadOnlyProperty();</span>
+    }
+
+    public String getMaintainers() {
+<span class="nc" id="L97">        return maintainers.get();</span>
+    }
+
+    public ReadOnlyStringProperty headingProperty() {
+<span class="nc" id="L101">        return heading.getReadOnlyProperty();</span>
+    }
+
+    public String getHeading() {
+<span class="nc" id="L105">        return heading.get();</span>
+    }
+
+    public ReadOnlyStringProperty licenseProperty() {
+<span class="nc" id="L109">        return license.getReadOnlyProperty();</span>
+    }
+
+    public String getLicense() {
+<span class="nc" id="L113">        return license.get();</span>
+    }
+
+    public String getEnvironmentInfo() {
+<span class="nc" id="L117">        return environmentInfo.get();</span>
+    }
+
+    public void copyVersionToClipboard() {
+<span class="nc" id="L121">        clipBoardManager.setContent(versionInfo);</span>
+<span class="nc" id="L122">        dialogService.notify(Localization.lang(&quot;Copied version to clipboard&quot;));</span>
+<span class="nc" id="L123">    }</span>
+
+    public void openJabrefWebsite() {
+<span class="nc" id="L126">        openWebsite(HOMEPAGE_URL);</span>
+<span class="nc" id="L127">    }</span>
+
+    public void openExternalLibrariesWebsite() {
+<span class="nc" id="L130">        openWebsite(LIBRARIES_URL);</span>
+<span class="nc" id="L131">    }</span>
+
+    public void openGithub() {
+<span class="nc" id="L134">        openWebsite(GITHUB_URL);</span>
+<span class="nc" id="L135">    }</span>
+
+    public void openChangeLog() {
+<span class="nc" id="L138">        openWebsite(changelogUrl);</span>
+<span class="nc" id="L139">    }</span>
+
+    public void openLicense() {
+<span class="nc" id="L142">        openWebsite(LICENSE_URL);</span>
+<span class="nc" id="L143">    }</span>
+
+    public void openContributors() {
+<span class="nc" id="L146">        openWebsite(CONTRIBUTORS_URL);</span>
+<span class="nc" id="L147">    }</span>
+
+    public void openDonation() {
+<span class="nc" id="L150">        openWebsite(DONATION_URL);</span>
+<span class="nc" id="L151">    }</span>
+
+    private void openWebsite(String url) {
+        try {
+<span class="nc" id="L155">            JabRefDesktop.openBrowser(url, preferencesService.getFilePreferences());</span>
+<span class="nc" id="L156">        } catch (IOException e) {</span>
+<span class="nc" id="L157">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Could not open website.&quot;), e);</span>
+<span class="nc" id="L158">            logger.error(&quot;Could not open default browser.&quot;, e);</span>
+<span class="nc" id="L159">        }</span>
+<span class="nc" id="L160">    }</span>
+
+    public void openPrivacyPolicy() {
+<span class="nc" id="L163">        openWebsite(PRIVACY_POLICY_URL);</span>
+<span class="nc" id="L164">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

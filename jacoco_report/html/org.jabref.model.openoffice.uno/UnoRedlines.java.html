@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnoRedlines.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.uno</a> &gt; <span class="el_source">UnoRedlines.java</span></div><h1>UnoRedlines.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.uno;
+
+import java.util.Optional;
+
+import com.sun.star.beans.UnknownPropertyException;
+import com.sun.star.beans.XPropertySet;
+import com.sun.star.container.NoSuchElementException;
+import com.sun.star.container.XEnumeration;
+import com.sun.star.container.XEnumerationAccess;
+import com.sun.star.document.XRedlinesSupplier;
+import com.sun.star.lang.WrappedTargetException;
+import com.sun.star.text.XTextDocument;
+
+/**
+ * Change tracking and Redlines
+ */
+<span class="nc" id="L17">public class UnoRedlines {</span>
+
+    public static boolean getRecordChanges(XTextDocument doc)
+            throws
+            WrappedTargetException {
+
+        // https://wiki.openoffice.org/wiki/Documentation/DevGuide/Text/Settings
+        // &quot;Properties of com.sun.star.text.TextDocument&quot;
+
+<span class="nc" id="L26">        XPropertySet propertySet = UnoCast.cast(XPropertySet.class, doc).get();</span>
+
+        try {
+<span class="nc" id="L29">            return (boolean) propertySet.getPropertyValue(&quot;RecordChanges&quot;);</span>
+<span class="nc" id="L30">        } catch (UnknownPropertyException ex) {</span>
+<span class="nc" id="L31">            throw new java.lang.IllegalStateException(&quot;Caught UnknownPropertyException on 'RecordChanges'&quot;);</span>
+        }
+    }
+
+    private static Optional&lt;XRedlinesSupplier&gt; getRedlinesSupplier(XTextDocument doc) {
+<span class="nc" id="L36">        return UnoCast.cast(XRedlinesSupplier.class, doc);</span>
+    }
+
+    public static int countRedlines(XTextDocument doc) {
+<span class="nc" id="L40">        Optional&lt;XRedlinesSupplier&gt; supplier = getRedlinesSupplier(doc);</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (supplier.isEmpty()) {</span>
+<span class="nc" id="L42">            return 0;</span>
+        }
+<span class="nc" id="L44">        XEnumerationAccess enumerationAccess = supplier.get().getRedlines();</span>
+<span class="nc" id="L45">        XEnumeration enumeration = enumerationAccess.createEnumeration();</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (enumeration == null) {</span>
+<span class="nc" id="L47">            return 0;</span>
+        } else {
+<span class="nc" id="L49">            int count = 0;</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">            while (enumeration.hasMoreElements()) {</span>
+                try {
+<span class="nc" id="L52">                    enumeration.nextElement();</span>
+<span class="nc" id="L53">                    count++;</span>
+<span class="nc" id="L54">                } catch (NoSuchElementException | WrappedTargetException ex) {</span>
+<span class="nc" id="L55">                    break;</span>
+<span class="nc" id="L56">                }</span>
+            }
+<span class="nc" id="L58">            return count;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

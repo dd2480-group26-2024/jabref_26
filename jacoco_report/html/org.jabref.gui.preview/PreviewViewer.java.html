@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreviewViewer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preview</a> &gt; <span class="el_source">PreviewViewer.java</span></div><h1>PreviewViewer.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preview;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.net.MalformedURLException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+import javafx.beans.InvalidationListener;
+import javafx.beans.Observable;
+import javafx.beans.value.ChangeListener;
+import javafx.concurrent.Worker;
+import javafx.print.PrinterJob;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.web.WebView;
+
+import org.jabref.gui.ClipBoardManager;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.Globals;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.desktop.JabRefDesktop;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.layout.format.Number;
+import org.jabref.logic.preview.PreviewLayout;
+import org.jabref.logic.search.SearchQuery;
+import org.jabref.logic.util.WebViewStore;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.w3c.dom.events.EventTarget;
+import org.w3c.dom.html.HTMLAnchorElement;
+
+/**
+ * Displays an BibEntry using the given layout format.
+ */
+public class PreviewViewer extends ScrollPane implements InvalidationListener {
+
+<span class="nc" id="L50">    private static final Logger LOGGER = LoggerFactory.getLogger(PreviewViewer.class);</span>
+
+    // https://stackoverflow.com/questions/5669448/get-selected-texts-html-in-div/5670825#5670825
+    private static final String JS_GET_SELECTION_HTML_SCRIPT = &quot;&quot;&quot;
+                                                                   function getSelectionHtml() {
+                                                                   var html = &quot;&quot;;
+                                                                   if (typeof window.getSelection != &quot;undefined&quot;) {
+                                                                       var sel = window.getSelection();
+                                                                       if (sel.rangeCount) {
+                                                                           var container = document.createElement(&quot;div&quot;);
+                                                                           for (var i = 0, len = sel.rangeCount; i &lt; len; ++i) {
+                                                                               container.appendChild(sel.getRangeAt(i).cloneContents());
+                                                                           }
+                                                                           html = container.innerHTML;
+                                                                       }
+                                                                   } else if (typeof document.selection != &quot;undefined&quot;) {
+                                                                       if (document.selection.type == &quot;Text&quot;) {
+                                                                           html = document.selection.createRange().htmlText;
+                                                                       }
+                                                                   }
+                                                                   return html;
+                                                                   }
+                                                               getSelectionHtml();
+                                                               &quot;&quot;&quot;;
+    private static final String JS_HIGHLIGHT_FUNCTION =
+            &quot;&quot;&quot;
+                    &lt;head&gt;
+                       &lt;meta charset=&quot;UTF-8&quot;&gt;
+                       &lt;style&gt;
+                           mark{
+                               background: orange;
+                               color: black;
+                           }
+                       &lt;/style&gt;
+                       &lt;script type=&quot;text/javascript&quot;&gt;
+                    /*!***************************************************
+                    * mark.js v9.0.0
+                    * https://markjs.io/
+                    * Copyright (c) 2014–2018, Julian Kühnel
+                    * Released under the MIT license https://git.io/vwTVl
+                    *****************************************************/
+
+                    !function(e,t){&quot;object&quot;==typeof exports&amp;&amp;&quot;undefined&quot;!=typeof module?module.exports=t():&quot;function&quot;==typeof define&amp;&amp;define.amd?define(t):e.Mark=t()}(this,function(){&quot;use strict&quot;;function e(t){return(e=&quot;function&quot;==typeof Symbol&amp;&amp;&quot;symbol&quot;==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&amp;&amp;&quot;function&quot;==typeof Symbol&amp;&amp;e.constructor===Symbol&amp;&amp;e!==Symbol.prototype?&quot;symbol&quot;:typeof e})(t)}function t(e,t){if(!(e instanceof t))throw new TypeError(&quot;Cannot call a class as a function&quot;)}function n(e,t){for(var n=0;n&lt;t.length;n++){var r=t[n];r.enumerable=r.enumerable||!1,r.configurable=!0,&quot;value&quot;in r&amp;&amp;(r.writable=!0),Object.defineProperty(e,r.key,r)}}function r(e,t,r){return t&amp;&amp;n(e.prototype,t),r&amp;&amp;n(e,r),e}function o(){return(o=Object.assign||function(e){for(var t=1;t&lt;arguments.length;t++){var n=arguments[t];for(var r in n)Object.prototype.hasOwnProperty.call(n,r)&amp;&amp;(e[r]=n[r])}return e}).apply(this,arguments)}var i=
+
+                    /* */
+
+                    function(){function e(n){var r=!(arguments.length&gt;1&amp;&amp;void 0!==arguments[1])||arguments[1],o=arguments.length&gt;2&amp;&amp;void 0!==arguments[2]?arguments[2]:[],i=arguments.length&gt;3&amp;&amp;void 0!==arguments[3]?arguments[3]:5e3;t(this,e),this.ctx=n,this.iframes=r,this.exclude=o,this.iframesTimeout=i}return r(e,[{key:&quot;getContexts&quot;,value:function(){var e=[];return(void 0!==this.ctx&amp;&amp;this.ctx?NodeList.prototype.isPrototypeOf(this.ctx)?Array.prototype.slice.call(this.ctx):Array.isArray(this.ctx)?this.ctx:&quot;string&quot;==typeof this.ctx?Array.prototype.slice.call(document.querySelectorAll(this.ctx)):[this.ctx]:[]).forEach(function(t){var n=e.filter(function(e){return e.contains(t)}).length&gt;0;-1!==e.indexOf(t)||n||e.push(t)}),e}},{key:&quot;getIframeContents&quot;,value:function(e,t){var n,r=arguments.length&gt;2&amp;&amp;void 0!==arguments[2]?arguments[2]:function(){};try{var o=e.contentWindow;if(n=o.document,!o||!n)throw new Error(&quot;iframe inaccessible&quot;)}catch(e){r()}n&amp;&amp;t(n)}},{key:&quot;isIframeBlank&quot;,value:function(e){var t=&quot;about:blank&quot;,n=e.getAttribute(&quot;src&quot;).trim();return e.contentWindow.location.href===t&amp;&amp;n!==t&amp;&amp;n}},{key:&quot;observeIframeLoad&quot;,value:function(e,t,n){var r=this,o=!1,i=null,a=function a(){if(!o){o=!0,clearTimeout(i);try{r.isIframeBlank(e)||(e.removeEventListener(&quot;load&quot;,a),r.getIframeContents(e,t,n))}catch(e){n()}}};e.addEventListener(&quot;load&quot;,a),i=setTimeout(a,this.iframesTimeout)}},{key:&quot;onIframeReady&quot;,value:function(e,t,n){try{&quot;complete&quot;===e.contentWindow.document.readyState?this.isIframeBlank(e)?this.observeIframeLoad(e,t,n):this.getIframeContents(e,t,n):this.observeIframeLoad(e,t,n)}catch(e){n()}}},{key:&quot;waitForIframes&quot;,value:function(e,t){var n=this,r=0;this.forEachIframe(e,function(){return!0},function(e){r++,n.waitForIframes(e.querySelector(&quot;html&quot;),function(){--r||t()})},function(e){e||t()})}},{key:&quot;forEachIframe&quot;,value:function(t,n,r){var o=this,i=arguments.length&gt;3&amp;&amp;void 0!==arguments[3]?arguments[3]:function(){},a=t.querySelectorAll(&quot;iframe&quot;),s=a.length,c=0;a=Array.prototype.slice.call(a);var u=function(){--s&lt;=0&amp;&amp;i(c)};s||u(),a.forEach(function(t){e.matches(t,o.exclude)?u():o.onIframeReady(t,function(e){n(t)&amp;&amp;(c++,r(e)),u()},u)})}},{key:&quot;createIterator&quot;,value:function(e,t,n){return document.createNodeIterator(e,t,n,!1)}},{key:&quot;createInstanceOnIframe&quot;,value:function(t){return new e(t.querySelector(&quot;html&quot;),this.iframes)}},{key:&quot;compareNodeIframe&quot;,value:function(e,t,n){if(e.compareDocumentPosition(n)&amp;Node.DOCUMENT_POSITION_PRECEDING){if(null===t)return!0;if(t.compareDocumentPosition(n)&amp;Node.DOCUMENT_POSITION_FOLLOWING)return!0}return!1}},{key:&quot;getIteratorNode&quot;,value:function(e){var t=e.previousNode();return{prevNode:t,node:null===t?e.nextNode():e.nextNode()&amp;&amp;e.nextNode()}}},{key:&quot;checkIframeFilter&quot;,value:function(e,t,n,r){var o=!1,i=!1;return r.forEach(function(e,t){e.val===n&amp;&amp;(o=t,i=e.handled)}),this.compareNodeIframe(e,t,n)?(!1!==o||i?!1===o||i||(r[o].handled=!0):r.push({val:n,handled:!0}),!0):(!1===o&amp;&amp;r.push({val:n,handled:!1}),!1)}},{key:&quot;handleOpenIframes&quot;,value:function(e,t,n,r){var o=this;e.forEach(function(e){e.handled||o.getIframeContents(e.val,function(e){o.createInstanceOnIframe(e).forEachNode(t,n,r)})})}},{key:&quot;iterateThroughNodes&quot;,value:function(e,t,n,r,o){for(var i,a,s,c=this,u=this.createIterator(t,e,r),l=[],h=[];s=void 0,s=c.getIteratorNode(u),a=s.prevNode,i=s.node;)this.iframes&amp;&amp;this.forEachIframe(t,function(e){return c.checkIframeFilter(i,a,e,l)},function(t){c.createInstanceOnIframe(t).forEachNode(e,function(e){return h.push(e)},r)}),h.push(i);h.forEach(function(e){n(e)}),this.iframes&amp;&amp;this.handleOpenIframes(l,e,n,r),o()}},{key:&quot;forEachNode&quot;,value:function(e,t,n){var r=this,o=arguments.length&gt;3&amp;&amp;void 0!==arguments[3]?arguments[3]:function(){},i=this.getContexts(),a=i.length;a||o(),i.forEach(function(i){var s=function(){r.iterateThroughNodes(e,i,t,n,function(){--a&lt;=0&amp;&amp;o()})};r.iframes?r.waitForIframes(i,s):s()})}}],[{key:&quot;matches&quot;,value:function(e,t){var n=&quot;string&quot;==typeof t?[t]:t,r=e.matches||e.matchesSelector||e.msMatchesSelector||e.mozMatchesSelector||e.oMatchesSelector||e.webkitMatchesSelector;if(r){var o=!1;return n.every(function(t){return!r.call(e,t)||(o=!0,!1)}),o}return!1}}]),e}(),a=
+
+                    /* */
+
+                    function(){function e(n){t(this,e),this.opt=o({},{diacritics:!0,synonyms:{},accuracy:&quot;partially&quot;,caseSensitive:!1,ignoreJoiners:!1,ignorePunctuation:[],wildcards:&quot;disabled&quot;},n)}return r(e,[{key:&quot;create&quot;,value:function(e){return&quot;disabled&quot;!==this.opt.wildcards&amp;&amp;(e=this.setupWildcardsRegExp(e)),e=this.escapeStr(e),Object.keys(this.opt.synonyms).length&amp;&amp;(e=this.createSynonymsRegExp(e)),(this.opt.ignoreJoiners||this.opt.ignorePunctuation.length)&amp;&amp;(e=this.setupIgnoreJoinersRegExp(e)),this.opt.diacritics&amp;&amp;(e=this.createDiacriticsRegExp(e)),e=this.createMergedBlanksRegExp(e),(this.opt.ignoreJoiners||this.opt.ignorePunctuation.length)&amp;&amp;(e=this.createJoinersRegExp(e)),&quot;disabled&quot;!==this.opt.wildcards&amp;&amp;(e=this.createWildcardsRegExp(e)),e=this.createAccuracyRegExp(e),new RegExp(e,&quot;gm&quot;.concat(this.opt.caseSensitive?&quot;&quot;:&quot;i&quot;))}},{key:&quot;sortByLength&quot;,value:function(e){return e.sort(function(e,t){return e.length===t.length?e&gt;t?1:-1:t.length-e.length})}},{key:&quot;escapeStr&quot;,value:function(e){return e.replace(/[\\-\\[\\]\\/\\{\\}\\(\\)\\*\\+\\?\\.\\\\\\^\\$\\|]/g,&quot;\\\\$&amp;&quot;)}},{key:&quot;createSynonymsRegExp&quot;,value:function(e){var t=this,n=this.opt.synonyms,r=this.opt.caseSensitive?&quot;&quot;:&quot;i&quot;,o=this.opt.ignoreJoiners||this.opt.ignorePunctuation.length?&quot;\\0&quot;:&quot;&quot;;for(var i in n)if(n.hasOwnProperty(i)){var a=Array.isArray(n[i])?n[i]:[n[i]];a.unshift(i),(a=this.sortByLength(a).map(function(e){return&quot;disabled&quot;!==t.opt.wildcards&amp;&amp;(e=t.setupWildcardsRegExp(e)),e=t.escapeStr(e)}).filter(function(e){return&quot;&quot;!==e})).length&gt;1&amp;&amp;(e=e.replace(new RegExp(&quot;(&quot;.concat(a.map(function(e){return t.escapeStr(e)}).join(&quot;|&quot;),&quot;)&quot;),&quot;gm&quot;.concat(r)),o+&quot;(&quot;.concat(a.map(function(e){return t.processSynonyms(e)}).join(&quot;|&quot;),&quot;)&quot;)+o))}return e}},{key:&quot;processSynonyms&quot;,value:function(e){return(this.opt.ignoreJoiners||this.opt.ignorePunctuation.length)&amp;&amp;(e=this.setupIgnoreJoinersRegExp(e)),e}},{key:&quot;setupWildcardsRegExp&quot;,value:function(e){return(e=e.replace(/(?:\\\\)*\\?/g,function(e){return&quot;\\\\&quot;===e.charAt(0)?&quot;?&quot;:&quot;\u0001&quot;})).replace(/(?:\\\\)*\\*/g,function(e){return&quot;\\\\&quot;===e.charAt(0)?&quot;*&quot;:&quot;\u0002&quot;})}},{key:&quot;createWildcardsRegExp&quot;,value:function(e){var t=&quot;withSpaces&quot;===this.opt.wildcards;return e.replace(/\\u0001/g,t?&quot;[\\\\S\\\\s]?&quot;:&quot;\\\\S?&quot;).replace(/\\u0002/g,t?&quot;[\\\\S\\\\s]*?&quot;:&quot;\\\\S*&quot;)}},{key:&quot;setupIgnoreJoinersRegExp&quot;,value:function(e){return e.replace(/[^(|)\\\\]/g,function(e,t,n){var r=n.charAt(t+1);return/[(|)\\\\]/.test(r)||&quot;&quot;===r?e:e+&quot;\\0&quot;})}},{key:&quot;createJoinersRegExp&quot;,value:function(e){var t=[],n=this.opt.ignorePunctuation;return Array.isArray(n)&amp;&amp;n.length&amp;&amp;t.push(this.escapeStr(n.join(&quot;&quot;))),this.opt.ignoreJoiners&amp;&amp;t.push(&quot;\\\\u00ad\\\\u200b\\\\u200c\\\\u200d&quot;),t.length?e.split(/\\u0000+/).join(&quot;[&quot;.concat(t.join(&quot;&quot;),&quot;]*&quot;)):e}},{key:&quot;createDiacriticsRegExp&quot;,value:function(e){var t=this.opt.caseSensitive?&quot;&quot;:&quot;i&quot;,n=this.opt.caseSensitive?[&quot;aàáảãạăằắẳẵặâầấẩẫậäåāą&quot;,&quot;AÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÄÅĀĄ&quot;,&quot;cçćč&quot;,&quot;CÇĆČ&quot;,&quot;dđď&quot;,&quot;DĐĎ&quot;,&quot;eèéẻẽẹêềếểễệëěēę&quot;,&quot;EÈÉẺẼẸÊỀẾỂỄỆËĚĒĘ&quot;,&quot;iìíỉĩịîïī&quot;,&quot;IÌÍỈĨỊÎÏĪ&quot;,&quot;lł&quot;,&quot;LŁ&quot;,&quot;nñňń&quot;,&quot;NÑŇŃ&quot;,&quot;oòóỏõọôồốổỗộơởỡớờợöøō&quot;,&quot;OÒÓỎÕỌÔỒỐỔỖỘƠỞỠỚỜỢÖØŌ&quot;,&quot;rř&quot;,&quot;RŘ&quot;,&quot;sšśșş&quot;,&quot;SŠŚȘŞ&quot;,&quot;tťțţ&quot;,&quot;TŤȚŢ&quot;,&quot;uùúủũụưừứửữựûüůū&quot;,&quot;UÙÚỦŨỤƯỪỨỬỮỰÛÜŮŪ&quot;,&quot;yýỳỷỹỵÿ&quot;,&quot;YÝỲỶỸỴŸ&quot;,&quot;zžżź&quot;,&quot;ZŽŻŹ&quot;]:[&quot;aàáảãạăằắẳẵặâầấẩẫậäåāąAÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÄÅĀĄ&quot;,&quot;cçćčCÇĆČ&quot;,&quot;dđďDĐĎ&quot;,&quot;eèéẻẽẹêềếểễệëěēęEÈÉẺẼẸÊỀẾỂỄỆËĚĒĘ&quot;,&quot;iìíỉĩịîïīIÌÍỈĨỊÎÏĪ&quot;,&quot;lłLŁ&quot;,&quot;nñňńNÑŇŃ&quot;,&quot;oòóỏõọôồốổỗộơởỡớờợöøōOÒÓỎÕỌÔỒỐỔỖỘƠỞỠỚỜỢÖØŌ&quot;,&quot;rřRŘ&quot;,&quot;sšśșşSŠŚȘŞ&quot;,&quot;tťțţTŤȚŢ&quot;,&quot;uùúủũụưừứửữựûüůūUÙÚỦŨỤƯỪỨỬỮỰÛÜŮŪ&quot;,&quot;yýỳỷỹỵÿYÝỲỶỸỴŸ&quot;,&quot;zžżźZŽŻŹ&quot;],r=[];return e.split(&quot;&quot;).forEach(function(o){n.every(function(n){if(-1!==n.indexOf(o)){if(r.indexOf(n)&gt;-1)return!1;e=e.replace(new RegExp(&quot;[&quot;.concat(n,&quot;]&quot;),&quot;gm&quot;.concat(t)),&quot;[&quot;.concat(n,&quot;]&quot;)),r.push(n)}return!0})}),e}},{key:&quot;createMergedBlanksRegExp&quot;,value:function(e){return e.replace(/[\\s]+/gim,&quot;[\\\\s]+&quot;)}},{key:&quot;createAccuracyRegExp&quot;,value:function(e){var t=this,n=this.opt.accuracy,r=&quot;string&quot;==typeof n?n:n.value,o=&quot;string&quot;==typeof n?[]:n.limiters,i=&quot;&quot;;switch(o.forEach(function(e){i+=&quot;|&quot;.concat(t.escapeStr(e))}),r){case&quot;partially&quot;:default:return&quot;()(&quot;.concat(e,&quot;)&quot;);case&quot;complementary&quot;:return i=&quot;\\\\s&quot;+(i||this.escapeStr(&quot;!\\&quot;#$%&amp;'()*+,-./:;&lt;=&gt;?@[\\\\]^_`{|}~¡¿&quot;)),&quot;()([^&quot;.concat(i,&quot;]*&quot;).concat(e,&quot;[^&quot;).concat(i,&quot;]*)&quot;);case&quot;exactly&quot;:return&quot;(^|\\\\s&quot;.concat(i,&quot;)(&quot;).concat(e,&quot;)(?=$|\\\\s&quot;).concat(i,&quot;)&quot;)}}}]),e}(),s=
+
+                    /* */
+
+                    function(){function n(e){t(this,n),this.ctx=e,this.ie=!1;var r=window.navigator.userAgent;(r.indexOf(&quot;MSIE&quot;)&gt;-1||r.indexOf(&quot;Trident&quot;)&gt;-1)&amp;&amp;(this.ie=!0)}return r(n,[{key:&quot;log&quot;,value:function(t){var n=arguments.length&gt;1&amp;&amp;void 0!==arguments[1]?arguments[1]:&quot;debug&quot;,r=this.opt.log;this.opt.debug&amp;&amp;&quot;object&quot;===e(r)&amp;&amp;&quot;function&quot;==typeof r[n]&amp;&amp;r[n](&quot;mark.js: &quot;.concat(t))}},{key:&quot;getSeparatedKeywords&quot;,value:function(e){var t=this,n=[];return e.forEach(function(e){t.opt.separateWordSearch?e.split(&quot; &quot;).forEach(function(e){e.trim()&amp;&amp;-1===n.indexOf(e)&amp;&amp;n.push(e)}):e.trim()&amp;&amp;-1===n.indexOf(e)&amp;&amp;n.push(e)}),{keywords:n.sort(function(e,t){return t.length-e.length}),length:n.length}}},{key:&quot;isNumeric&quot;,value:function(e){return Number(parseFloat(e))==e}},{key:&quot;checkRanges&quot;,value:function(e){var t=this;if(!Array.isArray(e)||&quot;[object Object]&quot;!==Object.prototype.toString.call(e[0]))return this.log(&quot;markRanges() will only accept an array of objects&quot;),this.opt.noMatch(e),[];var n=[],r=0;return e.sort(function(e,t){return e.start-t.start}).forEach(function(e){var o=t.callNoMatchOnInvalidRanges(e,r),i=o.start,a=o.end;o.valid&amp;&amp;(e.start=i,e.length=a-i,n.push(e),r=a)}),n}},{key:&quot;callNoMatchOnInvalidRanges&quot;,value:function(e,t){var n,r,o=!1;return e&amp;&amp;void 0!==e.start?(r=(n=parseInt(e.start,10))+parseInt(e.length,10),this.isNumeric(e.start)&amp;&amp;this.isNumeric(e.length)&amp;&amp;r-t&gt;0&amp;&amp;r-n&gt;0?o=!0:(this.log(&quot;Ignoring invalid or overlapping range: &quot;+&quot;&quot;.concat(JSON.stringify(e))),this.opt.noMatch(e))):(this.log(&quot;Ignoring invalid range: &quot;.concat(JSON.stringify(e))),this.opt.noMatch(e)),{start:n,end:r,valid:o}}},{key:&quot;checkWhitespaceRanges&quot;,value:function(e,t,n){var r,o=!0,i=n.length,a=t-i,s=parseInt(e.start,10)-a;return(r=(s=s&gt;i?i:s)+parseInt(e.length,10))&gt;i&amp;&amp;(r=i,this.log(&quot;End range automatically set to the max value of &quot;.concat(i))),s&lt;0||r-s&lt;0||s&gt;i||r&gt;i?(o=!1,this.log(&quot;Invalid range: &quot;.concat(JSON.stringify(e))),this.opt.noMatch(e)):&quot;&quot;===n.substring(s,r).replace(/\\s+/g,&quot;&quot;)&amp;&amp;(o=!1,this.log(&quot;Skipping whitespace only range: &quot;+JSON.stringify(e)),this.opt.noMatch(e)),{start:s,end:r,valid:o}}},{key:&quot;getTextNodes&quot;,value:function(e){var t=this,n=&quot;&quot;,r=[];this.iterator.forEachNode(NodeFilter.SHOW_TEXT,function(e){r.push({start:n.length,end:(n+=e.textContent).length,node:e})},function(e){return t.matchesExclude(e.parentNode)?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT},function(){e({value:n,nodes:r})})}},{key:&quot;matchesExclude&quot;,value:function(e){return i.matches(e,this.opt.exclude.concat([&quot;script&quot;,&quot;style&quot;,&quot;title&quot;,&quot;head&quot;,&quot;html&quot;]))}},{key:&quot;wrapRangeInTextNode&quot;,value:function(e,t,n){var r=this.opt.element?this.opt.element:&quot;mark&quot;,o=e.splitText(t),i=o.splitText(n-t),a=document.createElement(r);return a.setAttribute(&quot;data-markjs&quot;,&quot;true&quot;),this.opt.className&amp;&amp;a.setAttribute(&quot;class&quot;,this.opt.className),a.textContent=o.textContent,o.parentNode.replaceChild(a,o),i}},{key:&quot;wrapRangeInMappedTextNode&quot;,value:function(e,t,n,r,o){var i=this;e.nodes.every(function(a,s){var c=e.nodes[s+1];if(void 0===c||c.start&gt;t){if(!r(a.node))return!1;var u=t-a.start,l=(n&gt;a.end?a.end:n)-a.start,h=e.value.substr(0,a.start),f=e.value.substr(l+a.start);if(a.node=i.wrapRangeInTextNode(a.node,u,l),e.value=h+f,e.nodes.forEach(function(t,n){n&gt;=s&amp;&amp;(e.nodes[n].start&gt;0&amp;&amp;n!==s&amp;&amp;(e.nodes[n].start-=l),e.nodes[n].end-=l)}),n-=l,o(a.node.previousSibling,a.start),!(n&gt;a.end))return!1;t=a.end}return!0})}},{key:&quot;wrapGroups&quot;,value:function(e,t,n,r){return r((e=this.wrapRangeInTextNode(e,t,t+n)).previousSibling),e}},{key:&quot;separateGroups&quot;,value:function(e,t,n,r,o){for(var i=t.length,a=1;a&lt;i;a++){var s=e.textContent.indexOf(t[a]);t[a]&amp;&amp;s&gt;-1&amp;&amp;r(t[a],e)&amp;&amp;(e=this.wrapGroups(e,s,t[a].length,o))}return e}},{key:&quot;wrapMatches&quot;,value:function(e,t,n,r,o){var i=this,a=0===t?0:t+1;this.getTextNodes(function(t){t.nodes.forEach(function(t){var o;for(t=t.node;null!==(o=e.exec(t.textContent))&amp;&amp;&quot;&quot;!==o[a];){if(i.opt.separateGroups)t=i.separateGroups(t,o,a,n,r);else{if(!n(o[a],t))continue;var s=o.index;if(0!==a)for(var c=1;c&lt;a;c++)s+=o[c].length;t=i.wrapGroups(t,s,o[a].length,r)}e.lastIndex=0}}),o()})}},{key:&quot;wrapMatchesAcrossElements&quot;,value:function(e,t,n,r,o){var i=this,a=0===t?0:t+1;this.getTextNodes(function(t){for(var s;null!==(s=e.exec(t.value))&amp;&amp;&quot;&quot;!==s[a];){var c=s.index;if(0!==a)for(var u=1;u&lt;a;u++)c+=s[u].length;var l=c+s[a].length;i.wrapRangeInMappedTextNode(t,c,l,function(e){return n(s[a],e)},function(t,n){e.lastIndex=n,r(t)})}o()})}},{key:&quot;wrapRangeFromIndex&quot;,value:function(e,t,n,r){var o=this;this.getTextNodes(function(i){var a=i.value.length;e.forEach(function(e,r){var s=o.checkWhitespaceRanges(e,a,i.value),c=s.start,u=s.end;s.valid&amp;&amp;o.wrapRangeInMappedTextNode(i,c,u,function(n){return t(n,e,i.value.substring(c,u),r)},function(t){n(t,e)})}),r()})}},{key:&quot;unwrapMatches&quot;,value:function(e){for(var t=e.parentNode,n=document.createDocumentFragment();e.firstChild;)n.appendChild(e.removeChild(e.firstChild));t.replaceChild(n,e),this.ie?this.normalizeTextNode(t):t.normalize()}},{key:&quot;normalizeTextNode&quot;,value:function(e){if(e){if(3===e.nodeType)for(;e.nextSibling&amp;&amp;3===e.nextSibling.nodeType;)e.nodeValue+=e.nextSibling.nodeValue,e.parentNode.removeChild(e.nextSibling);else this.normalizeTextNode(e.firstChild);this.normalizeTextNode(e.nextSibling)}}},{key:&quot;markRegExp&quot;,value:function(e,t){var n=this;this.opt=t,this.log('Searching with expression &quot;'.concat(e,'&quot;'));var r=0,o=&quot;wrapMatches&quot;;this.opt.acrossElements&amp;&amp;(o=&quot;wrapMatchesAcrossElements&quot;),this[o](e,this.opt.ignoreGroups,function(e,t){return n.opt.filter(t,e,r)},function(e){r++,n.opt.each(e)},function(){0===r&amp;&amp;n.opt.noMatch(e),n.opt.done(r)})}},{key:&quot;mark&quot;,value:function(e,t){var n=this;this.opt=t;var r=0,o=&quot;wrapMatches&quot;,i=this.getSeparatedKeywords(&quot;string&quot;==typeof e?[e]:e),s=i.keywords,c=i.length;this.opt.acrossElements&amp;&amp;(o=&quot;wrapMatchesAcrossElements&quot;),0===c?this.opt.done(r):function e(t){var i=new a(n.opt).create(t),u=0;n.log('Searching with expression &quot;'.concat(i,'&quot;')),n[o](i,1,function(e,o){return n.opt.filter(o,t,r,u)},function(e){u++,r++,n.opt.each(e)},function(){0===u&amp;&amp;n.opt.noMatch(t),s[c-1]===t?n.opt.done(r):e(s[s.indexOf(t)+1])})}(s[0])}},{key:&quot;markRanges&quot;,value:function(e,t){var n=this;this.opt=t;var r=0,o=this.checkRanges(e);o&amp;&amp;o.length?(this.log(&quot;Starting to mark with the following ranges: &quot;+JSON.stringify(o)),this.wrapRangeFromIndex(o,function(e,t,r,o){return n.opt.filter(e,t,r,o)},function(e,t){r++,n.opt.each(e,t)},function(){n.opt.done(r)})):this.opt.done(r)}},{key:&quot;unmark&quot;,value:function(e){var t=this;this.opt=e;var n=this.opt.element?this.opt.element:&quot;*&quot;;n+=&quot;[data-markjs]&quot;,this.opt.className&amp;&amp;(n+=&quot;.&quot;.concat(this.opt.className)),this.log('Removal selector &quot;'.concat(n,'&quot;')),this.iterator.forEachNode(NodeFilter.SHOW_ELEMENT,function(e){t.unwrapMatches(e)},function(e){var r=i.matches(e,n),o=t.matchesExclude(e);return!r||o?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT},this.opt.done)}},{key:&quot;opt&quot;,set:function(e){this._opt=o({},{element:&quot;&quot;,className:&quot;&quot;,exclude:[],iframes:!1,iframesTimeout:5e3,separateWordSearch:!0,acrossElements:!1,ignoreGroups:0,each:function(){},noMatch:function(){},filter:function(){return!0},done:function(){},debug:!1,log:window.console},e)},get:function(){return this._opt}},{key:&quot;iterator&quot;,get:function(){return new i(this.ctx,this.opt.iframes,this.opt.exclude,this.opt.iframesTimeout)}}]),n}();return function(e){var t=this,n=new s(e);return this.mark=function(e,r){return n.mark(e,r),t},this.markRegExp=function(e,r){return n.markRegExp(e,r),t},this.markRanges=function(e,r){return n.markRanges(e,r),t},this.unmark=function(e){return n.unmark(e),t},this}});
+
+                       &lt;/script&gt;
+
+                    &lt;/head&gt;&quot;&quot;&quot;;
+    // This is a string format, and it takes a variable name as an argument to pass to the markInstance.markRegExp() Javascript method.
+    private static final String JS_MARK_REG_EXP_CALLBACK =
+            &quot;&quot;&quot;
+            {done: function(){
+                markInstance.markRegExp(%s);}
+            }&quot;&quot;&quot;;
+
+    // This is a string format, and it takes a variable name as an argument to pass to the markInstance.unmark() Javascript method.
+    private static final String JS_UNMARK_WITH_CALLBACK =
+            &quot;&quot;&quot;
+            var markInstance = new Mark(document.getElementById(&quot;content&quot;));
+            markInstance.unmark(%s);&quot;&quot;&quot;;
+<span class="nc" id="L121">    private static final Pattern UNESCAPED_FORWARD_SLASH = Pattern.compile(&quot;(?&lt;!\\\\)/&quot;);</span>
+
+    private final ClipBoardManager clipBoardManager;
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+
+    private final TaskExecutor taskExecutor;
+    private final WebView previewView;
+    private PreviewLayout layout;
+
+    /**
+     * The entry currently shown
+     */
+<span class="nc" id="L134">    private Optional&lt;BibEntry&gt; entry = Optional.empty();</span>
+<span class="nc" id="L135">    private Optional&lt;Pattern&gt; searchHighlightPattern = Optional.empty();</span>
+
+    private final BibDatabaseContext database;
+    private boolean registered;
+
+<span class="nc" id="L140">    private final ChangeListener&lt;Optional&lt;SearchQuery&gt;&gt; listener = (queryObservable, queryOldValue, queryNewValue) -&gt; {</span>
+<span class="nc" id="L141">        searchHighlightPattern = queryNewValue.flatMap(SearchQuery::getJavaScriptPatternForWords);</span>
+<span class="nc" id="L142">        highlightSearchPattern();</span>
+<span class="nc" id="L143">    };</span>
+
+    /**
+     * @param database Used for resolving strings and pdf directories for links.
+     */
+    public PreviewViewer(BibDatabaseContext database,
+                         DialogService dialogService,
+                         PreferencesService preferencesService,
+                         StateManager stateManager,
+                         ThemeManager themeManager,
+<span class="nc" id="L153">                         TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L154">        this.database = Objects.requireNonNull(database);</span>
+<span class="nc" id="L155">        this.dialogService = dialogService;</span>
+<span class="nc" id="L156">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L157">        this.clipBoardManager = Globals.getClipboardManager();</span>
+<span class="nc" id="L158">        this.taskExecutor = taskExecutor;</span>
+
+<span class="nc" id="L160">        setFitToHeight(true);</span>
+<span class="nc" id="L161">        setFitToWidth(true);</span>
+<span class="nc" id="L162">        previewView = WebViewStore.get();</span>
+<span class="nc" id="L163">        setContent(previewView);</span>
+<span class="nc" id="L164">        previewView.setContextMenuEnabled(false);</span>
+
+<span class="nc" id="L166">        previewView.getEngine().getLoadWorker().stateProperty().addListener((observable, oldValue, newValue) -&gt; {</span>
+
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            if (newValue != Worker.State.SUCCEEDED) {</span>
+<span class="nc" id="L169">                return;</span>
+            }
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (!registered) {</span>
+<span class="nc" id="L172">                stateManager.activeSearchQueryProperty().addListener(listener);</span>
+<span class="nc" id="L173">                registered = true;</span>
+            }
+<span class="nc" id="L175">            highlightSearchPattern();</span>
+
+            // https://stackoverflow.com/questions/15555510/javafx-stop-opening-url-in-webview-open-in-browser-instead
+<span class="nc" id="L178">            NodeList anchorList = previewView.getEngine().getDocument().getElementsByTagName(&quot;a&quot;);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            for (int i = 0; i &lt; anchorList.getLength(); i++) {</span>
+<span class="nc" id="L180">                Node node = anchorList.item(i);</span>
+<span class="nc" id="L181">                EventTarget eventTarget = (EventTarget) node;</span>
+<span class="nc" id="L182">                eventTarget.addEventListener(&quot;click&quot;, evt -&gt; {</span>
+<span class="nc" id="L183">                    EventTarget target = evt.getCurrentTarget();</span>
+<span class="nc" id="L184">                    HTMLAnchorElement anchorElement = (HTMLAnchorElement) target;</span>
+<span class="nc" id="L185">                    String href = anchorElement.getHref();</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                    if (href != null) {</span>
+                        try {
+<span class="nc" id="L188">                            JabRefDesktop.openBrowser(href, preferencesService.getFilePreferences());</span>
+<span class="nc" id="L189">                        } catch (MalformedURLException exception) {</span>
+<span class="nc" id="L190">                            LOGGER.error(&quot;Invalid URL&quot;, exception);</span>
+<span class="nc" id="L191">                        } catch (IOException exception) {</span>
+<span class="nc" id="L192">                            LOGGER.error(&quot;Invalid URL Input&quot;, exception);</span>
+<span class="nc" id="L193">                        }</span>
+                    }
+<span class="nc" id="L195">                    evt.preventDefault();</span>
+<span class="nc" id="L196">                }, false);</span>
+            }
+<span class="nc" id="L198">        });</span>
+
+<span class="nc" id="L200">        themeManager.installCss(previewView.getEngine());</span>
+<span class="nc" id="L201">    }</span>
+
+    private void highlightSearchPattern() {
+<span class="nc" id="L204">        String callbackForUnmark = &quot;&quot;;</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (searchHighlightPattern.isPresent()) {</span>
+<span class="nc" id="L206">            String javaScriptRegex = createJavaScriptRegex(searchHighlightPattern.get());</span>
+<span class="nc" id="L207">            callbackForUnmark = JS_MARK_REG_EXP_CALLBACK.formatted(javaScriptRegex);</span>
+        }
+<span class="nc" id="L209">        String unmarkInstance = JS_UNMARK_WITH_CALLBACK.formatted(callbackForUnmark);</span>
+<span class="nc" id="L210">        previewView.getEngine().executeScript(unmarkInstance);</span>
+<span class="nc" id="L211">    }</span>
+
+    /**
+     * Returns the String representation of a JavaScript regex object. The method does not take into account differences between the regex implementations in Java and JavaScript.
+     *
+     * @param regex Java regex to print as a JavaScript regex
+     * @return JavaScript regex object
+     */
+    private static String createJavaScriptRegex(Pattern regex) {
+<span class="nc" id="L220">        String pattern = regex.pattern();</span>
+        // Create a JavaScript regular expression literal (https://ecma-international.org/ecma-262/10.0/index.html#sec-literals-regular-expression-literals)
+        // Forward slashes are reserved to delimit the regular expression body. Hence, they must be escaped.
+<span class="nc" id="L223">        pattern = UNESCAPED_FORWARD_SLASH.matcher(pattern).replaceAll(&quot;\\\\/&quot;);</span>
+<span class="nc" id="L224">        return &quot;/&quot; + pattern + &quot;/gmi&quot;;</span>
+    }
+
+    public void setLayout(PreviewLayout newLayout) {
+        // Change listeners might set the layout to null while the update method is executing, therefore we need to prevent this here
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (newLayout == null) {</span>
+<span class="nc" id="L230">            return;</span>
+        }
+<span class="nc" id="L232">        layout = newLayout;</span>
+<span class="nc" id="L233">        update();</span>
+<span class="nc" id="L234">    }</span>
+
+    public void setEntry(BibEntry newEntry) {
+        // Remove update listener for old entry
+<span class="nc" id="L238">        entry.ifPresent(oldEntry -&gt; {</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">            for (Observable observable : oldEntry.getObservables()) {</span>
+<span class="nc" id="L240">                observable.removeListener(this);</span>
+            }
+<span class="nc" id="L242">        });</span>
+
+<span class="nc" id="L244">        entry = Optional.of(newEntry);</span>
+
+        // Register for changes
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        for (Observable observable : newEntry.getObservables()) {</span>
+<span class="nc" id="L248">            observable.addListener(this);</span>
+        }
+<span class="nc" id="L250">        update();</span>
+<span class="nc" id="L251">    }</span>
+
+    private void update() {
+<span class="nc bnc" id="L254" title="All 4 branches missed.">        if (entry.isEmpty() || (layout == null)) {</span>
+            // Make sure that the preview panel is not completely white, especially with dark theme on
+<span class="nc" id="L256">            setPreviewText(&quot;&quot;);</span>
+<span class="nc" id="L257">            return;</span>
+        }
+
+<span class="nc" id="L260">        Number.serialExportNumber = 1; // Set entry number in case that is included in the preview layout.</span>
+
+<span class="nc" id="L262">        final BibEntry theEntry = entry.get();</span>
+<span class="nc" id="L263">        BackgroundTask</span>
+<span class="nc" id="L264">                .wrap(() -&gt; layout.generatePreview(theEntry, database))</span>
+<span class="nc" id="L265">                .onRunning(() -&gt; setPreviewText(&quot;&lt;i&gt;&quot; + Localization.lang(&quot;Processing %0&quot;, Localization.lang(&quot;Citation Style&quot;)) + &quot;: &quot; + layout.getDisplayName() + &quot; ...&quot; + &quot;&lt;/i&gt;&quot;))</span>
+<span class="nc" id="L266">                .onSuccess(this::setPreviewText)</span>
+<span class="nc" id="L267">                .onFailure(exception -&gt; {</span>
+<span class="nc" id="L268">                    LOGGER.error(&quot;Error while generating citation style&quot;, exception);</span>
+
+                    // Convert stack trace to a string
+<span class="nc" id="L271">                    StringWriter stringWriter = new StringWriter();</span>
+<span class="nc" id="L272">                    PrintWriter printWriter = new PrintWriter(stringWriter);</span>
+<span class="nc" id="L273">                    exception.printStackTrace(printWriter);</span>
+<span class="nc" id="L274">                    String stackTraceString = stringWriter.toString();</span>
+
+                    // Set the preview text with the localized error message and the stack trace
+<span class="nc" id="L277">                    setPreviewText(Localization.lang(&quot;Error while generating citation style&quot;) + &quot;\n\n&quot; + exception.getLocalizedMessage() + &quot;\n\nBibTeX (internal):\n&quot; + theEntry + &quot;\n\nStack Trace:\n&quot; + stackTraceString);</span>
+<span class="nc" id="L278">                })</span>
+<span class="nc" id="L279">                .executeWith(taskExecutor);</span>
+<span class="nc" id="L280">    }</span>
+
+    private void setPreviewText(String text) {
+<span class="nc" id="L283">        String myText = &quot;&quot;&quot;</span>
+                &lt;html&gt;
+                    %s
+                    &lt;body id=&quot;previewBody&quot;&gt;
+                        &lt;div id=&quot;content&quot;&gt; %s &lt;/div&gt;
+                    &lt;/body&gt;
+                &lt;/html&gt;
+<span class="nc" id="L290">                &quot;&quot;&quot;.formatted(JS_HIGHLIGHT_FUNCTION, text);</span>
+<span class="nc" id="L291">        previewView.getEngine().setJavaScriptEnabled(true);</span>
+<span class="nc" id="L292">        previewView.getEngine().loadContent(myText);</span>
+
+<span class="nc" id="L294">        this.setHvalue(0);</span>
+<span class="nc" id="L295">    }</span>
+
+    public void print() {
+<span class="nc" id="L298">        PrinterJob job = PrinterJob.createPrinterJob();</span>
+<span class="nc" id="L299">        boolean proceed = dialogService.showPrintDialog(job);</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        if (!proceed) {</span>
+<span class="nc" id="L301">            return;</span>
+        }
+
+<span class="nc" id="L304">        BackgroundTask</span>
+<span class="nc" id="L305">                .wrap(() -&gt; {</span>
+<span class="nc" id="L306">                    job.getJobSettings().setJobName(entry.flatMap(BibEntry::getCitationKey).orElse(&quot;NO ENTRY&quot;));</span>
+<span class="nc" id="L307">                    previewView.getEngine().print(job);</span>
+<span class="nc" id="L308">                    job.endJob();</span>
+<span class="nc" id="L309">                })</span>
+<span class="nc" id="L310">                .onFailure(exception -&gt; dialogService.showErrorDialogAndWait(Localization.lang(&quot;Could not print preview&quot;), exception))</span>
+<span class="nc" id="L311">                .executeWith(taskExecutor);</span>
+<span class="nc" id="L312">    }</span>
+
+    public void copyPreviewToClipBoard() {
+<span class="nc" id="L315">        Document document = previewView.getEngine().getDocument();</span>
+
+<span class="nc" id="L317">        ClipboardContent content = new ClipboardContent();</span>
+<span class="nc" id="L318">        content.putString(document.getElementById(&quot;content&quot;).getTextContent());</span>
+<span class="nc" id="L319">        content.putHtml((String) previewView.getEngine().executeScript(&quot;document.documentElement.outerHTML&quot;));</span>
+
+<span class="nc" id="L321">        clipBoardManager.setContent(content);</span>
+<span class="nc" id="L322">    }</span>
+
+    public void copySelectionToClipBoard() {
+<span class="nc" id="L325">        ClipboardContent content = new ClipboardContent();</span>
+<span class="nc" id="L326">        content.putString(getSelectionTextContent());</span>
+<span class="nc" id="L327">        content.putHtml(getSelectionHtmlContent());</span>
+
+<span class="nc" id="L329">        clipBoardManager.setContent(content);</span>
+<span class="nc" id="L330">    }</span>
+
+    @Override
+    public void invalidated(Observable observable) {
+<span class="nc" id="L334">        update();</span>
+<span class="nc" id="L335">    }</span>
+
+    public String getSelectionTextContent() {
+<span class="nc" id="L338">        return (String) previewView.getEngine().executeScript(&quot;window.getSelection().toString()&quot;);</span>
+    }
+
+    public String getSelectionHtmlContent() {
+<span class="nc" id="L342">        return (String) previewView.getEngine().executeScript(JS_GET_SELECTION_HTML_SCRIPT);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

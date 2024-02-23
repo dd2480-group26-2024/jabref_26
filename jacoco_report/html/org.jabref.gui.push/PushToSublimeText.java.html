@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PushToSublimeText.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.push</a> &gt; <span class="el_source">PushToSublimeText.java</span></div><h1>PushToSublimeText.java</h1><pre class="source lang-java linenums">package org.jabref.gui.push;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.JabRefExecutorService;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.gui.util.StreamGobbler;
+import org.jabref.logic.util.OS;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class PushToSublimeText extends AbstractPushToApplication {
+
+    public static final String NAME = PushToApplications.SUBLIME_TEXT;
+
+<span class="nc" id="L26">    private static final Logger LOGGER = LoggerFactory.getLogger(PushToSublimeText.class);</span>
+
+    public PushToSublimeText(DialogService dialogService, PreferencesService preferencesService) {
+<span class="nc" id="L29">        super(dialogService, preferencesService);</span>
+<span class="nc" id="L30">    }</span>
+
+    @Override
+    public String getDisplayName() {
+<span class="nc" id="L34">        return NAME;</span>
+    }
+
+    @Override
+    public JabRefIcon getApplicationIcon() {
+<span class="nc" id="L39">        return IconTheme.JabRefIcons.APPLICATION_SUBLIMETEXT;</span>
+    }
+
+    @Override
+    public void pushEntries(BibDatabaseContext database, List&lt;BibEntry&gt; entries, String keyString) {
+<span class="nc" id="L44">        couldNotPush = false;</span>
+<span class="nc" id="L45">        couldNotCall = false;</span>
+<span class="nc" id="L46">        notDefined = false;</span>
+
+<span class="nc" id="L48">        commandPath = preferencesService.getPushToApplicationPreferences().getCommandPaths().get(this.getDisplayName());</span>
+
+        // Check if a path to the command has been specified
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (StringUtil.isNullOrEmpty(commandPath)) {</span>
+<span class="nc" id="L52">            notDefined = true;</span>
+<span class="nc" id="L53">            return;</span>
+        }
+        try {
+<span class="nc" id="L56">            LOGGER.debug(&quot;Sublime string: {}&quot;, String.join(&quot; &quot;, getCommandLine(keyString)));</span>
+<span class="nc" id="L57">            ProcessBuilder processBuilder = new ProcessBuilder(getCommandLine(keyString));</span>
+<span class="nc" id="L58">            processBuilder.inheritIO();</span>
+<span class="nc" id="L59">            Map&lt;String, String&gt; envs = processBuilder.environment();</span>
+<span class="nc" id="L60">            envs.put(&quot;PATH&quot;, Path.of(commandPath).getParent().toString());</span>
+
+<span class="nc" id="L62">            Process process = processBuilder.start();</span>
+<span class="nc" id="L63">            StreamGobbler streamGobblerInput = new StreamGobbler(process.getInputStream(), LOGGER::info);</span>
+<span class="nc" id="L64">            StreamGobbler streamGobblerError = new StreamGobbler(process.getErrorStream(), LOGGER::info);</span>
+
+<span class="nc" id="L66">            JabRefExecutorService.INSTANCE.execute(streamGobblerInput);</span>
+<span class="nc" id="L67">            JabRefExecutorService.INSTANCE.execute(streamGobblerError);</span>
+<span class="nc" id="L68">        } catch (IOException excep) {</span>
+<span class="nc" id="L69">            LOGGER.warn(&quot;Error: Could not call executable '{}'&quot;, commandPath, excep);</span>
+<span class="nc" id="L70">            couldNotCall = true;</span>
+<span class="nc" id="L71">        }</span>
+<span class="nc" id="L72">    }</span>
+
+    @Override
+    protected String[] getCommandLine(String keyString) {
+<span class="nc" id="L76">        String citeCommand = getCitePrefix();</span>
+        // we need to escape the extra slashses
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (getCitePrefix().contains(&quot;\\&quot;)) {</span>
+<span class="nc" id="L79">            citeCommand = &quot;\&quot;\\&quot; + getCitePrefix();</span>
+        }
+
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (OS.WINDOWS) {</span>
+            // TODO we might need to escape the inner double quotes with &quot;&quot;&quot; &quot;&quot;&quot;
+<span class="nc" id="L84">            return new String[] {&quot;cmd.exe&quot;, &quot;/c&quot;, &quot;\&quot;&quot; + commandPath + &quot;\&quot;&quot; + &quot;--command \&quot;insert {\\\&quot;characters\\\&quot;: \&quot;\\&quot; + getCitePrefix() + keyString + getCiteSuffix() + &quot;\&quot;}\&quot;&quot;};</span>
+        } else {
+<span class="nc" id="L86">            return new String[] {&quot;sh&quot;, &quot;-c&quot;, &quot;\&quot;&quot; + commandPath + &quot;\&quot;&quot; + &quot; --command 'insert {\&quot;characters\&quot;: \&quot;&quot; + citeCommand + keyString + getCiteSuffix() + &quot;\&quot;}'&quot;};</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

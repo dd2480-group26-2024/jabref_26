@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnlinkedFilesCrawler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.externalfiles</a> &gt; <span class="el_source">UnlinkedFilesCrawler.java</span></div><h1>UnlinkedFilesCrawler.java</h1><pre class="source lang-java linenums">package org.jabref.gui.externalfiles;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.DirectoryStream.Filter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+import javafx.scene.control.CheckBoxTreeItem;
+
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.FileNodeViewModel;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.preferences.FilePreferences;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Util class for searching files on the file system which are not linked to a provided {@link BibDatabase}.
+ */
+public class UnlinkedFilesCrawler extends BackgroundTask&lt;FileNodeViewModel&gt; {
+
+<span class="fc" id="L31">    private static final Logger LOGGER = LoggerFactory.getLogger(UnlinkedFilesCrawler.class);</span>
+
+    private final Path directory;
+    private final Filter&lt;Path&gt; fileFilter;
+    private final DateRange dateFilter;
+    private final ExternalFileSorter sorter;
+    private final BibDatabaseContext databaseContext;
+    private final FilePreferences filePreferences;
+
+<span class="fc" id="L40">    public UnlinkedFilesCrawler(Path directory, Filter&lt;Path&gt; fileFilter, DateRange dateFilter, ExternalFileSorter sorter, BibDatabaseContext databaseContext, FilePreferences filePreferences) {</span>
+<span class="fc" id="L41">        this.directory = directory;</span>
+<span class="fc" id="L42">        this.fileFilter = fileFilter;</span>
+<span class="fc" id="L43">        this.dateFilter = dateFilter;</span>
+<span class="fc" id="L44">        this.sorter = sorter;</span>
+<span class="fc" id="L45">        this.databaseContext = databaseContext;</span>
+<span class="fc" id="L46">        this.filePreferences = filePreferences;</span>
+<span class="fc" id="L47">    }</span>
+
+    @Override
+    protected FileNodeViewModel call() throws IOException {
+<span class="nc" id="L51">        UnlinkedPDFFileFilter unlinkedPDFFileFilter = new UnlinkedPDFFileFilter(fileFilter, databaseContext, filePreferences);</span>
+<span class="nc" id="L52">        return searchDirectory(directory, unlinkedPDFFileFilter);</span>
+    }
+
+    /**
+     * Searches recursively all files in the specified directory. &lt;br&gt;
+     * &lt;br&gt;
+     * All files matched by the given {@link UnlinkedPDFFileFilter} are taken into the resulting tree. &lt;br&gt;
+     * &lt;br&gt;
+     * The result will be a tree structure of nodes of the type {@link CheckBoxTreeItem}. &lt;br&gt;
+     * &lt;br&gt;
+     * The user objects that are attached to the nodes is the {@link FileNodeViewModel}, which wraps the {@link
+     * File}-Object. &lt;br&gt;
+     * &lt;br&gt;
+     * For ensuring the capability to cancel the work of this recursive method, the first position in the integer array
+     * 'state' must be set to 1, to keep the recursion running. When the states value changes, the method will resolve
+     * its recursion and return what it has saved so far.
+     * &lt;br&gt;
+     * The files are filtered according to the {@link DateRange} filter value
+     * and then sorted according to the {@link ExternalFileSorter} value.
+     *
+     * @param unlinkedPDFFileFilter contains a BibDatabaseContext which is used to determine whether the file is linked
+     *
+     * @return FileNodeViewModel containing the data of the current directory and all subdirectories
+     * @throws IOException if directory is not a directory or empty
+     */
+    FileNodeViewModel searchDirectory(Path directory, UnlinkedPDFFileFilter unlinkedPDFFileFilter) throws IOException {
+        // Return null if the directory is not valid.
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        if ((directory == null) || !Files.isDirectory(directory)) {</span>
+<span class="nc" id="L80">            throw new IOException(&quot;Invalid directory for searching: %s&quot;.formatted(directory));</span>
+        }
+
+<span class="fc" id="L83">        FileNodeViewModel fileNodeViewModelForCurrentDirectory = new FileNodeViewModel(directory);</span>
+
+        // Map from isDirectory (true/false) to full path
+        // Result: Contains only files not matching the filter (i.e., PDFs not linked and files not ignored)
+        // Filters:
+        //   1. UnlinkedPDFFileFilter
+        //   2. GitIgnoreFilter
+<span class="fc" id="L90">        ChainedFilters filters = new ChainedFilters(unlinkedPDFFileFilter, new GitIgnoreFileFilter(directory));</span>
+        Map&lt;Boolean, List&lt;Path&gt;&gt; directoryAndFilePartition;
+<span class="fc" id="L92">        try (Stream&lt;Path&gt; filesStream = StreamSupport.stream(Files.newDirectoryStream(directory, filters).spliterator(), false)) {</span>
+<span class="fc" id="L93">            directoryAndFilePartition = filesStream.collect(Collectors.partitioningBy(Files::isDirectory));</span>
+<span class="nc" id="L94">        } catch (IOException e) {</span>
+<span class="nc" id="L95">            LOGGER.error(&quot;Error while searching files&quot;, e);</span>
+<span class="nc" id="L96">            return fileNodeViewModelForCurrentDirectory;</span>
+<span class="fc" id="L97">        }</span>
+<span class="fc" id="L98">        List&lt;Path&gt; subDirectories = directoryAndFilePartition.get(true);</span>
+<span class="fc" id="L99">        List&lt;Path&gt; files = directoryAndFilePartition.get(false);</span>
+
+        // at this point, only unlinked PDFs AND unignored files are contained
+
+        // initially, we find no files at all
+<span class="fc" id="L104">        int fileCountOfSubdirectories = 0;</span>
+
+        // now we crawl into the found subdirectories first (!)
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (Path subDirectory : subDirectories) {</span>
+<span class="fc" id="L108">            FileNodeViewModel subRoot = searchDirectory(subDirectory, unlinkedPDFFileFilter);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (!subRoot.getChildren().isEmpty()) {</span>
+<span class="nc" id="L110">                fileCountOfSubdirectories += subRoot.getFileCount();</span>
+<span class="nc" id="L111">                fileNodeViewModelForCurrentDirectory.getChildren().add(subRoot);</span>
+            }
+<span class="fc" id="L113">        }</span>
+        // now we have the data of all subdirectories
+        // it is stored in fileNodeViewModelForCurrentDirectory.getChildren()
+
+        // now we handle the files in the current directory
+
+        // filter files according to last edited date.
+        // Note that we do not use the &quot;StreamSupport.stream&quot; filtering functionality, because refactoring the code to that would lead to more code
+<span class="fc" id="L121">        List&lt;Path&gt; resultingFiles = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (Path path : files) {</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            if (FileFilterUtils.filterByDate(path, dateFilter)) {</span>
+<span class="fc" id="L124">                resultingFiles.add(path);</span>
+            }
+<span class="fc" id="L126">        }</span>
+
+        // sort files according to last edited date.
+<span class="fc" id="L129">        resultingFiles = FileFilterUtils.sortByDate(resultingFiles, sorter);</span>
+
+        // the count of all files is the count of the found files in current directory plus the count of all files in the subdirectories
+<span class="fc" id="L132">        fileNodeViewModelForCurrentDirectory.setFileCount(resultingFiles.size() + fileCountOfSubdirectories);</span>
+
+        // create and add FileNodeViewModel to the FileNodeViewModel for the current directory
+<span class="fc" id="L135">        fileNodeViewModelForCurrentDirectory.getChildren().addAll(resultingFiles.stream()</span>
+<span class="fc" id="L136">                .map(FileNodeViewModel::new)</span>
+<span class="fc" id="L137">                .collect(Collectors.toList()));</span>
+
+<span class="fc" id="L139">        return fileNodeViewModelForCurrentDirectory;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

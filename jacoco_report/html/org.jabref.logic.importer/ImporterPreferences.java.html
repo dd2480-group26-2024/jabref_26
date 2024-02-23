@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImporterPreferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer</a> &gt; <span class="el_source">ImporterPreferences.java</span></div><h1>ImporterPreferences.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.ObservableSet;
+
+import org.jabref.logic.importer.fileformat.CustomImporter;
+import org.jabref.logic.preferences.FetcherApiKey;
+
+public class ImporterPreferences {
+
+    private final BooleanProperty importerEnabled;
+    private final BooleanProperty generateNewKeyOnImport;
+    private final BooleanProperty warnAboutDuplicatesOnImport;
+    private final ObjectProperty&lt;Path&gt; importWorkingDirectory;
+    private final ObservableSet&lt;FetcherApiKey&gt; apiKeys;
+    private final ObservableSet&lt;CustomImporter&gt; customImporters;
+    private final BooleanProperty persistCustomKeys;
+    private final ObservableList&lt;String&gt; catalogs;
+    public ImporterPreferences(boolean importerEnabled,
+                               boolean generateNewKeyOnImport,
+                               Path importWorkingDirectory,
+                               boolean warnAboutDuplicatesOnImport,
+                               Set&lt;CustomImporter&gt; customImporters,
+                               Set&lt;FetcherApiKey&gt; apiKeys,
+                               boolean persistCustomKeys,
+<span class="nc" id="L36">                               List&lt;String&gt; catalogs) {</span>
+<span class="nc" id="L37">        this.importerEnabled = new SimpleBooleanProperty(importerEnabled);</span>
+<span class="nc" id="L38">        this.generateNewKeyOnImport = new SimpleBooleanProperty(generateNewKeyOnImport);</span>
+<span class="nc" id="L39">        this.importWorkingDirectory = new SimpleObjectProperty&lt;&gt;(importWorkingDirectory);</span>
+<span class="nc" id="L40">        this.warnAboutDuplicatesOnImport = new SimpleBooleanProperty(warnAboutDuplicatesOnImport);</span>
+<span class="nc" id="L41">        this.customImporters = FXCollections.observableSet(customImporters);</span>
+<span class="nc" id="L42">        this.apiKeys = FXCollections.observableSet(apiKeys);</span>
+<span class="nc" id="L43">        this.persistCustomKeys = new SimpleBooleanProperty(persistCustomKeys);</span>
+<span class="nc" id="L44">        this.catalogs = FXCollections.observableArrayList(catalogs);</span>
+<span class="nc" id="L45">    }</span>
+
+    public boolean areImporterEnabled() {
+<span class="nc" id="L48">        return importerEnabled.get();</span>
+    }
+
+    public BooleanProperty importerEnabledProperty() {
+<span class="nc" id="L52">        return importerEnabled;</span>
+    }
+
+    public void setImporterEnabled(boolean importerEnabled) {
+<span class="nc" id="L56">        this.importerEnabled.set(importerEnabled);</span>
+<span class="nc" id="L57">    }</span>
+
+    public boolean isGenerateNewKeyOnImport() {
+<span class="nc" id="L60">        return generateNewKeyOnImport.get();</span>
+    }
+
+    public BooleanProperty generateNewKeyOnImportProperty() {
+<span class="nc" id="L64">        return generateNewKeyOnImport;</span>
+    }
+
+    public void setGenerateNewKeyOnImport(boolean generateNewKeyOnImport) {
+<span class="nc" id="L68">        this.generateNewKeyOnImport.set(generateNewKeyOnImport);</span>
+<span class="nc" id="L69">    }</span>
+
+    public Path getImportWorkingDirectory() {
+<span class="nc" id="L72">        return importWorkingDirectory.get();</span>
+    }
+
+    public ObjectProperty&lt;Path&gt; importWorkingDirectoryProperty() {
+<span class="nc" id="L76">        return importWorkingDirectory;</span>
+    }
+
+    public void setImportWorkingDirectory(Path importWorkingDirectory) {
+<span class="nc" id="L80">        this.importWorkingDirectory.set(importWorkingDirectory);</span>
+<span class="nc" id="L81">    }</span>
+
+    public boolean shouldWarnAboutDuplicatesOnImport() {
+<span class="nc" id="L84">        return warnAboutDuplicatesOnImport.get();</span>
+    }
+
+    public BooleanProperty warnAboutDuplicatesOnImportProperty() {
+<span class="nc" id="L88">        return warnAboutDuplicatesOnImport;</span>
+    }
+
+    public void setWarnAboutDuplicatesOnImport(boolean warnAboutDuplicatesOnImport) {
+<span class="nc" id="L92">        this.warnAboutDuplicatesOnImport.set(warnAboutDuplicatesOnImport);</span>
+<span class="nc" id="L93">    }</span>
+
+    public ObservableSet&lt;FetcherApiKey&gt; getApiKeys() {
+<span class="nc" id="L96">        return apiKeys;</span>
+    }
+
+    public ObservableSet&lt;CustomImporter&gt; getCustomImporters() {
+<span class="nc" id="L100">        return customImporters;</span>
+    }
+
+    public void setCustomImporters(Set&lt;CustomImporter&gt; importers) {
+<span class="nc" id="L104">        customImporters.clear();</span>
+<span class="nc" id="L105">        customImporters.addAll(importers);</span>
+<span class="nc" id="L106">    }</span>
+
+    public boolean shouldPersistCustomKeys() {
+<span class="nc" id="L109">        return persistCustomKeys.get();</span>
+    }
+
+    public BooleanProperty persistCustomKeysProperty() {
+<span class="nc" id="L113">        return persistCustomKeys;</span>
+    }
+
+    public void setPersistCustomKeys(boolean persistCustomKeys) {
+<span class="nc" id="L117">        this.persistCustomKeys.set(persistCustomKeys);</span>
+<span class="nc" id="L118">    }</span>
+
+    public Optional&lt;String&gt; getApiKey(String name) {
+<span class="nc" id="L121">        return apiKeys.stream()</span>
+<span class="nc" id="L122">                      .filter(key -&gt; key.getName().equalsIgnoreCase(name))</span>
+<span class="nc" id="L123">                      .filter(FetcherApiKey::shouldUse)</span>
+<span class="nc" id="L124">                      .findFirst()</span>
+<span class="nc" id="L125">                      .map(FetcherApiKey::getKey);</span>
+    }
+
+    public void setCatalogs(List&lt;String&gt; catalogs) {
+<span class="nc" id="L129">        this.catalogs.clear();</span>
+<span class="nc" id="L130">        this.catalogs.addAll(catalogs);</span>
+<span class="nc" id="L131">    }</span>
+
+    public ObservableList&lt;String&gt; getCatalogs() {
+<span class="nc" id="L134">          return catalogs;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

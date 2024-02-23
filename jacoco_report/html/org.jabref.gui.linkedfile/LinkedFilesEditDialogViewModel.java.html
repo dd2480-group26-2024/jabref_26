@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LinkedFilesEditDialogViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.linkedfile</a> &gt; <span class="el_source">LinkedFilesEditDialogViewModel.java</span></div><h1>LinkedFilesEditDialogViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.linkedfile;
+
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+
+import org.jabref.gui.AbstractViewModel;
+import org.jabref.gui.DialogService;
+import org.jabref.gui.externalfiletype.ExternalFileType;
+import org.jabref.gui.externalfiletype.ExternalFileTypes;
+import org.jabref.gui.externalfiletype.UnknownExternalFileType;
+import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.preferences.FilePreferences;
+
+import com.tobiasdiez.easybind.EasyBind;
+import com.tobiasdiez.easybind.optional.ObservableOptionalValue;
+
+public class LinkedFilesEditDialogViewModel extends AbstractViewModel {
+
+<span class="nc" id="L34">    private static final Pattern REMOTE_LINK_PATTERN = Pattern.compile(&quot;[a-z]+://.*&quot;);</span>
+<span class="nc" id="L35">    private final StringProperty link = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L36">    private final StringProperty description = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L37">    private final StringProperty sourceUrl = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L38">    private final ListProperty&lt;ExternalFileType&gt; allExternalFileTypes = new SimpleListProperty&lt;&gt;(FXCollections.emptyObservableList());</span>
+<span class="nc" id="L39">    private final ObjectProperty&lt;ExternalFileType&gt; selectedExternalFileType = new SimpleObjectProperty&lt;&gt;();</span>
+    private final ObservableOptionalValue&lt;ExternalFileType&gt; monadicSelectedExternalFileType;
+    private final BibDatabaseContext database;
+    private final DialogService dialogService;
+    private final FilePreferences filePreferences;
+
+    public LinkedFilesEditDialogViewModel(LinkedFile linkedFile,
+                                          BibDatabaseContext database,
+                                          DialogService dialogService,
+<span class="nc" id="L48">                                          FilePreferences filePreferences) {</span>
+<span class="nc" id="L49">        this.database = database;</span>
+<span class="nc" id="L50">        this.dialogService = dialogService;</span>
+<span class="nc" id="L51">        this.filePreferences = filePreferences;</span>
+<span class="nc" id="L52">        allExternalFileTypes.set(FXCollections.observableArrayList(filePreferences.getExternalFileTypes()));</span>
+
+<span class="nc" id="L54">        monadicSelectedExternalFileType = EasyBind.wrapNullable(selectedExternalFileType);</span>
+<span class="nc" id="L55">        setValues(linkedFile);</span>
+<span class="nc" id="L56">    }</span>
+
+    private void setExternalFileTypeByExtension(String link) {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (!link.isEmpty()) {</span>
+            // Check if this looks like a remote link:
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            if (REMOTE_LINK_PATTERN.matcher(link).matches()) {</span>
+<span class="nc" id="L62">                ExternalFileTypes.getExternalFileTypeByExt(&quot;html&quot;, filePreferences)</span>
+<span class="nc" id="L63">                                 .ifPresent(selectedExternalFileType::setValue);</span>
+            }
+
+            // Try to guess the file type:
+<span class="nc" id="L67">            String theLink = link.trim();</span>
+<span class="nc" id="L68">            ExternalFileTypes.getExternalFileTypeForName(theLink, filePreferences)</span>
+<span class="nc" id="L69">                             .ifPresent(selectedExternalFileType::setValue);</span>
+        }
+<span class="nc" id="L71">    }</span>
+
+    public void openBrowseDialog() {
+<span class="nc" id="L74">        String fileText = link.get();</span>
+
+<span class="nc" id="L76">        Optional&lt;Path&gt; file = FileUtil.find(database, fileText, filePreferences);</span>
+
+<span class="nc" id="L78">        Path workingDir = file.orElse(filePreferences.getWorkingDirectory());</span>
+<span class="nc" id="L79">        String fileName = Path.of(fileText).getFileName().toString();</span>
+
+<span class="nc" id="L81">        FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()</span>
+<span class="nc" id="L82">                .withInitialDirectory(workingDir)</span>
+<span class="nc" id="L83">                .withInitialFileName(fileName)</span>
+<span class="nc" id="L84">                .build();</span>
+
+<span class="nc" id="L86">        dialogService.showFileOpenDialog(fileDialogConfiguration).ifPresent(path -&gt; {</span>
+            // Store the directory for next time:
+<span class="nc" id="L88">            filePreferences.setWorkingDirectory(path);</span>
+<span class="nc" id="L89">            link.set(relativize(path));</span>
+
+<span class="nc" id="L91">            setExternalFileTypeByExtension(link.getValueSafe());</span>
+<span class="nc" id="L92">        });</span>
+<span class="nc" id="L93">    }</span>
+
+    public void setValues(LinkedFile linkedFile) {
+<span class="nc" id="L96">        description.set(linkedFile.getDescription());</span>
+<span class="nc" id="L97">        sourceUrl.set(linkedFile.getSourceUrl());</span>
+
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (linkedFile.isOnlineLink()) {</span>
+<span class="nc" id="L100">            link.setValue(linkedFile.getLink()); // Might be an URL</span>
+        } else {
+<span class="nc" id="L102">            link.setValue(relativize(Path.of(linkedFile.getLink())));</span>
+        }
+
+<span class="nc" id="L105">        selectedExternalFileType.setValue(null);</span>
+
+        // See what is a reasonable selection for the type combobox:
+<span class="nc" id="L108">        Optional&lt;ExternalFileType&gt; fileType = ExternalFileTypes.getExternalFileTypeByLinkedFile(linkedFile, false, filePreferences);</span>
+<span class="nc bnc" id="L109" title="All 4 branches missed.">        if (fileType.isPresent() &amp;&amp; !(fileType.get() instanceof UnknownExternalFileType)) {</span>
+<span class="nc" id="L110">            selectedExternalFileType.setValue(fileType.get());</span>
+<span class="nc bnc" id="L111" title="All 4 branches missed.">        } else if ((linkedFile.getLink() != null) &amp;&amp; (!linkedFile.getLink().isEmpty())) {</span>
+<span class="nc" id="L112">            setExternalFileTypeByExtension(linkedFile.getLink());</span>
+        }
+<span class="nc" id="L114">    }</span>
+
+    public StringProperty linkProperty() {
+<span class="nc" id="L117">        return link;</span>
+    }
+
+    public StringProperty descriptionProperty() {
+<span class="nc" id="L121">        return description;</span>
+    }
+
+    public StringProperty sourceUrlProperty() {
+<span class="nc" id="L125">        return sourceUrl;</span>
+    }
+
+    public ListProperty&lt;ExternalFileType&gt; externalFileTypeProperty() {
+<span class="nc" id="L129">        return allExternalFileTypes;</span>
+    }
+
+    public ObjectProperty&lt;ExternalFileType&gt; selectedExternalFileTypeProperty() {
+<span class="nc" id="L133">        return selectedExternalFileType;</span>
+    }
+
+    public LinkedFile getNewLinkedFile() {
+<span class="nc" id="L137">        String fileType = monadicSelectedExternalFileType.getValue().map(ExternalFileType::toString).orElse(&quot;&quot;);</span>
+
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (LinkedFile.isOnlineLink(link.getValue())) {</span>
+            try {
+<span class="nc" id="L141">                return new LinkedFile(description.getValue(), new URL(link.getValue()), fileType, sourceUrl.getValue());</span>
+<span class="nc" id="L142">            } catch (MalformedURLException e) {</span>
+<span class="nc" id="L143">                return new LinkedFile(description.getValue(), link.getValue(), fileType, sourceUrl.getValue());</span>
+            }
+        }
+<span class="nc" id="L146">        return new LinkedFile(description.getValue(), Path.of(link.getValue()), fileType, sourceUrl.getValue());</span>
+    }
+
+    private String relativize(Path filePath) {
+<span class="nc" id="L150">        List&lt;Path&gt; fileDirectories = database.getFileDirectories(filePreferences);</span>
+<span class="nc" id="L151">        return FileUtil.relativize(filePath, fileDirectories).toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

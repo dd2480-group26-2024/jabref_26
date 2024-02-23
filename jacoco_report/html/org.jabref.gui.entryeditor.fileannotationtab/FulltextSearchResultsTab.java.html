@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FulltextSearchResultsTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor.fileannotationtab</a> &gt; <span class="el_source">FulltextSearchResultsTab.java</span></div><h1>FulltextSearchResultsTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor.fileannotationtab;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+
+import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Separator;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.MouseButton;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.desktop.JabRefDesktop;
+import org.jabref.gui.documentviewer.DocumentViewerView;
+import org.jabref.gui.entryeditor.EntryEditorTab;
+import org.jabref.gui.maintable.OpenExternalFileAction;
+import org.jabref.gui.maintable.OpenFolderAction;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.gui.util.TooltipTextUtil;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.model.pdf.search.PdfSearchResults;
+import org.jabref.model.pdf.search.SearchResult;
+import org.jabref.model.search.rules.SearchRules;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class FulltextSearchResultsTab extends EntryEditorTab {
+
+    public static final String NAME = &quot;Search results&quot;;
+<span class="nc" id="L43">    private static final Logger LOGGER = LoggerFactory.getLogger(FulltextSearchResultsTab.class);</span>
+
+    private final StateManager stateManager;
+    private final PreferencesService preferencesService;
+    private final DialogService dialogService;
+    private final ActionFactory actionFactory;
+    private final TaskExecutor taskExecutor;
+
+    private final TextFlow content;
+
+    private BibEntry entry;
+
+    private DocumentViewerView documentViewerView;
+
+    public FulltextSearchResultsTab(StateManager stateManager,
+                                    PreferencesService preferencesService,
+                                    DialogService dialogService,
+<span class="nc" id="L60">                                    TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L61">        this.stateManager = stateManager;</span>
+<span class="nc" id="L62">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L63">        this.dialogService = dialogService;</span>
+<span class="nc" id="L64">        this.actionFactory = new ActionFactory(preferencesService.getKeyBindingRepository());</span>
+<span class="nc" id="L65">        this.taskExecutor = taskExecutor;</span>
+
+<span class="nc" id="L67">        content = new TextFlow();</span>
+<span class="nc" id="L68">        ScrollPane scrollPane = new ScrollPane(content);</span>
+<span class="nc" id="L69">        scrollPane.setFitToWidth(true);</span>
+<span class="nc" id="L70">        content.setPadding(new Insets(10));</span>
+<span class="nc" id="L71">        setContent(scrollPane);</span>
+<span class="nc" id="L72">        setText(Localization.lang(&quot;Search results&quot;));</span>
+<span class="nc" id="L73">        this.stateManager.activeSearchQueryProperty().addListener((observable, oldValue, newValue) -&gt; bindToEntry(entry));</span>
+<span class="nc" id="L74">    }</span>
+
+    @Override
+    public boolean shouldShow(BibEntry entry) {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        return this.stateManager.activeSearchQueryProperty().isPresent().get() &amp;&amp;</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                this.stateManager.activeSearchQueryProperty().get().isPresent() &amp;&amp;</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                this.stateManager.activeSearchQueryProperty().get().get().getSearchFlags().contains(SearchRules.SearchFlags.FULLTEXT) &amp;&amp;</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                this.stateManager.activeSearchQueryProperty().get().get().getQuery().length() &gt; 0;</span>
+    }
+
+    @Override
+    protected void bindToEntry(BibEntry entry) {
+<span class="nc bnc" id="L86" title="All 4 branches missed.">        if (entry == null || !shouldShow(entry)) {</span>
+<span class="nc" id="L87">            return;</span>
+        }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (!entry.equals(this.entry)) {</span>
+<span class="nc" id="L90">            documentViewerView = new DocumentViewerView();</span>
+        }
+<span class="nc" id="L92">        this.entry = entry;</span>
+<span class="nc" id="L93">        PdfSearchResults searchResults = stateManager.activeSearchQueryProperty().get().get().getRule().getFulltextResults(stateManager.activeSearchQueryProperty().get().get().getQuery(), entry);</span>
+
+<span class="nc" id="L95">        content.getChildren().clear();</span>
+
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (searchResults.numSearchResults() == 0) {</span>
+<span class="nc" id="L98">            content.getChildren().add(new Text(Localization.lang(&quot;No search matches.&quot;)));</span>
+        }
+
+        // Iterate through files with search hits
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        for (Map.Entry&lt;String, List&lt;SearchResult&gt;&gt; resultsForPath : searchResults.getSearchResultsByPath().entrySet()) {</span>
+<span class="nc" id="L103">            content.getChildren().addAll(createFileLink(resultsForPath.getKey()), lineSeparator());</span>
+
+            // Iterate through pages (within file) with search hits
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            for (SearchResult searchResult : resultsForPath.getValue()) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                for (String resultTextHtml : searchResult.getContentResultStringsHtml()) {</span>
+<span class="nc" id="L108">                    content.getChildren().addAll(TooltipTextUtil.createTextsFromHtml(resultTextHtml.replace(&quot;&lt;/b&gt; &lt;b&gt;&quot;, &quot; &quot;)));</span>
+<span class="nc" id="L109">                    content.getChildren().addAll(new Text(System.lineSeparator()), lineSeparator(0.8), createPageLink(searchResult.getPageNumber()));</span>
+<span class="nc" id="L110">                }</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                if (!searchResult.getAnnotationsResultStringsHtml().isEmpty()) {</span>
+<span class="nc" id="L112">                    Text annotationsText = new Text(System.lineSeparator() + Localization.lang(&quot;Found matches in Annotations:&quot;) + System.lineSeparator() + System.lineSeparator());</span>
+<span class="nc" id="L113">                    annotationsText.setStyle(&quot;-fx-font-style: italic;&quot;);</span>
+<span class="nc" id="L114">                    content.getChildren().add(annotationsText);</span>
+                }
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                for (String resultTextHtml : searchResult.getAnnotationsResultStringsHtml()) {</span>
+<span class="nc" id="L117">                    content.getChildren().addAll(TooltipTextUtil.createTextsFromHtml(resultTextHtml.replace(&quot;&lt;/b&gt; &lt;b&gt;&quot;, &quot; &quot;)));</span>
+<span class="nc" id="L118">                    content.getChildren().addAll(new Text(System.lineSeparator()), lineSeparator(0.8), createPageLink(searchResult.getPageNumber()));</span>
+<span class="nc" id="L119">                }</span>
+<span class="nc" id="L120">            }</span>
+<span class="nc" id="L121">        }</span>
+<span class="nc" id="L122">    }</span>
+
+    private Text createFileLink(String pathToFile) {
+<span class="nc" id="L125">        LinkedFile linkedFile = new LinkedFile(&quot;&quot;, Path.of(pathToFile), &quot;pdf&quot;);</span>
+<span class="nc" id="L126">        Text fileLinkText = new Text(Localization.lang(&quot;Found match in %0&quot;, pathToFile) + System.lineSeparator() + System.lineSeparator());</span>
+<span class="nc" id="L127">        fileLinkText.setStyle(&quot;-fx-font-weight: bold;&quot;);</span>
+
+<span class="nc" id="L129">        ContextMenu fileContextMenu = getFileContextMenu(linkedFile);</span>
+<span class="nc" id="L130">        Path resolvedPath = linkedFile.findIn(stateManager.getActiveDatabase().get(), preferencesService.getFilePreferences()).orElse(Path.of(pathToFile));</span>
+<span class="nc" id="L131">        Tooltip fileLinkTooltip = new Tooltip(resolvedPath.toAbsolutePath().toString());</span>
+<span class="nc" id="L132">        Tooltip.install(fileLinkText, fileLinkTooltip);</span>
+<span class="nc" id="L133">        fileLinkText.setOnMouseClicked(event -&gt; {</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">            if (MouseButton.PRIMARY.equals(event.getButton())) {</span>
+                try {
+<span class="nc" id="L136">                    JabRefDesktop.openBrowser(resolvedPath.toUri(), preferencesService.getFilePreferences());</span>
+<span class="nc" id="L137">                } catch (IOException e) {</span>
+<span class="nc" id="L138">                    LOGGER.error(&quot;Cannot open {}.&quot;, resolvedPath.toString(), e);</span>
+<span class="nc" id="L139">                }</span>
+            } else {
+<span class="nc" id="L141">                fileContextMenu.show(fileLinkText, event.getScreenX(), event.getScreenY());</span>
+            }
+<span class="nc" id="L143">        });</span>
+<span class="nc" id="L144">        return fileLinkText;</span>
+    }
+
+    private Text createPageLink(int pageNumber) {
+<span class="nc" id="L148">        Text pageLink = new Text(Localization.lang(&quot;On page %0&quot;, pageNumber) + System.lineSeparator() + System.lineSeparator());</span>
+<span class="nc" id="L149">        pageLink.setStyle(&quot;-fx-font-style: italic; -fx-font-weight: bold;&quot;);</span>
+
+<span class="nc" id="L151">        pageLink.setOnMouseClicked(event -&gt; {</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (MouseButton.PRIMARY.equals(event.getButton())) {</span>
+<span class="nc" id="L153">                documentViewerView.gotoPage(pageNumber);</span>
+<span class="nc" id="L154">                documentViewerView.setLiveMode(false);</span>
+<span class="nc" id="L155">                documentViewerView.show();</span>
+            }
+<span class="nc" id="L157">        });</span>
+<span class="nc" id="L158">        return pageLink;</span>
+    }
+
+    private ContextMenu getFileContextMenu(LinkedFile file) {
+<span class="nc" id="L162">        ContextMenu fileContextMenu = new ContextMenu();</span>
+<span class="nc" id="L163">        fileContextMenu.getItems().add(actionFactory.createMenuItem(</span>
+                StandardActions.OPEN_FOLDER, new OpenFolderAction(dialogService, stateManager, preferencesService, entry, file, taskExecutor)));
+<span class="nc" id="L165">        fileContextMenu.getItems().add(actionFactory.createMenuItem(</span>
+                StandardActions.OPEN_EXTERNAL_FILE, new OpenExternalFileAction(dialogService, stateManager, preferencesService, taskExecutor)));
+<span class="nc" id="L167">        return fileContextMenu;</span>
+    }
+
+    private Separator lineSeparator() {
+<span class="nc" id="L171">        return lineSeparator(1.0);</span>
+    }
+
+    private Separator lineSeparator(double widthMultiplier) {
+<span class="nc" id="L175">        Separator lineSeparator = new Separator(Orientation.HORIZONTAL);</span>
+<span class="nc" id="L176">        lineSeparator.prefWidthProperty().bind(content.widthProperty().multiply(widthMultiplier));</span>
+<span class="nc" id="L177">        lineSeparator.setPrefHeight(15);</span>
+<span class="nc" id="L178">        return lineSeparator;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

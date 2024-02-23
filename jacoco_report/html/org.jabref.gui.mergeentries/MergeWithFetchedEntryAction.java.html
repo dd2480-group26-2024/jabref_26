@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MergeWithFetchedEntryAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries</a> &gt; <span class="el_source">MergeWithFetchedEntryAction.java</span></div><h1>MergeWithFetchedEntryAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries;
+
+import javax.swing.undo.UndoManager;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.OrFields;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.preferences.PreferencesService;
+
+public class MergeWithFetchedEntryAction extends SimpleCommand {
+
+    private final DialogService dialogService;
+    private final StateManager stateManager;
+    private final PreferencesService preferencesService;
+    private final UndoManager undoManager;
+    private final TaskExecutor taskExecutor;
+
+    public MergeWithFetchedEntryAction(DialogService dialogService,
+                                       StateManager stateManager,
+                                       TaskExecutor taskExecutor,
+                                       PreferencesService preferencesService,
+<span class="nc" id="L28">                                       UndoManager undoManager) {</span>
+<span class="nc" id="L29">        this.dialogService = dialogService;</span>
+<span class="nc" id="L30">        this.stateManager = stateManager;</span>
+<span class="nc" id="L31">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L32">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L33">        this.undoManager = undoManager;</span>
+
+<span class="nc" id="L35">        this.executable.bind(ActionHelper.needsEntriesSelected(1, stateManager)</span>
+<span class="nc" id="L36">                                         .and(ActionHelper.isAnyFieldSetForSelectedEntry(FetchAndMergeEntry.SUPPORTED_FIELDS, stateManager)));</span>
+<span class="nc" id="L37">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (stateManager.getActiveDatabase().isEmpty()) {</span>
+<span class="nc" id="L42">            return;</span>
+        }
+
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (stateManager.getSelectedEntries().size() != 1) {</span>
+<span class="nc" id="L46">            dialogService.showInformationDialogAndWait(</span>
+<span class="nc" id="L47">                    Localization.lang(&quot;Merge entry with %0 information&quot;, new OrFields(StandardField.DOI, StandardField.ISBN, StandardField.EPRINT).getDisplayName()),</span>
+<span class="nc" id="L48">                    Localization.lang(&quot;This operation requires exactly one item to be selected.&quot;));</span>
+        }
+
+<span class="nc" id="L51">        BibEntry originalEntry = stateManager.getSelectedEntries().get(0);</span>
+<span class="nc" id="L52">        new FetchAndMergeEntry(stateManager.getActiveDatabase().get(), taskExecutor, preferencesService, dialogService, undoManager).fetchAndMerge(originalEntry);</span>
+<span class="nc" id="L53">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

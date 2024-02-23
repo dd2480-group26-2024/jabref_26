@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalFileTypesTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.externalfiletypes</a> &gt; <span class="el_source">ExternalFileTypesTabViewModel.java</span></div><h1>ExternalFileTypesTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.externalfiletypes;
+
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.exporter.CreateModifyExporterDialogViewModel;
+import org.jabref.gui.externalfiletype.ExternalFileType;
+import org.jabref.gui.externalfiletype.ExternalFileTypes;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.preferences.FilePreferences;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ExternalFileTypesTabViewModel implements PreferenceTabViewModel {
+
+<span class="fc" id="L23">    private static final Logger LOGGER = LoggerFactory.getLogger(CreateModifyExporterDialogViewModel.class);</span>
+<span class="fc" id="L24">    private final ObservableList&lt;ExternalFileTypeItemViewModel&gt; fileTypes = FXCollections.observableArrayList();</span>
+
+    private final FilePreferences filePreferences;
+    private final DialogService dialogService;
+
+<span class="fc" id="L29">    public ExternalFileTypesTabViewModel(FilePreferences filePreferences, DialogService dialogService) {</span>
+<span class="fc" id="L30">        this.filePreferences = filePreferences;</span>
+<span class="fc" id="L31">        this.dialogService = dialogService;</span>
+<span class="fc" id="L32">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L36">        fileTypes.clear();</span>
+<span class="nc" id="L37">        fileTypes.addAll(filePreferences.getExternalFileTypes().stream()</span>
+<span class="nc" id="L38">                       .map(ExternalFileTypeItemViewModel::new)</span>
+<span class="nc" id="L39">                       .toList());</span>
+<span class="nc" id="L40">        fileTypes.sort(Comparator.comparing(ExternalFileTypeItemViewModel::getName));</span>
+<span class="nc" id="L41">    }</span>
+
+    public void storeSettings() {
+<span class="nc" id="L44">        Set&lt;ExternalFileType&gt; saveList = new HashSet&lt;&gt;();</span>
+
+<span class="nc" id="L46">        fileTypes.stream().map(ExternalFileTypeItemViewModel::toExternalFileType)</span>
+<span class="nc" id="L47">                 .forEach(type -&gt; ExternalFileTypes.getDefaultExternalFileTypes().stream()</span>
+<span class="nc" id="L48">                                                   .filter(type::equals).findAny()</span>
+<span class="nc" id="L49">                                                   .ifPresentOrElse(saveList::add, () -&gt; saveList.add(type)));</span>
+
+<span class="nc" id="L51">        filePreferences.getExternalFileTypes().clear();</span>
+<span class="nc" id="L52">        filePreferences.getExternalFileTypes().addAll(saveList);</span>
+<span class="nc" id="L53">    }</span>
+
+    public void resetToDefaults() {
+<span class="nc" id="L56">        fileTypes.setAll(ExternalFileTypes.getDefaultExternalFileTypes().stream()</span>
+<span class="nc" id="L57">                                          .map(ExternalFileTypeItemViewModel::new)</span>
+<span class="nc" id="L58">                                          .toList());</span>
+<span class="nc" id="L59">        fileTypes.sort(Comparator.comparing(ExternalFileTypeItemViewModel::getName));</span>
+<span class="nc" id="L60">    }</span>
+
+    public boolean addNewType() {
+<span class="fc" id="L63">        ExternalFileTypeItemViewModel item = new ExternalFileTypeItemViewModel();</span>
+<span class="fc" id="L64">        showEditDialog(item, Localization.lang(&quot;Add new file type&quot;));</span>
+
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (!isValidExternalFileType(item)) {</span>
+<span class="fc" id="L67">            return false;</span>
+        }
+
+<span class="fc" id="L70">        fileTypes.add(item);</span>
+<span class="fc" id="L71">        return true;</span>
+    }
+
+    public ObservableList&lt;ExternalFileTypeItemViewModel&gt; getFileTypes() {
+<span class="fc" id="L75">        return fileTypes;</span>
+    }
+
+    protected void showEditDialog(ExternalFileTypeItemViewModel item, String dialogTitle) {
+<span class="nc" id="L79">        dialogService.showCustomDialogAndWait(new EditExternalFileTypeEntryDialog(item, dialogTitle, fileTypes));</span>
+<span class="nc" id="L80">    }</span>
+
+    public boolean edit(ExternalFileTypeItemViewModel type) {
+<span class="nc" id="L83">        ExternalFileTypeItemViewModel typeToModify = new ExternalFileTypeItemViewModel(type.toExternalFileType());</span>
+<span class="nc" id="L84">        showEditDialog(typeToModify, Localization.lang(&quot;Edit file type&quot;));</span>
+
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (!isValidExternalFileType(typeToModify)) {</span>
+<span class="nc" id="L87">            return false;</span>
+        }
+
+<span class="nc" id="L90">        fileTypes.remove(type);</span>
+<span class="nc" id="L91">        fileTypes.add(typeToModify);</span>
+<span class="nc" id="L92">        return true;</span>
+    }
+
+    public void remove(ExternalFileTypeItemViewModel type) {
+<span class="nc" id="L96">        fileTypes.remove(type);</span>
+<span class="nc" id="L97">    }</span>
+
+    public boolean isValidExternalFileType(ExternalFileTypeItemViewModel item) {
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (withEmptyValue(item)) {</span>
+<span class="fc" id="L101">            LOGGER.debug(&quot;One of the fields is empty or invalid.&quot;);</span>
+<span class="fc" id="L102">            return false;</span>
+        }
+
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!isUniqueExtension(item)) {</span>
+<span class="nc" id="L106">            LOGGER.debug(&quot;File Extension exists already.&quot;);</span>
+<span class="nc" id="L107">            return false;</span>
+        }
+
+<span class="fc" id="L110">        return true;</span>
+    }
+
+    private boolean withEmptyValue(ExternalFileTypeItemViewModel item) {
+<span class="pc bpc" id="L114" title="2 of 6 branches missed.">        return item.getName().isEmpty() || item.extensionProperty().get().isEmpty() || item.mimetypeProperty().get().isEmpty();</span>
+    }
+
+    private boolean isUniqueExtension(ExternalFileTypeItemViewModel item) {
+        // check extension need to be unique in the list
+<span class="fc" id="L119">        String newExt = item.extensionProperty().get();</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        for (ExternalFileTypeItemViewModel fileTypeItem : fileTypes) {</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">            if (newExt.equalsIgnoreCase(fileTypeItem.extensionProperty().get())) {</span>
+<span class="nc" id="L122">                return false;</span>
+            }
+<span class="nc" id="L124">        }</span>
+<span class="fc" id="L125">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

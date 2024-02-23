@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImportFormatReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer</a> &gt; <span class="el_source">ImportFormatReader.java</span></div><h1>ImportFormatReader.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
+import org.jabref.logic.importer.fileformat.BiblioscapeImporter;
+import org.jabref.logic.importer.fileformat.BibtexImporter;
+import org.jabref.logic.importer.fileformat.CffImporter;
+import org.jabref.logic.importer.fileformat.CitaviXmlImporter;
+import org.jabref.logic.importer.fileformat.CopacImporter;
+import org.jabref.logic.importer.fileformat.EndnoteImporter;
+import org.jabref.logic.importer.fileformat.EndnoteXmlImporter;
+import org.jabref.logic.importer.fileformat.InspecImporter;
+import org.jabref.logic.importer.fileformat.IsiImporter;
+import org.jabref.logic.importer.fileformat.MedlineImporter;
+import org.jabref.logic.importer.fileformat.MedlinePlainImporter;
+import org.jabref.logic.importer.fileformat.ModsImporter;
+import org.jabref.logic.importer.fileformat.MsBibImporter;
+import org.jabref.logic.importer.fileformat.OvidImporter;
+import org.jabref.logic.importer.fileformat.PdfContentImporter;
+import org.jabref.logic.importer.fileformat.PdfEmbeddedBibFileImporter;
+import org.jabref.logic.importer.fileformat.PdfGrobidImporter;
+import org.jabref.logic.importer.fileformat.PdfMergeMetadataImporter;
+import org.jabref.logic.importer.fileformat.PdfVerbatimBibTextImporter;
+import org.jabref.logic.importer.fileformat.PdfXmpImporter;
+import org.jabref.logic.importer.fileformat.RepecNepImporter;
+import org.jabref.logic.importer.fileformat.RisImporter;
+import org.jabref.logic.importer.fileformat.SilverPlatterImporter;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabases;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.util.FileUpdateMonitor;
+
+public class ImportFormatReader {
+
+    public static final String BIBTEX_FORMAT = &quot;BibTeX&quot;;
+
+    /**
+     * All import formats.
+     * Sorted accordingly to {@link Importer#compareTo}, which defaults to alphabetically by the name
+     */
+<span class="fc" id="L48">    private final List&lt;Importer&gt; formats = new ArrayList&lt;&gt;();</span>
+
+    private final ImporterPreferences importerPreferences;
+    private final ImportFormatPreferences importFormatPreferences;
+    private final FileUpdateMonitor fileUpdateMonitor;
+
+    public ImportFormatReader(ImporterPreferences importerPreferences,
+                              ImportFormatPreferences importFormatPreferences,
+<span class="fc" id="L56">                              FileUpdateMonitor fileUpdateMonitor) {</span>
+<span class="fc" id="L57">        this.importerPreferences = importerPreferences;</span>
+<span class="fc" id="L58">        this.importFormatPreferences = importFormatPreferences;</span>
+<span class="fc" id="L59">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="fc" id="L60">        reset();</span>
+<span class="fc" id="L61">    }</span>
+
+    public void reset() {
+<span class="fc" id="L64">        formats.add(new CopacImporter());</span>
+<span class="fc" id="L65">        formats.add(new EndnoteImporter());</span>
+<span class="fc" id="L66">        formats.add(new EndnoteXmlImporter(importFormatPreferences));</span>
+<span class="fc" id="L67">        formats.add(new InspecImporter());</span>
+<span class="fc" id="L68">        formats.add(new IsiImporter());</span>
+<span class="fc" id="L69">        formats.add(new MedlineImporter());</span>
+<span class="fc" id="L70">        formats.add(new MedlinePlainImporter());</span>
+<span class="fc" id="L71">        formats.add(new ModsImporter(importFormatPreferences));</span>
+<span class="fc" id="L72">        formats.add(new MsBibImporter());</span>
+<span class="fc" id="L73">        formats.add(new OvidImporter());</span>
+<span class="fc" id="L74">        formats.add(new PdfMergeMetadataImporter(importFormatPreferences));</span>
+<span class="fc" id="L75">        formats.add(new PdfVerbatimBibTextImporter(importFormatPreferences));</span>
+<span class="fc" id="L76">        formats.add(new PdfContentImporter());</span>
+<span class="fc" id="L77">        formats.add(new PdfEmbeddedBibFileImporter(importFormatPreferences));</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (importFormatPreferences.grobidPreferences().isGrobidEnabled()) {</span>
+<span class="nc" id="L79">            formats.add(new PdfGrobidImporter(importFormatPreferences));</span>
+        }
+<span class="fc" id="L81">        formats.add(new PdfXmpImporter(importFormatPreferences.xmpPreferences()));</span>
+<span class="fc" id="L82">        formats.add(new RepecNepImporter(importFormatPreferences));</span>
+<span class="fc" id="L83">        formats.add(new RisImporter());</span>
+<span class="fc" id="L84">        formats.add(new SilverPlatterImporter());</span>
+<span class="fc" id="L85">        formats.add(new CffImporter());</span>
+<span class="fc" id="L86">        formats.add(new BiblioscapeImporter());</span>
+<span class="fc" id="L87">        formats.add(new BibtexImporter(importFormatPreferences, fileUpdateMonitor));</span>
+<span class="fc" id="L88">        formats.add(new CitaviXmlImporter());</span>
+
+        // Get custom import formats
+<span class="fc" id="L91">        formats.addAll(importerPreferences.getCustomImporters());</span>
+<span class="fc" id="L92">    }</span>
+
+    /**
+     * Format for a given CLI-ID.
+     * &lt;p&gt;
+     * &lt;p&gt;Will return the first format according to the default-order of
+     * format that matches the given ID.&lt;/p&gt;
+     *
+     * @param cliId CLI-Id
+     * @return Import Format or &lt;code&gt;null&lt;/code&gt; if none matches
+     */
+    private Optional&lt;Importer&gt; getByCliId(String cliId) {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (Importer format : formats) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (format.getId().equals(cliId)) {</span>
+<span class="fc" id="L106">                return Optional.of(format);</span>
+            }
+<span class="fc" id="L108">        }</span>
+<span class="fc" id="L109">        return Optional.empty();</span>
+    }
+
+    public ParserResult importFromFile(String format, Path file) throws ImportException {
+<span class="fc" id="L113">        Optional&lt;Importer&gt; importer = getByCliId(format);</span>
+
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (importer.isEmpty()) {</span>
+<span class="fc" id="L116">            throw new ImportException(Localization.lang(&quot;Unknown import format&quot;) + &quot;: &quot; + format);</span>
+        }
+
+        try {
+<span class="fc" id="L120">            return importer.get().importDatabase(file);</span>
+<span class="nc" id="L121">        } catch (IOException e) {</span>
+<span class="nc" id="L122">            throw new ImportException(e);</span>
+        }
+    }
+
+    /**
+     * All importers.
+     *
+     * Elements are sorted by name.
+     * &lt;/p&gt;
+     *
+     * @return all custom importers, elements are of type InputFormat
+     */
+    public SortedSet&lt;Importer&gt; getImportFormats() {
+<span class="nc" id="L135">        return new TreeSet&lt;&gt;(this.formats);</span>
+    }
+
+<span class="fc" id="L138">    public record UnknownFormatImport(String format, ParserResult parserResult) {</span>
+    }
+
+    /**
+     * Tries to import a file by iterating through the available import filters,
+     * and keeping the import that seems most promising.
+     * &lt;p/&gt;
+     * This method first attempts to read this file as bibtex.
+     *
+     * @throws ImportException if the import fails (for example, if no suitable importer is found)
+     */
+    public UnknownFormatImport importUnknownFormat(Path filePath, FileUpdateMonitor fileMonitor) throws ImportException {
+<span class="fc" id="L150">        Objects.requireNonNull(filePath);</span>
+
+        try {
+<span class="fc" id="L153">            UnknownFormatImport unknownFormatImport = importUnknownFormat(importer -&gt; importer.importDatabase(filePath), importer -&gt; importer.isRecognizedFormat(filePath));</span>
+<span class="fc" id="L154">            unknownFormatImport.parserResult.setPath(filePath);</span>
+<span class="fc" id="L155">            return unknownFormatImport;</span>
+<span class="fc" id="L156">        } catch (ImportException e) {</span>
+            // If all importers fail, try to read the file as BibTeX
+            try {
+<span class="fc" id="L159">                ParserResult parserResult = OpenDatabase.loadDatabase(filePath, importFormatPreferences, fileMonitor);</span>
+<span class="pc bpc" id="L160" title="2 of 4 branches missed.">                if (parserResult.getDatabase().hasEntries() || !parserResult.getDatabase().hasNoStrings()) {</span>
+<span class="nc" id="L161">                    parserResult.setPath(filePath);</span>
+<span class="nc" id="L162">                    return new UnknownFormatImport(ImportFormatReader.BIBTEX_FORMAT, parserResult);</span>
+                } else {
+<span class="fc" id="L164">                    throw new ImportException(parserResult.getErrorMessage());</span>
+                }
+<span class="fc" id="L166">            } catch (IOException ignore) {</span>
+                // Ignored
+<span class="fc" id="L168">                throw new ImportException(Localization.lang(&quot;Could not find a suitable import format.&quot;));</span>
+            }
+        }
+    }
+
+    /**
+     * Tries to import entries by iterating through the available import filters,
+     * and keeping the import that seems the most promising
+     *
+     * @param importDatabase     the function to import the entries with a formatter
+     * @param isRecognizedFormat the function to check whether the source is in the correct format for an importer
+     * @return an UnknownFormatImport with the imported entries and metadata
+     * @throws ImportException if the import fails (for example, if no suitable importer is found)
+     */
+    private UnknownFormatImport importUnknownFormat(CheckedFunction&lt;Importer, ParserResult&gt; importDatabase, CheckedFunction&lt;Importer, Boolean&gt; isRecognizedFormat) throws ImportException {
+        // stores ref to best result, gets updated at the next loop
+<span class="fc" id="L184">        List&lt;BibEntry&gt; bestResult = null;</span>
+<span class="fc" id="L185">        int bestResultCount = 0;</span>
+<span class="fc" id="L186">        String bestFormatName = null;</span>
+
+        // Cycle through all importers:
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (Importer imFo : formats) {</span>
+            try {
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                if (!isRecognizedFormat.apply(imFo)) {</span>
+<span class="fc" id="L192">                    continue;</span>
+                }
+
+<span class="fc" id="L195">                ParserResult parserResult = importDatabase.apply(imFo);</span>
+<span class="fc" id="L196">                List&lt;BibEntry&gt; entries = parserResult.getDatabase().getEntries();</span>
+
+<span class="fc" id="L198">                BibDatabases.purgeEmptyEntries(entries);</span>
+<span class="fc" id="L199">                int entryCount = entries.size();</span>
+
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                if (entryCount &gt; bestResultCount) {</span>
+<span class="fc" id="L202">                    bestResult = entries;</span>
+<span class="fc" id="L203">                    bestResultCount = entryCount;</span>
+<span class="fc" id="L204">                    bestFormatName = imFo.getName();</span>
+                }
+<span class="fc" id="L206">            } catch (IOException ex) {</span>
+                // The import did not succeed. Go on.
+<span class="fc" id="L208">            }</span>
+<span class="fc" id="L209">        }</span>
+
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (bestResult != null) {</span>
+            // we found something
+<span class="fc" id="L213">            ParserResult parserResult = new ParserResult(bestResult);</span>
+<span class="fc" id="L214">            return new UnknownFormatImport(bestFormatName, parserResult);</span>
+        }
+
+<span class="fc" id="L217">        throw new ImportException(Localization.lang(&quot;Could not find a suitable import format.&quot;));</span>
+    }
+
+    @FunctionalInterface
+    public interface CheckedFunction&lt;T, R&gt; {
+
+        R apply(T t) throws IOException;
+    }
+
+    /**
+     * Tries to import a String by iterating through the available import filters,
+     * and keeping the import that seems the most promising
+     *
+     * @param data the string to import
+     * @return an UnknownFormatImport with the imported entries and metadata
+     * @throws ImportException if the import fails (for example, if no suitable importer is found)
+     */
+    public UnknownFormatImport importUnknownFormat(String data) throws ImportException {
+<span class="fc" id="L235">        Objects.requireNonNull(data);</span>
+
+<span class="fc" id="L237">        return importUnknownFormat(importer -&gt; importer.importDatabase(data), importer -&gt; importer.isRecognizedFormat(data));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

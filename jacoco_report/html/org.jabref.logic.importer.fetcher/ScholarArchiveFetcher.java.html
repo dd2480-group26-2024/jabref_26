@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScholarArchiveFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">ScholarArchiveFetcher.java</span></div><h1>ScholarArchiveFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.IntStream;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.PagedSearchBasedParserFetcher;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.fetcher.transformers.ScholarArchiveQueryTransformer;
+import org.jabref.logic.importer.util.JsonReader;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.StandardEntryType;
+
+import jakarta.ws.rs.core.MediaType;
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONException;
+import kong.unirest.json.JSONObject;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+<span class="fc" id="L33">public class ScholarArchiveFetcher implements PagedSearchBasedParserFetcher {</span>
+
+    public static final String FETCHER_NAME = &quot;ScholarArchive&quot;;
+
+<span class="fc" id="L37">    private static final Logger LOGGER = LoggerFactory.getLogger(ScholarArchiveFetcher.class);</span>
+
+    private static final String API_URL = &quot;https://scholar.archive.org/search&quot;;
+
+    /**
+     * Gets the query URL by luceneQuery and pageNumber.
+     *
+     * @param luceneQuery the search query
+     * @param pageNumber  the number of the page indexed from 0
+     * @return URL
+     */
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery, int pageNumber) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L50">        URIBuilder uriBuilder = new URIBuilder(API_URL);</span>
+<span class="fc" id="L51">        uriBuilder.addParameter(&quot;q&quot;, new ScholarArchiveQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;));</span>
+<span class="fc" id="L52">        uriBuilder.addParameter(&quot;from&quot;, String.valueOf(getPageSize() * pageNumber));</span>
+<span class="fc" id="L53">        uriBuilder.addParameter(&quot;size&quot;, String.valueOf(getPageSize()));</span>
+<span class="fc" id="L54">        uriBuilder.addParameter(&quot;format&quot;, &quot;json&quot;);</span>
+
+<span class="fc" id="L56">        LOGGER.debug(&quot;using URL for search {}&quot;, uriBuilder.build());</span>
+<span class="fc" id="L57">        return uriBuilder.build().toURL();</span>
+    }
+
+    @Override
+    public URLDownload getUrlDownload(URL url) {
+<span class="fc" id="L62">        URLDownload download = new URLDownload(url);</span>
+<span class="fc" id="L63">        download.addHeader(&quot;Accept&quot;, MediaType.APPLICATION_JSON);</span>
+<span class="fc" id="L64">        return download;</span>
+    }
+
+    /**
+     * Gets the list of BibEntry by given Json response from scholar archive fetcher API
+     *
+     * @return Parser, list of BibEntry
+     */
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L74">        return inputStream -&gt; {</span>
+<span class="fc" id="L75">            JSONObject response = JsonReader.toJsonObject(inputStream);</span>
+<span class="fc" id="L76">            List&lt;BibEntry&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (response.has(&quot;results&quot;)) {</span>
+<span class="fc" id="L78">                JSONArray results = response.getJSONArray(&quot;results&quot;);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                for (int i = 0; i &lt; results.length(); i++) {</span>
+<span class="fc" id="L80">                    JSONObject jsonEntry = results.getJSONObject(i);</span>
+<span class="fc" id="L81">                    BibEntry entry = parseJSONtoBibtex(jsonEntry);</span>
+<span class="fc" id="L82">                    entries.add(entry);</span>
+                }
+            }
+
+<span class="fc" id="L86">            return entries;</span>
+        };
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L92">        return FETCHER_NAME;</span>
+    }
+
+    private BibEntry parseJSONtoBibtex(JSONObject jsonEntry) throws ParseException {
+        try {
+<span class="fc" id="L97">            BibEntry entry = new BibEntry();</span>
+<span class="fc" id="L98">            EntryType entryType = StandardEntryType.InCollection;</span>
+<span class="fc" id="L99">            JSONObject biblio = jsonEntry.optJSONObject(&quot;biblio&quot;);</span>
+
+<span class="fc" id="L101">            JSONArray abstracts = jsonEntry.getJSONArray(&quot;abstracts&quot;);</span>
+<span class="fc" id="L102">            String foundAbstract = IntStream.range(0, abstracts.length())</span>
+<span class="fc" id="L103">                                            .mapToObj(abstracts::getJSONObject)</span>
+<span class="fc" id="L104">                                            .map(object -&gt; object.optString(&quot;body&quot;))</span>
+<span class="fc" id="L105">                                            .findFirst().orElse(&quot;&quot;);</span>
+
+<span class="fc" id="L107">            String url = Optional.ofNullable(jsonEntry.optJSONObject(&quot;fulltext&quot;)).map(fullText -&gt; fullText.optString(&quot;access_url&quot;)).orElse(&quot;&quot;);</span>
+
+            // publication type
+<span class="fc" id="L110">            String type = biblio.optString(&quot;release_type&quot;);</span>
+<span class="fc" id="L111">            entry.setField(StandardField.TYPE, type);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (type.toLowerCase().contains(&quot;book&quot;)) {</span>
+<span class="nc" id="L113">                entryType = StandardEntryType.Book;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            } else if (type.toLowerCase().contains(&quot;article&quot;)) {</span>
+<span class="fc" id="L115">                entryType = StandardEntryType.Article;</span>
+            }
+<span class="fc" id="L117">            entry.setType(entryType);</span>
+
+<span class="fc" id="L119">            entry.setField(StandardField.TITLE, biblio.optString(&quot;title&quot;));</span>
+<span class="fc" id="L120">            entry.setField(StandardField.JOURNAL, biblio.optString(&quot;container_name&quot;));</span>
+<span class="fc" id="L121">            entry.setField(StandardField.DOI, biblio.optString(&quot;doi&quot;));</span>
+<span class="fc" id="L122">            entry.setField(StandardField.ISSUE, biblio.optString(&quot;issue&quot;));</span>
+<span class="fc" id="L123">            entry.setField(StandardField.LANGUAGE, biblio.optString(&quot;lang_code&quot;));</span>
+<span class="fc" id="L124">            entry.setField(StandardField.PUBLISHER, biblio.optString(&quot;publisher&quot;));</span>
+
+<span class="fc" id="L126">            entry.setField(StandardField.YEAR, String.valueOf(biblio.optInt(&quot;release_year&quot;)));</span>
+<span class="fc" id="L127">            entry.setField(StandardField.VOLUME, String.valueOf(biblio.optInt(&quot;volume_int&quot;)));</span>
+<span class="fc" id="L128">            entry.setField(StandardField.ABSTRACT, foundAbstract);</span>
+<span class="fc" id="L129">            entry.setField(StandardField.URL, url);</span>
+
+<span class="fc" id="L131">            String dateString = biblio.optString(&quot;date&quot;);</span>
+<span class="fc" id="L132">            entry.setField(StandardField.DATE, dateString);</span>
+
+            // Authors are in contrib_names
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (biblio.has(&quot;contrib_names&quot;)) {</span>
+<span class="fc" id="L136">                JSONArray authors = biblio.getJSONArray(&quot;contrib_names&quot;);</span>
+<span class="fc" id="L137">                List&lt;String&gt; authorList = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                for (int i = 0; i &lt; authors.length(); i++) {</span>
+<span class="fc" id="L139">                    authorList.add(authors.getString(i));</span>
+                }
+<span class="fc" id="L141">                AuthorList parsedAuthors = AuthorList.parse(String.join(&quot; and &quot;, authorList));</span>
+<span class="fc" id="L142">                entry.setField(StandardField.AUTHOR, parsedAuthors.getAsLastFirstNamesWithAnd(false));</span>
+            }
+
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            if (biblio.has(&quot;issns&quot;)) {</span>
+<span class="fc" id="L146">                JSONArray issn = biblio.getJSONArray(&quot;issns&quot;);</span>
+<span class="fc" id="L147">                List&lt;String&gt; issnList = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                for (int i = 0; i &lt; issn.length(); i++) {</span>
+<span class="fc" id="L149">                    issnList.add(issn.getString(i));</span>
+                }
+<span class="fc" id="L151">                entry.setField(StandardField.ISSN, String.join(&quot; &quot;, issnList));</span>
+            }
+<span class="fc" id="L153">            return entry;</span>
+<span class="nc" id="L154">        } catch (JSONException exception) {</span>
+<span class="nc" id="L155">            throw new ParseException(&quot;ScholarArchive API JSON format has changed&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchResultsTableDataModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.search</a> &gt; <span class="el_source">SearchResultsTableDataModel.java</span></div><h1>SearchResultsTableDataModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.search;
+
+import java.util.List;
+import java.util.Optional;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
+
+import org.jabref.gui.StateManager;
+import org.jabref.gui.maintable.BibEntryTableViewModel;
+import org.jabref.gui.maintable.MainTableFieldValueFormatter;
+import org.jabref.gui.maintable.NameDisplayPreferences;
+import org.jabref.logic.search.SearchQuery;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+
+public class SearchResultsTableDataModel {
+
+    private final FilteredList&lt;BibEntryTableViewModel&gt; entriesFiltered;
+    private final SortedList&lt;BibEntryTableViewModel&gt; entriesSorted;
+    private final ObjectProperty&lt;MainTableFieldValueFormatter&gt; fieldValueFormatter;
+    private final NameDisplayPreferences nameDisplayPreferences;
+    private final BibDatabaseContext bibDatabaseContext;
+
+<span class="nc" id="L32">    public SearchResultsTableDataModel(BibDatabaseContext bibDatabaseContext, PreferencesService preferencesService, StateManager stateManager) {</span>
+<span class="nc" id="L33">        this.nameDisplayPreferences = preferencesService.getNameDisplayPreferences();</span>
+<span class="nc" id="L34">        this.bibDatabaseContext = bibDatabaseContext;</span>
+<span class="nc" id="L35">        this.fieldValueFormatter = new SimpleObjectProperty&lt;&gt;(new MainTableFieldValueFormatter(nameDisplayPreferences, bibDatabaseContext));</span>
+
+<span class="nc" id="L37">        ObservableList&lt;BibEntryTableViewModel&gt; entriesViewModel = FXCollections.observableArrayList();</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        for (BibDatabaseContext context : stateManager.getOpenDatabases()) {</span>
+<span class="nc" id="L39">            ObservableList&lt;BibEntry&gt; entriesForDb = context.getDatabase().getEntries();</span>
+<span class="nc" id="L40">            List&lt;BibEntryTableViewModel&gt; viewModelForDb = EasyBind.mapBacked(entriesForDb, entry -&gt; new BibEntryTableViewModel(entry, context, fieldValueFormatter));</span>
+<span class="nc" id="L41">            entriesViewModel.addAll(viewModelForDb);</span>
+<span class="nc" id="L42">        }</span>
+
+<span class="nc" id="L44">        entriesFiltered = new FilteredList&lt;&gt;(entriesViewModel);</span>
+<span class="nc" id="L45">        entriesFiltered.predicateProperty().bind(EasyBind.map(stateManager.activeSearchQueryProperty(), query -&gt; entry -&gt; isMatchedBySearch(query, entry)));</span>
+
+        // We need to wrap the list since otherwise sorting in the table does not work
+<span class="nc" id="L48">        entriesSorted = new SortedList&lt;&gt;(entriesFiltered);</span>
+<span class="nc" id="L49">    }</span>
+
+    private boolean isMatchedBySearch(Optional&lt;SearchQuery&gt; query, BibEntryTableViewModel entry) {
+<span class="nc" id="L52">        return query.map(matcher -&gt; matcher.isMatch(entry.getEntry()))</span>
+<span class="nc" id="L53">                    .orElse(true);</span>
+    }
+
+    public SortedList&lt;BibEntryTableViewModel&gt; getEntriesFilteredAndSorted() {
+<span class="nc" id="L57">        return entriesSorted;</span>
+    }
+
+    public void refresh() {
+<span class="nc" id="L61">        this.fieldValueFormatter.setValue(new MainTableFieldValueFormatter(nameDisplayPreferences, bibDatabaseContext));</span>
+<span class="nc" id="L62">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

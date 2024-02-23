@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlobalSearchResultDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.search</a> &gt; <span class="el_source">GlobalSearchResultDialog.java</span></div><h1>GlobalSearchResultDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui.search;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.ToggleButton;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.stage.WindowEvent;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.maintable.columns.SpecialFieldColumn;
+import org.jabref.gui.preview.PreviewViewer;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import jakarta.inject.Inject;
+
+public class GlobalSearchResultDialog extends BaseDialog&lt;Void&gt; {
+
+    @FXML private SplitPane container;
+    @FXML private ToggleButton keepOnTop;
+
+    private final UndoManager undoManager;
+
+    @Inject private PreferencesService preferencesService;
+    @Inject private StateManager stateManager;
+    @Inject private DialogService dialogService;
+    @Inject private ThemeManager themeManager;
+    @Inject private TaskExecutor taskExecutor;
+
+    private GlobalSearchResultDialogViewModel viewModel;
+
+<span class="nc" id="L42">    public GlobalSearchResultDialog(UndoManager undoManager) {</span>
+<span class="nc" id="L43">        this.undoManager = undoManager;</span>
+
+<span class="nc" id="L45">        setTitle(Localization.lang(&quot;Search results from open libraries&quot;));</span>
+<span class="nc" id="L46">        ViewLoader.view(this)</span>
+<span class="nc" id="L47">                  .load()</span>
+<span class="nc" id="L48">                  .setAsDialogPane(this);</span>
+<span class="nc" id="L49">        initModality(Modality.NONE);</span>
+<span class="nc" id="L50">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L54">        viewModel = new GlobalSearchResultDialogViewModel(preferencesService);</span>
+
+<span class="nc" id="L56">        PreviewViewer previewViewer = new PreviewViewer(viewModel.getSearchDatabaseContext(), dialogService, preferencesService, stateManager, themeManager, taskExecutor);</span>
+<span class="nc" id="L57">        previewViewer.setLayout(preferencesService.getPreviewPreferences().getSelectedPreviewLayout());</span>
+
+<span class="nc" id="L59">        SearchResultsTableDataModel model = new SearchResultsTableDataModel(viewModel.getSearchDatabaseContext(), preferencesService, stateManager);</span>
+<span class="nc" id="L60">        SearchResultsTable resultsTable = new SearchResultsTable(model, viewModel.getSearchDatabaseContext(), preferencesService, undoManager, dialogService, stateManager, taskExecutor);</span>
+
+<span class="nc" id="L62">        resultsTable.getColumns().removeIf(SpecialFieldColumn.class::isInstance);</span>
+<span class="nc" id="L63">        resultsTable.getSelectionModel().selectFirst();</span>
+
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (resultsTable.getSelectionModel().getSelectedItem() != null) {</span>
+<span class="nc" id="L66">            previewViewer.setEntry(resultsTable.getSelectionModel().getSelectedItem().getEntry());</span>
+        }
+
+<span class="nc" id="L69">        resultsTable.getSelectionModel().selectedItemProperty().addListener((obs, old, newValue) -&gt; {</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (newValue != null) {</span>
+<span class="nc" id="L71">                previewViewer.setEntry(newValue.getEntry());</span>
+            } else {
+<span class="nc" id="L73">                previewViewer.setEntry(old.getEntry());</span>
+            }
+<span class="nc" id="L75">        });</span>
+
+<span class="nc" id="L77">        container.getItems().addAll(resultsTable, previewViewer);</span>
+
+<span class="nc" id="L79">        keepOnTop.selectedProperty().bindBidirectional(viewModel.keepOnTop());</span>
+<span class="nc" id="L80">        EasyBind.subscribe(viewModel.keepOnTop(), value -&gt; {</span>
+<span class="nc" id="L81">            Stage stage = (Stage) getDialogPane().getScene().getWindow();</span>
+<span class="nc" id="L82">            stage.setAlwaysOnTop(value);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            keepOnTop.setGraphic(value</span>
+<span class="nc" id="L84">                    ? IconTheme.JabRefIcons.KEEP_ON_TOP.getGraphicNode()</span>
+<span class="nc" id="L85">                    : IconTheme.JabRefIcons.KEEP_ON_TOP_OFF.getGraphicNode());</span>
+<span class="nc" id="L86">        });</span>
+
+<span class="nc" id="L88">        getDialogPane().getScene().getWindow().addEventHandler(WindowEvent.WINDOW_SHOWN, event -&gt; {</span>
+<span class="nc" id="L89">            getDialogPane().setPrefHeight(preferencesService.getSearchPreferences().getSearchWindowHeight());</span>
+<span class="nc" id="L90">            getDialogPane().setPrefWidth(preferencesService.getSearchPreferences().getSearchWindowWidth());</span>
+<span class="nc" id="L91">        });</span>
+
+<span class="nc" id="L93">        getDialogPane().getScene().getWindow().addEventHandler(WindowEvent.WINDOW_HIDDEN, event -&gt; {</span>
+<span class="nc" id="L94">            preferencesService.getSearchPreferences().setSearchWindowHeight(getHeight());</span>
+<span class="nc" id="L95">            preferencesService.getSearchPreferences().setSearchWindowWidth(getWidth());</span>
+<span class="nc" id="L96">        });</span>
+<span class="nc" id="L97">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

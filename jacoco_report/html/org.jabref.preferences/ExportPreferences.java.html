@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExportPreferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.preferences</a> &gt; <span class="el_source">ExportPreferences.java</span></div><h1>ExportPreferences.java</h1><pre class="source lang-java linenums">package org.jabref.preferences;
+
+import java.nio.file.Path;
+import java.util.List;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.logic.exporter.TemplateExporter;
+import org.jabref.model.metadata.SaveOrder;
+
+public class ExportPreferences {
+
+    private final StringProperty lastExportExtension;
+    private final ObjectProperty&lt;Path&gt; exportWorkingDirectory;
+    private final ObjectProperty&lt;SaveOrder&gt; exportSaveOrder;
+    private final ObservableList&lt;TemplateExporter&gt; customExporters;
+
+    public ExportPreferences(String lastExportExtension,
+                             Path exportWorkingDirectory,
+                             SaveOrder exportSaveOrder,
+<span class="fc" id="L26">                             List&lt;TemplateExporter&gt; customExporters) {</span>
+<span class="fc" id="L27">        this.lastExportExtension = new SimpleStringProperty(lastExportExtension);</span>
+<span class="fc" id="L28">        this.exportWorkingDirectory = new SimpleObjectProperty&lt;&gt;(exportWorkingDirectory);</span>
+<span class="fc" id="L29">        this.exportSaveOrder = new SimpleObjectProperty&lt;&gt;(exportSaveOrder);</span>
+<span class="fc" id="L30">        this.customExporters = FXCollections.observableList(customExporters);</span>
+<span class="fc" id="L31">    }</span>
+
+    public String getLastExportExtension() {
+<span class="nc" id="L34">        return lastExportExtension.get();</span>
+    }
+
+    public StringProperty lastExportExtensionProperty() {
+<span class="nc" id="L38">        return lastExportExtension;</span>
+    }
+
+    public void setLastExportExtension(String lastExportExtension) {
+<span class="nc" id="L42">        this.lastExportExtension.set(lastExportExtension);</span>
+<span class="nc" id="L43">    }</span>
+
+    public Path getExportWorkingDirectory() {
+<span class="nc" id="L46">        return exportWorkingDirectory.get();</span>
+    }
+
+    public ObjectProperty&lt;Path&gt; exportWorkingDirectoryProperty() {
+<span class="nc" id="L50">        return exportWorkingDirectory;</span>
+    }
+
+    public void setExportWorkingDirectory(Path exportWorkingDirectory) {
+<span class="nc" id="L54">        this.exportWorkingDirectory.set(exportWorkingDirectory);</span>
+<span class="nc" id="L55">    }</span>
+
+    public SaveOrder getExportSaveOrder() {
+<span class="nc" id="L58">        return exportSaveOrder.get();</span>
+    }
+
+    public ObjectProperty&lt;SaveOrder&gt; exportSaveOrderProperty() {
+<span class="nc" id="L62">        return exportSaveOrder;</span>
+    }
+
+    public void setExportSaveOrder(SaveOrder exportSaveOrder) {
+<span class="nc" id="L66">        this.exportSaveOrder.set(exportSaveOrder);</span>
+<span class="nc" id="L67">    }</span>
+
+    public ObservableList&lt;TemplateExporter&gt; getCustomExporters() {
+<span class="fc" id="L70">        return customExporters;</span>
+    }
+
+    public void setCustomExporters(List&lt;TemplateExporter&gt; exporters) {
+<span class="nc" id="L74">        customExporters.clear();</span>
+<span class="nc" id="L75">        customExporters.addAll(exporters);</span>
+<span class="nc" id="L76">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

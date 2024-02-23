@@ -1,0 +1,483 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DublinCoreExtractor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.xmp</a> &gt; <span class="el_source">DublinCoreExtractor.java</span></div><h1>DublinCoreExtractor.java</h1><pre class="source lang-java linenums">package org.jabref.logic.xmp;
+
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
+import org.jabref.logic.bibtex.TypedBibEntry;
+import org.jabref.logic.formatter.casechanger.UnprotectTermsFormatter;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.Date;
+import org.jabref.model.entry.Month;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.entry.types.EntryTypeFactory;
+import org.jabref.model.strings.StringUtil;
+
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.xmpbox.schema.DublinCoreSchema;
+import org.apache.xmpbox.type.BadFieldValueException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class is used for &lt;em&gt;both&lt;/em&gt; conversion from Dublin Core to BibTeX and conversion form BibTeX to Dublin Core
+ */
+public class DublinCoreExtractor {
+
+    public static final String DC_COVERAGE = &quot;coverage&quot;;
+    public static final String DC_RIGHTS = &quot;rights&quot;;
+    public static final String DC_SOURCE = &quot;source&quot;;
+
+<span class="fc" id="L43">    private static final Logger LOGGER = LoggerFactory.getLogger(DublinCoreExtractor.class);</span>
+
+    private final DublinCoreSchema dcSchema;
+    private final XmpPreferences xmpPreferences;
+
+    private final BibEntry bibEntry;
+
+<span class="fc" id="L50">    private final UnprotectTermsFormatter unprotectTermsFormatter = new UnprotectTermsFormatter();</span>
+
+    /**
+     * @param dcSchema      Metadata in DublinCore format.
+     * @param resolvedEntry The BibEntry object, which is filled during metadata extraction.
+     */
+<span class="fc" id="L56">    public DublinCoreExtractor(DublinCoreSchema dcSchema, XmpPreferences xmpPreferences, BibEntry resolvedEntry) {</span>
+<span class="fc" id="L57">        this.dcSchema = dcSchema;</span>
+<span class="fc" id="L58">        this.xmpPreferences = xmpPreferences;</span>
+<span class="fc" id="L59">        this.bibEntry = resolvedEntry;</span>
+<span class="fc" id="L60">    }</span>
+
+    /**
+     * Editor in BibTeX - Contributor in DublinCore
+     */
+    private void extractEditor() {
+<span class="fc" id="L66">        List&lt;String&gt; contributors = dcSchema.getContributors();</span>
+<span class="pc bpc" id="L67" title="3 of 4 branches missed.">        if ((contributors != null) &amp;&amp; !contributors.isEmpty()) {</span>
+<span class="nc" id="L68">            bibEntry.setField(StandardField.EDITOR, String.join(&quot; and &quot;, contributors));</span>
+        }
+<span class="fc" id="L70">    }</span>
+
+    /**
+     * Author in BibTeX - Creator in DublinCore
+     */
+    private void extractAuthor() {
+<span class="fc" id="L76">        List&lt;String&gt; creators = dcSchema.getCreators();</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">        if ((creators != null) &amp;&amp; !creators.isEmpty()) {</span>
+<span class="fc" id="L78">           bibEntry.setField(StandardField.AUTHOR, String.join(&quot; and &quot;, creators));</span>
+        }
+<span class="fc" id="L80">    }</span>
+
+    /**
+     * BibTeX-Fields : year, [month], [day] - 'dc:date' in DublinCore
+     */
+    private void extractDate() {
+<span class="fc" id="L86">        List&lt;String&gt; dates = dcSchema.getUnqualifiedSequenceValueList(&quot;date&quot;);</span>
+<span class="pc bpc" id="L87" title="1 of 4 branches missed.">        if ((dates != null) &amp;&amp; !dates.isEmpty()) {</span>
+<span class="fc" id="L88">            String date = dates.getFirst().trim();</span>
+<span class="fc" id="L89">            Date.parse(date)</span>
+<span class="fc" id="L90">                    .ifPresent(dateValue -&gt; {</span>
+<span class="fc" id="L91">                        dateValue.getDay().ifPresent(day -&gt; bibEntry.setField(StandardField.DAY, Integer.toString(day)));</span>
+<span class="fc" id="L92">                        dateValue.getMonth().ifPresent(bibEntry::setMonth);</span>
+<span class="fc" id="L93">                        dateValue.getYear().ifPresent(year -&gt; bibEntry.setField(StandardField.YEAR, Integer.toString(year)));</span>
+<span class="fc" id="L94">                    });</span>
+        }
+<span class="fc" id="L96">    }</span>
+
+    /**
+     * Abstract in BibTeX - Description in DublinCore
+     */
+    private void extractAbstract() {
+<span class="fc" id="L102">        String description = null;</span>
+        try {
+<span class="fc" id="L104">            description = dcSchema.getDescription();</span>
+<span class="nc" id="L105">        } catch (BadFieldValueException e) {</span>
+<span class="nc" id="L106">            LOGGER.warn(&quot;Could not get abstract&quot;, e);</span>
+<span class="fc" id="L107">        }</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!StringUtil.isNullOrEmpty(description)) {</span>
+<span class="fc" id="L109">            bibEntry.setField(StandardField.ABSTRACT, description);</span>
+        }
+<span class="fc" id="L111">    }</span>
+
+    /**
+     * DOI in BibTeX - Identifier in DublinCore
+     */
+    private void extractDOI() {
+<span class="fc" id="L117">        String identifier = dcSchema.getIdentifier();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (!StringUtil.isNullOrEmpty(identifier)) {</span>
+<span class="fc" id="L119">            bibEntry.setField(StandardField.DOI, identifier);</span>
+        }
+<span class="fc" id="L121">    }</span>
+
+    /**
+     * Publisher are equivalent in both formats (BibTeX and DublinCore)
+     */
+    private void extractPublisher() {
+<span class="fc" id="L127">        List&lt;String&gt; publishers = dcSchema.getPublishers();</span>
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">        if ((publishers != null) &amp;&amp; !publishers.isEmpty()) {</span>
+<span class="fc" id="L129">            bibEntry.setField(StandardField.PUBLISHER, String.join(&quot; and &quot;, publishers));</span>
+        }
+<span class="fc" id="L131">    }</span>
+
+    /**
+     * This method sets all fields, which are custom in BibTeX and therefore supported by JabRef, but which are not
+     * included in the DublinCore format.
+     * &lt;p&gt;
+     * The relation attribute of DublinCore is abused to store these custom fields. The prefix &lt;code&gt;bibtex&lt;/code&gt; is used.
+     */
+    private void extractBibTexFields() {
+<span class="fc" id="L140">        Predicate&lt;String&gt; isBibTeXElement = s -&gt; s.startsWith(&quot;bibtex/&quot;);</span>
+<span class="fc" id="L141">        Consumer&lt;String&gt; splitBibTeXElement = s -&gt; {</span>
+            // the default pattern is bibtex/key/value, but some fields contains url etc.
+            // so the value property contains additional slashes, which makes the usage of
+            // String#split complicated.
+<span class="fc" id="L145">            String temp = s.substring(&quot;bibtex/&quot;.length());</span>
+<span class="fc" id="L146">            int i = temp.indexOf('/');</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (i != -1) {</span>
+<span class="fc" id="L148">                Field key = FieldFactory.parseField(temp.substring(0, i));</span>
+<span class="fc" id="L149">                String value = temp.substring(i + 1);</span>
+<span class="fc" id="L150">                bibEntry.setField(key, value);</span>
+
+                // only for month field - override value
+                // workaround, because the date value of the xmp component of pdf box is corrupted
+                // see also DublinCoreExtractor#extractYearAndMonth
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                if (StandardField.MONTH == key) {</span>
+<span class="fc" id="L156">                    Optional&lt;Month&gt; parsedMonth = Month.parse(value);</span>
+<span class="fc" id="L157">                    parsedMonth.ifPresent(bibEntry::setMonth);</span>
+                }
+            }
+<span class="fc" id="L160">        };</span>
+<span class="fc" id="L161">        List&lt;String&gt; relationships = dcSchema.getRelations();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (relationships != null) {</span>
+<span class="fc" id="L163">            relationships.stream()</span>
+<span class="fc" id="L164">                         .filter(isBibTeXElement)</span>
+<span class="fc" id="L165">                         .forEach(splitBibTeXElement);</span>
+        }
+<span class="fc" id="L167">    }</span>
+
+    /**
+     * Rights are equivalent in both formats (BibTeX and DublinCore)
+     */
+    private void extractRights() {
+<span class="fc" id="L173">        String rights = null;</span>
+        try {
+<span class="fc" id="L175">            rights = dcSchema.getRights();</span>
+<span class="nc" id="L176">        } catch (BadFieldValueException e) {</span>
+<span class="nc" id="L177">           LOGGER.warn(&quot;Could not extract rights&quot;, e);</span>
+<span class="fc" id="L178">        }</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (!StringUtil.isNullOrEmpty(rights)) {</span>
+<span class="fc" id="L180">            bibEntry.setField(new UnknownField(DC_RIGHTS), rights);</span>
+        }
+<span class="fc" id="L182">    }</span>
+
+    /**
+     * Source is equivalent in both formats (BibTeX and DublinCore)
+     */
+    private void extractSource() {
+<span class="fc" id="L188">        String source = dcSchema.getSource();</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (!StringUtil.isNullOrEmpty(source)) {</span>
+<span class="fc" id="L190">            bibEntry.setField(new UnknownField(DC_SOURCE), source);</span>
+        }
+<span class="fc" id="L192">    }</span>
+
+    /**
+     * Keywords in BibTeX - Subjects in DublinCore
+     */
+    private void extractSubject() {
+<span class="fc" id="L198">        List&lt;String&gt; subjects = dcSchema.getSubjects();</span>
+<span class="pc bpc" id="L199" title="1 of 4 branches missed.">        if ((subjects != null) &amp;&amp; !subjects.isEmpty()) {</span>
+<span class="fc" id="L200">            bibEntry.addKeywords(subjects, xmpPreferences.getKeywordSeparator());</span>
+        }
+<span class="fc" id="L202">    }</span>
+
+    /**
+     * Title is equivalent in both formats (BibTeX and DublinCore)
+     */
+    private void extractTitle() {
+<span class="fc" id="L208">        String title = null;</span>
+        try {
+<span class="fc" id="L210">            title = dcSchema.getTitle();</span>
+<span class="nc" id="L211">        } catch (BadFieldValueException e) {</span>
+<span class="nc" id="L212">            LOGGER.warn(&quot;Could not extract title&quot;, e);</span>
+<span class="fc" id="L213">        }</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (!StringUtil.isNullOrEmpty(title)) {</span>
+<span class="fc" id="L215">            bibEntry.setField(StandardField.TITLE, title);</span>
+        }
+<span class="fc" id="L217">    }</span>
+
+    /**
+     * Type is equivalent in both formats (BibTeX and DublinCore)
+     * &lt;p&gt;Opposite method: {@link DublinCoreExtractor#fillType()}
+     */
+    private void extractType() {
+<span class="fc" id="L224">        List&lt;String&gt; types = dcSchema.getTypes();</span>
+<span class="pc bpc" id="L225" title="1 of 4 branches missed.">        if ((types != null) &amp;&amp; !types.isEmpty()) {</span>
+<span class="fc" id="L226">            String type = types.getFirst();</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            if (!StringUtil.isNullOrEmpty(type)) {</span>
+<span class="fc" id="L228">                bibEntry.setType(EntryTypeFactory.parse(type));</span>
+            }
+        }
+<span class="fc" id="L231">    }</span>
+
+    /**
+     * No Equivalent in BibTeX. Will create an Unknown &quot;Coverage&quot; Field
+     */
+    private void extractCoverage() {
+<span class="fc" id="L237">        String coverage = dcSchema.getCoverage();</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (!StringUtil.isNullOrEmpty(coverage)) {</span>
+<span class="fc" id="L239">            bibEntry.setField(FieldFactory.parseField(DC_COVERAGE), coverage);</span>
+        }
+<span class="fc" id="L241">    }</span>
+
+    /**
+     *  Language is equivalent in both formats (BibTeX and DublinCore)
+     */
+    private void extractLanguages() {
+<span class="fc" id="L247">        StringBuilder builder = new StringBuilder();</span>
+
+<span class="fc" id="L249">        List&lt;String&gt; languages = dcSchema.getLanguages();</span>
+<span class="pc bpc" id="L250" title="1 of 4 branches missed.">        if ((languages != null) &amp;&amp; !languages.isEmpty()) {</span>
+<span class="fc" id="L251">            languages.forEach(language -&gt; builder.append(&quot;,&quot;).append(language));</span>
+<span class="fc" id="L252">            bibEntry.setField(StandardField.LANGUAGE, builder.substring(1));</span>
+        }
+<span class="fc" id="L254">    }</span>
+
+    /**
+     * Helper function for retrieving a BibEntry from the DublinCore metadata in a PDF file.
+     * &lt;p&gt;
+     * To understand how to get hold of a DublinCore have a look in the test cases for XMPUtil.
+     * &lt;p&gt;
+     * The BibEntry is build by mapping individual fields in the dublin core (like creator, title, subject) to fields in
+     * a bibtex bibEntry. In case special &quot;bibtex/&quot; entries are contained, the normal dublin core fields take
+     * precedence. For instance, the dublin core date takes precedence over bibtex/month.
+     * &lt;p&gt;
+     * The opposite method is {@link DublinCoreExtractor#fillDublinCoreSchema()}
+     * &lt;/p&gt;
+     *
+     * @return The bibEntry extracted from the document information.
+     */
+    public Optional&lt;BibEntry&gt; extractBibtexEntry() {
+        // first extract &quot;bibtex/&quot; entries
+<span class="fc" id="L272">        this.extractBibTexFields();</span>
+
+        // then extract all &quot;standard&quot; dublin core entries
+<span class="fc" id="L275">        this.extractType();</span>
+<span class="fc" id="L276">        this.extractEditor();</span>
+<span class="fc" id="L277">        this.extractAuthor();</span>
+<span class="fc" id="L278">        this.extractDate();</span>
+<span class="fc" id="L279">        this.extractAbstract();</span>
+<span class="fc" id="L280">        this.extractDOI();</span>
+<span class="fc" id="L281">        this.extractPublisher();</span>
+<span class="fc" id="L282">        this.extractRights();</span>
+<span class="fc" id="L283">        this.extractSource();</span>
+<span class="fc" id="L284">        this.extractSubject();</span>
+<span class="fc" id="L285">        this.extractTitle();</span>
+<span class="fc" id="L286">        this.extractCoverage();</span>
+<span class="fc" id="L287">        this.extractLanguages();</span>
+
+        // we pass a new BibEntry in the constructor which is never empty as it already consists of &quot;@misc&quot;
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        if (bibEntry.getFieldMap().isEmpty()) {</span>
+<span class="fc" id="L291">            return Optional.empty();</span>
+        }
+<span class="fc" id="L293">        return Optional.of(bibEntry);</span>
+    }
+
+    /**
+     * BibTeX: editor; DC: 'dc:contributor'
+     */
+    private void fillContributor(String authors) {
+<span class="nc" id="L300">        AuthorList list = AuthorList.parse(authors);</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        for (Author author : list.getAuthors()) {</span>
+<span class="nc" id="L302">            dcSchema.addContributor(author.getFirstLast(false));</span>
+<span class="nc" id="L303">        }</span>
+<span class="nc" id="L304">    }</span>
+
+    /**
+     * BibTeX: author; DC: 'dc:creator'
+     */
+    private void fillCreator(String creators) {
+<span class="fc" id="L310">        AuthorList list = AuthorList.parse(creators);</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        for (Author author : list.getAuthors()) {</span>
+<span class="fc" id="L312">            dcSchema.addCreator(author.getFirstLast(false));</span>
+<span class="fc" id="L313">        }</span>
+<span class="fc" id="L314">    }</span>
+
+    /**
+     * BibTeX: year, month; DC: 'dc:date'
+     */
+    private void fillDate() {
+<span class="fc" id="L320">        bibEntry.getFieldOrAlias(StandardField.DATE)</span>
+<span class="fc" id="L321">                .ifPresent(publicationDate -&gt; dcSchema.addUnqualifiedSequenceValue(&quot;date&quot;, publicationDate));</span>
+<span class="fc" id="L322">    }</span>
+
+    /**
+     * BibTeX: abstract; DC: 'dc:description'
+     */
+    private void fillDescription(String description) {
+<span class="fc" id="L328">        dcSchema.setDescription(description);</span>
+<span class="fc" id="L329">    }</span>
+
+    /**
+     * BibTeX:doi; DC: 'dc:identifier'
+     */
+    private void fillIdentifier(String identifier) {
+<span class="fc" id="L335">        dcSchema.setIdentifier(identifier);</span>
+<span class="fc" id="L336">    }</span>
+
+    /**
+     * BibTeX: publisher, DC: dc:publisher
+     */
+    private void fillPublisher(String publisher) {
+<span class="fc" id="L342">        dcSchema.addPublisher(publisher);</span>
+<span class="fc" id="L343">    }</span>
+
+    /**
+     * BibTeX: keywords; DC: 'dc:subject'
+     */
+    private void fillKeywords(String value) {
+<span class="fc" id="L349">        String[] keywords = value.split(xmpPreferences.getKeywordSeparator().toString());</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        for (String keyword : keywords) {</span>
+<span class="fc" id="L351">            dcSchema.addSubject(keyword.trim());</span>
+        }
+<span class="fc" id="L353">    }</span>
+
+    /**
+     * BibTeX: title; DC: 'dc:title'
+     */
+    private void fillTitle(String title) {
+<span class="fc" id="L359">        dcSchema.setTitle(title);</span>
+<span class="fc" id="L360">    }</span>
+
+    /**
+     * BibTeX: Coverage (Custom Field); DC Field : Coverage
+     */
+    private void fillCoverage(String coverage) {
+<span class="fc" id="L366">        dcSchema.setCoverage(coverage);</span>
+<span class="fc" id="L367">    }</span>
+
+    /**
+     * BibTeX: language; DC: dc:language
+     */
+    private void fillLanguages(String languages) {
+<span class="fc" id="L373">        Arrays.stream(languages.split(&quot;,&quot;))</span>
+<span class="fc" id="L374">                .forEach(dcSchema::addLanguage);</span>
+<span class="fc" id="L375">    }</span>
+
+    /**
+     * BibTeX: Rights (Custom Field); DC: dc:rights
+     */
+    private void fillRights(String rights) {
+<span class="fc" id="L381">        dcSchema.addRights(null, rights.split(&quot;,&quot;)[0]);</span>
+<span class="fc" id="L382">    }</span>
+
+    /**
+     * BibTeX: Source (Custom Field); DC: Source
+     */
+    private void fillSource(String source) {
+<span class="fc" id="L388">        dcSchema.setSource(source);</span>
+<span class="fc" id="L389">    }</span>
+
+    /**
+     * All others (+ citation key) get packaged in the dc:relation attribute with &lt;code&gt;bibtex/&lt;/code&gt; prefix in the content.
+     * The value of the given field is fetched from the class variable {@link DublinCoreExtractor#bibEntry}.
+     */
+    private void fillCustomField(Field field) {
+        // We write the plain content of the field, because this is a custom DC field content with the semantics that
+        // BibTeX data is stored. Thus, we do not need to get rid of BibTeX, but can keep it.
+<span class="fc" id="L398">        String value = bibEntry.getField(field).get();</span>
+<span class="fc" id="L399">        dcSchema.addRelation(&quot;bibtex/&quot; + field.getName() + '/' + value);</span>
+<span class="fc" id="L400">    }</span>
+
+    /**
+     * Opposite method: {@link DublinCoreExtractor#extractType()}
+     */
+    private void fillType() {
+        // BibTeX: entry type; DC: 'dc:type'
+<span class="fc" id="L407">        TypedBibEntry typedEntry = new TypedBibEntry(bibEntry, BibDatabaseMode.BIBTEX);</span>
+<span class="fc" id="L408">        String typeForDisplay = typedEntry.getTypeForDisplay();</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        if (!typeForDisplay.isEmpty()) {</span>
+<span class="fc" id="L410">            dcSchema.addType(typeForDisplay);</span>
+        }
+<span class="fc" id="L412">    }</span>
+
+    /**
+     * Converts the content of the bibEntry to dublin core.
+     * &lt;p&gt;
+     * The opposite method is {@link DublinCoreExtractor#extractBibtexEntry()}.
+     * &lt;p&gt;
+     *     A similar method for writing the DocumentInformationItem (DII) is {@link XmpUtilWriter#writeDocumentInformation(PDDocument, BibEntry, BibDatabase, XmpPreferences)}
+     * &lt;/p&gt;
+     */
+    public void fillDublinCoreSchema() {
+        // Query privacy filter settings
+<span class="fc" id="L424">        boolean useXmpPrivacyFilter = xmpPreferences.shouldUseXmpPrivacyFilter();</span>
+
+<span class="fc" id="L426">        SortedSet&lt;Field&gt; fields = new TreeSet&lt;&gt;(Comparator.comparing(Field::getName));</span>
+<span class="fc" id="L427">        fields.addAll(bibEntry.getFields());</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        for (Field field : fields) {</span>
+<span class="pc bpc" id="L429" title="1 of 4 branches missed.">            if (useXmpPrivacyFilter &amp;&amp; xmpPreferences.getXmpPrivacyFilter().contains(field)) {</span>
+<span class="fc" id="L430">                continue;</span>
+            }
+
+<span class="fc" id="L433">            String value = unprotectTermsFormatter.format(bibEntry.getField(field).get());</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">            if (field instanceof StandardField standardField) {</span>
+<span class="pc bpc" id="L435" title="1 of 12 branches missed.">                switch (standardField) {</span>
+                    case EDITOR -&gt;
+<span class="nc" id="L437">                            this.fillContributor(value);</span>
+                    case AUTHOR -&gt;
+<span class="fc" id="L439">                            this.fillCreator(value);</span>
+                    case YEAR -&gt;
+<span class="fc" id="L441">                            this.fillDate();</span>
+                    case ABSTRACT -&gt;
+<span class="fc" id="L443">                            this.fillDescription(value);</span>
+                    case DOI -&gt;
+<span class="fc" id="L445">                            this.fillIdentifier(value);</span>
+                    case PUBLISHER -&gt;
+<span class="fc" id="L447">                            this.fillPublisher(value);</span>
+                    case KEYWORDS -&gt;
+<span class="fc" id="L449">                            this.fillKeywords(value);</span>
+                    case TITLE -&gt;
+<span class="fc" id="L451">                            this.fillTitle(value);</span>
+                    case LANGUAGE -&gt;
+<span class="fc" id="L453">                            this.fillLanguages(value);</span>
+                    case FILE -&gt; {
+                        // we do not write the &quot;file&quot; field, because the file is the PDF itself
+<span class="fc" id="L456">                    }</span>
+                    case DAY, MONTH -&gt; {
+                        // we do not write day and month separately if dc:year can be used
+<span class="fc bfc" id="L459" title="All 2 branches covered.">                        if (!bibEntry.hasField(StandardField.YEAR)) {</span>
+<span class="fc" id="L460">                            this.fillCustomField(field);</span>
+                        }
+                    }
+                    default -&gt;
+<span class="fc" id="L464">                            this.fillCustomField(field);</span>
+                }
+            } else {
+<span class="fc bfc" id="L467" title="All 2 branches covered.">                if (DC_COVERAGE.equals(field.getName())) {</span>
+<span class="fc" id="L468">                    this.fillCoverage(value);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">                } else if (DC_RIGHTS.equals(field.getName())) {</span>
+<span class="fc" id="L470">                    this.fillRights(value);</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">                } else if (DC_SOURCE.equals(field.getName())) {</span>
+<span class="fc" id="L472">                    this.fillSource(value);</span>
+                } else {
+<span class="fc" id="L474">                    this.fillCustomField(field);</span>
+                }
+            }
+<span class="fc" id="L477">        }</span>
+
+<span class="fc" id="L479">        dcSchema.setFormat(&quot;application/pdf&quot;);</span>
+<span class="fc" id="L480">        fillType();</span>
+<span class="fc" id="L481">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

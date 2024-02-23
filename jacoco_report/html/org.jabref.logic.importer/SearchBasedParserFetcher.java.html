@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchBasedParserFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer</a> &gt; <span class="el_source">SearchBasedParserFetcher.java</span></div><h1>SearchBasedParserFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.List;
+
+import org.jabref.logic.cleanup.Formatter;
+import org.jabref.model.entry.BibEntry;
+
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+
+/**
+ * Provides a convenient interface for search-based fetcher, which follows the usual three-step procedure:
+ * &lt;ol&gt;
+ *     &lt;li&gt;Open a URL based on the search query&lt;/li&gt;
+ *     &lt;li&gt;Parse the response to get a list of {@link BibEntry}&lt;/li&gt;
+ *     &lt;li&gt;Post-process fetched entries&lt;/li&gt;
+ * &lt;/ol&gt;
+ * &lt;p&gt;
+ *     This interface is used for web resources which do NOT provide BibTeX data {@link BibEntry}.
+ *     JabRef's infrastructure to convert arbitrary input data to BibTeX is {@link Parser}.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ *     This interface inherits {@link SearchBasedFetcher}, because the methods &lt;code&gt;performSearch&lt;/code&gt; have to be provided by both.
+ *     As non-BibTeX web fetcher one could do &quot;magic&quot; stuff without this helper interface and directly use {@link WebFetcher}, but this is more work.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ *     Note that this interface &quot;should&quot; be an abstract class.
+ *     However, Java does not support multi inheritance with classes (but with interfaces).
+ *     We need multi inheritance, because a fetcher might implement multiple query types (such as id fetching {@link IdBasedFetcher}), complete entry {@link EntryBasedFetcher}, and search-based fetcher (this class).
+ * &lt;/p&gt;
+ */
+public interface SearchBasedParserFetcher extends SearchBasedFetcher {
+
+    /**
+     * This method is used to send queries with advanced URL parameters.
+     * This method is necessary as the performSearch method does not support certain URL parameters that are used for
+     * fielded search, such as a title, author, or year parameter.
+     *
+     * @param luceneQuery the root node of the lucene query
+     */
+    @Override
+    default List&lt;BibEntry&gt; performSearch(QueryNode luceneQuery) throws FetcherException {
+        // ADR-0014
+        URL urlForQuery;
+        try {
+<span class="fc" id="L50">            urlForQuery = getURLForQuery(luceneQuery);</span>
+<span class="nc" id="L51">        } catch (URISyntaxException | MalformedURLException | FetcherException e) {</span>
+<span class="nc" id="L52">            throw new FetcherException(&quot;Search URI crafted from complex search query is malformed&quot;, e);</span>
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">        return getBibEntries(urlForQuery);</span>
+    }
+
+    private List&lt;BibEntry&gt; getBibEntries(URL urlForQuery) throws FetcherException {
+<span class="fc" id="L58">        try (InputStream stream = getUrlDownload(urlForQuery).asInputStream()) {</span>
+<span class="fc" id="L59">            List&lt;BibEntry&gt; fetchedEntries = getParser().parseEntries(stream);</span>
+<span class="fc" id="L60">            fetchedEntries.forEach(this::doPostCleanup);</span>
+<span class="fc" id="L61">            return fetchedEntries;</span>
+<span class="fc" id="L62">        } catch (IOException e) {</span>
+<span class="fc" id="L63">            throw new FetcherException(&quot;A network error occurred while fetching from &quot; + urlForQuery, e);</span>
+<span class="fc" id="L64">        } catch (ParseException e) {</span>
+<span class="fc" id="L65">            throw new FetcherException(&quot;An internal parser error occurred while fetching from &quot; + urlForQuery, e);</span>
+        }
+    }
+
+    /**
+     * Returns the parser used to convert the response to a list of {@link BibEntry}.
+     */
+    Parser getParser();
+
+    /**
+     * Constructs a URL based on the lucene query.
+     *
+     * @param luceneQuery the root node of the lucene query
+     */
+    URL getURLForQuery(QueryNode luceneQuery) throws URISyntaxException, MalformedURLException, FetcherException;
+
+    /**
+     * Performs a cleanup of the fetched entry.
+     * &lt;p&gt;
+     * Only systematic errors of the fetcher should be corrected here
+     * (i.e. if information is consistently contained in the wrong field or the wrong format)
+     * but not cosmetic issues which may depend on the user's taste (for example, LateX code vs HTML in the abstract).
+     * &lt;p&gt;
+     * Try to reuse existing {@link Formatter} for the cleanup. For example,
+     * {@code new FieldFormatterCleanup(StandardField.TITLE, new RemoveBracesFormatter()).cleanup(entry);}
+     * &lt;p&gt;
+     * By default, no cleanup is done.
+     *
+     * @param entry the entry to be cleaned-up
+     */
+    default void doPostCleanup(BibEntry entry) {
+        // Do nothing by default
+<span class="fc" id="L97">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

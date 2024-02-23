@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DownloadFullTextAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.externalfiles</a> &gt; <span class="el_source">DownloadFullTextAction.java</span></div><h1>DownloadFullTextAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.externalfiles;
+
+import java.net.URL;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+import javafx.concurrent.Task;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.fieldeditors.LinkedFileViewModel;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.importer.FulltextFetchers;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Try to download fulltext PDF for selected entry(ies) by following URL or DOI link.
+ */
+public class DownloadFullTextAction extends SimpleCommand {
+
+<span class="nc" id="L32">    private static final Logger LOGGER = LoggerFactory.getLogger(DownloadFullTextAction.class);</span>
+    // The minimum number of selected entries to ask the user for confirmation
+    private static final int WARNING_LIMIT = 5;
+
+    private final DialogService dialogService;
+    private final StateManager stateManager;
+    private final PreferencesService preferences;
+    private final TaskExecutor taskExecutor;
+
+    public DownloadFullTextAction(DialogService dialogService,
+                                  StateManager stateManager,
+                                  PreferencesService preferences,
+<span class="nc" id="L44">                                  TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L45">        this.dialogService = dialogService;</span>
+<span class="nc" id="L46">        this.stateManager = stateManager;</span>
+<span class="nc" id="L47">        this.preferences = preferences;</span>
+<span class="nc" id="L48">        this.taskExecutor = taskExecutor;</span>
+
+<span class="nc" id="L50">        this.executable.bind(ActionHelper.needsEntriesSelected(stateManager));</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (stateManager.getActiveDatabase().isEmpty()) {</span>
+<span class="nc" id="L56">            return;</span>
+        }
+
+<span class="nc" id="L59">        List&lt;BibEntry&gt; entries = stateManager.getSelectedEntries();</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (entries.isEmpty()) {</span>
+<span class="nc" id="L61">            LOGGER.debug(&quot;No entry selected for fulltext download.&quot;);</span>
+<span class="nc" id="L62">            return;</span>
+        }
+
+<span class="nc" id="L65">        dialogService.notify(Localization.lang(&quot;Looking for full text document...&quot;));</span>
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (entries.size() &gt;= WARNING_LIMIT) {</span>
+<span class="nc" id="L68">            boolean confirmDownload = dialogService.showConfirmationDialogAndWait(</span>
+<span class="nc" id="L69">                    Localization.lang(&quot;Download full text documents&quot;),</span>
+<span class="nc" id="L70">                    Localization.lang(</span>
+                            &quot;You are about to download full text documents for %0 entries.&quot;,
+<span class="nc" id="L72">                            String.valueOf(stateManager.getSelectedEntries().size())) + &quot;\n&quot;</span>
+<span class="nc" id="L73">                            + Localization.lang(&quot;JabRef will send at least one request per entry to a publisher.&quot;)</span>
+                            + &quot;\n&quot;
+<span class="nc" id="L75">                            + Localization.lang(&quot;Do you still want to continue?&quot;),</span>
+<span class="nc" id="L76">                    Localization.lang(&quot;Download full text documents&quot;),</span>
+<span class="nc" id="L77">                    Localization.lang(&quot;Cancel&quot;));</span>
+
+<span class="nc bnc" id="L79" title="All 2 branches missed.">            if (!confirmDownload) {</span>
+<span class="nc" id="L80">                dialogService.notify(Localization.lang(&quot;Operation canceled.&quot;));</span>
+<span class="nc" id="L81">                return;</span>
+            }
+        }
+
+<span class="nc" id="L85">        Task&lt;Map&lt;BibEntry, Optional&lt;URL&gt;&gt;&gt; findFullTextsTask = new Task&lt;&gt;() {</span>
+            @Override
+            protected Map&lt;BibEntry, Optional&lt;URL&gt;&gt; call() {
+<span class="nc" id="L88">                Map&lt;BibEntry, Optional&lt;URL&gt;&gt; downloads = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L89">                int count = 0;</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                for (BibEntry entry : entries) {</span>
+<span class="nc" id="L91">                    FulltextFetchers fetchers = new FulltextFetchers(</span>
+<span class="nc" id="L92">                            preferences.getImportFormatPreferences(),</span>
+<span class="nc" id="L93">                            preferences.getImporterPreferences());</span>
+<span class="nc" id="L94">                    downloads.put(entry, fetchers.findFullTextPDF(entry));</span>
+<span class="nc" id="L95">                    updateProgress(++count, entries.size());</span>
+<span class="nc" id="L96">                }</span>
+<span class="nc" id="L97">                return downloads;</span>
+            }
+        };
+
+<span class="nc" id="L101">        findFullTextsTask.setOnSucceeded(value -&gt;</span>
+<span class="nc" id="L102">                downloadFullTexts(findFullTextsTask.getValue(), stateManager.getActiveDatabase().get()));</span>
+
+<span class="nc" id="L104">        dialogService.showProgressDialog(</span>
+<span class="nc" id="L105">                Localization.lang(&quot;Download full text documents&quot;),</span>
+<span class="nc" id="L106">                Localization.lang(&quot;Looking for full text document...&quot;),</span>
+                findFullTextsTask);
+
+<span class="nc" id="L109">        taskExecutor.execute(findFullTextsTask);</span>
+<span class="nc" id="L110">    }</span>
+
+    private void downloadFullTexts(Map&lt;BibEntry, Optional&lt;URL&gt;&gt; downloads, BibDatabaseContext databaseContext) {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        for (Map.Entry&lt;BibEntry, Optional&lt;URL&gt;&gt; download : downloads.entrySet()) {</span>
+<span class="nc" id="L114">            BibEntry entry = download.getKey();</span>
+<span class="nc" id="L115">            Optional&lt;URL&gt; result = download.getValue();</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            if (result.isPresent()) {</span>
+<span class="nc" id="L117">                addLinkedFileFromURL(databaseContext, result.get(), entry);</span>
+            } else {
+<span class="nc" id="L119">                dialogService.notify(Localization.lang(&quot;No full text document found for entry %0.&quot;,</span>
+<span class="nc" id="L120">                        entry.getCitationKey().orElse(Localization.lang(&quot;undefined&quot;))));</span>
+            }
+<span class="nc" id="L122">        }</span>
+<span class="nc" id="L123">    }</span>
+
+    /**
+     * This method attaches a linked file from a URL (if not already linked) to an entry using the key and value pair
+     * from the findFullTexts map and then downloads the file into the given targetDirectory
+     *
+     * @param databaseContext the active database
+     * @param url             the url &quot;key&quot;
+     * @param entry           the entry &quot;value&quot;
+     */
+    private void addLinkedFileFromURL(BibDatabaseContext databaseContext, URL url, BibEntry entry) {
+<span class="nc" id="L134">        LinkedFile newLinkedFile = new LinkedFile(url, &quot;&quot;);</span>
+
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (!entry.getFiles().contains(newLinkedFile)) {</span>
+<span class="nc" id="L137">            LinkedFileViewModel onlineFile = new LinkedFileViewModel(</span>
+                    newLinkedFile,
+                    entry,
+                    databaseContext,
+                    taskExecutor,
+                    dialogService,
+                    preferences);
+
+<span class="nc" id="L145">            onlineFile.download();</span>
+<span class="nc" id="L146">        } else {</span>
+<span class="nc" id="L147">            dialogService.notify(Localization.lang(&quot;Full text document for entry %0 already linked.&quot;,</span>
+<span class="nc" id="L148">                    entry.getCitationKey().orElse(Localization.lang(&quot;undefined&quot;))));</span>
+        }
+<span class="nc" id="L150">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

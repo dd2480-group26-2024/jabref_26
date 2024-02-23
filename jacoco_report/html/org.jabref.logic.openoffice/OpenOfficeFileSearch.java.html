@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenOfficeFileSearch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice</a> &gt; <span class="el_source">OpenOfficeFileSearch.java</span></div><h1>OpenOfficeFileSearch.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.jabref.logic.util.OS;
+import org.jabref.logic.util.io.FileUtil;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+<span class="nc" id="L22">public class OpenOfficeFileSearch {</span>
+<span class="nc" id="L23">    private static final Logger LOGGER = LoggerFactory.getLogger(OpenOfficeFileSearch.class);</span>
+
+    /**
+     * Detects existing installation of OpenOffice and LibreOffice.
+     *
+     * @return a list of detected installation paths
+     */
+    public static List&lt;Path&gt; detectInstallations() {
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        if (OS.WINDOWS) {</span>
+<span class="nc" id="L32">            List&lt;Path&gt; programDirs = findWindowsOpenOfficeDirs();</span>
+<span class="nc" id="L33">            return programDirs.stream().filter(dir -&gt; FileUtil.find(OpenOfficePreferences.WINDOWS_EXECUTABLE, dir).isPresent()).collect(Collectors.toList());</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        } else if (OS.OS_X) {</span>
+<span class="nc" id="L35">            List&lt;Path&gt; programDirs = findOSXOpenOfficeDirs();</span>
+<span class="nc" id="L36">            return programDirs.stream().filter(dir -&gt; FileUtil.find(OpenOfficePreferences.OSX_EXECUTABLE, dir).isPresent()).collect(Collectors.toList());</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        } else if (OS.LINUX) {</span>
+<span class="nc" id="L38">            List&lt;Path&gt; programDirs = findLinuxOpenOfficeDirs();</span>
+<span class="nc" id="L39">            return programDirs.stream().filter(dir -&gt; FileUtil.find(OpenOfficePreferences.LINUX_EXECUTABLE, dir).isPresent()).collect(Collectors.toList());</span>
+        }
+<span class="nc" id="L41">        return new ArrayList&lt;&gt;(0);</span>
+    }
+
+    private static List&lt;Path&gt; findOpenOfficeDirectories(List&lt;Path&gt; programDirectories) {
+<span class="nc" id="L45">        BiPredicate&lt;Path, BasicFileAttributes&gt; filePredicate = (path, attr) -&gt;</span>
+<span class="nc bnc" id="L46" title="All 4 branches missed.">                attr.isDirectory() &amp;&amp; (path.toString().toLowerCase(Locale.ROOT).contains(&quot;openoffice&quot;)</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">                        || path.toString().toLowerCase(Locale.ROOT).contains(&quot;libreoffice&quot;));</span>
+
+<span class="nc" id="L49">        return programDirectories.stream().flatMap(dirs -&gt; {</span>
+            try {
+<span class="nc" id="L51">                return Files.find(dirs, 1, filePredicate);</span>
+<span class="nc" id="L52">            } catch (IOException e) {</span>
+<span class="nc" id="L53">                LOGGER.error(&quot;Problem searching for openoffice/libreoffice install directory&quot;, e);</span>
+<span class="nc" id="L54">                return Stream.empty();</span>
+            }
+<span class="nc" id="L56">        }).collect(Collectors.toList());</span>
+    }
+
+    private static List&lt;Path&gt; findWindowsOpenOfficeDirs() {
+<span class="nc" id="L60">        List&lt;Path&gt; sourceList = new ArrayList&lt;&gt;();</span>
+
+        // 64-bit program directory
+<span class="nc" id="L63">        String progFiles = System.getenv(&quot;ProgramFiles&quot;);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (progFiles != null) {</span>
+<span class="nc" id="L65">            sourceList.add(Path.of(progFiles));</span>
+        }
+
+        // 32-bit program directory
+<span class="nc" id="L69">        progFiles = System.getenv(&quot;ProgramFiles(x86)&quot;);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (progFiles != null) {</span>
+<span class="nc" id="L71">            sourceList.add(Path.of(progFiles));</span>
+        }
+
+<span class="nc" id="L74">        return findOpenOfficeDirectories(sourceList);</span>
+    }
+
+    private static List&lt;Path&gt; findOSXOpenOfficeDirs() {
+<span class="nc" id="L78">        List&lt;Path&gt; sourceList = Collections.singletonList(Path.of(&quot;/Applications&quot;));</span>
+
+<span class="nc" id="L80">        return findOpenOfficeDirectories(sourceList);</span>
+    }
+
+    private static List&lt;Path&gt; findLinuxOpenOfficeDirs() {
+<span class="nc" id="L84">        List&lt;Path&gt; sourceList = Arrays.asList(Path.of(&quot;/usr/lib&quot;), Path.of(&quot;/usr/lib64&quot;), Path.of(&quot;/opt&quot;));</span>
+
+<span class="nc" id="L86">        return findOpenOfficeDirectories(sourceList);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

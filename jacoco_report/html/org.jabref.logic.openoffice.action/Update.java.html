@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Update.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice.action</a> &gt; <span class="el_source">Update.java</span></div><h1>Update.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice.action;
+
+import java.util.List;
+
+import org.jabref.logic.openoffice.frontend.OOFrontend;
+import org.jabref.logic.openoffice.frontend.UpdateBibliography;
+import org.jabref.logic.openoffice.frontend.UpdateCitationMarkers;
+import org.jabref.logic.openoffice.style.OOBibStyle;
+import org.jabref.logic.openoffice.style.OOProcess;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.openoffice.rangesort.FunctionalTextViewCursor;
+import org.jabref.model.openoffice.uno.CreationException;
+import org.jabref.model.openoffice.uno.NoDocumentException;
+import org.jabref.model.openoffice.uno.UnoScreenRefresh;
+
+import com.sun.star.lang.WrappedTargetException;
+import com.sun.star.text.XTextDocument;
+
+/**
+ * Update document: citation marks and bibliography
+ */
+public class Update {
+
+    private Update() {
+    }
+
+    /**
+     * @return the list of unresolved citation keys
+     */
+    private static List&lt;String&gt; updateDocument(XTextDocument doc,
+                                               OOFrontend frontend,
+                                               List&lt;BibDatabase&gt; databases,
+                                               OOBibStyle style,
+                                               FunctionalTextViewCursor fcursor,
+                                               boolean doUpdateBibliography,
+                                               boolean alwaysAddCitedOnPages)
+            throws
+            CreationException,
+            NoDocumentException,
+            WrappedTargetException,
+            com.sun.star.lang.IllegalArgumentException {
+
+<span class="nc" id="L43">        final boolean useLockControllers = true;</span>
+
+<span class="nc" id="L45">        frontend.imposeGlobalOrder(doc, fcursor);</span>
+<span class="nc" id="L46">        OOProcess.produceCitationMarkers(frontend.citationGroups, databases, style);</span>
+
+        try {
+            if (useLockControllers) {
+<span class="nc" id="L50">                UnoScreenRefresh.lockControllers(doc);</span>
+            }
+
+<span class="nc" id="L53">            UpdateCitationMarkers.applyNewCitationMarkers(doc, frontend, style);</span>
+
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            if (doUpdateBibliography) {</span>
+<span class="nc" id="L56">                UpdateBibliography.rebuildBibTextSection(doc,</span>
+                        frontend,
+<span class="nc" id="L58">                        frontend.citationGroups.getBibliography().get(),</span>
+                        style,
+                        alwaysAddCitedOnPages);
+            }
+
+<span class="nc" id="L63">            return frontend.citationGroups.getUnresolvedKeys();</span>
+        } finally {
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (useLockControllers &amp;&amp; UnoScreenRefresh.hasControllersLocked(doc)) {</span>
+<span class="nc" id="L66">                UnoScreenRefresh.unlockControllers(doc);</span>
+            }
+        }
+    }
+
+    public static class SyncOptions {
+
+        public final List&lt;BibDatabase&gt; databases;
+        boolean updateBibliography;
+        boolean alwaysAddCitedOnPages;
+
+<span class="nc" id="L77">        public SyncOptions(List&lt;BibDatabase&gt; databases) {</span>
+<span class="nc" id="L78">            this.databases = databases;</span>
+<span class="nc" id="L79">            this.updateBibliography = false;</span>
+<span class="nc" id="L80">            this.alwaysAddCitedOnPages = false;</span>
+<span class="nc" id="L81">        }</span>
+
+        public SyncOptions setUpdateBibliography(boolean value) {
+<span class="nc" id="L84">            this.updateBibliography = value;</span>
+<span class="nc" id="L85">            return this;</span>
+        }
+
+        public SyncOptions setAlwaysAddCitedOnPages(boolean value) {
+<span class="nc" id="L89">            this.alwaysAddCitedOnPages = value;</span>
+<span class="nc" id="L90">            return this;</span>
+        }
+    }
+
+    public static List&lt;String&gt; synchronizeDocument(XTextDocument doc,
+                                                   OOFrontend frontend,
+                                                   OOBibStyle style,
+                                                   FunctionalTextViewCursor fcursor,
+                                                   SyncOptions syncOptions)
+            throws
+            CreationException,
+            NoDocumentException,
+            WrappedTargetException,
+            com.sun.star.lang.IllegalArgumentException {
+
+<span class="nc" id="L105">        return Update.updateDocument(doc,</span>
+                frontend,
+                syncOptions.databases,
+                style,
+                fcursor,
+                syncOptions.updateBibliography,
+                syncOptions.alwaysAddCitedOnPages);
+    }
+
+    /**
+     * Reread document before sync
+     */
+    public static List&lt;String&gt; resyncDocument(XTextDocument doc,
+                                              OOBibStyle style,
+                                              FunctionalTextViewCursor fcursor,
+                                              SyncOptions syncOptions)
+            throws
+            CreationException,
+            NoDocumentException,
+            WrappedTargetException,
+            com.sun.star.lang.IllegalArgumentException {
+
+<span class="nc" id="L127">        OOFrontend frontend = new OOFrontend(doc);</span>
+
+<span class="nc" id="L129">        return Update.synchronizeDocument(doc, frontend, style, fcursor, syncOptions);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JournalInformationFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">JournalInformationFetcher.java</span></div><h1>JournalInformationFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+import javafx.util.Pair;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.WebFetcher;
+import org.jabref.logic.journals.JournalInformation;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.identifier.ISSN;
+
+import kong.unirest.HttpResponse;
+import kong.unirest.JsonNode;
+import kong.unirest.Unirest;
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONException;
+import kong.unirest.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Fetches journal information from the JabRef Web API
+ */
+<span class="fc" id="L31">public class JournalInformationFetcher implements WebFetcher {</span>
+    public static final String NAME = &quot;Journal Information&quot;;
+<span class="fc" id="L33">    private static final Logger LOGGER = LoggerFactory.getLogger(JournalInformationFetcher.class);</span>
+    // Uses JabRef Online APIs
+    private static final String API_URL = &quot;https://jabref.org/api&quot;;
+<span class="fc" id="L36">    private static final Pattern QUOTES_BRACKET_PATTERN = Pattern.compile(&quot;[\&quot;\\[\\]]&quot;);</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L40">        return JournalInformationFetcher.NAME;</span>
+    }
+
+    public Optional&lt;JournalInformation&gt; getJournalInformation(String issnString, String journalName) throws FetcherException {
+<span class="fc" id="L44">        ISSN issn = new ISSN(issnString);</span>
+<span class="fc" id="L45">        String cleanedISSN = &quot;&quot;;</span>
+
+<span class="fc bfc" id="L47" title="All 4 branches covered.">        if (issn.isValidFormat() || issn.isCanBeCleaned()) {</span>
+<span class="fc" id="L48">            cleanedISSN = issn.getCleanedISSN();</span>
+        } else {
+<span class="fc" id="L50">            LOGGER.warn(Localization.lang(&quot;Incorrect ISSN format&quot;));</span>
+        }
+
+<span class="fc" id="L53">        Optional&lt;JournalInformation&gt; journalInformationOptional = Optional.empty();</span>
+
+<span class="fc" id="L55">        JSONObject postData = buildPostData(cleanedISSN, journalName);</span>
+
+<span class="fc" id="L57">        HttpResponse&lt;JsonNode&gt; httpResponse = Unirest.post(API_URL)</span>
+<span class="fc" id="L58">                                                     .header(&quot;Content-Type&quot;, &quot;application/json&quot;)</span>
+<span class="fc" id="L59">                                                     .body(postData)</span>
+<span class="fc" id="L60">                                                     .asJson();</span>
+
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (httpResponse.getBody() != null) {</span>
+<span class="fc" id="L63">            JSONObject responseJsonObject = httpResponse.getBody().getObject();</span>
+<span class="fc" id="L64">            journalInformationOptional = Optional.of(parseResponse(responseJsonObject));</span>
+        }
+
+<span class="fc" id="L67">        return journalInformationOptional;</span>
+    }
+
+    private JournalInformation parseResponse(JSONObject responseJsonObject) throws FetcherException {
+<span class="fc" id="L71">        String title = &quot;&quot;;</span>
+<span class="fc" id="L72">        String publisher = &quot;&quot;;</span>
+<span class="fc" id="L73">        String coverageStartYear = &quot;&quot;;</span>
+<span class="fc" id="L74">        String coverageEndYear = &quot;&quot;;</span>
+<span class="fc" id="L75">        String subjectArea = &quot;&quot;;</span>
+<span class="fc" id="L76">        String country = &quot;&quot;;</span>
+<span class="fc" id="L77">        String categories = &quot;&quot;;</span>
+<span class="fc" id="L78">        String scimagoId = &quot;&quot;;</span>
+<span class="fc" id="L79">        String hIndex = &quot;&quot;;</span>
+<span class="fc" id="L80">        String issn = &quot;&quot;;</span>
+<span class="fc" id="L81">        List&lt;Pair&lt;Integer, Double&gt;&gt; sjrArray = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L82">        List&lt;Pair&lt;Integer, Double&gt;&gt; snipArray = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L83">        List&lt;Pair&lt;Integer, Double&gt;&gt; docsThisYear = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L84">        List&lt;Pair&lt;Integer, Double&gt;&gt; docsPrevious3Years = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L85">        List&lt;Pair&lt;Integer, Double&gt;&gt; citableDocsPrevious3Years = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L86">        List&lt;Pair&lt;Integer, Double&gt;&gt; citesOutgoing = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L87">        List&lt;Pair&lt;Integer, Double&gt;&gt; citesOutgoingPerDoc = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L88">        List&lt;Pair&lt;Integer, Double&gt;&gt; citesIncomingByRecentlyPublished = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L89">        List&lt;Pair&lt;Integer, Double&gt;&gt; citesIncomingPerDocByRecentlyPublished = new ArrayList&lt;&gt;();</span>
+
+        try {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (responseJsonObject.has(&quot;errors&quot;)) {</span>
+<span class="fc" id="L93">                JSONArray errors = responseJsonObject.optJSONArray(&quot;errors&quot;);</span>
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">                if (errors != null &amp;&amp; !errors.isEmpty()) {</span>
+<span class="fc" id="L95">                    JSONObject error = errors.getJSONObject(0);</span>
+<span class="fc" id="L96">                    String errorMessage = error.optString(&quot;message&quot;, &quot;&quot;);</span>
+<span class="fc" id="L97">                    LOGGER.error(&quot;Error accessing catalog: {}&quot;, errorMessage);</span>
+                }
+<span class="fc" id="L99">                throw new FetcherException(Localization.lang(&quot;Error accessing catalog&quot;));</span>
+            }
+
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (responseJsonObject.has(&quot;data&quot;)) {</span>
+<span class="fc" id="L103">                JSONObject data = responseJsonObject.getJSONObject(&quot;data&quot;);</span>
+<span class="pc bpc" id="L104" title="1 of 4 branches missed.">                if (data.has(&quot;journal&quot;) &amp;&amp; data.get(&quot;journal&quot;) != null) {</span>
+<span class="fc" id="L105">                    JSONObject journalData = data.getJSONObject(&quot;journal&quot;);</span>
+
+<span class="fc" id="L107">                    title = journalData.optString(&quot;name&quot;, &quot;&quot;);</span>
+<span class="fc" id="L108">                    publisher = journalData.optString(&quot;publisher&quot;, &quot;&quot;);</span>
+<span class="fc" id="L109">                    coverageStartYear = journalData.optString(&quot;coverageStartYear&quot;, &quot;&quot;);</span>
+<span class="fc" id="L110">                    coverageEndYear = journalData.optString(&quot;coverageEndYear&quot;, &quot;&quot;);</span>
+<span class="fc" id="L111">                    scimagoId = journalData.optString(&quot;scimagoId&quot;, &quot;&quot;);</span>
+<span class="fc" id="L112">                    country = journalData.optString(&quot;country&quot;, &quot;&quot;);</span>
+<span class="fc" id="L113">                    issn = getConcatenatedString(journalData, &quot;issn&quot;);</span>
+<span class="fc" id="L114">                    subjectArea = getConcatenatedString(journalData, &quot;areas&quot;);</span>
+<span class="fc" id="L115">                    categories = getConcatenatedString(journalData, &quot;categories&quot;);</span>
+<span class="fc" id="L116">                    hIndex = journalData.optString(&quot;hIndex&quot;, &quot;&quot;);</span>
+
+<span class="fc" id="L118">                    JSONArray citationInfo = journalData.optJSONArray(&quot;citationInfo&quot;);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                    if (citationInfo != null) {</span>
+<span class="fc" id="L120">                        docsThisYear = parseCitationInfo(citationInfo, &quot;docsThisYear&quot;);</span>
+<span class="fc" id="L121">                        docsPrevious3Years = parseCitationInfo(citationInfo, &quot;docsPrevious3Years&quot;);</span>
+<span class="fc" id="L122">                        citableDocsPrevious3Years = parseCitationInfo(citationInfo, &quot;citableDocsPrevious3Years&quot;);</span>
+<span class="fc" id="L123">                        citesOutgoing = parseCitationInfo(citationInfo, &quot;citesOutgoing&quot;);</span>
+<span class="fc" id="L124">                        citesOutgoingPerDoc = parseCitationInfo(citationInfo, &quot;citesOutgoingPerDoc&quot;);</span>
+<span class="fc" id="L125">                        citesIncomingByRecentlyPublished = parseCitationInfo(citationInfo, &quot;citesIncomingByRecentlyPublished&quot;);</span>
+<span class="fc" id="L126">                        citesIncomingPerDocByRecentlyPublished = parseCitationInfo(citationInfo, &quot;citesIncomingPerDocByRecentlyPublished&quot;);</span>
+<span class="fc" id="L127">                        sjrArray = parseCitationInfo(citationInfo, &quot;sjrIndex&quot;);</span>
+<span class="fc" id="L128">                        snipArray = parseCitationInfo(citationInfo, &quot;snipIndex&quot;);</span>
+                    }
+<span class="fc" id="L130">                } else {</span>
+<span class="fc" id="L131">                    throw new FetcherException(Localization.lang(&quot;ISSN and/or journal name not found in catalog&quot;));</span>
+                }
+<span class="fc" id="L133">            } else {</span>
+<span class="nc" id="L134">                throw new FetcherException(Localization.lang(&quot;ISSN and/or journal name not found in catalog&quot;));</span>
+            }
+<span class="nc" id="L136">        } catch (JSONException e) {</span>
+<span class="nc" id="L137">            throw new FetcherException(Localization.lang(&quot;Parsing error&quot;), e);</span>
+<span class="fc" id="L138">        }</span>
+
+<span class="fc" id="L140">        return new JournalInformation(</span>
+                title,
+                publisher,
+                coverageStartYear,
+                coverageEndYear,
+                subjectArea,
+                country,
+                categories,
+                scimagoId,
+                hIndex,
+                issn,
+                sjrArray,
+                snipArray,
+                docsThisYear,
+                docsPrevious3Years,
+                citableDocsPrevious3Years,
+                citesOutgoing,
+                citesOutgoingPerDoc,
+                citesIncomingByRecentlyPublished,
+                citesIncomingPerDocByRecentlyPublished
+        );
+    }
+
+    private static String getConcatenatedString(JSONObject jsonObject, String key) {
+<span class="fc" id="L164">        JSONArray jsonArray = jsonObject.optJSONArray(key);</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (jsonArray != null) {</span>
+<span class="fc" id="L166">            return QUOTES_BRACKET_PATTERN.matcher(jsonArray.join(&quot;, &quot;)).replaceAll(&quot;&quot;);</span>
+        } else {
+<span class="nc" id="L168">            return &quot;&quot;;</span>
+        }
+    }
+
+    private JSONObject buildPostData(String issn, String journalName) {
+<span class="fc" id="L173">        String query = &quot;&quot;&quot;</span>
+                query GetJournal($issn: String, $name: String) {
+                  journal(issn: $issn, name: $name) {
+                    id
+                    name
+                    issn
+                    scimagoId
+                    country
+                    publisher
+                    areas
+                    categories
+                    citationInfo {
+                      year
+                      docsThisYear
+                      docsPrevious3Years
+                      citableDocsPrevious3Years
+                      citesOutgoing
+                      citesOutgoingPerDoc
+                      citesIncomingByRecentlyPublished
+                      citesIncomingPerDocByRecentlyPublished
+                      sjrIndex
+                    }
+                    hIndex
+                  }
+                }&quot;&quot;&quot;;
+
+<span class="fc" id="L199">        JSONObject postData = new JSONObject();</span>
+<span class="fc" id="L200">        postData.put(&quot;query&quot;, query);</span>
+<span class="fc" id="L201">        postData.put(&quot;operationName&quot;, &quot;GetJournal&quot;);</span>
+
+<span class="fc" id="L203">        JSONObject variables = new JSONObject();</span>
+<span class="fc" id="L204">        variables.put(&quot;issn&quot;, issn);</span>
+<span class="fc" id="L205">        variables.put(&quot;name&quot;, journalName);</span>
+<span class="fc" id="L206">        postData.put(&quot;variables&quot;, variables);</span>
+
+<span class="fc" id="L208">        return postData;</span>
+    }
+
+    private List&lt;Pair&lt;Integer, Double&gt;&gt; parseCitationInfo(JSONArray jsonArray, String key) {
+<span class="fc" id="L212">        List&lt;Pair&lt;Integer, Double&gt;&gt; parsedArray = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L213">        Set&lt;Integer&gt; yearSet = new HashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        for (int i = 0; i &lt; jsonArray.length(); i++) {</span>
+<span class="fc" id="L216">            JSONObject item = jsonArray.getJSONObject(i);</span>
+
+<span class="pc bpc" id="L218" title="1 of 4 branches missed.">            if (item.has(&quot;year&quot;) &amp;&amp; item.has(key)) {</span>
+<span class="fc" id="L219">                int year = item.getInt(&quot;year&quot;);</span>
+<span class="fc" id="L220">                double value = item.getDouble(key);</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                if (!yearSet.contains(year)) {</span>
+<span class="fc" id="L222">                    parsedArray.add(new Pair&lt;&gt;(year, value));</span>
+<span class="fc" id="L223">                    yearSet.add(year);</span>
+                }
+            }
+        }
+
+<span class="fc" id="L228">        parsedArray.sort(Comparator.comparing(Pair::getKey));</span>
+<span class="fc" id="L229">        return parsedArray;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
