@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LatexIntegrityChecker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.integrity</a> &gt; <span class="el_source">LatexIntegrityChecker.java</span></div><h1>LatexIntegrityChecker.java</h1><pre class="source lang-java linenums">package org.jabref.logic.integrity;
+
+import java.io.IOException;
+import java.text.MessageFormat;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.stream.Stream;
+
+import javafx.util.Pair;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldProperty;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import uk.ac.ed.ph.snuggletex.ErrorCode;
+import uk.ac.ed.ph.snuggletex.InputError;
+import uk.ac.ed.ph.snuggletex.SnuggleEngine;
+import uk.ac.ed.ph.snuggletex.SnuggleInput;
+import uk.ac.ed.ph.snuggletex.SnugglePackage;
+import uk.ac.ed.ph.snuggletex.SnuggleSession;
+import uk.ac.ed.ph.snuggletex.definitions.CoreErrorCode;
+import uk.ac.ed.ph.snuggletex.definitions.CoreErrorGroup;
+
+import static uk.ac.ed.ph.snuggletex.definitions.Globals.TEXT_MODE_ONLY;
+
+/**
+ * Similar check to {@link HTMLCharacterChecker}.
+ * Here, we use &lt;a href=&quot;https://github.com/davemckain/snuggletex&quot;&gt;SnuggleTeX&lt;/a&gt;, in the {@link HTMLCharacterChecker}, it is searched for HTML characters.
+ *
+ * Unescaped ampersands cannot be checked by SnuggleTeX, therefore the {@link AmpersandChecker} is available additionaly.
+ */
+<span class="fc" id="L38">public class LatexIntegrityChecker implements EntryChecker {</span>
+
+<span class="fc" id="L40">    private static final Logger LOGGER = LoggerFactory.getLogger(SnuggleSession.class);</span>
+<span class="fc" id="L41">    private static final SnuggleEngine ENGINE = new SnuggleEngine();</span>
+    private static final SnuggleSession SESSION;
+<span class="fc" id="L43">    private static final ResourceBundle ERROR_MESSAGES = ENGINE.getPackages().get(0).getErrorMessageBundle();</span>
+<span class="fc" id="L44">    private static final Set&lt;ErrorCode&gt; EXCLUDED_ERRORS = new HashSet&lt;&gt;();</span>
+
+    static {
+<span class="fc" id="L47">        SnugglePackage snugglePackage = ENGINE.getPackages().get(0);</span>
+<span class="fc" id="L48">        snugglePackage.addComplexCommand(&quot;textgreater&quot;, false, 0, TEXT_MODE_ONLY, null, null, null);</span>
+<span class="fc" id="L49">        snugglePackage.addComplexCommand(&quot;textless&quot;, false, 0, TEXT_MODE_ONLY, null, null, null);</span>
+<span class="fc" id="L50">        snugglePackage.addComplexCommand(&quot;textbackslash&quot;, false, 0, TEXT_MODE_ONLY, null, null, null);</span>
+<span class="fc" id="L51">        snugglePackage.addComplexCommand(&quot;textbar&quot;, false, 0, TEXT_MODE_ONLY, null, null, null);</span>
+        // ENGINE.getPackages().get(0).addComplexCommandOneArg()
+              // engine.getPackages().get(0).addComplexCommandOneArg(&quot;text&quot;, false, ALL_MODES,LR, StyleDeclarationInterpretation.NORMALSIZE, null, TextFlowContext.ALLOW_INLINE);
+
+<span class="fc" id="L55">        SESSION = ENGINE.createSession();</span>
+<span class="fc" id="L56">        SESSION.getConfiguration().setFailingFast(true);</span>
+
+        // '#' only allowed inside and command/environment definitions.
+<span class="fc" id="L59">        EXCLUDED_ERRORS.add(CoreErrorCode.TTEG04);</span>
+<span class="fc" id="L60">    }</span>
+
+    @Override
+    public List&lt;IntegrityMessage&gt; check(BibEntry entry) {
+<span class="fc" id="L64">        return entry.getFieldMap().entrySet().stream()</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                    .filter(field -&gt; !field.getKey().getProperties().contains(FieldProperty.VERBATIM))</span>
+<span class="fc" id="L66">                    .flatMap(LatexIntegrityChecker::getUnescapedAmpersandsWithCount)</span>
+                    // Exclude all DOM building errors as this functionality is not used.
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                    .filter(pair -&gt; !pair.getValue().getErrorCode().getErrorGroup().equals(CoreErrorGroup.TDE))</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                    .filter(pair -&gt; !EXCLUDED_ERRORS.contains(pair.getValue().getErrorCode()))</span>
+<span class="fc" id="L70">                    .map(pair -&gt;</span>
+<span class="fc" id="L71">                            new IntegrityMessage(errorMessageFormatHelper(pair.getValue().getErrorCode(), pair.getValue().getArguments()), entry, pair.getKey()))</span>
+<span class="fc" id="L72">                    .toList();</span>
+    }
+
+    private static Stream&lt;Pair&lt;Field, InputError&gt;&gt; getUnescapedAmpersandsWithCount(Map.Entry&lt;Field, String&gt; entry) {
+<span class="fc" id="L76">        SESSION.reset();</span>
+<span class="fc" id="L77">        SnuggleInput input = new SnuggleInput(entry.getValue());</span>
+        try {
+<span class="fc" id="L79">            SESSION.parseInput(input);</span>
+<span class="nc" id="L80">        } catch (IOException e) {</span>
+<span class="nc" id="L81">            LOGGER.error(&quot;Error at parsing&quot;, e);</span>
+<span class="nc" id="L82">            return Stream.empty();</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (SESSION.getErrors().isEmpty()) {</span>
+<span class="fc" id="L85">            return Stream.empty();</span>
+        }
+        // Retrieve the first error only because it is likely to be more meaningful.
+        // Displaying all (subsequent) faults may lead to confusion.
+        // We further get a slight performance benefit from failing fast (see static config in class header).
+<span class="fc" id="L90">        InputError error = SESSION.getErrors().get(0);</span>
+<span class="fc" id="L91">        return Stream.of(new Pair&lt;&gt;(entry.getKey(), error));</span>
+    }
+
+    public static String errorMessageFormatHelper(ErrorCode snuggleTexErrorCode, Object... arguments) {
+<span class="fc" id="L95">        String snuggletexMessagePattern = LatexIntegrityChecker.ERROR_MESSAGES.getString(snuggleTexErrorCode.getName());</span>
+<span class="fc" id="L96">        String snuggletexErrorMessage = MessageFormat.format(snuggletexMessagePattern, arguments);</span>
+<span class="fc" id="L97">        return Localization.lang(&quot;LaTeX Warning: %0&quot;, snuggletexErrorMessage);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

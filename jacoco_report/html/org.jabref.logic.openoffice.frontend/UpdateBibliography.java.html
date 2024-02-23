@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UpdateBibliography.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice.frontend</a> &gt; <span class="el_source">UpdateBibliography.java</span></div><h1>UpdateBibliography.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice.frontend;
+
+import java.util.Optional;
+
+import org.jabref.logic.openoffice.style.OOBibStyle;
+import org.jabref.logic.openoffice.style.OOFormatBibliography;
+import org.jabref.model.openoffice.ootext.OOText;
+import org.jabref.model.openoffice.ootext.OOTextIntoOO;
+import org.jabref.model.openoffice.style.CitedKeys;
+import org.jabref.model.openoffice.uno.CreationException;
+import org.jabref.model.openoffice.uno.NoDocumentException;
+import org.jabref.model.openoffice.uno.UnoBookmark;
+import org.jabref.model.openoffice.uno.UnoTextSection;
+
+import com.sun.star.lang.WrappedTargetException;
+import com.sun.star.text.XTextCursor;
+import com.sun.star.text.XTextDocument;
+import com.sun.star.text.XTextRange;
+
+public class UpdateBibliography {
+
+    private static final String BIB_SECTION_NAME = &quot;JR_bib&quot;;
+    private static final String BIB_SECTION_END_NAME = &quot;JR_bib_end&quot;;
+
+    private UpdateBibliography() {
+    }
+
+    public static Optional&lt;XTextRange&gt; getBibliographyRange(XTextDocument doc)
+            throws
+            NoDocumentException,
+            WrappedTargetException {
+<span class="nc" id="L32">        return UnoTextSection.getAnchor(doc, BIB_SECTION_NAME);</span>
+    }
+
+    /**
+     * Rebuilds the bibliography.
+     */
+    public static void rebuildBibTextSection(XTextDocument doc,
+                                             OOFrontend frontend,
+                                             CitedKeys bibliography,
+                                             OOBibStyle style,
+                                             boolean alwaysAddCitedOnPages)
+            throws
+            WrappedTargetException,
+            CreationException,
+            NoDocumentException {
+
+<span class="nc" id="L48">        clearBibTextSectionContent2(doc);</span>
+
+<span class="nc" id="L50">        populateBibTextSection(doc,</span>
+                frontend,
+                bibliography,
+                style,
+                alwaysAddCitedOnPages);
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * Insert a paragraph break and create a text section for the bibliography.
+     * &lt;p&gt;
+     * Only called from `clearBibTextSectionContent2`
+     */
+    private static void createBibTextSection2(XTextDocument doc)
+            throws
+            CreationException {
+
+        // Always creating at the end of the document.
+        // Alternatively, we could receive a cursor.
+<span class="nc" id="L68">        XTextCursor textCursor = doc.getText().createTextCursor();</span>
+<span class="nc" id="L69">        textCursor.gotoEnd(false);</span>
+<span class="nc" id="L70">        UnoTextSection.create(doc, BIB_SECTION_NAME, textCursor, false);</span>
+<span class="nc" id="L71">    }</span>
+
+    /**
+     * Find and clear the text section BIB_SECTION_NAME to &quot;&quot;, or create it.
+     * &lt;p&gt;
+     * Only called from: `rebuildBibTextSection`
+     */
+    private static void clearBibTextSectionContent2(XTextDocument doc)
+            throws
+            CreationException,
+            NoDocumentException,
+            WrappedTargetException {
+
+        // Optional&lt;XTextRange&gt; sectionRange = UnoTextSection.getAnchor(doc, BIB_SECTION_NAME);
+<span class="nc" id="L85">        Optional&lt;XTextRange&gt; sectionRange = getBibliographyRange(doc);</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (sectionRange.isEmpty()) {</span>
+<span class="nc" id="L87">            createBibTextSection2(doc);</span>
+        } else {
+            // Clear it
+<span class="nc" id="L90">            XTextCursor cursor = doc.getText().createTextCursorByRange(sectionRange.get());</span>
+<span class="nc" id="L91">            cursor.setString(&quot;&quot;);</span>
+        }
+<span class="nc" id="L93">    }</span>
+
+    /**
+     * Only called from: `rebuildBibTextSection`
+     * &lt;p&gt;
+     * Assumes the section named BIB_SECTION_NAME exists.
+     */
+    private static void populateBibTextSection(XTextDocument doc,
+                                               OOFrontend frontend,
+                                               CitedKeys bibliography,
+                                               OOBibStyle style,
+                                               boolean alwaysAddCitedOnPages)
+            throws
+            CreationException,
+            IllegalArgumentException,
+            NoDocumentException,
+            WrappedTargetException {
+
+<span class="nc" id="L111">        XTextRange sectionRange = getBibliographyRange(doc).orElseThrow(IllegalStateException::new);</span>
+
+<span class="nc" id="L113">        XTextCursor cursor = doc.getText().createTextCursorByRange(sectionRange);</span>
+
+        // emit the title of the bibliography
+<span class="nc" id="L116">        OOTextIntoOO.removeDirectFormatting(cursor);</span>
+<span class="nc" id="L117">        OOText bibliographyText = OOFormatBibliography.formatBibliography(frontend.citationGroups,</span>
+                bibliography,
+                style,
+                alwaysAddCitedOnPages);
+<span class="nc" id="L121">        OOTextIntoOO.write(doc, cursor, bibliographyText);</span>
+<span class="nc" id="L122">        cursor.collapseToEnd();</span>
+
+        // remove the initial empty paragraph from the section.
+<span class="nc" id="L125">        sectionRange = getBibliographyRange(doc).orElseThrow(IllegalStateException::new);</span>
+<span class="nc" id="L126">        XTextCursor initialParagraph = doc.getText().createTextCursorByRange(sectionRange);</span>
+<span class="nc" id="L127">        initialParagraph.collapseToStart();</span>
+<span class="nc" id="L128">        initialParagraph.goRight((short) 1, true);</span>
+<span class="nc" id="L129">        initialParagraph.setString(&quot;&quot;);</span>
+
+<span class="nc" id="L131">        UnoBookmark.removeIfExists(doc, BIB_SECTION_END_NAME);</span>
+<span class="nc" id="L132">        UnoBookmark.create(doc, BIB_SECTION_END_NAME, cursor, true);</span>
+
+<span class="nc" id="L134">        cursor.collapseToEnd();</span>
+<span class="nc" id="L135">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

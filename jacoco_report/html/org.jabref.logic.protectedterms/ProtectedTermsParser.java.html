@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtectedTermsParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.protectedterms</a> &gt; <span class="el_source">ProtectedTermsParser.java</span></div><h1>ProtectedTermsParser.java</h1><pre class="source lang-java linenums">package org.jabref.logic.protectedterms;
+
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.jabref.logic.l10n.Localization;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Reads abbreviation files (property files using NAME = ABBREVIATION as a format) into a list of Abbreviations.
+ */
+<span class="fc" id="L22">public class ProtectedTermsParser {</span>
+
+<span class="fc" id="L24">    private static final Logger LOGGER = LoggerFactory.getLogger(ProtectedTermsParser.class);</span>
+
+<span class="fc" id="L26">    private final List&lt;String&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L27">    private String description = Localization.lang(&quot;The text after the last line starting with # will be used&quot;);</span>
+
+    private String location;
+
+    public void readTermsFromResource(String resourceFileName, String descriptionString) {
+        try {
+<span class="fc" id="L33">            Path path = Path.of(Objects.requireNonNull(ProtectedTermsLoader.class.getResource(Objects.requireNonNull(resourceFileName))).toURI());</span>
+<span class="fc" id="L34">            readTermsList(path);</span>
+<span class="fc" id="L35">            description = descriptionString;</span>
+<span class="fc" id="L36">            location = resourceFileName;</span>
+<span class="nc" id="L37">        } catch (URISyntaxException e1) {</span>
+<span class="nc" id="L38">            LOGGER.error(&quot;&quot;);</span>
+<span class="fc" id="L39">        }</span>
+<span class="fc" id="L40">    }</span>
+
+    public void readTermsFromFile(Path path) {
+<span class="fc" id="L43">        location = path.toAbsolutePath().toString();</span>
+<span class="fc" id="L44">        readTermsList(path);</span>
+<span class="fc" id="L45">    }</span>
+
+    private void readTermsList(Path path) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (!Files.exists(path)) {</span>
+<span class="nc" id="L49">            LOGGER.warn(&quot;Could not read terms from file {}&quot;, path);</span>
+<span class="nc" id="L50">            return;</span>
+        }
+<span class="fc" id="L52">        try (Stream&lt;String&gt; lines = Files.lines(path, StandardCharsets.UTF_8)) {</span>
+<span class="fc" id="L53">            this.terms.addAll(lines.map(this::setDescription).filter(Objects::nonNull).collect(Collectors.toList()));</span>
+<span class="nc" id="L54">        } catch (IOException e) {</span>
+<span class="nc" id="L55">            LOGGER.warn(&quot;Could not read terms from file {}&quot;, path, e);</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">    }</span>
+
+    /**
+     * Parse the description that starts after the # but don't include it in the terms
+     *
+     * @return line or null if the line contains the description
+     */
+    private String setDescription(String line) {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (line.startsWith(&quot;#&quot;)) {</span>
+<span class="fc" id="L66">            description = line.substring(1).trim();</span>
+<span class="fc" id="L67">            return null;</span>
+        }
+<span class="fc" id="L69">        return line;</span>
+    }
+
+    public ProtectedTermsList getProtectTermsList(boolean enabled, boolean internal) {
+<span class="fc" id="L73">        ProtectedTermsList termList = new ProtectedTermsList(description, terms, location, internal);</span>
+<span class="fc" id="L74">        termList.setEnabled(enabled);</span>
+<span class="fc" id="L75">        return termList;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

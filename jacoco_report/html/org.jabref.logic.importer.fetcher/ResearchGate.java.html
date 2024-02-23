@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResearchGate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">ResearchGate.java</span></div><h1>ResearchGate.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.importer.EntryBasedFetcher;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.FulltextFetcher;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.SearchBasedFetcher;
+import org.jabref.logic.importer.fetcher.transformers.DefaultQueryTransformer;
+import org.jabref.logic.importer.fileformat.BibtexParser;
+import org.jabref.logic.layout.format.RTFChars;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.logic.util.OS;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.identifier.DOI;
+
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.jsoup.Connection;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ResearchGate implements FulltextFetcher, EntryBasedFetcher, SearchBasedFetcher {
+
+<span class="fc" id="L40">    private static final Logger LOGGER = LoggerFactory.getLogger(ResearchGate.class);</span>
+    private static final String HOST = &quot;https://www.researchgate.net/&quot;;
+    private static final String GOOGLE_SEARCH = &quot;https://www.google.com/search?q=&quot;;
+    private static final String GOOGLE_SITE = &quot;%20site:researchgate.net&quot;;
+    private static final String SEARCH = &quot;https://www.researchgate.net/search.Search.html?&quot;;
+    private static final String SEARCH_FOR_BIB_ENTRY = &quot;https://www.researchgate.net/lite.publication.PublicationDownloadCitationModal.downloadCitation.html?fileType=BibTeX&amp;citation=citationAndAbstract&amp;publicationUid=&quot;;
+    private final ImportFormatPreferences formatPreferences;
+
+<span class="fc" id="L48">    public ResearchGate(ImportFormatPreferences importFormatPreferences) {</span>
+<span class="fc" id="L49">        this.formatPreferences = importFormatPreferences;</span>
+<span class="fc" id="L50">    }</span>
+
+    /**
+     * Tries to find a fulltext URL for a given BibTex entry.
+     * &lt;p&gt;
+     * Search by title first, as DOI is not searchable directly. When the title is not present, the search is made with DOI via google.com with site:researchgate.net
+     *
+     * @param entry The Bibtex entry
+     * @return The fulltext PDF URL Optional, if found, or an empty Optional if not found.
+     * @throws IOException      if an IO operation has failed
+     * @throws FetcherException if the ResearchGate refuses to serve the page
+     */
+    @Override
+    public Optional&lt;URL&gt; findFullText(BibEntry entry) throws IOException, FetcherException {
+<span class="fc" id="L64">        Objects.requireNonNull(entry);</span>
+
+        Document html;
+        try {
+<span class="fc" id="L68">            html = getHTML(entry);</span>
+<span class="fc" id="L69">        } catch (FetcherException | NullPointerException e) {</span>
+<span class="fc" id="L70">            LOGGER.debug(&quot;ResearchGate server is not available&quot;);</span>
+<span class="fc" id="L71">            return Optional.empty();</span>
+<span class="fc" id="L72">        }</span>
+<span class="fc" id="L73">        Elements eLink = html.getElementsByTag(&quot;section&quot;);</span>
+<span class="fc" id="L74">        String link = eLink.select(&quot;a[href^=https]&quot;).select(&quot;a[href$=.pdf]&quot;).attr(&quot;href&quot;);</span>
+<span class="fc" id="L75">        LOGGER.debug(&quot;PDF link: {}&quot;, link);</span>
+
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (link.contains(&quot;researchgate.net&quot;)) {</span>
+<span class="nc" id="L78">            return Optional.of(new URL(link));</span>
+        }
+<span class="fc" id="L80">        return Optional.empty();</span>
+    }
+
+    private Document getHTML(BibEntry entry) throws FetcherException, IOException {
+        // DOI search
+<span class="fc" id="L85">        Optional&lt;String&gt; title = entry.getField(StandardField.TITLE);</span>
+<span class="fc" id="L86">        Optional&lt;DOI&gt; doi = entry.getField(StandardField.DOI).flatMap(DOI::parse);</span>
+
+        // Retrieve PDF link
+        Optional&lt;String&gt; linkForSearch;
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (title.isPresent()) {</span>
+<span class="fc" id="L91">            LOGGER.trace(&quot;Search by Title&quot;);</span>
+<span class="nc" id="L92">            linkForSearch = getURLByString(title.get());</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (linkForSearch.isPresent()) {</span>
+<span class="nc" id="L94">                Connection connection = Jsoup.connect(linkForSearch.get());</span>
+<span class="nc" id="L95">                return connection</span>
+<span class="nc" id="L96">                        .cookieStore(connection.cookieStore())</span>
+<span class="nc" id="L97">                        .userAgent(URLDownload.USER_AGENT)</span>
+<span class="nc" id="L98">                        .referrer(&quot;www.google.com&quot;)</span>
+<span class="nc" id="L99">                        .ignoreHttpErrors(true)</span>
+<span class="nc" id="L100">                        .get();</span>
+            }
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (doi.isPresent()) {</span>
+<span class="fc" id="L104">            LOGGER.trace(&quot;Search by DOI&quot;);</span>
+            // Retrieve PDF link
+<span class="fc" id="L106">            linkForSearch = getURLByDoi(doi.get());</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if (linkForSearch.isPresent()) {</span>
+<span class="fc" id="L108">                Connection connection = Jsoup.connect(linkForSearch.get());</span>
+<span class="fc" id="L109">                return connection</span>
+<span class="fc" id="L110">                        .cookieStore(connection.cookieStore())</span>
+<span class="fc" id="L111">                        .userAgent(URLDownload.USER_AGENT)</span>
+<span class="fc" id="L112">                        .ignoreHttpErrors(true)</span>
+<span class="fc" id="L113">                        .get();</span>
+            }
+        }
+<span class="fc" id="L116">        throw new FetcherException(&quot;Could not find a pdf&quot;);</span>
+    }
+
+    Optional&lt;String&gt; getURLByString(String query) throws IOException, NullPointerException {
+        URIBuilder source;
+        String link;
+        try {
+<span class="fc" id="L123">            source = new URIBuilder(SEARCH);</span>
+<span class="fc" id="L124">            source.addParameter(&quot;type&quot;, &quot;publication&quot;);</span>
+<span class="fc" id="L125">            source.addParameter(&quot;query&quot;, query);</span>
+
+<span class="fc" id="L127">            URLDownload urlDownload = new URLDownload(source.toString());</span>
+<span class="nc" id="L128">            urlDownload.getCookieFromUrl();</span>
+<span class="nc" id="L129">            Document html = Jsoup.connect(source.toString())</span>
+<span class="nc" id="L130">                                 .userAgent(URLDownload.USER_AGENT)</span>
+<span class="nc" id="L131">                                 .referrer(&quot;www.google.com&quot;)</span>
+<span class="nc" id="L132">                                 .ignoreHttpErrors(true)</span>
+<span class="nc" id="L133">                                 .get();</span>
+
+<span class="nc" id="L135">            link = HOST + Objects.requireNonNull(html.getElementById(&quot;content&quot;))</span>
+<span class="nc" id="L136">                                 .select(&quot;a[href^=publication/]&quot;)</span>
+<span class="nc" id="L137">                                 .attr(&quot;href&quot;);</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            if (link.contains(&quot;?&quot;)) {</span>
+<span class="nc" id="L139">                link = link.substring(0, link.indexOf(&quot;?&quot;));</span>
+            }
+<span class="nc" id="L141">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L142">            return Optional.empty();</span>
+<span class="nc" id="L143">        }</span>
+<span class="nc" id="L144">        LOGGER.trace(&quot;URL for page: {}&quot;, link);</span>
+<span class="nc" id="L145">        return Optional.of(link);</span>
+    }
+
+    Optional&lt;String&gt; getURLByDoi(DOI doi) throws IOException, NullPointerException {
+        String link;
+        try {
+<span class="fc" id="L151">            URIBuilder source = new URIBuilder(SEARCH);</span>
+<span class="fc" id="L152">            source.addParameter(&quot;type&quot;, &quot;publication&quot;);</span>
+<span class="fc" id="L153">            source.addParameter(&quot;query&quot;, doi.getDOI());</span>
+
+<span class="fc" id="L155">            source = new URIBuilder(GOOGLE_SEARCH + doi.getDOI() + GOOGLE_SITE);</span>
+<span class="fc" id="L156">            Connection connection = Jsoup.connect(source.toString());</span>
+<span class="fc" id="L157">            Document html = connection</span>
+<span class="fc" id="L158">                    .cookieStore(connection.cookieStore())</span>
+<span class="fc" id="L159">                    .userAgent(URLDownload.USER_AGENT)</span>
+<span class="fc" id="L160">                    .ignoreHttpErrors(true)</span>
+<span class="fc" id="L161">                    .get();</span>
+
+<span class="fc" id="L163">            link = Objects.requireNonNull(html.getElementById(&quot;search&quot;))</span>
+<span class="fc" id="L164">                          .select(&quot;a&quot;).attr(&quot;href&quot;);</span>
+<span class="nc" id="L165">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L166">            return Optional.empty();</span>
+<span class="fc" id="L167">        }</span>
+<span class="fc" id="L168">        LOGGER.trace(&quot;URL for page: {}&quot;, link);</span>
+<span class="fc" id="L169">        return Optional.of(link);</span>
+    }
+
+    /**
+     * Constructs a URL based on the query, size and page number.
+     * &lt;p&gt;
+     * Extract the numerical internal ID and add it to the URL to receive a link to a {@link BibEntry}
+     *
+     * @param luceneQuery the search query.
+     * @return A URL that lets us download a .bib file
+     * @throws URISyntaxException from {@link URIBuilder}'s build() method
+     * @throws IOException        from {@link Connection}'s get() method
+     */
+    private Document getPage(QueryNode luceneQuery) throws URISyntaxException, IOException {
+<span class="fc" id="L183">        String query = new DefaultQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;);</span>
+<span class="fc" id="L184">        URIBuilder source = new URIBuilder(SEARCH);</span>
+<span class="fc" id="L185">        source.addParameter(&quot;type&quot;, &quot;publication&quot;);</span>
+<span class="fc" id="L186">        source.addParameter(&quot;query&quot;, query);</span>
+<span class="fc" id="L187">        return Jsoup.connect(source.build().toString())</span>
+<span class="fc" id="L188">                    .userAgent(URLDownload.USER_AGENT)</span>
+<span class="fc" id="L189">                    .referrer(&quot;www.google.com&quot;)</span>
+<span class="fc" id="L190">                    .ignoreHttpErrors(true)</span>
+<span class="fc" id="L191">                    .get();</span>
+    }
+
+    @Override
+    public TrustLevel getTrustLevel() {
+<span class="fc" id="L196">        return TrustLevel.META_SEARCH;</span>
+    }
+
+    /**
+     * This method is used to send complex queries using fielded search.
+     *
+     * @param luceneQuery the root node of the lucene query
+     * @return a list of {@link BibEntry}, which are matched by the query (maybe empty)
+     * @throws FetcherException if the ResearchGate refuses to serve the page
+     */
+    @Override
+    public List&lt;BibEntry&gt; performSearch(QueryNode luceneQuery) throws FetcherException {
+        Document html;
+        try {
+<span class="fc" id="L210">            html = getPage(luceneQuery);</span>
+            // ResearchGate's server blocks when too many request are made
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">            if (!html.getElementsByClass(&quot;nova-legacy-v-publication-item__title&quot;).hasText()) {</span>
+<span class="fc" id="L213">                throw new FetcherException(&quot;ResearchGate server unavailable&quot;);</span>
+            }
+<span class="nc" id="L215">        } catch (URISyntaxException | IOException e) {</span>
+<span class="nc" id="L216">            throw new FetcherException(&quot;URL is not correct&quot;, e);</span>
+<span class="nc" id="L217">        }</span>
+
+<span class="nc" id="L219">        Elements sol = html.getElementsByClass(&quot;nova-legacy-v-publication-item__title&quot;);</span>
+<span class="nc" id="L220">        List&lt;String&gt; urls = sol.select(&quot;a&quot;).eachAttr(&quot;href&quot;).stream()</span>
+<span class="nc" id="L221">                               .filter(stream -&gt; stream.contains(&quot;publication/&quot;))</span>
+<span class="nc" id="L222">                               .map(resultStream -&gt; resultStream.substring(resultStream.indexOf(&quot;publication/&quot;) + 12, resultStream.indexOf(&quot;_&quot;)))</span>
+<span class="nc" id="L223">                               .map(idStream -&gt; SEARCH_FOR_BIB_ENTRY + idStream)</span>
+<span class="nc" id="L224">                               .map(this::getInputStream)</span>
+<span class="nc" id="L225">                               .filter(Objects::nonNull)</span>
+<span class="nc" id="L226">                               .map(stream -&gt; stream.lines().collect(Collectors.joining(OS.NEWLINE)))</span>
+<span class="nc" id="L227">                               .toList();</span>
+
+<span class="nc" id="L229">        List&lt;BibEntry&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        for (String bib : urls) {</span>
+<span class="nc" id="L231">            BibtexParser parser = new BibtexParser(formatPreferences);</span>
+            Optional&lt;BibEntry&gt; entry;
+            try {
+<span class="nc" id="L234">                entry = parser.parseSingleEntry(bib);</span>
+<span class="nc" id="L235">                entry.ifPresent(list::add);</span>
+<span class="nc" id="L236">            } catch (ParseException e) {</span>
+<span class="nc" id="L237">                LOGGER.debug(&quot;Entry is not convertible to Bibtex&quot;, e);</span>
+<span class="nc" id="L238">            }</span>
+<span class="nc" id="L239">        }</span>
+<span class="nc" id="L240">        return list;</span>
+    }
+
+    private BufferedReader getInputStream(String urlString) {
+        try {
+<span class="nc" id="L245">            URL url = new URL(urlString);</span>
+<span class="nc" id="L246">            return new BufferedReader(new InputStreamReader(url.openStream()));</span>
+<span class="nc" id="L247">        } catch (IOException e) {</span>
+<span class="nc" id="L248">            LOGGER.debug(&quot;Wrong URL:&quot;, e);</span>
+        }
+<span class="nc" id="L250">        return null;</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L255">        return &quot;ResearchGate&quot;;</span>
+    }
+
+    /**
+     * Looks for hits which are matched by the given {@link BibEntry}.
+     *
+     * @param entry entry to search bibliographic information for
+     * @return a list of {@link BibEntry}, which are matched by the query (maybe empty)
+     * @throws FetcherException if the ResearchGate refuses to serve the page
+     */
+    @Override
+    public List&lt;BibEntry&gt; performSearch(BibEntry entry) throws FetcherException {
+<span class="fc" id="L267">        Optional&lt;String&gt; title = entry.getTitle();</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (title.isEmpty()) {</span>
+<span class="nc" id="L269">            return new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L271">        return performSearch(new RTFChars().format(title.get()));</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

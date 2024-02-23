@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProcessingLibraryDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui</a> &gt; <span class="el_source">ProcessingLibraryDialog.java</span></div><h1>ProcessingLibraryDialog.java</h1><pre class="source lang-java linenums">package org.jabref.gui;
+
+import java.util.List;
+
+import javafx.concurrent.Task;
+
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.logic.l10n.Localization;
+
+/**
+ * Dialog shown when &lt;em&gt;closing&lt;/em&gt; of application needs to wait for a save operation to finish.
+ */
+public class ProcessingLibraryDialog {
+
+    private final DialogService dialogService;
+
+<span class="nc" id="L17">    public ProcessingLibraryDialog(DialogService dialogService) {</span>
+<span class="nc" id="L18">        this.dialogService = dialogService;</span>
+<span class="nc" id="L19">    }</span>
+
+    public void showAndWait(List&lt;LibraryTab&gt; libraryTabs) {
+<span class="nc bnc" id="L22" title="All 2 branches missed.">        if (libraryTabs.stream().anyMatch(tab -&gt; tab.isSaving())) {</span>
+<span class="nc" id="L23">            Task&lt;Void&gt; waitForSaveFinished = new Task&lt;&gt;() {</span>
+                @Override
+                protected Void call() throws Exception {
+<span class="nc bnc" id="L26" title="All 2 branches missed.">                    while (libraryTabs.stream().anyMatch(tab -&gt; tab.isSaving())) {</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">                        if (isCancelled()) {</span>
+<span class="nc" id="L28">                            return null;</span>
+                        } else {
+<span class="nc" id="L30">                            Thread.sleep(100);</span>
+                        }
+                    }
+<span class="nc" id="L33">                    return null;</span>
+                }
+            };
+
+<span class="nc" id="L37">            DefaultTaskExecutor.runInJavaFXThread(waitForSaveFinished);</span>
+<span class="nc" id="L38">            dialogService.showProgressDialogAndWait(</span>
+<span class="nc" id="L39">                    Localization.lang(&quot;Please wait...&quot;),</span>
+<span class="nc" id="L40">                    Localization.lang(&quot;Waiting for save operation to finish...&quot;),</span>
+                    waitForSaveFinished
+            );
+        }
+<span class="nc" id="L44">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

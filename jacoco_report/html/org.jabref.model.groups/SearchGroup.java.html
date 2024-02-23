@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchGroup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.groups</a> &gt; <span class="el_source">SearchGroup.java</span></div><h1>SearchGroup.java</h1><pre class="source lang-java linenums">package org.jabref.model.groups;
+
+import java.util.EnumSet;
+import java.util.Objects;
+
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.search.GroupSearchQuery;
+import org.jabref.model.search.rules.SearchRules.SearchFlags;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This group matches entries by a complex search pattern, which might include conditions about the values of
+ * multiple fields.
+ */
+public class SearchGroup extends AbstractGroup {
+
+<span class="fc" id="L19">    private static final Logger LOGGER = LoggerFactory.getLogger(SearchGroup.class);</span>
+    private final GroupSearchQuery query;
+
+    public SearchGroup(String name, GroupHierarchyType context, String searchExpression, EnumSet&lt;SearchFlags&gt; searchFlags) {
+<span class="fc" id="L23">        super(name, context);</span>
+<span class="fc" id="L24">        this.query = new GroupSearchQuery(searchExpression, searchFlags);</span>
+<span class="fc" id="L25">    }</span>
+
+    public String getSearchExpression() {
+<span class="fc" id="L28">        return query.getSearchExpression();</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L34">            return true;</span>
+        }
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (!(o instanceof SearchGroup)) {</span>
+<span class="nc" id="L37">            return false;</span>
+        }
+<span class="fc" id="L39">        SearchGroup other = (SearchGroup) o;</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        return Objects.equals(getName(), other.getName())</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">               &amp;&amp; Objects.equals(getHierarchicalContext(), other.getHierarchicalContext())</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">               &amp;&amp; Objects.equals(getSearchExpression(), other.getSearchExpression())</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">               &amp;&amp; Objects.equals(getSearchFlags(), other.getSearchFlags());</span>
+    }
+
+    @Override
+    public boolean contains(BibEntry entry) {
+<span class="fc" id="L48">        return query.isMatch(entry);</span>
+    }
+
+    public EnumSet&lt;SearchFlags&gt; getSearchFlags() {
+<span class="fc" id="L52">        return query.getSearchFlags();</span>
+    }
+
+    @Override
+    public AbstractGroup deepCopy() {
+        try {
+<span class="nc" id="L58">            return new SearchGroup(getName(), getHierarchicalContext(), getSearchExpression(), getSearchFlags());</span>
+<span class="nc" id="L59">        } catch (Throwable t) {</span>
+            // this should never happen, because the constructor obviously
+            // succeeded in creating _this_ instance!
+<span class="nc" id="L62">            LOGGER.error(&quot;Internal error in SearchGroup.deepCopy(). &quot;</span>
+                    + &quot;Please report this on https://github.com/JabRef/jabref/issues&quot;, t);
+<span class="nc" id="L64">            return null;</span>
+        }
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L70">        return &quot;SearchGroup [query=&quot; + query + &quot;, name=&quot; + name + &quot;, searchFlags=&quot; + getSearchFlags() + &quot;,  context=&quot; + context + &quot;, color=&quot; + color + &quot;, isExpanded=&quot; + isExpanded + &quot;, description=&quot; + description + &quot;, iconName=&quot; + iconName + &quot;]&quot;;</span>
+    }
+
+    @Override
+    public boolean isDynamic() {
+<span class="nc" id="L75">        return true;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L80">        return Objects.hash(getName(), getHierarchicalContext(), getSearchExpression(), getSearchFlags());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

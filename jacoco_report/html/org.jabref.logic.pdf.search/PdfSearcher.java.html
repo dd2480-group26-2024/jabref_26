@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfSearcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.pdf.search</a> &gt; <span class="el_source">PdfSearcher.java</span></div><h1>PdfSearcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.pdf.search;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+import org.jabref.gui.LibraryTab;
+import org.jabref.model.pdf.search.EnglishStemAnalyzer;
+import org.jabref.model.pdf.search.PdfSearchResults;
+import org.jabref.model.pdf.search.SearchResult;
+import org.jabref.model.strings.StringUtil;
+
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TopDocs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.jabref.model.pdf.search.SearchFieldConstants.PDF_FIELDS;
+
+public final class PdfSearcher {
+
+<span class="fc" id="L31">    private static final Logger LOGGER = LoggerFactory.getLogger(LibraryTab.class);</span>
+
+    private final PdfIndexer indexer;
+<span class="fc" id="L34">    private EnglishStemAnalyzer englishStemAnalyzer = new EnglishStemAnalyzer();</span>
+
+<span class="fc" id="L36">    private PdfSearcher(PdfIndexer indexer) {</span>
+<span class="fc" id="L37">        this.indexer = indexer;</span>
+<span class="fc" id="L38">    }</span>
+
+    public static PdfSearcher of(PdfIndexer indexer) throws IOException {
+<span class="fc" id="L41">        return new PdfSearcher(indexer);</span>
+    }
+
+    /**
+     * Search for results matching a query in the Lucene search index
+     *
+     * @param searchString a pattern to search for matching entries in the index, must not be null
+     * @param maxHits      number of maximum search results, must be positive
+     * @return a result set of all documents that have matches in any fields
+     */
+    public PdfSearchResults search(final String searchString, final int maxHits) throws IOException {
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (StringUtil.isBlank(Objects.requireNonNull(searchString, &quot;The search string was null.&quot;))) {</span>
+<span class="fc" id="L53">            return new PdfSearchResults();</span>
+        }
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (maxHits &lt;= 0) {</span>
+<span class="fc" id="L56">            throw new IllegalArgumentException(&quot;Must be called with at least 1 maxHits, was &quot; + maxHits);</span>
+        }
+
+<span class="fc" id="L59">        List&lt;SearchResult&gt; resultDocs = new ArrayList&lt;&gt;();</span>
+        // We need to point the DirectoryReader to the indexer, because we get errors otherwise
+        // Hint from https://stackoverflow.com/a/63673753/873282.
+<span class="fc" id="L62">        Optional&lt;IndexWriter&gt; optionalIndexWriter = indexer.getIndexWriter();</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (optionalIndexWriter.isEmpty()) {</span>
+<span class="nc" id="L64">            LOGGER.info(&quot;No index writer present, returning empty result set.&quot;);</span>
+<span class="nc" id="L65">            return new PdfSearchResults();</span>
+        }
+<span class="fc" id="L67">        try (IndexReader reader = DirectoryReader.open(optionalIndexWriter.get())) {</span>
+<span class="fc" id="L68">            Query query = new MultiFieldQueryParser(PDF_FIELDS, englishStemAnalyzer).parse(searchString);</span>
+<span class="fc" id="L69">            IndexSearcher searcher = new IndexSearcher(reader);</span>
+<span class="fc" id="L70">            TopDocs results = searcher.search(query, maxHits);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            for (ScoreDoc scoreDoc : results.scoreDocs) {</span>
+<span class="fc" id="L72">                resultDocs.add(new SearchResult(searcher, query, scoreDoc));</span>
+            }
+<span class="fc" id="L74">            return new PdfSearchResults(resultDocs);</span>
+<span class="nc" id="L75">        } catch (ParseException e) {</span>
+<span class="nc" id="L76">            LOGGER.warn(&quot;Could not parse query: '{}'&quot;, searchString, e);</span>
+<span class="nc" id="L77">            return new PdfSearchResults();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

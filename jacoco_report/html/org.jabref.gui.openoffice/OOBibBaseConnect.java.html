@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OOBibBaseConnect.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.openoffice</a> &gt; <span class="el_source">OOBibBaseConnect.java</span></div><h1>OOBibBaseConnect.java</h1><pre class="source lang-java linenums">package org.jabref.gui.openoffice;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.jabref.gui.DialogService;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.openoffice.NoDocumentFoundException;
+import org.jabref.model.openoffice.uno.CreationException;
+import org.jabref.model.openoffice.uno.NoDocumentException;
+import org.jabref.model.openoffice.uno.UnoCast;
+import org.jabref.model.openoffice.uno.UnoTextDocument;
+import org.jabref.model.openoffice.util.OOResult;
+
+import com.sun.star.bridge.XBridge;
+import com.sun.star.bridge.XBridgeFactory;
+import com.sun.star.comp.helper.BootstrapException;
+import com.sun.star.container.NoSuchElementException;
+import com.sun.star.container.XEnumeration;
+import com.sun.star.container.XEnumerationAccess;
+import com.sun.star.frame.XDesktop;
+import com.sun.star.lang.WrappedTargetException;
+import com.sun.star.lang.XComponent;
+import com.sun.star.lang.XMultiComponentFactory;
+import com.sun.star.text.XTextDocument;
+import com.sun.star.uno.XComponentContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static com.sun.star.uno.UnoRuntime.queryInterface;
+
+/**
+ * Establish connection to a document opened in OpenOffice or LibreOffice.
+ */
+public class OOBibBaseConnect {
+
+<span class="nc" id="L40">    private static final Logger LOGGER = LoggerFactory.getLogger(OOBibBaseConnect.class);</span>
+
+    private final DialogService dialogService;
+    private final XDesktop xDesktop;
+
+    /**
+     * Created when connected to a document.
+     * &lt;p&gt;
+     * Cleared (to null) when we discover we lost the connection.
+     */
+    private XTextDocument xTextDocument;
+
+    public OOBibBaseConnect(Path loPath, DialogService dialogService)
+            throws
+            BootstrapException,
+<span class="nc" id="L55">            CreationException {</span>
+
+<span class="nc" id="L57">        this.dialogService = dialogService;</span>
+<span class="nc" id="L58">        this.xDesktop = simpleBootstrap(loPath);</span>
+<span class="nc" id="L59">    }</span>
+
+    private XDesktop simpleBootstrap(Path loPath)
+            throws
+            CreationException,
+            BootstrapException {
+
+        // Get the office component context:
+<span class="nc" id="L67">        XComponentContext context = Bootstrap.bootstrap(loPath);</span>
+<span class="nc" id="L68">        XMultiComponentFactory sem = context.getServiceManager();</span>
+
+        // Create the desktop, which is the root frame of the
+        // hierarchy of frames that contain viewable components:
+        Object desktop;
+        try {
+<span class="nc" id="L74">            desktop = sem.createInstanceWithContext(&quot;com.sun.star.frame.Desktop&quot;, context);</span>
+<span class="nc" id="L75">        } catch (com.sun.star.uno.Exception e) {</span>
+<span class="nc" id="L76">            throw new CreationException(e.getMessage());</span>
+<span class="nc" id="L77">        }</span>
+<span class="nc" id="L78">        return UnoCast.cast(XDesktop.class, desktop).get();</span>
+    }
+
+    /**
+     * Close any open office connection, if none exists does nothing
+     */
+    public static void closeOfficeConnection() {
+        try {
+            // get the bridge factory from the local service manager
+<span class="nc" id="L87">            XBridgeFactory bridgeFactory = queryInterface(XBridgeFactory.class,</span>
+<span class="nc" id="L88">                                                          Bootstrap.createSimpleServiceManager()</span>
+<span class="nc" id="L89">                    .createInstance(&quot;com.sun.star.bridge.BridgeFactory&quot;));</span>
+
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (bridgeFactory != null) {</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                for (XBridge bridge : bridgeFactory.getExistingBridges()) {</span>
+                    // dispose of this bridge after closing its connection
+<span class="nc" id="L94">                    queryInterface(XComponent.class, bridge).dispose();</span>
+                }
+            }
+<span class="nc" id="L97">        } catch (Exception ex) {</span>
+<span class="nc" id="L98">            LOGGER.error(&quot;Exception disposing office process connection bridge&quot;, ex);</span>
+<span class="nc" id="L99">        }</span>
+<span class="nc" id="L100">    }</span>
+
+    private static List&lt;XTextDocument&gt; getTextDocuments(XDesktop desktop)
+            throws
+            NoSuchElementException,
+            WrappedTargetException {
+
+<span class="nc" id="L107">        List&lt;XTextDocument&gt; result = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L109">        XEnumerationAccess enumAccess = desktop.getComponents();</span>
+<span class="nc" id="L110">        XEnumeration compEnum = enumAccess.createEnumeration();</span>
+
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        while (compEnum.hasMoreElements()) {</span>
+<span class="nc" id="L113">            Object next = compEnum.nextElement();</span>
+<span class="nc" id="L114">            XComponent comp = UnoCast.cast(XComponent.class, next).get();</span>
+<span class="nc" id="L115">            Optional&lt;XTextDocument&gt; doc = UnoCast.cast(XTextDocument.class, comp);</span>
+<span class="nc" id="L116">            doc.ifPresent(result::add);</span>
+<span class="nc" id="L117">        }</span>
+<span class="nc" id="L118">        return result;</span>
+    }
+
+    /**
+     * Run a dialog allowing the user to choose among the documents in `list`.
+     *
+     * @return Null if no document was selected. Otherwise the document selected.
+     */
+    private static XTextDocument selectDocumentDialog(List&lt;XTextDocument&gt; list,
+                                                      DialogService dialogService) {
+
+        class DocumentTitleViewModel {
+
+            private final XTextDocument xTextDocument;
+            private final String description;
+
+<span class="nc" id="L134">            public DocumentTitleViewModel(XTextDocument xTextDocument) {</span>
+<span class="nc" id="L135">                this.xTextDocument = xTextDocument;</span>
+<span class="nc" id="L136">                this.description = UnoTextDocument.getFrameTitle(xTextDocument).orElse(&quot;&quot;);</span>
+<span class="nc" id="L137">            }</span>
+
+            public XTextDocument getXtextDocument() {
+<span class="nc" id="L140">                return xTextDocument;</span>
+            }
+
+            @Override
+            public String toString() {
+<span class="nc" id="L145">                return description;</span>
+            }
+        }
+
+<span class="nc" id="L149">        List&lt;DocumentTitleViewModel&gt; viewModel = list.stream()</span>
+<span class="nc" id="L150">                                                      .map(DocumentTitleViewModel::new)</span>
+<span class="nc" id="L151">                                                      .collect(Collectors.toList());</span>
+
+        // This whole method is part of a background task when
+        // auto-detecting instances, so we need to show dialog in FX
+        // thread
+<span class="nc" id="L156">        Optional&lt;DocumentTitleViewModel&gt; selectedDocument =</span>
+                dialogService
+<span class="nc" id="L158">                        .showChoiceDialogAndWait(Localization.lang(&quot;Select document&quot;),</span>
+<span class="nc" id="L159">                                Localization.lang(&quot;Found documents:&quot;),</span>
+<span class="nc" id="L160">                                Localization.lang(&quot;Use selected document&quot;),</span>
+                                viewModel);
+
+<span class="nc" id="L163">        return selectedDocument</span>
+<span class="nc" id="L164">                .map(DocumentTitleViewModel::getXtextDocument)</span>
+<span class="nc" id="L165">                .orElse(null);</span>
+    }
+
+    /**
+     * Choose a document to work with.
+     * &lt;p&gt;
+     * Assumes we have already connected to LibreOffice or OpenOffice.
+     * &lt;p&gt;
+     * If there is a single document to choose from, selects that. If there are more than one, shows selection dialog. If there are none, throws NoDocumentFoundException
+     * &lt;p&gt;
+     * After successful selection connects to the selected document and extracts some frequently used parts (starting points for managing its content).
+     * &lt;p&gt;
+     * Finally initializes this.xTextDocument with the selected document and parts extracted.
+     */
+    public void selectDocument(boolean autoSelectForSingle)
+            throws
+            NoDocumentFoundException,
+            NoSuchElementException,
+            WrappedTargetException {
+
+        XTextDocument selected;
+<span class="nc" id="L186">        List&lt;XTextDocument&gt; textDocumentList = getTextDocuments(this.xDesktop);</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (textDocumentList.isEmpty()) {</span>
+<span class="nc" id="L188">            throw new NoDocumentFoundException(&quot;No Writer documents found&quot;);</span>
+<span class="nc bnc" id="L189" title="All 4 branches missed.">        } else if ((textDocumentList.size() == 1) &amp;&amp; autoSelectForSingle) {</span>
+<span class="nc" id="L190">            selected = textDocumentList.getFirst(); // Get the only one</span>
+        } else { // Bring up a dialog
+<span class="nc" id="L192">            selected = OOBibBaseConnect.selectDocumentDialog(textDocumentList,</span>
+                    this.dialogService);
+        }
+
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (selected == null) {</span>
+<span class="nc" id="L197">            return;</span>
+        }
+
+<span class="nc" id="L200">        this.xTextDocument = selected;</span>
+<span class="nc" id="L201">    }</span>
+
+    /**
+     * Mark the current document as missing.
+     */
+    private void forgetDocument() {
+<span class="nc" id="L207">        this.xTextDocument = null;</span>
+<span class="nc" id="L208">    }</span>
+
+    /**
+     * A simple test for document availability.
+     * &lt;p&gt;
+     * See also `isDocumentConnectionMissing` for a test actually attempting to use teh connection.
+     */
+    public boolean isConnectedToDocument() {
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        return this.xTextDocument != null;</span>
+    }
+
+    /**
+     * @return true if we are connected to a document
+     */
+    public boolean isDocumentConnectionMissing() {
+<span class="nc" id="L223">        XTextDocument doc = this.xTextDocument;</span>
+
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        if (doc == null) {</span>
+<span class="nc" id="L226">            return true;</span>
+        }
+
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (UnoTextDocument.isDocumentConnectionMissing(doc)) {</span>
+<span class="nc" id="L230">            forgetDocument();</span>
+<span class="nc" id="L231">            return true;</span>
+        }
+<span class="nc" id="L233">        return false;</span>
+    }
+
+    /**
+     * Either return a valid XTextDocument or throw NoDocumentException.
+     */
+    public XTextDocument getXTextDocumentOrThrow()
+            throws
+            NoDocumentException {
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        if (isDocumentConnectionMissing()) {</span>
+<span class="nc" id="L243">            throw new NoDocumentException(&quot;Not connected to document&quot;);</span>
+        }
+<span class="nc" id="L245">        return this.xTextDocument;</span>
+    }
+
+    public OOResult&lt;XTextDocument, OOError&gt; getXTextDocument() {
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        if (isDocumentConnectionMissing()) {</span>
+<span class="nc" id="L250">            return OOResult.error(OOError.from(new NoDocumentException()));</span>
+        }
+<span class="nc" id="L252">        return OOResult.ok(this.xTextDocument);</span>
+    }
+
+    /**
+     * The title of the current document, or Optional.empty()
+     */
+    public Optional&lt;String&gt; getCurrentDocumentTitle() {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (isDocumentConnectionMissing()) {</span>
+<span class="nc" id="L260">            return Optional.empty();</span>
+        } else {
+<span class="nc" id="L262">            return UnoTextDocument.getFrameTitle(this.xTextDocument);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

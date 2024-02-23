@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CanonicalBibEntry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry</a> &gt; <span class="el_source">CanonicalBibEntry.java</span></div><h1>CanonicalBibEntry.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry;
+
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.SortedSet;
+import java.util.StringJoiner;
+import java.util.TreeSet;
+
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.InternalField;
+
+public class CanonicalBibEntry {
+
+    private CanonicalBibEntry() {
+    }
+
+    /**
+     * This returns a canonical BibTeX serialization.
+     * The result is close to BibTeX, but not a valid BibTeX representation in all cases
+     *
+     * &lt;ul&gt;
+     *     &lt;li&gt;Serializes all fields, even the JabRef internal ones.&lt;/li&gt;
+     *     &lt;li&gt;Does NOT serialize &quot;KEY_FIELD&quot; as field, but as key.&lt;/li&gt;
+     *     &lt;li&gt;Special characters such as &quot;{&quot; or &quot;&amp;&quot; are NOT escaped, but written as is.&lt;/li&gt;
+     *     &lt;li&gt;New lines are written as is.&lt;/li&gt;
+     *     &lt;li&gt;String constants are not handled. That means, &lt;code&gt;month = apr&lt;/code&gt; in a bib file gets &lt;code&gt;month = {#apr#}&lt;/code&gt;.
+     *         This indicates that the month field is correctly stored.&lt;/li&gt;
+     * &lt;/ul&gt;
+     */
+    public static String getCanonicalRepresentation(BibEntry entry) {
+<span class="fc" id="L33">        StringBuilder sb = new StringBuilder();</span>
+
+<span class="fc" id="L35">        sb.append(entry.getUserComments());</span>
+
+        // generate first line: type and citation key
+<span class="fc" id="L38">        String citeKey = entry.getCitationKey().orElse(&quot;&quot;);</span>
+<span class="fc" id="L39">        sb.append(&quot;@%s{%s,&quot;.formatted(entry.getType().getName(), citeKey)).append('\n');</span>
+
+        // we have to introduce a new Map as fields are stored case-sensitive in JabRef (see https://github.com/koppor/jabref/issues/45).
+<span class="fc" id="L42">        Map&lt;String, String&gt; mapFieldToValue = new HashMap&lt;&gt;();</span>
+
+        // determine sorted fields -- all fields lower case
+<span class="fc" id="L45">        SortedSet&lt;String&gt; sortedFields = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (Entry&lt;Field, String&gt; field : entry.getFieldMap().entrySet()) {</span>
+<span class="fc" id="L47">            Field fieldName = field.getKey();</span>
+<span class="fc" id="L48">            String fieldValue = field.getValue();</span>
+            // JabRef stores the key in the field KEY_FIELD, which must not be serialized
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (!fieldName.equals(InternalField.KEY_FIELD)) {</span>
+<span class="fc" id="L51">                String lowerCaseFieldName = fieldName.getName().toLowerCase(Locale.US);</span>
+<span class="fc" id="L52">                sortedFields.add(lowerCaseFieldName);</span>
+<span class="fc" id="L53">                mapFieldToValue.put(lowerCaseFieldName, fieldValue);</span>
+            }
+<span class="fc" id="L55">        }</span>
+
+        // generate field entries
+<span class="fc" id="L58">        StringJoiner sj = new StringJoiner(&quot;,\n&quot;, &quot;&quot;, &quot;\n&quot;);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (String fieldName : sortedFields) {</span>
+<span class="fc" id="L60">            String line = &quot;  %s = {%s}&quot;.formatted(fieldName, mapFieldToValue.get(fieldName));</span>
+<span class="fc" id="L61">            sj.add(line);</span>
+<span class="fc" id="L62">        }</span>
+
+<span class="fc" id="L64">        sj.add(&quot;  _jabref_shared = {sharedId: %d, version: %d}&quot;.formatted(entry.getSharedBibEntryData().getSharedID(), entry.getSharedBibEntryData().getVersion()));</span>
+
+<span class="fc" id="L66">        sb.append(sj);</span>
+
+        // append the closing entry bracket
+<span class="fc" id="L69">        sb.append('}');</span>
+<span class="fc" id="L70">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

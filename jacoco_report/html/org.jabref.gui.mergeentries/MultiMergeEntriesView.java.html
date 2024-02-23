@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MultiMergeEntriesView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries</a> &gt; <span class="el_source">MultiMergeEntriesView.java</span></div><h1>MultiMergeEntriesView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.function.Supplier;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
+import javafx.collections.MapChangeListener;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.Control;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.RowConstraints;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.TextAlignment;
+
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.BindingsHelper;
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.fetcher.DoiFetcher;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import com.tobiasdiez.easybind.EasyObservableValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class MultiMergeEntriesView extends BaseDialog&lt;BibEntry&gt; {
+
+<span class="nc" id="L61">    private static final Logger LOGGER = LoggerFactory.getLogger(MultiMergeEntriesView.class);</span>
+
+    // LEFT
+    @FXML private ScrollPane leftScrollPane;
+    @FXML private VBox fieldHeader;
+
+    // CENTER
+    @FXML private ScrollPane topScrollPane;
+    @FXML private HBox supplierHeader;
+    @FXML private ScrollPane centerScrollPane;
+    @FXML private GridPane optionsGrid;
+
+    // RIGHT
+    @FXML private ScrollPane rightScrollPane;
+    @FXML private VBox fieldEditor;
+
+    @FXML private Label failedSuppliers;
+    @FXML private ComboBox&lt;DiffMode&gt; diffMode;
+
+<span class="nc" id="L80">    private final ToggleGroup headerToggleGroup = new ToggleGroup();</span>
+<span class="nc" id="L81">    private final HashMap&lt;Field, FieldRow&gt; fieldRows = new HashMap&lt;&gt;();</span>
+
+    private final MultiMergeEntriesViewModel viewModel;
+    private final TaskExecutor taskExecutor;
+
+    private final PreferencesService preferences;
+
+    public MultiMergeEntriesView(PreferencesService preferences,
+<span class="nc" id="L89">                                 TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L90">        this.preferences = preferences;</span>
+<span class="nc" id="L91">        this.taskExecutor = taskExecutor;</span>
+
+<span class="nc" id="L93">        viewModel = new MultiMergeEntriesViewModel();</span>
+
+<span class="nc" id="L95">        ViewLoader.view(this)</span>
+<span class="nc" id="L96">                  .load()</span>
+<span class="nc" id="L97">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L99">        ButtonType mergeEntries = new ButtonType(Localization.lang(&quot;Merge entries&quot;), ButtonBar.ButtonData.OK_DONE);</span>
+<span class="nc" id="L100">        this.getDialogPane().getButtonTypes().setAll(ButtonType.CANCEL, mergeEntries);</span>
+<span class="nc" id="L101">        this.setResultConverter(viewModel::resultConverter);</span>
+
+<span class="nc" id="L103">        viewModel.entriesProperty().addListener((ListChangeListener&lt;MultiMergeEntriesViewModel.EntrySource&gt;) c -&gt; {</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            while (c.next()) {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                if (c.wasAdded()) {</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                    for (MultiMergeEntriesViewModel.EntrySource entrySourceColumn : c.getAddedSubList()) {</span>
+<span class="nc" id="L107">                        addColumn(entrySourceColumn);</span>
+<span class="nc" id="L108">                    }</span>
+                }
+            }
+<span class="nc" id="L111">        });</span>
+
+<span class="nc" id="L113">        viewModel.mergedEntryProperty().get().getFieldsObservable().addListener((MapChangeListener&lt;Field, String&gt;) change -&gt; {</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">            if (change.wasAdded() &amp;&amp; !fieldRows.containsKey(change.getKey())) {</span>
+<span class="nc" id="L115">                FieldRow fieldRow = new FieldRow(</span>
+<span class="nc" id="L116">                        change.getKey(),</span>
+<span class="nc" id="L117">                        viewModel.mergedEntryProperty().get().getFields().size() - 1);</span>
+<span class="nc" id="L118">                fieldRows.put(change.getKey(), fieldRow);</span>
+            }
+<span class="nc" id="L120">        });</span>
+<span class="nc" id="L121">    }</span>
+
+    @FXML
+    public void initialize() {
+<span class="nc" id="L125">        topScrollPane.hvalueProperty().bindBidirectional(centerScrollPane.hvalueProperty());</span>
+<span class="nc" id="L126">        leftScrollPane.vvalueProperty().bindBidirectional(centerScrollPane.vvalueProperty());</span>
+<span class="nc" id="L127">        rightScrollPane.vvalueProperty().bindBidirectional(centerScrollPane.vvalueProperty());</span>
+
+<span class="nc" id="L129">        viewModel.failedSuppliersProperty().addListener((obs, oldValue, newValue) -&gt;</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                failedSuppliers.setText(viewModel.failedSuppliersProperty().get().isEmpty() ? &quot;&quot; : Localization.lang(</span>
+                        &quot;Could not extract Metadata from: %0&quot;,
+<span class="nc" id="L132">                        String.join(&quot;, &quot;, viewModel.failedSuppliersProperty())</span>
+                ))
+        );
+
+<span class="nc" id="L136">        fillDiffModes();</span>
+<span class="nc" id="L137">    }</span>
+
+    private void fillDiffModes() {
+<span class="nc" id="L140">        diffMode.setItems(FXCollections.observableList(List.of(</span>
+                DiffMode.PLAIN,
+                DiffMode.WORD,
+                DiffMode.CHARACTER)));
+<span class="nc" id="L144">        new ViewModelListCellFactory&lt;DiffMode&gt;()</span>
+<span class="nc" id="L145">                .withText(DiffMode::getDisplayText)</span>
+<span class="nc" id="L146">                .install(diffMode);</span>
+<span class="nc" id="L147">        diffMode.setValue(preferences.getMergeDialogPreferences().getMergeDiffMode());</span>
+<span class="nc" id="L148">        EasyBind.subscribe(this.diffMode.valueProperty(), mode -&gt; preferences.getMergeDialogPreferences().setMergeDiffMode(mode));</span>
+<span class="nc" id="L149">    }</span>
+
+    private void addColumn(MultiMergeEntriesViewModel.EntrySource entrySourceColumn) {
+        // add header
+<span class="nc" id="L153">        int columnIndex = supplierHeader.getChildren().size();</span>
+<span class="nc" id="L154">        ToggleButton header = generateEntryHeader(entrySourceColumn, columnIndex);</span>
+<span class="nc" id="L155">        header.getStyleClass().add(&quot;toggle-button&quot;);</span>
+<span class="nc" id="L156">        HBox.setHgrow(header, Priority.ALWAYS);</span>
+<span class="nc" id="L157">        supplierHeader.getChildren().add(header);</span>
+<span class="nc" id="L158">        header.setMinWidth(250);</span>
+
+        // setup column constraints
+<span class="nc" id="L161">        ColumnConstraints constraint = new ColumnConstraints();</span>
+<span class="nc" id="L162">        constraint.setMinWidth(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L163">        constraint.setMaxWidth(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L164">        constraint.prefWidthProperty().bind(header.widthProperty());</span>
+<span class="nc" id="L165">        optionsGrid.getColumnConstraints().add(constraint);</span>
+
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (!entrySourceColumn.isLoadingProperty().getValue()) {</span>
+<span class="nc" id="L168">            writeBibEntryToColumn(entrySourceColumn, columnIndex);</span>
+        } else {
+<span class="nc" id="L170">            header.setDisable(true);</span>
+<span class="nc" id="L171">            entrySourceColumn.isLoadingProperty().addListener((observable, oldValue, newValue) -&gt; {</span>
+<span class="nc bnc" id="L172" title="All 4 branches missed.">                if (!newValue &amp;&amp; entrySourceColumn.entryProperty().get() != null) {</span>
+<span class="nc" id="L173">                    writeBibEntryToColumn(entrySourceColumn, columnIndex);</span>
+<span class="nc" id="L174">                    header.setDisable(false);</span>
+                }
+<span class="nc" id="L176">            });</span>
+        }
+<span class="nc" id="L178">    }</span>
+
+    private ToggleButton generateEntryHeader(MultiMergeEntriesViewModel.EntrySource column, int columnIndex) {
+<span class="nc" id="L181">        ToggleButton header = new ToggleButton();</span>
+<span class="nc" id="L182">        header.setToggleGroup(headerToggleGroup);</span>
+<span class="nc" id="L183">        header.textProperty().bind(column.titleProperty());</span>
+<span class="nc" id="L184">        setupSourceButtonAction(header, columnIndex);</span>
+
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (column.isLoadingProperty().getValue()) {</span>
+<span class="nc" id="L187">            ProgressIndicator progressIndicator = new ProgressIndicator(-1);</span>
+<span class="nc" id="L188">            progressIndicator.setPrefHeight(20);</span>
+<span class="nc" id="L189">            progressIndicator.setMinHeight(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L190">            progressIndicator.setMaxHeight(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L191">            header.setGraphic(progressIndicator);</span>
+<span class="nc" id="L192">            progressIndicator.visibleProperty().bind(column.isLoadingProperty());</span>
+        }
+
+<span class="nc" id="L195">        column.isLoadingProperty().addListener((obs, oldValue, newValue) -&gt; {</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            if (!newValue) {</span>
+<span class="nc" id="L197">                header.setGraphic(null);</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">                if (column.entryProperty().get() == null) {</span>
+<span class="nc" id="L199">                    header.setMinWidth(0);</span>
+<span class="nc" id="L200">                    header.setMaxWidth(0);</span>
+<span class="nc" id="L201">                    header.setVisible(false);</span>
+                }
+            }
+<span class="nc" id="L204">        });</span>
+
+<span class="nc" id="L206">        return header;</span>
+    }
+
+    /**
+     * Adds ToggleButtons for all fields that are set for this BibEntry
+     *
+     * @param entrySourceColumn the entry to write
+     * @param columnIndex       the index of the column to write this entry to
+     */
+    private void writeBibEntryToColumn(MultiMergeEntriesViewModel.EntrySource entrySourceColumn, int columnIndex) {
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        for (Map.Entry&lt;Field, String&gt; entry : entrySourceColumn.entryProperty().get().getFieldsObservable().entrySet()) {</span>
+<span class="nc" id="L217">            Field key = entry.getKey();</span>
+<span class="nc" id="L218">            String value = entry.getValue();</span>
+<span class="nc" id="L219">            Cell cell = new Cell(value, key, columnIndex);</span>
+<span class="nc" id="L220">            optionsGrid.add(cell, columnIndex, fieldRows.get(key).rowIndex);</span>
+<span class="nc" id="L221">        }</span>
+<span class="nc" id="L222">    }</span>
+
+    /**
+     * Set up the button that displays the name of the source so that if it is clicked, all toggles in that column are
+     * selected.
+     *
+     * @param sourceButton the header button to setup
+     * @param column       the column this button is heading
+     */
+    private void setupSourceButtonAction(ToggleButton sourceButton, int column) {
+<span class="nc" id="L232">        sourceButton.selectedProperty().addListener((observable, oldValue, newValue) -&gt; {</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (newValue) {</span>
+<span class="nc" id="L234">                optionsGrid.getChildrenUnmodifiable().stream()</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                           .filter(node -&gt; GridPane.getColumnIndex(node) == column)</span>
+<span class="nc" id="L236">                           .filter(HBox.class::isInstance)</span>
+<span class="nc" id="L237">                           .forEach(hbox -&gt; ((HBox) hbox).getChildrenUnmodifiable().stream()</span>
+<span class="nc" id="L238">                                                         .filter(ToggleButton.class::isInstance)</span>
+<span class="nc" id="L239">                                                         .forEach(toggleButton -&gt; ((ToggleButton) toggleButton).setSelected(true)));</span>
+<span class="nc" id="L240">                sourceButton.setSelected(true);</span>
+            }
+<span class="nc" id="L242">        });</span>
+<span class="nc" id="L243">    }</span>
+
+    /**
+     * Checks if the Field can be multiline
+     *
+     * @param field the field to be checked
+     * @return true if the field may be multiline, false otherwise
+     */
+    private boolean isMultilineField(Field field) {
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (field.equals(StandardField.DOI)) {</span>
+<span class="nc" id="L253">            return false;</span>
+        }
+<span class="nc" id="L255">        return FieldFactory.isMultiLineField(field, preferences.getFieldPreferences().getNonWrappableFields());</span>
+    }
+
+    private class Cell extends HBox {
+
+        private final String content;
+
+<span class="nc" id="L262">        public Cell(String content, Field field, int columnIndex) {</span>
+<span class="nc" id="L263">            this.content = content;</span>
+
+            /*
+            If this is not explicitly done on the JavaFX thread, the bindings to the text fields don't work properly.
+            The text only shows up after one text in that same row is selected by the user.
+             */
+<span class="nc" id="L269">            DefaultTaskExecutor.runInJavaFXThread(() -&gt; {</span>
+
+<span class="nc" id="L271">                FieldRow row = fieldRows.get(field);</span>
+
+<span class="nc" id="L273">                prefWidthProperty().bind(((Region) supplierHeader.getChildren().get(columnIndex)).widthProperty());</span>
+<span class="nc" id="L274">                setMinWidth(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L275">                setMaxWidth(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L276">                prefHeightProperty().bind(((Region) fieldEditor.getChildren().get(row.rowIndex)).heightProperty());</span>
+<span class="nc" id="L277">                setMinHeight(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L278">                setMaxHeight(Control.USE_PREF_SIZE);</span>
+
+                // Button
+<span class="nc" id="L281">                ToggleButton cellButton = new ToggleButton();</span>
+<span class="nc" id="L282">                cellButton.prefHeightProperty().bind(heightProperty());</span>
+<span class="nc" id="L283">                cellButton.setMinHeight(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L284">                cellButton.setMaxHeight(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L285">                cellButton.setGraphicTextGap(0);</span>
+<span class="nc" id="L286">                getChildren().add(cellButton);</span>
+<span class="nc" id="L287">                cellButton.maxWidthProperty().bind(widthProperty());</span>
+<span class="nc" id="L288">                HBox.setHgrow(cellButton, Priority.ALWAYS);</span>
+
+                // Text
+<span class="nc" id="L291">                DiffHighlightingEllipsingTextFlow buttonText = new DiffHighlightingEllipsingTextFlow(content, viewModel.mergedEntryProperty().get().getFieldBinding(field).asOrdinary(), diffMode.valueProperty());</span>
+
+<span class="nc" id="L293">                buttonText.maxWidthProperty().bind(widthProperty().add(-10));</span>
+<span class="nc" id="L294">                buttonText.maxHeightProperty().bind(heightProperty());</span>
+<span class="nc" id="L295">                cellButton.setGraphic(buttonText);</span>
+<span class="nc" id="L296">                cellButton.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);</span>
+<span class="nc" id="L297">                cellButton.setContentDisplay(ContentDisplay.CENTER);</span>
+
+                // Tooltip
+<span class="nc" id="L300">                Tooltip buttonTooltip = new Tooltip(content);</span>
+<span class="nc" id="L301">                buttonTooltip.setWrapText(true);</span>
+<span class="nc" id="L302">                buttonTooltip.prefWidthProperty().bind(widthProperty());</span>
+<span class="nc" id="L303">                buttonTooltip.setTextAlignment(TextAlignment.LEFT);</span>
+<span class="nc" id="L304">                cellButton.setTooltip(buttonTooltip);</span>
+
+<span class="nc" id="L306">                cellButton.setToggleGroup(row.toggleGroup);</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                if (row.toggleGroup.getSelectedToggle() == null) {</span>
+<span class="nc" id="L308">                    cellButton.setSelected(true);</span>
+                }
+
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                if (field.equals(StandardField.DOI)) {</span>
+<span class="nc" id="L312">                    Button doiButton = IconTheme.JabRefIcons.LOOKUP_IDENTIFIER.asButton();</span>
+<span class="nc" id="L313">                    HBox.setHgrow(doiButton, Priority.NEVER);</span>
+<span class="nc" id="L314">                    doiButton.prefHeightProperty().bind(cellButton.heightProperty());</span>
+<span class="nc" id="L315">                    doiButton.setMinHeight(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L316">                    doiButton.setMaxHeight(Control.USE_PREF_SIZE);</span>
+
+<span class="nc" id="L318">                    getChildren().add(doiButton);</span>
+
+<span class="nc" id="L320">                    doiButton.setOnAction(event -&gt; {</span>
+<span class="nc" id="L321">                        DoiFetcher doiFetcher = new DoiFetcher(preferences.getImportFormatPreferences());</span>
+<span class="nc" id="L322">                        doiButton.setDisable(true);</span>
+<span class="nc" id="L323">                        addSource(Localization.lang(&quot;From DOI&quot;), () -&gt; {</span>
+                            try {
+<span class="nc" id="L325">                                return doiFetcher.performSearchById(content).get();</span>
+<span class="nc" id="L326">                            } catch (FetcherException | NoSuchElementException e) {</span>
+<span class="nc" id="L327">                                LOGGER.warn(&quot;Failed to fetch BibEntry for DOI {}&quot;, content, e);</span>
+<span class="nc" id="L328">                                return null;</span>
+                            }
+                        });
+<span class="nc" id="L331">                    });</span>
+                }
+<span class="nc" id="L333">            });</span>
+<span class="nc" id="L334">        }</span>
+
+        public String getContent() {
+<span class="nc" id="L337">            return content;</span>
+        }
+    }
+
+    public void addSource(String title, BibEntry entry) {
+<span class="nc" id="L342">        viewModel.addSource(new MultiMergeEntriesViewModel.EntrySource(title, entry));</span>
+<span class="nc" id="L343">    }</span>
+
+    public void addSource(String title, Supplier&lt;BibEntry&gt; supplier) {
+<span class="nc" id="L346">        viewModel.addSource(new MultiMergeEntriesViewModel.EntrySource(title, supplier, taskExecutor));</span>
+<span class="nc" id="L347">    }</span>
+
+    private class FieldRow {
+
+<span class="nc" id="L351">        public final ToggleGroup toggleGroup = new ToggleGroup();</span>
+        private final TextInputControl fieldEditorCell;
+
+        private final int rowIndex;
+
+        // Reference needs to be kept, since java garbage collection would otherwise destroy the subscription
+        @SuppressWarnings(&quot;FieldCanBeLocal&quot;) private EasyObservableValue&lt;String&gt; fieldBinding;
+
+<span class="nc" id="L359">        public FieldRow(Field field, int rowIndex) {</span>
+<span class="nc" id="L360">            this.rowIndex = rowIndex;</span>
+
+            // setup field editor column entry
+<span class="nc" id="L363">            boolean isMultiLine = isMultilineField(field);</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">            if (isMultiLine) {</span>
+<span class="nc" id="L365">                fieldEditorCell = new TextArea();</span>
+<span class="nc" id="L366">                ((TextArea) fieldEditorCell).setWrapText(true);</span>
+            } else {
+<span class="nc" id="L368">                fieldEditorCell = new TextField();</span>
+            }
+
+<span class="nc" id="L371">            addRow(field);</span>
+
+<span class="nc" id="L373">            fieldEditorCell.addEventFilter(KeyEvent.KEY_PRESSED, event -&gt; toggleGroup.selectToggle(null));</span>
+
+<span class="nc" id="L375">            toggleGroup.selectedToggleProperty().addListener((obs, oldValue, newValue) -&gt; {</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">                if (newValue == null) {</span>
+<span class="nc" id="L377">                    viewModel.mergedEntryProperty().get().setField(field, &quot;&quot;);</span>
+                } else {
+<span class="nc" id="L379">                    viewModel.mergedEntryProperty().get().setField(field, ((DiffHighlightingEllipsingTextFlow) ((ToggleButton) newValue).getGraphic()).getFullText());</span>
+<span class="nc" id="L380">                    headerToggleGroup.selectToggle(null);</span>
+                }
+<span class="nc" id="L382">            });</span>
+<span class="nc" id="L383">        }</span>
+
+        /**
+         * Adds a row that represents this field
+         *
+         * @param field the field to add to the view as a new row in the table
+         */
+        private void addRow(Field field) {
+<span class="nc" id="L391">            VBox.setVgrow(fieldEditorCell, Priority.ALWAYS);</span>
+
+<span class="nc" id="L393">            fieldBinding = viewModel.mergedEntryProperty().get().getFieldBinding(field).asOrdinary();</span>
+<span class="nc" id="L394">            BindingsHelper.bindBidirectional(</span>
+<span class="nc" id="L395">                    fieldEditorCell.textProperty(),</span>
+                    fieldBinding,
+                    text -&gt; {
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                        if (text != null) {</span>
+<span class="nc" id="L399">                            fieldEditorCell.setText(text);</span>
+                        }
+<span class="nc" id="L401">                    },</span>
+                    binding -&gt; {
+<span class="nc bnc" id="L403" title="All 2 branches missed.">                        if (binding != null) {</span>
+<span class="nc" id="L404">                            viewModel.mergedEntryProperty().get().setField(field, binding);</span>
+                        }
+<span class="nc" id="L406">                    });</span>
+
+<span class="nc" id="L408">            fieldEditorCell.setMaxHeight(Double.MAX_VALUE);</span>
+<span class="nc" id="L409">            VBox.setVgrow(fieldEditorCell, Priority.ALWAYS);</span>
+<span class="nc" id="L410">            fieldEditor.getChildren().add(fieldEditorCell);</span>
+
+            // setup header label
+<span class="nc" id="L413">            Label fieldHeaderLabel = new Label(field.getDisplayName());</span>
+<span class="nc" id="L414">            fieldHeaderLabel.prefHeightProperty().bind(fieldEditorCell.heightProperty());</span>
+<span class="nc" id="L415">            fieldHeaderLabel.setMaxWidth(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L416">            fieldHeaderLabel.setMinWidth(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L417">            fieldHeader.getChildren().add(fieldHeaderLabel);</span>
+
+            // setup RowConstraints
+<span class="nc" id="L420">            RowConstraints constraint = new RowConstraints();</span>
+<span class="nc" id="L421">            constraint.setMinHeight(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L422">            constraint.setMaxHeight(Control.USE_PREF_SIZE);</span>
+<span class="nc" id="L423">            constraint.prefHeightProperty().bind(fieldEditorCell.heightProperty());</span>
+<span class="nc" id="L424">            optionsGrid.getRowConstraints().add(constraint);</span>
+<span class="nc" id="L425">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

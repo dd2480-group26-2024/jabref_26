@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.field</a> &gt; <span class="el_source">FieldFactory.java</span></div><h1>FieldFactory.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.field;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.model.util.OptionalUtil;
+
+<span class="nc" id="L20">public class FieldFactory {</span>
+
+    /**
+     * Character separating field names that are to be used in sequence as fallbacks for a single column
+     * (e.g. &quot;author/editor&quot; to use editor where author is not set):
+     */
+    private static final String FIELD_OR_SEPARATOR = &quot;/&quot;;
+    private static final String DELIMITER = &quot;;&quot;;
+
+    public static String serializeOrFields(Field... fields) {
+<span class="fc" id="L30">        return serializeOrFields(new OrFields(fields));</span>
+    }
+
+    public static String serializeOrFields(OrFields fields) {
+<span class="fc" id="L34">        return fields.getFields().stream()</span>
+<span class="fc" id="L35">                     .map(field -&gt; {</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">                         if (field instanceof UnknownField unknownField) {</span>
+                             // In case a user has put a user-defined field, the casing of that field is kept
+<span class="fc" id="L38">                             return unknownField.getDisplayName();</span>
+                         } else {
+                             // In all fields known to JabRef, the name is used - JabRef knows better than the user how to case the field
+<span class="fc" id="L41">                             return field.getName();</span>
+                         }
+                     })
+<span class="fc" id="L44">                     .collect(Collectors.joining(FIELD_OR_SEPARATOR));</span>
+    }
+
+    public static String serializeOrFieldsList(Set&lt;OrFields&gt; fields) {
+<span class="fc" id="L48">        return fields.stream().map(FieldFactory::serializeOrFields).collect(Collectors.joining(DELIMITER));</span>
+    }
+
+    public static List&lt;Field&gt; getNotTextFieldNames() {
+<span class="fc" id="L52">        return Arrays.asList(StandardField.DOI, StandardField.FILE, StandardField.URL, StandardField.URI, StandardField.ISBN, StandardField.ISSN, StandardField.MONTH, StandardField.DATE, StandardField.YEAR);</span>
+    }
+
+    public static List&lt;Field&gt; getIdentifierFieldNames() {
+<span class="fc" id="L56">        return Arrays.asList(StandardField.DOI, StandardField.EPRINT, StandardField.PMID);</span>
+    }
+
+    public static OrFields parseOrFields(String fieldNames) {
+<span class="fc" id="L60">        Set&lt;Field&gt; fields = Arrays.stream(fieldNames.split(FieldFactory.FIELD_OR_SEPARATOR))</span>
+<span class="fc" id="L61">                                  .filter(StringUtil::isNotBlank)</span>
+<span class="fc" id="L62">                                  .map(FieldFactory::parseField)</span>
+<span class="fc" id="L63">                                  .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L64">        return new OrFields(fields);</span>
+    }
+
+    public static Set&lt;OrFields&gt; parseOrFieldsList(String fieldNames) {
+<span class="fc" id="L68">        return Arrays.stream(fieldNames.split(FieldFactory.DELIMITER))</span>
+<span class="fc" id="L69">                     .filter(StringUtil::isNotBlank)</span>
+<span class="fc" id="L70">                     .map(FieldFactory::parseOrFields)</span>
+<span class="fc" id="L71">                     .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+    }
+
+    public static Set&lt;Field&gt; parseFieldList(String fieldNames) {
+<span class="fc" id="L75">        return Arrays.stream(fieldNames.split(FieldFactory.DELIMITER))</span>
+<span class="fc" id="L76">                     .filter(StringUtil::isNotBlank)</span>
+<span class="fc" id="L77">                     .map(FieldFactory::parseField)</span>
+<span class="fc" id="L78">                     .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+    }
+
+    public static String serializeFieldsList(Collection&lt;Field&gt; fields) {
+<span class="fc" id="L82">        return fields.stream()</span>
+<span class="fc" id="L83">                     .map(field -&gt; {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                         if (field instanceof UnknownField unknownField) {</span>
+                             // In case a user has put a user-defined field, the casing of that field is kept
+<span class="fc" id="L86">                             return unknownField.getDisplayName();</span>
+                         } else {
+                             // In all fields known to JabRef, the name is used - JabRef knows better than the user how to case the field
+<span class="fc" id="L89">                             return field.getName();</span>
+                         }
+                     })
+<span class="fc" id="L92">                     .collect(Collectors.joining(DELIMITER));</span>
+    }
+
+    /**
+     * Type T is an entry type and is used to direct the mapping to the Java field class.
+     * This somehow acts as filter, BibLaTeX &quot;APA&quot; entry type has field &quot;article&quot;, but we want to have StandardField (if not explicitly requested otherwise)
+     */
+    public static &lt;T extends EntryType&gt; Field parseField(T type, String fieldName) {
+        // Check if the field name starts with &quot;comment-&quot; which indicates it's a UserSpecificCommentField
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (fieldName.startsWith(&quot;comment-&quot;)) {</span>
+<span class="fc" id="L102">            String username = fieldName.substring(&quot;comment-&quot;.length());</span>
+<span class="fc" id="L103">            return new UserSpecificCommentField(username);</span>
+        }
+<span class="fc" id="L105">        return OptionalUtil.&lt;Field&gt;orElse(</span>
+<span class="fc" id="L106">              OptionalUtil.&lt;Field&gt;orElse(</span>
+<span class="fc" id="L107">               OptionalUtil.&lt;Field&gt;orElse(</span>
+<span class="fc" id="L108">                OptionalUtil.&lt;Field&gt;orElse(</span>
+<span class="fc" id="L109">                 OptionalUtil.&lt;Field&gt;orElse(</span>
+<span class="fc" id="L110">                   OptionalUtil.&lt;Field&gt;orElse(</span>
+<span class="fc" id="L111">              InternalField.fromName(fieldName),</span>
+<span class="fc" id="L112">              StandardField.fromName(fieldName)),</span>
+<span class="fc" id="L113">              SpecialField.fromName(fieldName)),</span>
+<span class="fc" id="L114">              IEEEField.fromName(fieldName)),</span>
+<span class="fc" id="L115">              BiblatexSoftwareField.fromName(type, fieldName)),</span>
+<span class="fc" id="L116">              BiblatexApaField.fromName(type, fieldName)),</span>
+<span class="fc" id="L117">              AMSField.fromName(type, fieldName))</span>
+<span class="fc" id="L118">              .orElse(UnknownField.fromDisplayName(fieldName));</span>
+    }
+
+    public static Field parseField(String fieldName) {
+<span class="fc" id="L122">        return parseField(null, fieldName);</span>
+    }
+
+    public static Set&lt;Field&gt; getKeyFields() {
+<span class="fc bfc" id="L126" title="All 4 branches covered.">        return getFieldsFiltered(field -&gt; field.getProperties().contains(FieldProperty.SINGLE_ENTRY_LINK) || field.getProperties().contains(FieldProperty.MULTIPLE_ENTRY_LINK));</span>
+    }
+
+    public static boolean isInternalField(Field field) {
+<span class="fc" id="L130">        return field.getName().startsWith(&quot;__&quot;);</span>
+    }
+
+    public static Set&lt;Field&gt; getJournalNameFields() {
+<span class="nc" id="L134">        return getFieldsFiltered(field -&gt; field.getProperties().contains(FieldProperty.JOURNAL_NAME));</span>
+    }
+
+    /**
+     * Returns a Set with all standard fields and including some common internal fields
+     */
+    public static Set&lt;Field&gt; getCommonFields() {
+<span class="fc" id="L141">        EnumSet&lt;StandardField&gt; allFields = EnumSet.allOf(StandardField.class);</span>
+
+<span class="fc" id="L143">        LinkedHashSet&lt;Field&gt; publicAndInternalFields = new LinkedHashSet&lt;&gt;(allFields.size() + 3);</span>
+<span class="fc" id="L144">        publicAndInternalFields.add(InternalField.INTERNAL_ALL_FIELD);</span>
+<span class="fc" id="L145">        publicAndInternalFields.add(InternalField.INTERNAL_ALL_TEXT_FIELDS_FIELD);</span>
+<span class="fc" id="L146">        publicAndInternalFields.add(InternalField.KEY_FIELD);</span>
+<span class="fc" id="L147">        publicAndInternalFields.addAll(allFields);</span>
+
+<span class="fc" id="L149">        return publicAndInternalFields;</span>
+    }
+
+    /**
+     * Returns a sorted Set of Fields (by {@link Field#getDisplayName} with all fields without internal ones
+     */
+    public static Set&lt;Field&gt; getAllFieldsWithOutInternal() {
+<span class="nc" id="L156">        Set&lt;Field&gt; fields = new TreeSet&lt;&gt;(Comparator.comparing(Field::getDisplayName));</span>
+<span class="nc" id="L157">        fields.addAll(getAllFields());</span>
+<span class="nc" id="L158">        fields.removeAll(EnumSet.allOf(InternalField.class));</span>
+
+<span class="nc" id="L160">        return fields;</span>
+    }
+
+    /**
+     * Returns a  List with all standard fields and the citation key field
+     */
+    public static Set&lt;Field&gt; getStandardFieldsWithCitationKey() {
+<span class="fc" id="L167">        EnumSet&lt;StandardField&gt; allFields = EnumSet.allOf(StandardField.class);</span>
+
+<span class="fc" id="L169">        LinkedHashSet&lt;Field&gt; standardFieldsWithBibtexKey = new LinkedHashSet&lt;&gt;(allFields.size() + 1);</span>
+<span class="fc" id="L170">        standardFieldsWithBibtexKey.add(InternalField.KEY_FIELD);</span>
+<span class="fc" id="L171">        standardFieldsWithBibtexKey.addAll(allFields);</span>
+
+<span class="fc" id="L173">        return standardFieldsWithBibtexKey;</span>
+    }
+
+    public static Set&lt;Field&gt; getBookNameFields() {
+<span class="fc" id="L177">        return getFieldsFiltered(field -&gt; field.getProperties().contains(FieldProperty.BOOK_NAME));</span>
+    }
+
+    public static Set&lt;Field&gt; getPersonNameFields() {
+<span class="fc" id="L181">        return getFieldsFiltered(field -&gt; field.getProperties().contains(FieldProperty.PERSON_NAMES));</span>
+    }
+
+    private static Set&lt;Field&gt; getFieldsFiltered(Predicate&lt;Field&gt; selector) {
+<span class="fc" id="L185">        return getAllFields().stream()</span>
+<span class="fc" id="L186">                             .filter(selector)</span>
+<span class="fc" id="L187">                             .collect(Collectors.toSet());</span>
+    }
+
+    private static Set&lt;Field&gt; getAllFields() {
+<span class="fc" id="L191">        Set&lt;Field&gt; fields = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L192">        fields.addAll(EnumSet.allOf(BiblatexApaField.class));</span>
+<span class="fc" id="L193">        fields.addAll(EnumSet.allOf(BiblatexSoftwareField.class));</span>
+<span class="fc" id="L194">        fields.addAll(EnumSet.allOf(IEEEField.class));</span>
+<span class="fc" id="L195">        fields.addAll(EnumSet.allOf(InternalField.class));</span>
+<span class="fc" id="L196">        fields.addAll(EnumSet.allOf(SpecialField.class));</span>
+<span class="fc" id="L197">        fields.addAll(EnumSet.allOf(StandardField.class));</span>
+<span class="fc" id="L198">        fields.removeIf(field -&gt; field instanceof UserSpecificCommentField);</span>
+<span class="fc" id="L199">        return fields;</span>
+    }
+
+    /**
+     * These are the fields JabRef always displays as default {@link org.jabref.preferences.JabRefPreferences#setLanguageDependentDefaultValues()}
+     * &lt;p&gt;
+     * A user can change them. The change is currently stored in the preferences only and not explicitly exposed as
+     * separate preferences object
+     */
+    public static List&lt;Field&gt; getDefaultGeneralFields() {
+<span class="nc" id="L209">        List&lt;Field&gt; defaultGeneralFields = new ArrayList&lt;&gt;(Arrays.asList(StandardField.DOI, StandardField.CROSSREF, StandardField.KEYWORDS, StandardField.EPRINT, StandardField.URL, StandardField.FILE, StandardField.GROUPS, StandardField.OWNER, StandardField.TIMESTAMP));</span>
+<span class="nc" id="L210">        defaultGeneralFields.addAll(EnumSet.allOf(SpecialField.class));</span>
+<span class="nc" id="L211">        return defaultGeneralFields;</span>
+    }
+
+    // TODO: This should ideally be user configurable! (https://github.com/JabRef/jabref/issues/9840)
+    // TODO: Move somewhere more appropriate in the future
+    public static boolean isMultiLineField(final Field field, List&lt;Field&gt; nonWrappableFields) {
+<span class="nc bnc" id="L217" title="All 4 branches missed.">        return field.getProperties().contains(FieldProperty.MULTILINE_TEXT) || nonWrappableFields.contains(field);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

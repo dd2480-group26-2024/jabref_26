@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnlinkedFilesDialogView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.externalfiles</a> &gt; <span class="el_source">UnlinkedFilesDialogView.java</span></div><h1>UnlinkedFilesDialogView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.externalfiles;
+
+import java.nio.file.Path;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.application.Platform;
+import javafx.beans.InvalidationListener;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
+import javafx.collections.FXCollections;
+import javafx.fxml.FXML;
+import javafx.scene.control.Accordion;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBoxTreeItem;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Control;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.SelectionMode;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TitledPane;
+import javafx.scene.control.TreeItem;
+import javafx.scene.layout.VBox;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.FileNodeViewModel;
+import org.jabref.gui.util.IconValidationDecorator;
+import org.jabref.gui.util.RecursiveTreeItem;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.gui.util.ViewModelTreeCellFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+import jakarta.inject.Inject;
+import org.controlsfx.control.CheckTreeView;
+
+public class UnlinkedFilesDialogView extends BaseDialog&lt;Void&gt; {
+
+    @FXML private TextField directoryPathField;
+    @FXML private ComboBox&lt;FileExtensionViewModel&gt; fileTypeCombo;
+    @FXML private ComboBox&lt;DateRange&gt; fileDateCombo;
+    @FXML private ComboBox&lt;ExternalFileSorter&gt; fileSortCombo;
+    @FXML private CheckTreeView&lt;FileNodeViewModel&gt; unlinkedFilesList;
+    @FXML private Button scanButton;
+    @FXML private Button exportButton;
+    @FXML private Button importButton;
+    @FXML private Label progressText;
+    @FXML private Accordion accordion;
+    @FXML private ProgressIndicator progressDisplay;
+    @FXML private VBox progressPane;
+
+    @FXML private TableView&lt;ImportFilesResultItemViewModel&gt; importResultTable;
+    @FXML private TableColumn&lt;ImportFilesResultItemViewModel, JabRefIcon&gt; colStatus;
+    @FXML private TableColumn&lt;ImportFilesResultItemViewModel, String&gt; colMessage;
+    @FXML private TableColumn&lt;ImportFilesResultItemViewModel, String&gt; colFile;
+
+    @FXML private TitledPane filePane;
+    @FXML private TitledPane resultPane;
+
+    @Inject private PreferencesService preferencesService;
+    @Inject private DialogService dialogService;
+    @Inject private StateManager stateManager;
+    @Inject private UndoManager undoManager;
+    @Inject private TaskExecutor taskExecutor;
+    @Inject private FileUpdateMonitor fileUpdateMonitor;
+    @Inject private ThemeManager themeManager;
+
+    private final ControlsFxVisualizer validationVisualizer;
+    private UnlinkedFilesDialogViewModel viewModel;
+
+    private BibDatabaseContext bibDatabaseContext;
+
+<span class="nc" id="L92">    public UnlinkedFilesDialogView() {</span>
+<span class="nc" id="L93">        this.validationVisualizer = new ControlsFxVisualizer();</span>
+
+<span class="nc" id="L95">        this.setTitle(Localization.lang(&quot;Search for unlinked local files&quot;));</span>
+
+<span class="nc" id="L97">        ViewLoader.view(this)</span>
+<span class="nc" id="L98">                  .load()</span>
+<span class="nc" id="L99">                  .setAsDialogPane(this);</span>
+
+<span class="nc" id="L101">        setResultConverter(button -&gt; {</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            if (button == ButtonType.CANCEL) {</span>
+<span class="nc" id="L103">                viewModel.cancelTasks();</span>
+            }
+<span class="nc" id="L105">            return null;</span>
+        });
+
+<span class="nc" id="L108">        themeManager.updateFontStyle(getDialogPane().getScene());</span>
+<span class="nc" id="L109">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L113">        viewModel = new UnlinkedFilesDialogViewModel(</span>
+                dialogService,
+                undoManager,
+                fileUpdateMonitor,
+                preferencesService,
+                stateManager,
+                taskExecutor);
+
+<span class="nc" id="L121">        this.bibDatabaseContext = stateManager.getActiveDatabase().orElseThrow(() -&gt; new NullPointerException(&quot;No active library&quot;));</span>
+
+<span class="nc" id="L123">        progressDisplay.progressProperty().bind(viewModel.progressValueProperty());</span>
+<span class="nc" id="L124">        progressText.textProperty().bind(viewModel.progressTextProperty());</span>
+<span class="nc" id="L125">        progressPane.managedProperty().bind(viewModel.taskActiveProperty());</span>
+<span class="nc" id="L126">        progressPane.visibleProperty().bind(viewModel.taskActiveProperty());</span>
+<span class="nc" id="L127">        accordion.disableProperty().bind(viewModel.taskActiveProperty());</span>
+
+<span class="nc" id="L129">        viewModel.treeRootProperty().addListener(observable -&gt; {</span>
+<span class="nc" id="L130">            scanButton.setDefaultButton(false);</span>
+<span class="nc" id="L131">            importButton.setDefaultButton(true);</span>
+<span class="nc" id="L132">            scanButton.setDefaultButton(false);</span>
+<span class="nc" id="L133">            filePane.setExpanded(true);</span>
+<span class="nc" id="L134">            resultPane.setExpanded(false);</span>
+<span class="nc" id="L135">        });</span>
+
+<span class="nc" id="L137">        viewModel.resultTableItems().addListener((InvalidationListener) observable -&gt; {</span>
+<span class="nc" id="L138">            filePane.setExpanded(false);</span>
+<span class="nc" id="L139">            resultPane.setExpanded(true);</span>
+<span class="nc" id="L140">            resultPane.setDisable(false);</span>
+<span class="nc" id="L141">        });</span>
+
+<span class="nc" id="L143">        initDirectorySelection();</span>
+<span class="nc" id="L144">        initUnlinkedFilesList();</span>
+<span class="nc" id="L145">        initResultTable();</span>
+<span class="nc" id="L146">        initButtons();</span>
+<span class="nc" id="L147">    }</span>
+
+    private void initDirectorySelection() {
+<span class="nc" id="L150">        validationVisualizer.setDecoration(new IconValidationDecorator());</span>
+
+<span class="nc" id="L152">        directoryPathField.textProperty().bindBidirectional(viewModel.directoryPathProperty());</span>
+<span class="nc" id="L153">        Platform.runLater(() -&gt; validationVisualizer.initVisualization(viewModel.directoryPathValidationStatus(), directoryPathField));</span>
+
+<span class="nc" id="L155">        new ViewModelListCellFactory&lt;FileExtensionViewModel&gt;()</span>
+<span class="nc" id="L156">                .withText(FileExtensionViewModel::getDescription)</span>
+<span class="nc" id="L157">                .withIcon(FileExtensionViewModel::getIcon)</span>
+<span class="nc" id="L158">                .install(fileTypeCombo);</span>
+<span class="nc" id="L159">        fileTypeCombo.setItems(viewModel.getFileFilters());</span>
+<span class="nc" id="L160">        fileTypeCombo.valueProperty().bindBidirectional(viewModel.selectedExtensionProperty());</span>
+<span class="nc" id="L161">        fileTypeCombo.getSelectionModel().selectFirst();</span>
+<span class="nc" id="L162">        new ViewModelListCellFactory&lt;DateRange&gt;()</span>
+<span class="nc" id="L163">            .withText(DateRange::getDateRange)</span>
+<span class="nc" id="L164">            .install(fileDateCombo);</span>
+<span class="nc" id="L165">        fileDateCombo.setItems(viewModel.getDateFilters());</span>
+<span class="nc" id="L166">        fileDateCombo.valueProperty().bindBidirectional(viewModel.selectedDateProperty());</span>
+<span class="nc" id="L167">        fileDateCombo.getSelectionModel().selectFirst();</span>
+<span class="nc" id="L168">        new ViewModelListCellFactory&lt;ExternalFileSorter&gt;()</span>
+<span class="nc" id="L169">                .withText(ExternalFileSorter::getSorter)</span>
+<span class="nc" id="L170">                .install(fileSortCombo);</span>
+<span class="nc" id="L171">        fileSortCombo.setItems(viewModel.getSorters());</span>
+<span class="nc" id="L172">        fileSortCombo.valueProperty().bindBidirectional(viewModel.selectedSortProperty());</span>
+<span class="nc" id="L173">        fileSortCombo.getSelectionModel().selectFirst();</span>
+
+<span class="nc" id="L175">        directoryPathField.setText(bibDatabaseContext.getFirstExistingFileDir(preferencesService.getFilePreferences()).map(Path::toString).orElse(&quot;&quot;));</span>
+<span class="nc" id="L176">    }</span>
+
+    private void initUnlinkedFilesList() {
+<span class="nc" id="L179">        new ViewModelTreeCellFactory&lt;FileNodeViewModel&gt;()</span>
+<span class="nc" id="L180">                .withText(FileNodeViewModel::getDisplayTextWithEditDate)</span>
+<span class="nc" id="L181">                .install(unlinkedFilesList);</span>
+
+<span class="nc" id="L183">        unlinkedFilesList.maxHeightProperty().bind(((Control) filePane.contentProperty().get()).heightProperty());</span>
+<span class="nc" id="L184">        unlinkedFilesList.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);</span>
+<span class="nc" id="L185">        unlinkedFilesList.rootProperty().bind(EasyBind.map(viewModel.treeRootProperty(),</span>
+<span class="nc" id="L186">                fileNode -&gt; fileNode.map(fileNodeViewModel -&gt; new RecursiveTreeItem&lt;&gt;(fileNodeViewModel, FileNodeViewModel::getChildren))</span>
+<span class="nc" id="L187">                                    .orElse(null)));</span>
+
+<span class="nc" id="L189">        unlinkedFilesList.setContextMenu(createSearchContextMenu());</span>
+
+<span class="nc" id="L191">        EasyBind.subscribe(unlinkedFilesList.rootProperty(), root -&gt; {</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (root != null) {</span>
+<span class="nc" id="L193">                ((CheckBoxTreeItem&lt;FileNodeViewModel&gt;) root).setSelected(true);</span>
+<span class="nc" id="L194">                root.setExpanded(true);</span>
+<span class="nc" id="L195">                EasyBind.bindContent(viewModel.checkedFileListProperty(), unlinkedFilesList.getCheckModel().getCheckedItems());</span>
+            } else {
+<span class="nc" id="L197">                EasyBind.bindContent(viewModel.checkedFileListProperty(), FXCollections.observableArrayList());</span>
+            }
+<span class="nc" id="L199">        });</span>
+<span class="nc" id="L200">    }</span>
+
+    private void initResultTable() {
+<span class="nc" id="L203">        colFile.setCellValueFactory(cellData -&gt; cellData.getValue().file());</span>
+<span class="nc" id="L204">        new ValueTableCellFactory&lt;ImportFilesResultItemViewModel, String&gt;()</span>
+<span class="nc" id="L205">                .withText(item -&gt; item).withTooltip(item -&gt; item)</span>
+<span class="nc" id="L206">                .install(colFile);</span>
+
+<span class="nc" id="L208">        colMessage.setCellValueFactory(cellData -&gt; cellData.getValue().message());</span>
+<span class="nc" id="L209">        new ValueTableCellFactory&lt;ImportFilesResultItemViewModel, String&gt;()</span>
+<span class="nc" id="L210">                .withText(item -&gt; item).withTooltip(item -&gt; item)</span>
+<span class="nc" id="L211">                .install(colMessage);</span>
+
+<span class="nc" id="L213">        colStatus.setCellValueFactory(cellData -&gt; cellData.getValue().icon());</span>
+<span class="nc" id="L214">        colStatus.setCellFactory(new ValueTableCellFactory&lt;ImportFilesResultItemViewModel, JabRefIcon&gt;().withGraphic(JabRefIcon::getGraphicNode));</span>
+<span class="nc" id="L215">        importResultTable.setColumnResizePolicy(param -&gt; true);</span>
+
+<span class="nc" id="L217">        importResultTable.setItems(viewModel.resultTableItems());</span>
+<span class="nc" id="L218">    }</span>
+
+    private void initButtons() {
+<span class="nc" id="L221">        BooleanBinding noItemsChecked = Bindings.isNull(unlinkedFilesList.rootProperty())</span>
+<span class="nc" id="L222">                                                .or(Bindings.isEmpty(viewModel.checkedFileListProperty()));</span>
+<span class="nc" id="L223">        exportButton.disableProperty().bind(noItemsChecked);</span>
+<span class="nc" id="L224">        importButton.disableProperty().bind(noItemsChecked);</span>
+
+<span class="nc" id="L226">        scanButton.setDefaultButton(true);</span>
+<span class="nc" id="L227">        scanButton.disableProperty().bind(viewModel.taskActiveProperty().or(viewModel.directoryPathValidationStatus().validProperty().not()));</span>
+<span class="nc" id="L228">    }</span>
+
+    @FXML
+    void browseFileDirectory() {
+<span class="nc" id="L232">        viewModel.browseFileDirectory();</span>
+<span class="nc" id="L233">    }</span>
+
+    @FXML
+    void scanFiles() {
+<span class="nc" id="L237">        viewModel.startSearch();</span>
+<span class="nc" id="L238">    }</span>
+
+    @FXML
+    void startImport() {
+<span class="nc" id="L242">        viewModel.startImport();</span>
+<span class="nc" id="L243">    }</span>
+
+    @FXML
+    void exportSelected() {
+<span class="nc" id="L247">        viewModel.startExport();</span>
+<span class="nc" id="L248">    }</span>
+
+    /**
+     * Expands or collapses the specified tree according to the &lt;code&gt;expand&lt;/code&gt;-parameter.
+     */
+    private void expandTree(TreeItem&lt;?&gt; item, boolean expand) {
+<span class="nc bnc" id="L254" title="All 4 branches missed.">        if ((item != null) &amp;&amp; !item.isLeaf()) {</span>
+<span class="nc" id="L255">            item.setExpanded(expand);</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            for (TreeItem&lt;?&gt; child : item.getChildren()) {</span>
+<span class="nc" id="L257">                expandTree(child, expand);</span>
+<span class="nc" id="L258">            }</span>
+        }
+<span class="nc" id="L260">    }</span>
+
+    private ContextMenu createSearchContextMenu() {
+<span class="nc" id="L263">        ContextMenu contextMenu = new ContextMenu();</span>
+<span class="nc" id="L264">        ActionFactory factory = new ActionFactory(preferencesService.getKeyBindingRepository());</span>
+
+<span class="nc" id="L266">        contextMenu.getItems().add(factory.createMenuItem(StandardActions.SELECT_ALL, new SearchContextAction(StandardActions.SELECT_ALL)));</span>
+<span class="nc" id="L267">        contextMenu.getItems().add(factory.createMenuItem(StandardActions.UNSELECT_ALL, new SearchContextAction(StandardActions.UNSELECT_ALL)));</span>
+<span class="nc" id="L268">        contextMenu.getItems().add(factory.createMenuItem(StandardActions.EXPAND_ALL, new SearchContextAction(StandardActions.EXPAND_ALL)));</span>
+<span class="nc" id="L269">        contextMenu.getItems().add(factory.createMenuItem(StandardActions.COLLAPSE_ALL, new SearchContextAction(StandardActions.COLLAPSE_ALL)));</span>
+
+<span class="nc" id="L271">        return contextMenu;</span>
+    }
+
+    private class SearchContextAction extends SimpleCommand {
+
+        private final StandardActions command;
+
+<span class="nc" id="L278">        public SearchContextAction(StandardActions command) {</span>
+<span class="nc" id="L279">            this.command = command;</span>
+
+<span class="nc" id="L281">            this.executable.bind(unlinkedFilesList.rootProperty().isNotNull());</span>
+<span class="nc" id="L282">        }</span>
+
+        @Override
+        public void execute() {
+<span class="nc bnc" id="L286" title="All 5 branches missed.">            switch (command) {</span>
+<span class="nc" id="L287">                case SELECT_ALL -&gt; unlinkedFilesList.getCheckModel().checkAll();</span>
+<span class="nc" id="L288">                case UNSELECT_ALL -&gt; unlinkedFilesList.getCheckModel().clearChecks();</span>
+<span class="nc" id="L289">                case EXPAND_ALL -&gt; expandTree(unlinkedFilesList.getRoot(), true);</span>
+<span class="nc" id="L290">                case COLLAPSE_ALL -&gt; expandTree(unlinkedFilesList.getRoot(), false);</span>
+            }
+<span class="nc" id="L292">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

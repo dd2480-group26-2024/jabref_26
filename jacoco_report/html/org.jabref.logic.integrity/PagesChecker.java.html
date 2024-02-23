@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PagesChecker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.integrity</a> &gt; <span class="el_source">PagesChecker.java</span></div><h1>PagesChecker.java</h1><pre class="source lang-java linenums">package org.jabref.logic.integrity;
+
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.strings.StringUtil;
+
+public class PagesChecker implements ValueChecker {
+
+    private static final String PAGES_EXP_BIBTEX = &quot;&quot;
+            + &quot;\\A&quot;                 // begin String
+            + &quot;[A-Za-z]?\\d*&quot;       // optional prefix and number
+            + &quot;(&quot;
+            + &quot;(\\+|-{2}|\u2013)&quot;   // separator, must contain exactly two dashes
+            + &quot;[A-Za-z]?\\d*&quot;       // optional prefix and number
+            + &quot;)?&quot;
+            + &quot;\\z&quot;;                // end String
+
+    // See https://packages.oth-regensburg.de/ctan/macros/latex/contrib/biblatex/doc/biblatex.pdf#subsubsection.3.15.3 for valid content
+    private static final String PAGES_EXP_BIBLATEX = &quot;&quot;
+            + &quot;\\A&quot;               // begin String
+            + &quot;[A-Za-z]?\\d*&quot;     // optional prefix and number
+            + &quot;(&quot;
+            + &quot;(\\+|-{1,2}|\u2013)&quot; // separator
+            + &quot;[A-Za-z]?\\d*&quot;     // optional prefix and number
+            + &quot;)?&quot;
+            + &quot;\\z&quot;;              // end String
+
+    private final Predicate&lt;String&gt; isValidPageNumber;
+
+<span class="fc" id="L35">    public PagesChecker(BibDatabaseContext databaseContext) {</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (databaseContext.isBiblatexMode()) {</span>
+<span class="fc" id="L37">            isValidPageNumber = Pattern.compile(PAGES_EXP_BIBLATEX).asPredicate();</span>
+        } else {
+<span class="fc" id="L39">            isValidPageNumber = Pattern.compile(PAGES_EXP_BIBTEX).asPredicate();</span>
+        }
+<span class="fc" id="L41">    }</span>
+
+    /**
+     * From BibTex manual:
+     *  One or more page numbers or range of numbers, such as 42--111 or 7,41,73--97 or 43+
+     *  (the '+' in this last example indicates pages following that don't form a simple range).
+     *  To make it easier to maintain Scribe-compatible databases, the standard styles convert
+     *  a single dash (as in 7-33) to the double dash used in TEX to denote number ranges (as in 7--33).
+     * biblatex:
+     *  same as above but allows single dash as well
+     */
+    @Override
+    public Optional&lt;String&gt; checkValue(String value) {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (StringUtil.isBlank(value)) {</span>
+<span class="fc" id="L55">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L58">        if (Arrays.stream(value.split(&quot;,&quot;))</span>
+<span class="fc" id="L59">                .map(String::trim)</span>
+<span class="fc bfc" id="L60" title="All 4 branches covered.">                .anyMatch(pageRange -&gt; !isValidPageNumber.test(pageRange))) {</span>
+<span class="fc" id="L61">            return Optional.of(Localization.lang(&quot;should contain a valid page number range&quot;));</span>
+        }
+<span class="fc" id="L63">        return Optional.empty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

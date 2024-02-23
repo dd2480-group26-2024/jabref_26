@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SlrGitHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.git</a> &gt; <span class="el_source">SlrGitHandler.java</span></div><h1>SlrGitHandler.java</h1><pre class="source lang-java linenums">package org.jabref.logic.git;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.StringJoiner;
+
+import org.jabref.logic.crawler.StudyRepository;
+
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+
+public class SlrGitHandler extends GitHandler {
+
+    /**
+     * Initialize the handler for the given repository
+     *
+     * @param repositoryPath The root of the initialized git repository
+     */
+    public SlrGitHandler(Path repositoryPath) {
+<span class="fc" id="L34">        super(repositoryPath);</span>
+<span class="fc" id="L35">    }</span>
+
+    public void appendLatestSearchResultsOntoCurrentBranch(String patchMessage, String searchBranchName) throws IOException, GitAPIException {
+        // Calculate and apply new search results to work branch
+<span class="fc" id="L39">        String patch = calculatePatchOfNewSearchResults(searchBranchName);</span>
+<span class="fc" id="L40">        Map&lt;Path, String&gt; result = parsePatchForAddedEntries(patch);</span>
+
+<span class="fc" id="L42">        applyPatch(result);</span>
+<span class="fc" id="L43">        this.createCommitOnCurrentBranch(patchMessage, false);</span>
+<span class="fc" id="L44">    }</span>
+
+    /**
+     * Calculates the diff between the HEAD and the previous commit of the sourceBranch.
+     *
+     * @param sourceBranch The name of the branch that is the target of the calculation
+     * @return Returns the patch (diff) between the head of the sourceBranch and its previous commit HEAD^1
+     */
+    String calculatePatchOfNewSearchResults(String sourceBranch) throws IOException, GitAPIException {
+<span class="fc" id="L53">        try (Git git = Git.open(this.repositoryPathAsFile)) {</span>
+<span class="fc" id="L54">            Optional&lt;Ref&gt; sourceBranchRef = getRefForBranch(sourceBranch);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            if (sourceBranchRef.isEmpty()) {</span>
+<span class="nc" id="L56">                return &quot;&quot;;</span>
+            }
+<span class="fc" id="L58">            Repository repository = git.getRepository();</span>
+<span class="fc" id="L59">            ObjectId branchHead = sourceBranchRef.get().getObjectId();</span>
+<span class="fc" id="L60">            ObjectId treeIdHead = repository.resolve(branchHead.getName() + &quot;^{tree}&quot;);</span>
+<span class="fc" id="L61">            ObjectId treeIdHeadParent = repository.resolve(branchHead.getName() + &quot;~1^{tree}&quot;);</span>
+
+<span class="fc" id="L63">            try (ObjectReader reader = repository.newObjectReader()) {</span>
+<span class="fc" id="L64">                CanonicalTreeParser oldTreeIter = new CanonicalTreeParser();</span>
+<span class="fc" id="L65">                oldTreeIter.reset(reader, treeIdHeadParent);</span>
+<span class="fc" id="L66">                CanonicalTreeParser newTreeIter = new CanonicalTreeParser();</span>
+<span class="fc" id="L67">                newTreeIter.reset(reader, treeIdHead);</span>
+
+<span class="fc" id="L69">                ByteArrayOutputStream put = new ByteArrayOutputStream();</span>
+<span class="fc" id="L70">                try (DiffFormatter formatter = new DiffFormatter(put)) {</span>
+<span class="fc" id="L71">                    formatter.setRepository(git.getRepository());</span>
+<span class="fc" id="L72">                    List&lt;DiffEntry&gt; entries = formatter.scan(oldTreeIter, newTreeIter);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                    for (DiffEntry entry : entries) {</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                        if (entry.getChangeType().equals(DiffEntry.ChangeType.MODIFY)) {</span>
+<span class="fc" id="L75">                            formatter.format(entry);</span>
+                        }
+<span class="fc" id="L77">                    }</span>
+<span class="fc" id="L78">                    formatter.flush();</span>
+<span class="fc" id="L79">                    return put.toString();</span>
+                }
+            }
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        }</span>
+    }
+
+    /**
+     * Applies the provided patch on the current branch
+     * Ignores any changes made to the study definition file.
+     * The reason for this is that the study definition file cannot be patched the same way as the bib files, as the
+     * order of fields in the yml file matters.
+     *
+     * @param patch the patch (diff) as a string
+     * @return Returns a map where each file has its path as a key and the string contains the hunk of new results
+     */
+    Map&lt;Path, String&gt; parsePatchForAddedEntries(String patch) throws IOException, GitAPIException {
+<span class="fc" id="L95">        String[] tokens = patch.split(&quot;\n&quot;);</span>
+        // Tracks for each file the related diff. Represents each file by its relative path
+<span class="fc" id="L97">        Map&lt;Path, String&gt; diffsPerFile = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L98">        boolean content = false;</span>
+<span class="fc" id="L99">        StringJoiner joiner = null;</span>
+<span class="fc" id="L100">        String relativePath = null;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (String currentToken : tokens) {</span>
+            // Begin of a new diff
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (currentToken.startsWith(&quot;diff --git a/&quot;)) {</span>
+                // If the diff is related to a different file, save the diff for the previous file
+<span class="pc bpc" id="L105" title="3 of 4 branches missed.">                if (!(relativePath == null || joiner == null)) {</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                    if (!relativePath.contains(StudyRepository.STUDY_DEFINITION_FILE_NAME)) {</span>
+<span class="nc" id="L107">                        diffsPerFile.put(Path.of(repositoryPath.toString(), relativePath), joiner.toString());</span>
+                    }
+                }
+                // Find the relative path of the file that is related with the current diff
+<span class="fc" id="L111">                relativePath = currentToken.substring(13, currentToken.indexOf(&quot; b/&quot;));</span>
+<span class="fc" id="L112">                content = false;</span>
+<span class="fc" id="L113">                joiner = new StringJoiner(&quot;\n&quot;);</span>
+<span class="fc" id="L114">                continue;</span>
+            }
+            // From here on content follows
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">            if (currentToken.startsWith(&quot;@@ &quot;) &amp;&amp; currentToken.endsWith(&quot; @@&quot;)) {</span>
+<span class="fc" id="L118">                content = true;</span>
+<span class="fc" id="L119">                continue;</span>
+            }
+            // Only add &quot;new&quot; lines to diff (no context lines)
+<span class="fc bfc" id="L122" title="All 4 branches covered.">            if (content &amp;&amp; currentToken.startsWith(&quot;+&quot;)) {</span>
+                // Do not include + sign
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                if (joiner != null) {</span>
+<span class="fc" id="L125">                    joiner.add(currentToken.substring(1));</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">        if (!(relativePath == null || joiner == null)) {</span>
+            // For the last file this has to be done at the end
+<span class="fc" id="L131">            diffsPerFile.put(Path.of(repositoryPath.toString(), relativePath), joiner.toString());</span>
+        }
+<span class="fc" id="L133">        return diffsPerFile;</span>
+    }
+
+    /**
+     * Applies for each file (specified as keys), the calculated patch (specified as the value)
+     * The patch is inserted between the encoding and the contents of the bib files.
+     */
+    void applyPatch(Map&lt;Path, String&gt; patch) {
+<span class="fc" id="L141">        patch.keySet().forEach(path -&gt; {</span>
+            try {
+<span class="fc" id="L143">                String currentContent = Files.readString(path);</span>
+<span class="fc" id="L144">                String prefix = &quot;&quot;;</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                if (currentContent.startsWith(&quot;% Encoding:&quot;)) {</span>
+<span class="nc" id="L146">                    int endOfEncoding = currentContent.indexOf(&quot;\n&quot;);</span>
+                    // Include Encoding and the empty line
+<span class="nc" id="L148">                    prefix = currentContent.substring(0, endOfEncoding + 1) + &quot;\n&quot;;</span>
+<span class="nc" id="L149">                    currentContent = currentContent.substring(endOfEncoding + 2);</span>
+                }
+<span class="fc" id="L151">                Files.writeString(path, prefix + patch.get(path) + currentContent, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L152">            } catch (IOException e) {</span>
+<span class="nc" id="L153">                LOGGER.error(&quot;Could not apply patch.&quot;);</span>
+<span class="fc" id="L154">            }</span>
+<span class="fc" id="L155">        });</span>
+<span class="fc" id="L156">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

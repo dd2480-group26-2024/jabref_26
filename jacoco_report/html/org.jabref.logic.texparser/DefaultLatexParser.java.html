@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultLatexParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.texparser</a> &gt; <span class="el_source">DefaultLatexParser.java</span></div><h1>DefaultLatexParser.java</h1><pre class="source lang-java linenums">package org.jabref.logic.texparser;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.LineNumberReader;
+import java.io.Reader;
+import java.io.UncheckedIOException;
+import java.nio.channels.ClosedChannelException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.model.texparser.LatexParserResult;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class DefaultLatexParser implements LatexParser {
+
+<span class="fc" id="L26">    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLatexParser.class);</span>
+    private static final String TEX_EXT = &quot;.tex&quot;;
+    private static final String BIB_EXT = &quot;.bib&quot;;
+
+    /**
+     * It is allowed to add new cite commands for pattern matching. Some valid examples: &quot;citep&quot;, &quot;[cC]ite&quot;, and
+     * &quot;[cC]ite(author|title|year|t|p)?&quot;.
+     */
+<span class="fc" id="L34">    private static final String[] CITE_COMMANDS = {</span>
+            &quot;[cC]ite(alt|alp|author|authorfull|date|num|p|t|text|title|url|year|yearpar)?&quot;,
+            &quot;([aA]|[aA]uto|fnote|foot|footfull|full|no|[nN]ote|[pP]aren|[pP]note|[tT]ext|[sS]mart|super)cite([s*]?)&quot;,
+            &quot;footcitetext&quot;, &quot;(block|text)cquote&quot;
+    };
+    private static final String CITE_GROUP = &quot;key&quot;;
+<span class="fc" id="L40">    private static final Pattern CITE_PATTERN = Pattern.compile(</span>
+<span class="fc" id="L41">            &quot;\\\\(%s)\\*?(?:\\[(?:[^\\]]*)\\]){0,2}\\{(?&lt;%s&gt;[^\\}]*)\\}(?:\\{[^\\}]*\\})?&quot;.formatted(</span>
+<span class="fc" id="L42">                    String.join(&quot;|&quot;, CITE_COMMANDS), CITE_GROUP));</span>
+
+    private static final String BIBLIOGRAPHY_GROUP = &quot;bib&quot;;
+<span class="fc" id="L45">    private static final Pattern BIBLIOGRAPHY_PATTERN = Pattern.compile(</span>
+<span class="fc" id="L46">            &quot;\\\\(?:bibliography|addbibresource)\\{(?&lt;%s&gt;[^\\}]*)\\}&quot;.formatted(BIBLIOGRAPHY_GROUP));</span>
+
+    private static final String INCLUDE_GROUP = &quot;file&quot;;
+<span class="fc" id="L49">    private static final Pattern INCLUDE_PATTERN = Pattern.compile(</span>
+<span class="fc" id="L50">            &quot;\\\\(?:include|input)\\{(?&lt;%s&gt;[^\\}]*)\\}&quot;.formatted(INCLUDE_GROUP));</span>
+
+    private final LatexParserResult latexParserResult;
+
+<span class="fc" id="L54">    public DefaultLatexParser() {</span>
+<span class="fc" id="L55">        this.latexParserResult = new LatexParserResult();</span>
+<span class="fc" id="L56">    }</span>
+
+    public LatexParserResult getLatexParserResult() {
+<span class="nc" id="L59">        return latexParserResult;</span>
+    }
+
+    @Override
+    public LatexParserResult parse(String citeString) {
+<span class="fc" id="L64">        matchCitation(Path.of(&quot;&quot;), 1, citeString);</span>
+<span class="fc" id="L65">        return latexParserResult;</span>
+    }
+
+    @Override
+    public LatexParserResult parse(Path latexFile) {
+<span class="fc" id="L70">        return parse(Collections.singletonList(latexFile));</span>
+    }
+
+    @Override
+    public LatexParserResult parse(List&lt;Path&gt; latexFiles) {
+<span class="fc" id="L75">        latexParserResult.addFiles(latexFiles);</span>
+<span class="fc" id="L76">        List&lt;Path&gt; referencedFiles = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (Path file : latexFiles) {</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (!file.toFile().exists()) {</span>
+<span class="fc" id="L80">                LOGGER.error(&quot;File does not exist: {}&quot;, file);</span>
+<span class="fc" id="L81">                continue;</span>
+            }
+
+            try (
+<span class="fc" id="L85">                    InputStream inputStream = Files.newInputStream(file);</span>
+<span class="fc" id="L86">                    Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L87">                    LineNumberReader lineNumberReader = new LineNumberReader(reader)) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                for (String line = lineNumberReader.readLine(); line != null; line = lineNumberReader.readLine()) {</span>
+                    // Skip comments and blank lines.
+<span class="fc bfc" id="L90" title="All 4 branches covered.">                    if (line.trim().isEmpty() || line.trim().charAt(0) == '%') {</span>
+<span class="fc" id="L91">                        continue;</span>
+                    }
+<span class="fc" id="L93">                    matchCitation(file, lineNumberReader.getLineNumber(), line);</span>
+<span class="fc" id="L94">                    matchBibFile(file, line);</span>
+<span class="fc" id="L95">                    matchNestedFile(file, latexFiles, referencedFiles, line);</span>
+                }
+<span class="nc" id="L97">            } catch (ClosedChannelException e) {</span>
+                // User changed the underlying LaTeX file
+                // We ignore this error and just continue with parsing
+<span class="nc" id="L100">                LOGGER.info(&quot;Parsing has been interrupted&quot;);</span>
+<span class="nc" id="L101">            } catch (IOException | UncheckedIOException e) {</span>
+                // Some weired error during reading
+                // We ignore this error and just continue with parsing
+<span class="nc" id="L104">                LOGGER.info(&quot;Error while parsing file {}&quot;, file, e);</span>
+<span class="pc" id="L105">            }</span>
+<span class="fc" id="L106">        }</span>
+
+        // Parse all files referenced by TEX files, recursively.
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (!referencedFiles.isEmpty()) {</span>
+            // modifies class variable latexParserResult
+<span class="fc" id="L111">            parse(referencedFiles);</span>
+        }
+
+<span class="fc" id="L114">        return latexParserResult;</span>
+    }
+
+    /**
+     * Find cites along a specific line and store them.
+     */
+    private void matchCitation(Path file, int lineNumber, String line) {
+<span class="fc" id="L121">        Matcher citeMatch = CITE_PATTERN.matcher(line);</span>
+
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        while (citeMatch.find()) {</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            for (String key : citeMatch.group(CITE_GROUP).split(&quot;,&quot;)) {</span>
+<span class="fc" id="L125">                latexParserResult.addKey(key.trim(), file, lineNumber, citeMatch.start(), citeMatch.end(), line);</span>
+            }
+        }
+<span class="fc" id="L128">    }</span>
+
+    /**
+     * Find BIB files along a specific line and store them.
+     */
+    private void matchBibFile(Path file, String line) {
+<span class="fc" id="L134">        Matcher bibliographyMatch = BIBLIOGRAPHY_PATTERN.matcher(line);</span>
+
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        while (bibliographyMatch.find()) {</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            for (String bibString : bibliographyMatch.group(BIBLIOGRAPHY_GROUP).split(&quot;,&quot;)) {</span>
+<span class="fc" id="L138">                bibString = bibString.trim();</span>
+<span class="fc" id="L139">                Path bibFile = file.getParent().resolve(</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">                        bibString.endsWith(BIB_EXT)</span>
+<span class="nc" id="L141">                                ? bibString</span>
+<span class="fc" id="L142">                                : &quot;%s%s&quot;.formatted(bibString, BIB_EXT));</span>
+
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                if (bibFile.toFile().exists()) {</span>
+<span class="fc" id="L145">                    latexParserResult.addBibFile(file, bibFile);</span>
+                }
+            }
+        }
+<span class="fc" id="L149">    }</span>
+
+    /**
+     * Find inputs and includes along a specific line and store them for parsing later.
+     */
+    private void matchNestedFile(Path texFile, List&lt;Path&gt; texFiles, List&lt;Path&gt; referencedFiles, String line) {
+<span class="fc" id="L155">        Matcher includeMatch = INCLUDE_PATTERN.matcher(line);</span>
+
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        while (includeMatch.find()) {</span>
+<span class="fc" id="L158">            String filenamePassedToInclude = includeMatch.group(INCLUDE_GROUP);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            String texFileName = filenamePassedToInclude.endsWith(TEX_EXT)</span>
+<span class="nc" id="L160">                    ? filenamePassedToInclude</span>
+<span class="fc" id="L161">                    : &quot;%s%s&quot;.formatted(filenamePassedToInclude, TEX_EXT);</span>
+<span class="fc" id="L162">            Path nestedFile = texFile.getParent().resolve(texFileName);</span>
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">            if (nestedFile.toFile().exists() &amp;&amp; !texFiles.contains(nestedFile)) {</span>
+<span class="fc" id="L164">                referencedFiles.add(nestedFile);</span>
+            }
+<span class="fc" id="L166">        }</span>
+<span class="fc" id="L167">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

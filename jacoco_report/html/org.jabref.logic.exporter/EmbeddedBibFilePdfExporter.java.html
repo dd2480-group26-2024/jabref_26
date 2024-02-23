@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmbeddedBibFilePdfExporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.exporter</a> &gt; <span class="el_source">EmbeddedBibFilePdfExporter.java</span></div><h1>EmbeddedBibFilePdfExporter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.exporter;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+import org.jabref.logic.bibtex.BibEntryWriter;
+import org.jabref.logic.bibtex.FieldPreferences;
+import org.jabref.logic.bibtex.FieldWriter;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.OS;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.logic.xmp.XmpUtilWriter;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDDocumentNameDictionary;
+import org.apache.pdfbox.pdmodel.PDEmbeddedFilesNameTreeNode;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.filespecification.PDComplexFileSpecification;
+import org.apache.pdfbox.pdmodel.common.filespecification.PDEmbeddedFile;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A custom exporter to write bib entries to an embedded bib file.
+ */
+public class EmbeddedBibFilePdfExporter extends Exporter {
+<span class="fc" id="L45">    public static String EMBEDDED_FILE_NAME = &quot;main.bib&quot;;</span>
+
+<span class="fc" id="L47">    private static final Logger LOGGER = LoggerFactory.getLogger(EmbeddedBibFilePdfExporter.class);</span>
+
+    private final BibDatabaseMode bibDatabaseMode;
+    private final BibEntryTypesManager bibEntryTypesManager;
+    private final FieldPreferences fieldPreferences;
+
+    public EmbeddedBibFilePdfExporter(BibDatabaseMode bibDatabaseMode, BibEntryTypesManager bibEntryTypesManager, FieldPreferences fieldPreferences) {
+<span class="fc" id="L54">        super(&quot;bib&quot;, &quot;Embedded BibTeX&quot;, StandardFileType.PDF);</span>
+<span class="fc" id="L55">        this.bibDatabaseMode = bibDatabaseMode;</span>
+<span class="fc" id="L56">        this.bibEntryTypesManager = bibEntryTypesManager;</span>
+<span class="fc" id="L57">        this.fieldPreferences = fieldPreferences;</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * @param databaseContext the database to export from
+     * @param file            the file to write to. If it contains &quot;split&quot;, then the output is split into different files
+     * @param entries         a list containing all entries that should be exported
+     */
+    @Override
+    public void export(BibDatabaseContext databaseContext, Path file, List&lt;BibEntry&gt; entries) throws Exception {
+<span class="fc" id="L67">        Objects.requireNonNull(databaseContext);</span>
+<span class="fc" id="L68">        Objects.requireNonNull(file);</span>
+<span class="fc" id="L69">        Objects.requireNonNull(entries);</span>
+
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (!Files.exists(file)) {</span>
+<span class="fc" id="L72">            try (PDDocument document = new PDDocument()) {</span>
+<span class="fc" id="L73">                PDPage page = new PDPage();</span>
+<span class="fc" id="L74">                document.addPage(page);</span>
+
+<span class="fc" id="L76">                try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {</span>
+<span class="fc" id="L77">                    contentStream.beginText();</span>
+<span class="fc" id="L78">                    contentStream.newLineAtOffset(25, 500);</span>
+<span class="fc" id="L79">                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);</span>
+<span class="fc" id="L80">                    contentStream.showText(&quot;This PDF was created by JabRef. It demonstrates the embedding of BibTeX data in PDF files. Please open the file metadata view of your PDF viewer to see the attached files.&quot;);</span>
+<span class="fc" id="L81">                    contentStream.endText();</span>
+                }
+<span class="fc" id="L83">                document.save(file.toString());</span>
+<span class="nc" id="L84">            } catch (IOException e) {</span>
+<span class="nc" id="L85">                LOGGER.error(&quot;Could not create PDF file&quot;, e);</span>
+<span class="fc" id="L86">            }</span>
+        }
+
+<span class="fc" id="L89">        String bibString = getBibString(entries);</span>
+<span class="fc" id="L90">        embedBibTex(bibString, file);</span>
+<span class="fc" id="L91">    }</span>
+
+    /**
+     * Similar method: {@link XmpUtilWriter#writeXmp(Path, BibEntry, org.jabref.model.database.BibDatabase)}
+     */
+    private void embedBibTex(String bibTeX, Path path) throws IOException {
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">        if (!Files.exists(path) || !FileUtil.isPDFFile(path)) {</span>
+<span class="fc" id="L98">            return;</span>
+        }
+
+        // Read from another file
+        // Reason: Apache PDFBox does not support writing while the file is opened
+        // See https://issues.apache.org/jira/browse/PDFBOX-4028
+<span class="fc" id="L104">        Path newFile = Files.createTempFile(&quot;JabRef&quot;, &quot;pdf&quot;);</span>
+<span class="fc" id="L105">        try (PDDocument document = Loader.loadPDF(path.toFile())) {</span>
+<span class="fc" id="L106">            PDDocumentNameDictionary nameDictionary = document.getDocumentCatalog().getNames();</span>
+            PDEmbeddedFilesNameTreeNode efTree;
+            Map&lt;String, PDComplexFileSpecification&gt; names;
+
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (nameDictionary == null) {</span>
+<span class="fc" id="L111">                efTree = new PDEmbeddedFilesNameTreeNode();</span>
+<span class="fc" id="L112">                names = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L113">                nameDictionary = new PDDocumentNameDictionary(document.getDocumentCatalog());</span>
+<span class="fc" id="L114">                nameDictionary.setEmbeddedFiles(efTree);</span>
+<span class="fc" id="L115">                document.getDocumentCatalog().setNames(nameDictionary);</span>
+            } else {
+<span class="nc" id="L117">                efTree = nameDictionary.getEmbeddedFiles();</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                if (efTree == null) {</span>
+<span class="nc" id="L119">                    efTree = new PDEmbeddedFilesNameTreeNode();</span>
+<span class="nc" id="L120">                    nameDictionary.setEmbeddedFiles(efTree);</span>
+                }
+<span class="nc" id="L122">                names = efTree.getNames();</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                if (names == null) {</span>
+<span class="nc" id="L124">                    names = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L125">                    efTree.setNames(names);</span>
+                }
+            }
+
+            PDComplexFileSpecification fileSpecification;
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            if (names.containsKey(EMBEDDED_FILE_NAME)) {</span>
+<span class="nc" id="L131">                fileSpecification = names.get(EMBEDDED_FILE_NAME);</span>
+            } else {
+<span class="fc" id="L133">                fileSpecification = new PDComplexFileSpecification();</span>
+            }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (efTree != null) {</span>
+<span class="fc" id="L136">                InputStream inputStream = new ByteArrayInputStream(bibTeX.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L137">                fileSpecification.setFile(EMBEDDED_FILE_NAME);</span>
+<span class="fc" id="L138">                PDEmbeddedFile embeddedFile = new PDEmbeddedFile(document, inputStream);</span>
+<span class="fc" id="L139">                embeddedFile.setSubtype(&quot;text/x-bibtex&quot;);</span>
+<span class="fc" id="L140">                embeddedFile.setSize(bibTeX.length());</span>
+<span class="fc" id="L141">                fileSpecification.setEmbeddedFile(embeddedFile);</span>
+
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                if (!names.containsKey(EMBEDDED_FILE_NAME)) {</span>
+                    try {
+<span class="fc" id="L145">                        names.put(EMBEDDED_FILE_NAME, fileSpecification);</span>
+<span class="nc" id="L146">                    } catch (UnsupportedOperationException e) {</span>
+<span class="nc" id="L147">                        throw new IOException(Localization.lang(&quot;File '%0' is write protected.&quot;, path.toString()));</span>
+<span class="fc" id="L148">                    }</span>
+                }
+
+<span class="fc" id="L151">                efTree.setNames(names);</span>
+<span class="fc" id="L152">                nameDictionary.setEmbeddedFiles(efTree);</span>
+<span class="fc" id="L153">                document.getDocumentCatalog().setNames(nameDictionary);</span>
+            }
+<span class="fc" id="L155">            document.save(newFile.toFile());</span>
+<span class="fc" id="L156">            FileUtil.copyFile(newFile, path, true);</span>
+        }
+<span class="fc" id="L158">        Files.delete(newFile);</span>
+<span class="fc" id="L159">    }</span>
+
+    private String getBibString(List&lt;BibEntry&gt; entries) throws IOException {
+<span class="fc" id="L162">        StringWriter stringWriter = new StringWriter();</span>
+<span class="fc" id="L163">        BibWriter bibWriter = new BibWriter(stringWriter, OS.NEWLINE);</span>
+<span class="fc" id="L164">        FieldWriter fieldWriter = FieldWriter.buildIgnoreHashes(fieldPreferences);</span>
+<span class="fc" id="L165">        BibEntryWriter bibEntryWriter = new BibEntryWriter(fieldWriter, bibEntryTypesManager);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        for (BibEntry entry : entries) {</span>
+<span class="fc" id="L167">            bibEntryWriter.write(entry, bibWriter, bibDatabaseMode);</span>
+<span class="fc" id="L168">        }</span>
+<span class="fc" id="L169">        return stringWriter.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

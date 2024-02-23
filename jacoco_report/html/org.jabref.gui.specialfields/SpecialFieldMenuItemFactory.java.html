@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpecialFieldMenuItemFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.specialfields</a> &gt; <span class="el_source">SpecialFieldMenuItemFactory.java</span></div><h1>SpecialFieldMenuItemFactory.java</h1><pre class="source lang-java linenums">package org.jabref.gui.specialfields;
+
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuItem;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.model.entry.field.SpecialFieldValue;
+import org.jabref.preferences.PreferencesService;
+
+import de.saxsys.mvvmfx.utils.commands.Command;
+
+<span class="nc" id="L21">public class SpecialFieldMenuItemFactory {</span>
+    public static MenuItem getSpecialFieldSingleItem(SpecialField field,
+                                                     ActionFactory factory,
+                                                     Supplier&lt;LibraryTab&gt; tabSupplier,
+                                                     DialogService dialogService,
+                                                     PreferencesService preferencesService,
+                                                     UndoManager undoManager,
+                                                     StateManager stateManager) {
+<span class="nc" id="L29">        SpecialFieldValueViewModel specialField = new SpecialFieldValueViewModel(field.getValues().getFirst());</span>
+<span class="nc" id="L30">        MenuItem menuItem = factory.createMenuItem(specialField.getAction(),</span>
+                new SpecialFieldViewModel(field, preferencesService, undoManager)
+<span class="nc" id="L32">                        .getSpecialFieldAction(field.getValues().getFirst(), tabSupplier, dialogService, stateManager));</span>
+<span class="nc" id="L33">        menuItem.visibleProperty().bind(preferencesService.getSpecialFieldsPreferences().specialFieldsEnabledProperty());</span>
+<span class="nc" id="L34">        return menuItem;</span>
+    }
+
+    public static Menu createSpecialFieldMenu(SpecialField field,
+                                              ActionFactory factory,
+                                              Supplier&lt;LibraryTab&gt; tabSupplier,
+                                              DialogService dialogService,
+                                              PreferencesService preferencesService,
+                                              UndoManager undoManager,
+                                              StateManager stateManager) {
+
+<span class="nc" id="L45">        return createSpecialFieldMenu(field, factory, preferencesService, undoManager, specialField -&gt;</span>
+<span class="nc" id="L46">                new SpecialFieldViewModel(field, preferencesService, undoManager)</span>
+<span class="nc" id="L47">                        .getSpecialFieldAction(specialField.getValue(), tabSupplier, dialogService, stateManager));</span>
+    }
+
+    public static Menu createSpecialFieldMenu(SpecialField field,
+                                              ActionFactory factory,
+                                              PreferencesService preferencesService,
+                                              UndoManager undoManager,
+                                              Function&lt;SpecialFieldValueViewModel, Command&gt; commandFactory) {
+<span class="nc" id="L55">        SpecialFieldViewModel viewModel = new SpecialFieldViewModel(field, preferencesService, undoManager);</span>
+<span class="nc" id="L56">        Menu menu = factory.createMenu(viewModel.getAction());</span>
+
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        for (SpecialFieldValue Value : field.getValues()) {</span>
+<span class="nc" id="L59">            SpecialFieldValueViewModel valueViewModel = new SpecialFieldValueViewModel(Value);</span>
+<span class="nc" id="L60">            menu.getItems().add(factory.createMenuItem(valueViewModel.getAction(), commandFactory.apply(valueViewModel)));</span>
+<span class="nc" id="L61">        }</span>
+
+<span class="nc" id="L63">        menu.visibleProperty().bind(preferencesService.getSpecialFieldsPreferences().specialFieldsEnabledProperty());</span>
+<span class="nc" id="L64">        return menu;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalChangesResolverViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.collab</a> &gt; <span class="el_source">ExternalChangesResolverViewModel.java</span></div><h1>ExternalChangesResolverViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.collab;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.gui.AbstractViewModel;
+import org.jabref.gui.undo.NamedCompound;
+import org.jabref.logic.l10n.Localization;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ExternalChangesResolverViewModel extends AbstractViewModel {
+
+<span class="nc" id="L25">    private final static Logger LOGGER = LoggerFactory.getLogger(ExternalChangesResolverViewModel.class);</span>
+
+<span class="nc" id="L27">    private final NamedCompound ce = new NamedCompound(Localization.lang(&quot;Merged external changes&quot;));</span>
+<span class="nc" id="L28">    private final ObservableList&lt;DatabaseChange&gt; visibleChanges = FXCollections.observableArrayList();</span>
+
+    /**
+     * Because visible changes list will be bound to the UI, certain changes can be removed. This list is used to keep
+     * track of changes even when they're removed from the UI.
+     */
+<span class="nc" id="L34">    private final ObservableList&lt;DatabaseChange&gt; changes = FXCollections.observableArrayList();</span>
+
+<span class="nc" id="L36">    private final ObjectProperty&lt;DatabaseChange&gt; selectedChange = new SimpleObjectProperty&lt;&gt;();</span>
+
+    private final BooleanBinding areAllChangesResolved;
+
+    private final BooleanBinding canAskUserToResolveChange;
+
+    private final UndoManager undoManager;
+
+<span class="nc" id="L44">    public ExternalChangesResolverViewModel(List&lt;DatabaseChange&gt; externalChanges, UndoManager undoManager) {</span>
+<span class="nc" id="L45">        Objects.requireNonNull(externalChanges);</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        assert !externalChanges.isEmpty();</span>
+
+<span class="nc" id="L48">        this.visibleChanges.addAll(externalChanges);</span>
+<span class="nc" id="L49">        this.changes.addAll(externalChanges);</span>
+<span class="nc" id="L50">        this.undoManager = undoManager;</span>
+
+<span class="nc" id="L52">        areAllChangesResolved = Bindings.createBooleanBinding(visibleChanges::isEmpty, visibleChanges);</span>
+<span class="nc bnc" id="L53" title="All 4 branches missed.">        canAskUserToResolveChange = Bindings.createBooleanBinding(() -&gt; selectedChange.isNotNull().get() &amp;&amp; selectedChange.get().getExternalChangeResolver().isPresent(), selectedChange);</span>
+<span class="nc" id="L54">    }</span>
+
+    public ObservableList&lt;DatabaseChange&gt; getVisibleChanges() {
+<span class="nc" id="L57">        return visibleChanges;</span>
+    }
+
+    public ObjectProperty&lt;DatabaseChange&gt; selectedChangeProperty() {
+<span class="nc" id="L61">        return selectedChange;</span>
+    }
+
+    public Optional&lt;DatabaseChange&gt; getSelectedChange() {
+<span class="nc" id="L65">        return Optional.ofNullable(selectedChangeProperty().get());</span>
+    }
+
+    public BooleanBinding areAllChangesResolvedProperty() {
+<span class="nc" id="L69">        return areAllChangesResolved;</span>
+    }
+
+    public boolean areAllChangesResolved() {
+<span class="nc" id="L73">        return areAllChangesResolvedProperty().get();</span>
+    }
+
+    public BooleanBinding canAskUserToResolveChangeProperty() {
+<span class="nc" id="L77">        return canAskUserToResolveChange;</span>
+    }
+
+    public void acceptChange() {
+<span class="nc" id="L81">        getSelectedChange().ifPresent(selectedChange -&gt; {</span>
+<span class="nc" id="L82">            selectedChange.accept();</span>
+<span class="nc" id="L83">            getVisibleChanges().remove(selectedChange);</span>
+<span class="nc" id="L84">        });</span>
+<span class="nc" id="L85">    }</span>
+
+    public void denyChange() {
+<span class="nc" id="L88">        getSelectedChange().ifPresent(getVisibleChanges()::remove);</span>
+<span class="nc" id="L89">    }</span>
+
+    public void acceptMergedChange(DatabaseChange databaseChange) {
+<span class="nc" id="L92">        Objects.requireNonNull(databaseChange);</span>
+
+<span class="nc" id="L94">        getSelectedChange().ifPresent(oldChange -&gt; {</span>
+<span class="nc" id="L95">            changes.remove(oldChange);</span>
+<span class="nc" id="L96">            changes.add(databaseChange);</span>
+<span class="nc" id="L97">            databaseChange.accept();</span>
+<span class="nc" id="L98">            getVisibleChanges().remove(oldChange);</span>
+<span class="nc" id="L99">        });</span>
+<span class="nc" id="L100">    }</span>
+
+    public void applyChanges() {
+<span class="nc" id="L103">        changes.stream().filter(DatabaseChange::isAccepted).forEach(change -&gt; change.applyChange(ce));</span>
+<span class="nc" id="L104">        ce.end();</span>
+<span class="nc" id="L105">        undoManager.addEdit(ce);</span>
+<span class="nc" id="L106">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

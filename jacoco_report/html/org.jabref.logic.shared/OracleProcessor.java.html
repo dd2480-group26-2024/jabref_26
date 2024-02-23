@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OracleProcessor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.shared</a> &gt; <span class="el_source">OracleProcessor.java</span></div><h1>OracleProcessor.java</h1><pre class="source lang-java linenums">package org.jabref.logic.shared;
+
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.shared.listener.OracleNotificationListener;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.metadata.MetaData;
+
+import oracle.jdbc.OracleConnection;
+import oracle.jdbc.OracleStatement;
+import oracle.jdbc.dcn.DatabaseChangeRegistration;
+
+/**
+ * Processes all incoming or outgoing bib data to Oracle database and manages its structure.
+ */
+public class OracleProcessor extends DBMSProcessor {
+
+    private OracleConnection oracleConnection;
+
+    private OracleNotificationListener listener;
+
+    private DatabaseChangeRegistration databaseChangeRegistration;
+
+<span class="nc" id="L33">    private Integer VERSION_DB_STRUCT_DEFAULT = -1;</span>
+<span class="nc" id="L34">    private Integer CURRENT_VERSION_DB_STRUCT = 0;</span>
+
+    public OracleProcessor(DatabaseConnection connection) {
+<span class="nc" id="L37">        super(connection);</span>
+<span class="nc" id="L38">    }</span>
+
+    /**
+     * Creates and sets up the needed tables and columns according to the database type.
+     *
+     * @throws SQLException
+     */
+    @Override
+    public void setUp() throws SQLException {
+<span class="nc" id="L47">        connection.createStatement().executeUpdate(</span>
+                &quot;CREATE TABLE \&quot;ENTRY\&quot; (&quot; +
+                        &quot;\&quot;SHARED_ID\&quot; NUMBER NOT NULL, &quot; +
+                        &quot;\&quot;TYPE\&quot; VARCHAR2(255) NULL, &quot; +
+                        &quot;\&quot;VERSION\&quot; NUMBER DEFAULT 1, &quot; +
+                        &quot;CONSTRAINT \&quot;ENTRY_PK\&quot; PRIMARY KEY (\&quot;SHARED_ID\&quot;))&quot;);
+
+<span class="nc" id="L54">        connection.createStatement().executeUpdate(&quot;CREATE SEQUENCE \&quot;ENTRY_SEQ\&quot;&quot;);</span>
+
+<span class="nc" id="L56">        connection.createStatement().executeUpdate(&quot;CREATE TRIGGER \&quot;ENTRY_T\&quot; BEFORE INSERT ON \&quot;ENTRY\&quot; &quot; +</span>
+                &quot;FOR EACH ROW BEGIN SELECT \&quot;ENTRY_SEQ\&quot;.NEXTVAL INTO :NEW.shared_id FROM DUAL; END;&quot;);
+
+<span class="nc" id="L59">        connection.createStatement().executeUpdate(</span>
+                &quot;CREATE TABLE \&quot;FIELD\&quot; (&quot; +
+                        &quot;\&quot;ENTRY_SHARED_ID\&quot; NUMBER NOT NULL, &quot; +
+                        &quot;\&quot;NAME\&quot; VARCHAR2(255) NOT NULL, &quot; +
+                        &quot;\&quot;VALUE\&quot; CLOB NULL, &quot; +
+                        &quot;CONSTRAINT \&quot;ENTRY_SHARED_ID_FK\&quot; FOREIGN KEY (\&quot;ENTRY_SHARED_ID\&quot;) &quot; +
+                        &quot;REFERENCES \&quot;ENTRY\&quot;(\&quot;SHARED_ID\&quot;) ON DELETE CASCADE)&quot;);
+
+<span class="nc" id="L67">        connection.createStatement().executeUpdate(</span>
+                &quot;CREATE TABLE \&quot;METADATA\&quot; (&quot; +
+                        &quot;\&quot;KEY\&quot;  VARCHAR2(255) NULL,&quot; +
+                        &quot;\&quot;VALUE\&quot;  CLOB NOT NULL)&quot;);
+
+<span class="nc" id="L72">        Map&lt;String, String&gt; metadata = getSharedMetaData();</span>
+
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (metadata.get(MetaData.VERSION_DB_STRUCT) != null) {</span>
+            try {
+<span class="nc" id="L76">                VERSION_DB_STRUCT_DEFAULT = Integer.valueOf(metadata.get(MetaData.VERSION_DB_STRUCT));</span>
+<span class="nc" id="L77">            } catch (Exception e) {</span>
+<span class="nc" id="L78">                LOGGER.warn(&quot;[VERSION_DB_STRUCT_DEFAULT] not Integer!&quot;);</span>
+<span class="nc" id="L79">            }</span>
+        } else {
+<span class="nc" id="L81">            LOGGER.warn(&quot;[VERSION_DB_STRUCT_DEFAULT] not Exist!&quot;);</span>
+        }
+
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (VERSION_DB_STRUCT_DEFAULT &lt; CURRENT_VERSION_DB_STRUCT) {</span>
+            // We can to migrate from old table in new table
+<span class="nc" id="L86">            metadata.put(MetaData.VERSION_DB_STRUCT, CURRENT_VERSION_DB_STRUCT.toString());</span>
+<span class="nc" id="L87">            setSharedMetaData(metadata);</span>
+        }
+<span class="nc" id="L89">    }</span>
+
+    @Override
+    String escape(String expression) {
+<span class="nc" id="L93">        return expression;</span>
+    }
+
+    @Override
+    String escape_Table(String expression) {
+<span class="nc" id="L98">        return escape(expression);</span>
+    }
+
+    @Override
+    Integer getCURRENT_VERSION_DB_STRUCT() {
+<span class="nc" id="L103">        return CURRENT_VERSION_DB_STRUCT;</span>
+    }
+
+    @Override
+    public void startNotificationListener(DBMSSynchronizer dbmsSynchronizer) {
+<span class="nc" id="L108">        this.listener = new OracleNotificationListener(dbmsSynchronizer);</span>
+
+        try {
+<span class="nc" id="L111">            oracleConnection = (OracleConnection) connection;</span>
+
+<span class="nc" id="L113">            Properties properties = new Properties();</span>
+<span class="nc" id="L114">            properties.setProperty(OracleConnection.DCN_NOTIFY_ROWIDS, &quot;true&quot;);</span>
+<span class="nc" id="L115">            properties.setProperty(OracleConnection.DCN_QUERY_CHANGE_NOTIFICATION, &quot;true&quot;);</span>
+
+<span class="nc" id="L117">            databaseChangeRegistration = oracleConnection.registerDatabaseChangeNotification(properties);</span>
+<span class="nc" id="L118">            databaseChangeRegistration.addListener(listener);</span>
+
+<span class="nc" id="L120">            try (Statement statement = oracleConnection.createStatement()) {</span>
+<span class="nc" id="L121">                ((OracleStatement) statement).setDatabaseChangeRegistration(databaseChangeRegistration);</span>
+<span class="nc" id="L122">                StringBuilder selectQuery = new StringBuilder()</span>
+<span class="nc" id="L123">                        .append(&quot;SELECT 1 FROM &quot;)</span>
+<span class="nc" id="L124">                        .append(escape_Table(&quot;ENTRY&quot;))</span>
+<span class="nc" id="L125">                        .append(&quot;, &quot;)</span>
+<span class="nc" id="L126">                        .append(escape_Table(&quot;METADATA&quot;));</span>
+                // this execution registers all tables mentioned in selectQuery
+<span class="nc" id="L128">                statement.executeQuery(selectQuery.toString());</span>
+            }
+<span class="nc" id="L130">        } catch (SQLException e) {</span>
+<span class="nc" id="L131">            LOGGER.error(&quot;SQL Error during starting the notification listener&quot;, e);</span>
+<span class="nc" id="L132">        }</span>
+<span class="nc" id="L133">    }</span>
+
+    @Override
+    protected void insertIntoEntryTable(List&lt;BibEntry&gt; entries) {
+        try {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            for (BibEntry entry : entries) {</span>
+<span class="nc" id="L139">                String insertIntoEntryQuery =</span>
+                        &quot;INSERT INTO &quot; +
+<span class="nc" id="L141">                                escape_Table(&quot;ENTRY&quot;) +</span>
+                                &quot;(&quot; +
+<span class="nc" id="L143">                                escape(&quot;TYPE&quot;) +</span>
+                                &quot;) VALUES(?)&quot;;
+
+<span class="nc" id="L146">                try (PreparedStatement preparedEntryStatement = connection.prepareStatement(insertIntoEntryQuery,</span>
+                        new String[]{&quot;SHARED_ID&quot;})) {
+
+<span class="nc" id="L149">                    preparedEntryStatement.setString(1, entry.getType().getName());</span>
+<span class="nc" id="L150">                    preparedEntryStatement.executeUpdate();</span>
+
+<span class="nc" id="L152">                    try (ResultSet generatedKeys = preparedEntryStatement.getGeneratedKeys()) {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                        if (generatedKeys.next()) {</span>
+<span class="nc" id="L154">                            entry.getSharedBibEntryData().setSharedID(generatedKeys.getInt(1)); // set generated ID locally</span>
+                        }
+                    }
+                }
+<span class="nc" id="L158">            }</span>
+<span class="nc" id="L159">        } catch (SQLException e) {</span>
+<span class="nc" id="L160">            LOGGER.error(&quot;SQL Error during entry insertion&quot;, e);</span>
+<span class="nc" id="L161">        }</span>
+<span class="nc" id="L162">    }</span>
+
+    @Override
+    protected void insertIntoFieldTable(List&lt;BibEntry&gt; bibEntries) {
+        try {
+            // Inserting into FIELD table
+            // Coerce to ArrayList in order to use List.get()
+<span class="nc" id="L169">            List&lt;List&lt;Field&gt;&gt; fields = bibEntries.stream().map(entry -&gt; new ArrayList&lt;&gt;(entry.getFields()))</span>
+<span class="nc" id="L170">                                                 .collect(Collectors.toList());</span>
+<span class="nc" id="L171">            StringBuilder insertFieldQuery = new StringBuilder()</span>
+<span class="nc" id="L172">                    .append(&quot;INSERT ALL&quot;);</span>
+<span class="nc" id="L173">            int numFields = 0;</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            for (List&lt;Field&gt; entryFields : fields) {</span>
+<span class="nc" id="L175">                numFields += entryFields.size();</span>
+<span class="nc" id="L176">            }</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">            for (int i = 0; i &lt; numFields; i++) {</span>
+<span class="nc" id="L178">                insertFieldQuery.append(&quot; INTO &quot;)</span>
+<span class="nc" id="L179">                                .append(escape_Table(&quot;FIELD&quot;))</span>
+<span class="nc" id="L180">                                .append(&quot; (&quot;)</span>
+<span class="nc" id="L181">                                .append(escape(&quot;ENTRY_SHARED_ID&quot;))</span>
+<span class="nc" id="L182">                                .append(&quot;, &quot;)</span>
+<span class="nc" id="L183">                                .append(escape(&quot;NAME&quot;))</span>
+<span class="nc" id="L184">                                .append(&quot;, &quot;)</span>
+<span class="nc" id="L185">                                .append(escape(&quot;VALUE&quot;))</span>
+<span class="nc" id="L186">                                .append(&quot;) VALUES (?, ?, ?)&quot;);</span>
+            }
+<span class="nc" id="L188">            insertFieldQuery.append(&quot; SELECT * FROM DUAL&quot;);</span>
+<span class="nc" id="L189">            try (PreparedStatement preparedFieldStatement = connection.prepareStatement(insertFieldQuery.toString())) {</span>
+<span class="nc" id="L190">                int fieldsCompleted = 0;</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                for (int entryIndex = 0; entryIndex &lt; fields.size(); entryIndex++) {</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                    for (int entryFieldsIndex = 0; entryFieldsIndex &lt; fields.get(entryIndex).size(); entryFieldsIndex++) {</span>
+                        // columnIndex starts with 1
+<span class="nc" id="L194">                        preparedFieldStatement.setInt((3 * fieldsCompleted) + 1, bibEntries.get(entryIndex).getSharedBibEntryData().getSharedID());</span>
+<span class="nc" id="L195">                        preparedFieldStatement.setString((3 * fieldsCompleted) + 2, fields.get(entryIndex).get(entryFieldsIndex).getName());</span>
+<span class="nc" id="L196">                        preparedFieldStatement.setString((3 * fieldsCompleted) + 3, bibEntries.get(entryIndex).getField(fields.get(entryIndex).get(entryFieldsIndex)).get());</span>
+<span class="nc" id="L197">                        fieldsCompleted += 1;</span>
+                    }
+                }
+<span class="nc" id="L200">                preparedFieldStatement.executeUpdate();</span>
+            }
+<span class="nc" id="L202">        } catch (SQLException e) {</span>
+<span class="nc" id="L203">            LOGGER.error(&quot;SQL Error during field insertion&quot;, e);</span>
+<span class="nc" id="L204">        }</span>
+<span class="nc" id="L205">    }</span>
+
+    @Override
+    public void stopNotificationListener() {
+        try {
+<span class="nc" id="L210">            oracleConnection.unregisterDatabaseChangeNotification(databaseChangeRegistration);</span>
+<span class="nc" id="L211">            oracleConnection.close();</span>
+<span class="nc" id="L212">        } catch (SQLException e) {</span>
+<span class="nc" id="L213">            LOGGER.error(&quot;SQL Error during stopping the notification listener&quot;, e);</span>
+<span class="nc" id="L214">        }</span>
+<span class="nc" id="L215">    }</span>
+
+    @Override
+    public void notifyClients() {
+        // Do nothing because Oracle triggers notifications automatically.
+<span class="nc" id="L220">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

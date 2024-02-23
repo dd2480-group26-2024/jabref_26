@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldPreferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.bibtex</a> &gt; <span class="el_source">FieldPreferences.java</span></div><h1>FieldPreferences.java</h1><pre class="source lang-java linenums">package org.jabref.logic.bibtex;
+
+import java.util.Collection;
+import java.util.List;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import org.jabref.model.entry.field.Field;
+
+public class FieldPreferences {
+
+<span class="fc" id="L15">    private final BooleanProperty resolveStrings = new SimpleBooleanProperty();</span>
+    private final ObservableList&lt;Field&gt; resolvableFields;
+    private final ObservableList&lt;Field&gt; nonWrappableFields;
+
+    /**
+     * @param resolveStrings true - The character {@link FieldWriter#BIBTEX_STRING_START_END_SYMBOL} should be interpreted as indicator of BibTeX strings
+     */
+    public FieldPreferences(boolean resolveStrings,
+                            List&lt;Field&gt; resolvableFields,
+<span class="fc" id="L24">                            List&lt;Field&gt; nonWrappableFields) {</span>
+<span class="fc" id="L25">        this.resolveStrings.set(resolveStrings);</span>
+<span class="fc" id="L26">        this.resolvableFields = FXCollections.observableArrayList(resolvableFields);</span>
+<span class="fc" id="L27">        this.nonWrappableFields = FXCollections.observableArrayList(nonWrappableFields);</span>
+<span class="fc" id="L28">    }</span>
+
+    public boolean shouldResolveStrings() {
+<span class="fc" id="L31">        return resolveStrings.get();</span>
+    }
+
+    public BooleanProperty resolveStringsProperty() {
+<span class="nc" id="L35">        return resolveStrings;</span>
+    }
+
+    public void setResolveStrings(boolean resolveStrings) {
+<span class="nc" id="L39">        this.resolveStrings.set(resolveStrings);</span>
+<span class="nc" id="L40">    }</span>
+
+    public ObservableList&lt;Field&gt; getResolvableFields() {
+<span class="fc" id="L43">        return resolvableFields;</span>
+    }
+
+    public void setResolvableFields(Collection&lt;Field&gt; list) {
+<span class="nc" id="L47">        resolvableFields.clear();</span>
+<span class="nc" id="L48">        resolvableFields.addAll(list);</span>
+<span class="nc" id="L49">    }</span>
+
+    public ObservableList&lt;Field&gt; getNonWrappableFields() {
+<span class="fc" id="L52">        return nonWrappableFields;</span>
+    }
+
+    public void setNonWrappableFields(Collection&lt;Field&gt; list) {
+<span class="nc" id="L56">        nonWrappableFields.clear();</span>
+<span class="nc" id="L57">        nonWrappableFields.addAll(list);</span>
+<span class="nc" id="L58">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextInputControlBehavior.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors</a> &gt; <span class="el_source">TextInputControlBehavior.java</span></div><h1>TextInputControlBehavior.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors;
+
+import javafx.geometry.Point2D;
+import javafx.geometry.Rectangle2D;
+import javafx.scene.Scene;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.control.skin.TextAreaSkin;
+import javafx.scene.control.skin.TextFieldSkin;
+import javafx.scene.input.ContextMenuEvent;
+import javafx.stage.Screen;
+import javafx.stage.Window;
+
+import com.sun.javafx.scene.control.Properties;
+
+/**
+ * This class contains some code taken from {@link com.sun.javafx.scene.control.behavior.TextInputControlBehavior},
+ * witch is not accessible and thus we have no other choice.
+ * TODO: remove this ugly workaround as soon as control behavior is made public
+ * reported at https://github.com/javafxports/openjdk-jfx/issues/583
+ */
+<span class="nc" id="L23">public class TextInputControlBehavior {</span>
+
+    /**
+     * taken from {@link com.sun.javafx.scene.control.behavior.TextFieldBehavior#contextMenuRequested(javafx.scene.input.ContextMenuEvent)}
+     */
+    public static void showContextMenu(TextField textField, ContextMenu contextMenu, ContextMenuEvent e) {
+<span class="nc" id="L29">        double screenX = e.getScreenX();</span>
+<span class="nc" id="L30">        double screenY = e.getScreenY();</span>
+<span class="nc" id="L31">        double sceneX = e.getSceneX();</span>
+
+<span class="nc" id="L33">        TextFieldSkin skin = (TextFieldSkin) textField.getSkin();</span>
+
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        if (Properties.IS_TOUCH_SUPPORTED) {</span>
+            Point2D menuPos;
+<span class="nc bnc" id="L37" title="All 2 branches missed.">            if (textField.getSelection().getLength() == 0) {</span>
+<span class="nc" id="L38">                skin.positionCaret(skin.getIndex(e.getX(), e.getY()), false);</span>
+<span class="nc" id="L39">                menuPos = skin.getMenuPosition();</span>
+            } else {
+<span class="nc" id="L41">                menuPos = skin.getMenuPosition();</span>
+<span class="nc bnc" id="L42" title="All 6 branches missed.">                if (menuPos != null &amp;&amp; (menuPos.getX() &lt;= 0 || menuPos.getY() &lt;= 0)) {</span>
+<span class="nc" id="L43">                    skin.positionCaret(skin.getIndex(e.getX(), e.getY()), false);</span>
+<span class="nc" id="L44">                    menuPos = skin.getMenuPosition();</span>
+                }
+            }
+
+<span class="nc bnc" id="L48" title="All 2 branches missed.">            if (menuPos != null) {</span>
+<span class="nc" id="L49">                Point2D p = textField.localToScene(menuPos);</span>
+<span class="nc" id="L50">                Scene scene = textField.getScene();</span>
+<span class="nc" id="L51">                Window window = scene.getWindow();</span>
+<span class="nc" id="L52">                Point2D location = new Point2D(window.getX() + scene.getX() + p.getX(),</span>
+<span class="nc" id="L53">                        window.getY() + scene.getY() + p.getY());</span>
+<span class="nc" id="L54">                screenX = location.getX();</span>
+<span class="nc" id="L55">                sceneX = p.getX();</span>
+<span class="nc" id="L56">                screenY = location.getY();</span>
+            }
+        }
+
+<span class="nc" id="L60">        double menuWidth = contextMenu.prefWidth(-1);</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        double menuX = screenX - (Properties.IS_TOUCH_SUPPORTED ? (menuWidth / 2) : 0);</span>
+<span class="nc" id="L62">        Screen currentScreen = Screen.getPrimary();</span>
+<span class="nc" id="L63">        Rectangle2D bounds = currentScreen.getBounds();</span>
+
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (menuX &lt; bounds.getMinX()) {</span>
+<span class="nc" id="L66">            textField.getProperties().put(&quot;CONTEXT_MENU_SCREEN_X&quot;, screenX);</span>
+<span class="nc" id="L67">            textField.getProperties().put(&quot;CONTEXT_MENU_SCENE_X&quot;, sceneX);</span>
+<span class="nc" id="L68">            contextMenu.show(textField, bounds.getMinX(), screenY);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        } else if (screenX + menuWidth &gt; bounds.getMaxX()) {</span>
+<span class="nc" id="L70">            double leftOver = menuWidth - (bounds.getMaxX() - screenX);</span>
+<span class="nc" id="L71">            textField.getProperties().put(&quot;CONTEXT_MENU_SCREEN_X&quot;, screenX);</span>
+<span class="nc" id="L72">            textField.getProperties().put(&quot;CONTEXT_MENU_SCENE_X&quot;, sceneX);</span>
+<span class="nc" id="L73">            contextMenu.show(textField, screenX - leftOver, screenY);</span>
+<span class="nc" id="L74">        } else {</span>
+<span class="nc" id="L75">            textField.getProperties().put(&quot;CONTEXT_MENU_SCREEN_X&quot;, 0);</span>
+<span class="nc" id="L76">            textField.getProperties().put(&quot;CONTEXT_MENU_SCENE_X&quot;, 0);</span>
+<span class="nc" id="L77">            contextMenu.show(textField, menuX, screenY);</span>
+        }
+
+<span class="nc" id="L80">        e.consume();</span>
+<span class="nc" id="L81">    }</span>
+
+    /**
+     * taken from {@link com.sun.javafx.scene.control.behavior.TextAreaBehavior#contextMenuRequested(javafx.scene.input.ContextMenuEvent)}
+     */
+    public static void showContextMenu(TextArea textArea, ContextMenu contextMenu, ContextMenuEvent e) {
+<span class="nc" id="L87">        double screenX = e.getScreenX();</span>
+<span class="nc" id="L88">        double screenY = e.getScreenY();</span>
+<span class="nc" id="L89">        double sceneX = e.getSceneX();</span>
+
+<span class="nc" id="L91">        TextAreaSkin skin = (TextAreaSkin) textArea.getSkin();</span>
+
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (Properties.IS_TOUCH_SUPPORTED) {</span>
+            Point2D menuPos;
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (textArea.getSelection().getLength() == 0) {</span>
+<span class="nc" id="L96">                skin.positionCaret(skin.getIndex(e.getX(), e.getY()), false);</span>
+<span class="nc" id="L97">                menuPos = skin.getMenuPosition();</span>
+            } else {
+<span class="nc" id="L99">                menuPos = skin.getMenuPosition();</span>
+<span class="nc bnc" id="L100" title="All 6 branches missed.">                if (menuPos != null &amp;&amp; (menuPos.getX() &lt;= 0 || menuPos.getY() &lt;= 0)) {</span>
+<span class="nc" id="L101">                    skin.positionCaret(skin.getIndex(e.getX(), e.getY()), false);</span>
+<span class="nc" id="L102">                    menuPos = skin.getMenuPosition();</span>
+                }
+            }
+
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (menuPos != null) {</span>
+<span class="nc" id="L107">                Point2D p = textArea.localToScene(menuPos);</span>
+<span class="nc" id="L108">                Scene scene = textArea.getScene();</span>
+<span class="nc" id="L109">                Window window = scene.getWindow();</span>
+<span class="nc" id="L110">                Point2D location = new Point2D(window.getX() + scene.getX() + p.getX(),</span>
+<span class="nc" id="L111">                        window.getY() + scene.getY() + p.getY());</span>
+<span class="nc" id="L112">                screenX = location.getX();</span>
+<span class="nc" id="L113">                sceneX = p.getX();</span>
+<span class="nc" id="L114">                screenY = location.getY();</span>
+            }
+        }
+
+<span class="nc" id="L118">        double menuWidth = contextMenu.prefWidth(-1);</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        double menuX = screenX - (Properties.IS_TOUCH_SUPPORTED ? (menuWidth / 2) : 0);</span>
+<span class="nc" id="L120">        Screen currentScreen = Screen.getPrimary();</span>
+<span class="nc" id="L121">        Rectangle2D bounds = currentScreen.getBounds();</span>
+
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (menuX &lt; bounds.getMinX()) {</span>
+<span class="nc" id="L124">            textArea.getProperties().put(&quot;CONTEXT_MENU_SCREEN_X&quot;, screenX);</span>
+<span class="nc" id="L125">            textArea.getProperties().put(&quot;CONTEXT_MENU_SCENE_X&quot;, sceneX);</span>
+<span class="nc" id="L126">            contextMenu.show(textArea, bounds.getMinX(), screenY);</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        } else if (screenX + menuWidth &gt; bounds.getMaxX()) {</span>
+<span class="nc" id="L128">            double leftOver = menuWidth - (bounds.getMaxX() - screenX);</span>
+<span class="nc" id="L129">            textArea.getProperties().put(&quot;CONTEXT_MENU_SCREEN_X&quot;, screenX);</span>
+<span class="nc" id="L130">            textArea.getProperties().put(&quot;CONTEXT_MENU_SCENE_X&quot;, sceneX);</span>
+<span class="nc" id="L131">            contextMenu.show(textArea, screenX - leftOver, screenY);</span>
+<span class="nc" id="L132">        } else {</span>
+<span class="nc" id="L133">            textArea.getProperties().put(&quot;CONTEXT_MENU_SCREEN_X&quot;, 0);</span>
+<span class="nc" id="L134">            textArea.getProperties().put(&quot;CONTEXT_MENU_SCENE_X&quot;, 0);</span>
+<span class="nc" id="L135">            contextMenu.show(textArea, menuX, screenY);</span>
+        }
+
+<span class="nc" id="L138">        e.consume();</span>
+<span class="nc" id="L139">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

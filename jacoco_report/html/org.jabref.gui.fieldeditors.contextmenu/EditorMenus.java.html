@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EditorMenus.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors.contextmenu</a> &gt; <span class="el_source">EditorMenus.java</span></div><h1>EditorMenus.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors.contextmenu;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
+
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextInputControl;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.edit.CopyDoiUrlAction;
+import org.jabref.logic.formatter.bibtexfields.CleanupUrlFormatter;
+import org.jabref.logic.formatter.bibtexfields.NormalizeNamesFormatter;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+
+/**
+ * Provides context menus for the text fields of the entry editor. Note that we use {@link Supplier} to prevent an early
+ * instantiation of the menus. Therefore, they are attached to each text field but instantiation happens on the first
+ * right-click of the user in that field. The late instantiation is done by {@link
+ * org.jabref.gui.fieldeditors.EditorTextArea#initContextMenu(java.util.function.Supplier)}.
+ */
+<span class="nc" id="L30">public class EditorMenus {</span>
+
+    /**
+     * The default context menu with a specific menu for normalizing person names regarding to BibTex rules.
+     *
+     * @param textInput text-input-control that this menu will be connected to
+     * @return menu containing items of the default menu and an item for normalizing person names
+     */
+    public static Supplier&lt;List&lt;MenuItem&gt;&gt; getNameMenu(final TextInputControl textInput) {
+<span class="nc" id="L39">        return () -&gt; {</span>
+<span class="nc" id="L40">            MenuItem normalizeNames = new MenuItem(Localization.lang(&quot;Normalize to BibTeX name format&quot;));</span>
+<span class="nc" id="L41">            EasyBind.subscribe(textInput.textProperty(), value -&gt; normalizeNames.setDisable(StringUtil.isNullOrEmpty(value)));</span>
+<span class="nc" id="L42">            normalizeNames.setOnAction(event -&gt; textInput.setText(new NormalizeNamesFormatter().format(textInput.getText())));</span>
+<span class="nc" id="L43">            List&lt;MenuItem&gt; menuItems = new ArrayList&lt;&gt;(6);</span>
+<span class="nc" id="L44">            menuItems.add(normalizeNames);</span>
+<span class="nc" id="L45">            menuItems.addAll(new DefaultMenu(textInput).get());</span>
+<span class="nc" id="L46">            return menuItems;</span>
+        };
+    }
+
+    /**
+     * The default context menu with a specific menu copying a DOI/ DOI URL.
+     *
+     * @param textArea text-area that this menu will be connected to
+     * @return menu containing items of the default menu and an item for copying a DOI/DOI URL
+     */
+    public static Supplier&lt;List&lt;MenuItem&gt;&gt; getDOIMenu(TextArea textArea, DialogService dialogService, PreferencesService preferencesService) {
+<span class="nc" id="L57">        return () -&gt; {</span>
+<span class="nc" id="L58">            ActionFactory factory = new ActionFactory(preferencesService.getKeyBindingRepository());</span>
+<span class="nc" id="L59">            MenuItem copyDoiMenuItem = factory.createMenuItem(StandardActions.COPY_DOI, new CopyDoiUrlAction(textArea, StandardActions.COPY_DOI, dialogService));</span>
+<span class="nc" id="L60">            MenuItem copyDoiUrlMenuItem = factory.createMenuItem(StandardActions.COPY_DOI_URL, new CopyDoiUrlAction(textArea, StandardActions.COPY_DOI_URL, dialogService));</span>
+<span class="nc" id="L61">            List&lt;MenuItem&gt; menuItems = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L62">            menuItems.add(copyDoiMenuItem);</span>
+<span class="nc" id="L63">            menuItems.add(copyDoiUrlMenuItem);</span>
+<span class="nc" id="L64">            menuItems.add(new SeparatorMenuItem());</span>
+<span class="nc" id="L65">            menuItems.addAll(new DefaultMenu(textArea).get());</span>
+<span class="nc" id="L66">            return menuItems;</span>
+        };
+    }
+
+    /**
+     * The default context menu with a specific menu item to cleanup URL.
+     *
+     * @param textArea text-area that this menu will be connected to
+     * @return menu containing items of the default menu and an item to cleanup a URL
+     */
+    public static Supplier&lt;List&lt;MenuItem&gt;&gt; getCleanupUrlMenu(TextArea textArea) {
+<span class="nc" id="L77">        return () -&gt; {</span>
+<span class="nc" id="L78">            MenuItem cleanupURL = new MenuItem(Localization.lang(&quot;Cleanup URL link&quot;));</span>
+<span class="nc" id="L79">            cleanupURL.setDisable(textArea.textProperty().isEmpty().get());</span>
+<span class="nc" id="L80">            cleanupURL.setOnAction(event -&gt; textArea.setText(new CleanupUrlFormatter().format(textArea.getText())));</span>
+<span class="nc" id="L81">            List&lt;MenuItem&gt; menuItems = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L82">            menuItems.add(cleanupURL);</span>
+<span class="nc" id="L83">            return menuItems;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

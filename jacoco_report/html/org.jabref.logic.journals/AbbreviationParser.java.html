@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbbreviationParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.journals</a> &gt; <span class="el_source">AbbreviationParser.java</span></div><h1>AbbreviationParser.java</h1><pre class="source lang-java linenums">package org.jabref.logic.journals;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+
+/**
+ * Reads abbreviation files (CSV format) into a list of Abbreviations.
+ */
+<span class="fc" id="L18">public class AbbreviationParser {</span>
+<span class="fc" id="L19">    private static final Character[] DELIMITERS = {';', ','};</span>
+    private static final char NO_DELIMITER = '\0'; // empty char
+
+    // Ensures ordering while preventing duplicates
+<span class="fc" id="L23">    private final LinkedHashSet&lt;Abbreviation&gt; abbreviations = new LinkedHashSet&lt;&gt;();</span>
+
+    /*
+     * Read the given file, which should contain a list of journal names and their abbreviations. Each line should be
+     * formatted as: &quot;Full Journal Name,Abbr. Journal Name[,Shortest Unique Abbreviation]&quot;
+     * Tries to detect the delimiter, if comma or semicolon is used to ensure backwards compatibility
+     *
+     * @param file Path the given file
+     */
+    void readJournalListFromFile(Path file) throws IOException {
+<span class="fc" id="L33">        char delimiter = detectDelimiter(file);</span>
+
+<span class="fc" id="L35">        try (CSVParser csvParser = new CSVParser(Files.newBufferedReader(file, StandardCharsets.UTF_8), AbbreviationFormat.getCSVFormatWithDelimiter(delimiter))) {</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            for (CSVRecord csvRecord : csvParser) {</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">                String name = csvRecord.size() &gt; 0 ? csvRecord.get(0) : &quot;&quot;;</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                String abbreviation = csvRecord.size() &gt; 1 ? csvRecord.get(1) : &quot;&quot;;</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">                String shortestUniqueAbbreviation = csvRecord.size() &gt; 2 ? csvRecord.get(2) : &quot;&quot;;</span>
+
+                // Check name and abbreviation
+<span class="pc bpc" id="L42" title="2 of 4 branches missed.">                if (name.isEmpty() || abbreviation.isEmpty()) {</span>
+<span class="nc" id="L43">                    return;</span>
+                }
+
+<span class="fc" id="L46">                Abbreviation abbreviationToAdd = new Abbreviation(name, abbreviation, shortestUniqueAbbreviation);</span>
+<span class="fc" id="L47">                abbreviations.add(abbreviationToAdd);</span>
+<span class="fc" id="L48">            }</span>
+<span class="nc" id="L49">        }</span>
+<span class="fc" id="L50">    }</span>
+
+    private char detectDelimiter(Path file) throws IOException {
+<span class="fc" id="L53">        try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {</span>
+<span class="fc" id="L54">            String line = reader.readLine();</span>
+
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (line == null) {</span>
+<span class="fc" id="L57">                return NO_DELIMITER;</span>
+            }
+<span class="fc" id="L59">            return Arrays.stream(DELIMITERS)</span>
+<span class="fc" id="L60">                         .filter(s -&gt; line.contains(s.toString()))</span>
+<span class="fc" id="L61">                         .findFirst()</span>
+<span class="fc" id="L62">                         .orElse(NO_DELIMITER);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        }</span>
+    }
+
+    public Collection&lt;Abbreviation&gt; getAbbreviations() {
+<span class="fc" id="L67">        return abbreviations;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

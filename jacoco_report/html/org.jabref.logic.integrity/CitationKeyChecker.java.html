@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitationKeyChecker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.integrity</a> &gt; <span class="el_source">CitationKeyChecker.java</span></div><h1>CitationKeyChecker.java</h1><pre class="source lang-java linenums">package org.jabref.logic.integrity;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.InternalField;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.strings.StringUtil;
+
+/**
+ * Currently only checks the key if there is an author, year, and title present.
+ */
+<span class="fc" id="L16">public class CitationKeyChecker implements EntryChecker {</span>
+
+    @Override
+    public List&lt;IntegrityMessage&gt; check(BibEntry entry) {
+<span class="fc" id="L20">        Optional&lt;String&gt; author = entry.getField(StandardField.AUTHOR);</span>
+<span class="fc" id="L21">        Optional&lt;String&gt; title = entry.getField(StandardField.TITLE);</span>
+<span class="fc" id="L22">        Optional&lt;String&gt; year = entry.getField(StandardField.YEAR);</span>
+<span class="fc bfc" id="L23" title="All 6 branches covered.">        if (author.isEmpty() || title.isEmpty() || year.isEmpty()) {</span>
+<span class="fc" id="L24">            return Collections.emptyList();</span>
+        }
+
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (StringUtil.isBlank(entry.getCitationKey())) {</span>
+<span class="fc" id="L28">            String authorTitleYear = entry.getAuthorTitleYear(100);</span>
+<span class="fc" id="L29">            return Collections.singletonList(new IntegrityMessage(</span>
+<span class="fc" id="L30">                    Localization.lang(&quot;empty citation key&quot;) + &quot;: &quot; + authorTitleYear, entry, InternalField.KEY_FIELD));</span>
+        }
+
+<span class="fc" id="L33">        return Collections.emptyList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

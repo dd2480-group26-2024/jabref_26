@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnoReferenceMark.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.uno</a> &gt; <span class="el_source">UnoReferenceMark.java</span></div><h1>UnoReferenceMark.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.uno;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+
+import com.sun.star.container.NoSuchElementException;
+import com.sun.star.container.XNameAccess;
+import com.sun.star.container.XNamed;
+import com.sun.star.lang.DisposedException;
+import com.sun.star.lang.WrappedTargetException;
+import com.sun.star.text.XReferenceMarksSupplier;
+import com.sun.star.text.XTextContent;
+import com.sun.star.text.XTextDocument;
+import com.sun.star.text.XTextRange;
+
+public class UnoReferenceMark {
+
+    private UnoReferenceMark() {
+    }
+
+    /**
+     * @throws NoDocumentException If cannot get reference marks
+     *                             &lt;p&gt;
+     *                             Note: also used by `isDocumentConnectionMissing` to test if we have a working connection.
+     */
+    public static XNameAccess getNameAccess(XTextDocument doc)
+            throws
+            NoDocumentException {
+
+<span class="nc" id="L32">        XReferenceMarksSupplier supplier = UnoCast.cast(XReferenceMarksSupplier.class, doc).get();</span>
+
+        try {
+<span class="nc" id="L35">            return supplier.getReferenceMarks();</span>
+<span class="nc" id="L36">        } catch (DisposedException ex) {</span>
+<span class="nc" id="L37">            throw new NoDocumentException(&quot;UnoReferenceMarks.getNameAccess failed with&quot; + ex);</span>
+        }
+    }
+
+    /**
+     * Names of all reference marks.
+     * &lt;p&gt;
+     * Empty list for nothing.
+     */
+    public static List&lt;String&gt; getListOfNames(XTextDocument doc)
+            throws NoDocumentException {
+
+<span class="nc" id="L49">        XNameAccess nameAccess = UnoReferenceMark.getNameAccess(doc);</span>
+<span class="nc" id="L50">        String[] names = nameAccess.getElementNames();</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (names == null) {</span>
+<span class="nc" id="L52">            return new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc" id="L54">        return Arrays.asList(names);</span>
+    }
+
+    /**
+     * Remove the named reference mark.
+     * &lt;p&gt;
+     * Removes both the text and the mark itself.
+     */
+    public static void removeIfExists(XTextDocument doc, String name)
+            throws
+            WrappedTargetException,
+            NoDocumentException {
+
+<span class="nc" id="L67">        XNameAccess xReferenceMarks = UnoReferenceMark.getNameAccess(doc);</span>
+
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (xReferenceMarks.hasByName(name)) {</span>
+<span class="nc" id="L70">            Optional&lt;XTextContent&gt; mark = UnoNameAccess.getTextContentByName(xReferenceMarks, name);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            if (mark.isEmpty()) {</span>
+<span class="nc" id="L72">                return;</span>
+            }
+            try {
+<span class="nc" id="L75">                doc.getText().removeTextContent(mark.get());</span>
+<span class="nc" id="L76">            } catch (NoSuchElementException ex) {</span>
+                // The caller gets what it expects.
+<span class="nc" id="L78">            }</span>
+        }
+<span class="nc" id="L80">    }</span>
+
+    /**
+     * @return reference mark as XTextContent, Optional.empty if not found.
+     */
+    public static Optional&lt;XTextContent&gt; getAsTextContent(XTextDocument doc, String name)
+            throws
+            NoDocumentException,
+            WrappedTargetException {
+
+<span class="nc" id="L90">        XNameAccess nameAccess = UnoReferenceMark.getNameAccess(doc);</span>
+<span class="nc" id="L91">        return UnoNameAccess.getTextContentByName(nameAccess, name);</span>
+    }
+
+    /**
+     * XTextRange for the named reference mark, Optional.empty if not found.
+     */
+    public static Optional&lt;XTextRange&gt; getAnchor(XTextDocument doc, String name)
+            throws
+            NoDocumentException,
+            WrappedTargetException {
+<span class="nc" id="L101">        return UnoReferenceMark.getAsTextContent(doc, name)</span>
+<span class="nc" id="L102">                                .map(XTextContent::getAnchor);</span>
+    }
+
+    /**
+     * Insert a new reference mark at the provided cursor position.
+     * &lt;p&gt;
+     * If {@code absorb} is true, the text in the cursor range will become the text with gray background.
+     * &lt;p&gt;
+     * Note: LibreOffice 6.4.6.2 will create multiple reference marks with the same name without error or renaming. Its GUI does not allow this, but we can create them programmatically. In the GUI, clicking on any of those identical names will move the cursor to the same mark.
+     *
+     * @param name  For the reference mark.
+     * @param range Cursor marking the location or range for the reference mark.
+     */
+    public static XNamed create(XTextDocument doc, String name, XTextRange range, boolean absorb)
+            throws
+            CreationException {
+<span class="nc" id="L118">        return UnoNamed.insertNamedTextContent(doc, &quot;com.sun.star.text.ReferenceMark&quot;, name, range, absorb);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

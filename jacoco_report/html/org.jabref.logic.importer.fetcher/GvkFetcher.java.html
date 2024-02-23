@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GvkFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">GvkFetcher.java</span></div><h1>GvkFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Optional;
+
+import org.jabref.logic.cleanup.FieldFormatterCleanup;
+import org.jabref.logic.formatter.bibtexfields.NormalizeNamesFormatter;
+import org.jabref.logic.formatter.bibtexfields.NormalizePagesFormatter;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.SearchBasedParserFetcher;
+import org.jabref.logic.importer.fetcher.transformers.GVKQueryTransformer;
+import org.jabref.logic.importer.fileformat.PicaXmlParser;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+
+public class GvkFetcher extends AbstractIsbnFetcher implements SearchBasedParserFetcher {
+
+    private static final String URL_PATTERN = &quot;https://sru.k10plus.de/opac-de-627?&quot;;
+
+    /**
+     * Searchkeys are used to specify a search request. For example &quot;tit&quot; stands for &quot;title&quot;.
+     * If no searchkey is used, the default searchkey &quot;all&quot; is used.
+     */
+<span class="fc" id="L34">    private final Collection&lt;String&gt; searchKeys = Arrays.asList(&quot;all&quot;, &quot;tit&quot;, &quot;per&quot;, &quot;thm&quot;, &quot;slw&quot;, &quot;txt&quot;, &quot;num&quot;, &quot;kon&quot;, &quot;ppn&quot;, &quot;bkl&quot;, &quot;erj&quot;);</span>
+
+    public GvkFetcher(ImportFormatPreferences importFormatPreferences) {
+<span class="fc" id="L37">        super(importFormatPreferences);</span>
+<span class="fc" id="L38">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L42">        return &quot;GVK&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;HelpFile&gt; getHelpPage() {
+<span class="nc" id="L47">        return Optional.of(HelpFile.FETCHER_GVK);</span>
+    }
+
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L52">        URIBuilder uriBuilder = new URIBuilder(URL_PATTERN);</span>
+<span class="fc" id="L53">        uriBuilder.addParameter(&quot;version&quot;, &quot;1.1&quot;);</span>
+<span class="fc" id="L54">        uriBuilder.addParameter(&quot;operation&quot;, &quot;searchRetrieve&quot;);</span>
+<span class="fc" id="L55">        uriBuilder.addParameter(&quot;query&quot;, new GVKQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;));</span>
+<span class="fc" id="L56">        uriBuilder.addParameter(&quot;maximumRecords&quot;, &quot;50&quot;);</span>
+<span class="fc" id="L57">        uriBuilder.addParameter(&quot;recordSchema&quot;, &quot;picaxml&quot;);</span>
+<span class="fc" id="L58">        uriBuilder.addParameter(&quot;sortKeys&quot;, &quot;Year,,1&quot;);</span>
+
+<span class="fc" id="L60">        LOGGER.debug(&quot;Using URL {}&quot;, uriBuilder.build());</span>
+<span class="fc" id="L61">        return uriBuilder.build().toURL();</span>
+    }
+
+    @Override
+    public URL getUrlForIdentifier(String identifier) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L66">        this.ensureThatIsbnIsValid(identifier);</span>
+<span class="fc" id="L67">        URIBuilder uriBuilder = new URIBuilder(URL_PATTERN);</span>
+<span class="fc" id="L68">        uriBuilder.addParameter(&quot;version&quot;, &quot;1.1&quot;);</span>
+<span class="fc" id="L69">        uriBuilder.addParameter(&quot;operation&quot;, &quot;searchRetrieve&quot;);</span>
+<span class="fc" id="L70">        uriBuilder.addParameter(&quot;query&quot;, &quot;pica.isb=&quot; + identifier);</span>
+<span class="fc" id="L71">        uriBuilder.addParameter(&quot;maximumRecords&quot;, &quot;50&quot;);</span>
+<span class="fc" id="L72">        uriBuilder.addParameter(&quot;recordSchema&quot;, &quot;picaxml&quot;);</span>
+<span class="fc" id="L73">        uriBuilder.addParameter(&quot;sortKeys&quot;, &quot;Year,,1&quot;);</span>
+
+<span class="fc" id="L75">        LOGGER.debug(&quot;Using URL {}&quot;, uriBuilder.build());</span>
+<span class="fc" id="L76">        return uriBuilder.build().toURL();</span>
+    }
+
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L81">        return new PicaXmlParser();</span>
+    }
+
+    @Override
+    public void doPostCleanup(BibEntry entry) {
+<span class="fc" id="L86">        super.doPostCleanup(entry);</span>
+
+        // Fetcher returns page numbers as &quot;30 Seiten&quot; -&gt; remove every non-digit character in the PAGETOTAL field
+<span class="fc" id="L89">        entry.getField(StandardField.PAGETOTAL).ifPresent(pages -&gt;</span>
+<span class="fc" id="L90">                entry.setField(StandardField.PAGETOTAL, pages.replaceAll(&quot;[\\D]&quot;, &quot;&quot;)));</span>
+<span class="fc" id="L91">        new FieldFormatterCleanup(StandardField.PAGETOTAL, new NormalizePagesFormatter()).cleanup(entry);</span>
+<span class="fc" id="L92">        new FieldFormatterCleanup(StandardField.AUTHOR, new NormalizeNamesFormatter()).cleanup(entry);</span>
+<span class="fc" id="L93">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

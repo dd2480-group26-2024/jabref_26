@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JstorFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">JstorFetcher.java</span></div><h1>JstorFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.FulltextFetcher;
+import org.jabref.logic.importer.IdBasedParserFetcher;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.SearchBasedParserFetcher;
+import org.jabref.logic.importer.fetcher.transformers.JstorQueryTransformer;
+import org.jabref.logic.importer.fileformat.BibtexParser;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+
+/**
+ * Fetcher for jstor.org
+ **/
+public class JstorFetcher implements SearchBasedParserFetcher, FulltextFetcher, IdBasedParserFetcher {
+
+    private static final String HOST = &quot;https://www.jstor.org&quot;;
+    private static final String SEARCH_HOST = HOST + &quot;/open/search&quot;;
+    private static final String CITE_HOST = HOST + &quot;/citation/text/&quot;;
+    private static final String URL_QUERY_REGEX = &quot;(?&lt;=\\?).*&quot;;
+
+    private final ImportFormatPreferences importFormatPreferences;
+
+<span class="fc" id="L46">    public JstorFetcher(ImportFormatPreferences importFormatPreferences) {</span>
+<span class="fc" id="L47">        this.importFormatPreferences = importFormatPreferences;</span>
+<span class="fc" id="L48">    }</span>
+
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L52">        URIBuilder uriBuilder = new URIBuilder(SEARCH_HOST);</span>
+<span class="fc" id="L53">        uriBuilder.addParameter(&quot;Query&quot;, new JstorQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;));</span>
+<span class="fc" id="L54">        return uriBuilder.build().toURL();</span>
+    }
+
+    @Override
+    public URL getUrlForIdentifier(String identifier) throws FetcherException {
+<span class="fc" id="L59">        String start = &quot;https://www.jstor.org/citation/text/&quot;;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (identifier.startsWith(&quot;http&quot;)) {</span>
+<span class="fc" id="L61">            identifier = identifier.replace(&quot;https://www.jstor.org/stable&quot;, &quot;&quot;);</span>
+<span class="fc" id="L62">            identifier = identifier.replace(&quot;http://www.jstor.org/stable&quot;, &quot;&quot;);</span>
+        }
+<span class="fc" id="L64">        identifier = identifier.replaceAll(URL_QUERY_REGEX, &quot;&quot;);</span>
+
+        try {
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (identifier.contains(&quot;/&quot;)) {</span>
+                // if identifier links to a entry with a valid doi
+<span class="fc" id="L69">                return new URL(start + identifier);</span>
+            }
+            // else use default doi start.
+<span class="fc" id="L72">            return new URL(start + &quot;10.2307/&quot; + identifier);</span>
+<span class="nc" id="L73">        } catch (IOException e) {</span>
+<span class="nc" id="L74">            throw new FetcherException(&quot;could not construct url for jstor&quot;, e);</span>
+        }
+    }
+
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L80">        return inputStream -&gt; {</span>
+<span class="fc" id="L81">            BibtexParser parser = new BibtexParser(importFormatPreferences);</span>
+<span class="fc" id="L82">            String text = new BufferedReader(</span>
+<span class="fc" id="L83">                    new InputStreamReader(inputStream, StandardCharsets.UTF_8)).lines().collect(Collectors.joining());</span>
+
+            // does the input stream contain bibtex ?
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (text.startsWith(&quot;@&quot;)) {</span>
+<span class="fc" id="L87">                return parser.parseEntries(text);</span>
+            }
+            // input stream contains html
+            List&lt;BibEntry&gt; entries;
+            try {
+<span class="fc" id="L92">                Document doc = Jsoup.parse(inputStream, null, HOST);</span>
+
+<span class="fc" id="L94">                StringBuilder stringBuilder = new StringBuilder();</span>
+<span class="fc" id="L95">                List&lt;Element&gt; elements = doc.body().getElementsByClass(&quot;cite-this-item&quot;);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                for (Element element : elements) {</span>
+<span class="nc" id="L97">                    String id = element.attr(&quot;href&quot;).replace(&quot;citation/info/&quot;, &quot;&quot;);</span>
+
+<span class="nc" id="L99">                    String data = new URLDownload(CITE_HOST + id).asString();</span>
+<span class="nc" id="L100">                    stringBuilder.append(data);</span>
+<span class="nc" id="L101">                }</span>
+<span class="fc" id="L102">                entries = new ArrayList&lt;&gt;(parser.parseEntries(stringBuilder.toString()));</span>
+<span class="nc" id="L103">            } catch (IOException e) {</span>
+<span class="nc" id="L104">                throw new ParseException(&quot;Could not download data from jstor.org&quot;, e);</span>
+<span class="fc" id="L105">            }</span>
+<span class="fc" id="L106">            return entries;</span>
+        };
+    }
+
+    @Override
+    public String getName() {
+<span class="nc" id="L112">        return &quot;JSTOR&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;URL&gt; findFullText(BibEntry entry) throws IOException {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (entry.getField(StandardField.URL).isEmpty()) {</span>
+<span class="nc" id="L118">            return Optional.empty();</span>
+        }
+
+<span class="nc" id="L121">        String page = new URLDownload(entry.getField(StandardField.URL).get()).asString();</span>
+
+<span class="nc" id="L123">        Document doc = Jsoup.parse(page);</span>
+
+<span class="nc" id="L125">        List&lt;Element&gt; elements = doc.getElementsByAttribute(&quot;data-doi&quot;);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (elements.size() != 1) {</span>
+<span class="nc" id="L127">            return Optional.empty();</span>
+        }
+
+<span class="nc" id="L130">        String url = elements.getFirst().attr(&quot;href&quot;);</span>
+<span class="nc" id="L131">        return Optional.of(new URL(url));</span>
+    }
+
+    @Override
+    public TrustLevel getTrustLevel() {
+<span class="nc" id="L136">        return TrustLevel.META_SEARCH;</span>
+    }
+
+    @Override
+    public void doPostCleanup(BibEntry entry) {
+        // do nothing
+<span class="fc" id="L142">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

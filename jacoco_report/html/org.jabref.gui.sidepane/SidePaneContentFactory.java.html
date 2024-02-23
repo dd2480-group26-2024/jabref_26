@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SidePaneContentFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.sidepane</a> &gt; <span class="el_source">SidePaneContentFactory.java</span></div><h1>SidePaneContentFactory.java</h1><pre class="source lang-java linenums">package org.jabref.gui.sidepane;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.scene.Node;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.groups.GroupTreeView;
+import org.jabref.gui.importer.fetcher.WebSearchPaneView;
+import org.jabref.gui.openoffice.OpenOfficePanel;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+public class SidePaneContentFactory {
+    private final LibraryTabContainer tabContainer;
+    private final PreferencesService preferences;
+    private final JournalAbbreviationRepository abbreviationRepository;
+    private final TaskExecutor taskExecutor;
+    private final DialogService dialogService;
+    private final StateManager stateManager;
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final BibEntryTypesManager entryTypesManager;
+    private final UndoManager undoManager;
+
+    public SidePaneContentFactory(LibraryTabContainer tabContainer,
+                                  PreferencesService preferences,
+                                  JournalAbbreviationRepository abbreviationRepository,
+                                  TaskExecutor taskExecutor,
+                                  DialogService dialogService,
+                                  StateManager stateManager,
+                                  FileUpdateMonitor fileUpdateMonitor,
+                                  BibEntryTypesManager entryTypesManager,
+<span class="fc" id="L38">                                  UndoManager undoManager) {</span>
+<span class="fc" id="L39">        this.tabContainer = tabContainer;</span>
+<span class="fc" id="L40">        this.preferences = preferences;</span>
+<span class="fc" id="L41">        this.abbreviationRepository = abbreviationRepository;</span>
+<span class="fc" id="L42">        this.taskExecutor = taskExecutor;</span>
+<span class="fc" id="L43">        this.dialogService = dialogService;</span>
+<span class="fc" id="L44">        this.stateManager = stateManager;</span>
+<span class="fc" id="L45">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="fc" id="L46">        this.entryTypesManager = entryTypesManager;</span>
+<span class="fc" id="L47">        this.undoManager = undoManager;</span>
+<span class="fc" id="L48">    }</span>
+
+    public Node create(SidePaneType sidePaneType) {
+<span class="nc bnc" id="L51" title="All 4 branches missed.">        return switch (sidePaneType) {</span>
+<span class="nc" id="L52">            case GROUPS -&gt; new GroupTreeView(</span>
+                    taskExecutor,
+                    stateManager,
+                    preferences,
+                    dialogService);
+<span class="nc" id="L57">            case OPEN_OFFICE -&gt; new OpenOfficePanel(</span>
+                    tabContainer,
+                    preferences,
+<span class="nc" id="L60">                    preferences.getKeyBindingRepository(),</span>
+                    abbreviationRepository,
+                    taskExecutor,
+                    dialogService,
+                    stateManager,
+                    fileUpdateMonitor,
+                    entryTypesManager,
+<span class="nc" id="L67">                    undoManager).getContent();</span>
+<span class="nc" id="L68">            case WEB_SEARCH -&gt; new WebSearchPaneView(</span>
+                    preferences,
+                    dialogService,
+                    stateManager);
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

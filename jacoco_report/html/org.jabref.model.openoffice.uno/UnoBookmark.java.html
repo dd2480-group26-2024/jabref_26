@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnoBookmark.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.uno</a> &gt; <span class="el_source">UnoBookmark.java</span></div><h1>UnoBookmark.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.uno;
+
+import java.util.Optional;
+
+import com.sun.star.container.NoSuchElementException;
+import com.sun.star.container.XNameAccess;
+import com.sun.star.container.XNamed;
+import com.sun.star.lang.DisposedException;
+import com.sun.star.lang.WrappedTargetException;
+import com.sun.star.text.XBookmarksSupplier;
+import com.sun.star.text.XTextContent;
+import com.sun.star.text.XTextDocument;
+import com.sun.star.text.XTextRange;
+
+public class UnoBookmark {
+
+    private UnoBookmark() {
+    }
+
+    /**
+     * Provides access to bookmarks by name.
+     */
+    public static XNameAccess getNameAccess(XTextDocument doc)
+            throws
+            NoDocumentException {
+
+<span class="nc" id="L27">        XBookmarksSupplier supplier = UnoCast.cast(XBookmarksSupplier.class, doc).get();</span>
+        try {
+<span class="nc" id="L29">            return supplier.getBookmarks();</span>
+<span class="nc" id="L30">        } catch (DisposedException ex) {</span>
+<span class="nc" id="L31">            throw new NoDocumentException(&quot;UnoBookmark.getNameAccess failed with&quot; + ex);</span>
+        }
+    }
+
+    /**
+     * Get the XTextRange corresponding to the named bookmark.
+     *
+     * @param name The name of the bookmark to find.
+     * @return The XTextRange for the bookmark, or Optional.empty().
+     */
+    public static Optional&lt;XTextRange&gt; getAnchor(XTextDocument doc, String name)
+            throws
+            WrappedTargetException,
+            NoDocumentException {
+
+<span class="nc" id="L46">        XNameAccess nameAccess = getNameAccess(doc);</span>
+<span class="nc" id="L47">        return UnoNameAccess.getTextContentByName(nameAccess, name).map(XTextContent::getAnchor);</span>
+    }
+
+    /**
+     * Insert a bookmark with the given name at the cursor provided, or with another name if the one we asked for is already in use.
+     * &lt;p&gt;
+     * In LibreOffice the another name is in &quot;{name}{number}&quot; format.
+     *
+     * @param name   For the bookmark.
+     * @param range  Cursor marking the location or range for the bookmark.
+     * @param absorb Shall we incorporate range?
+     * @return The XNamed interface of the bookmark.
+     * result.getName() should be checked by the caller, because its name may differ from the one requested.
+     */
+    public static XNamed create(XTextDocument doc, String name, XTextRange range, boolean absorb)
+            throws
+            CreationException {
+<span class="nc" id="L64">        return UnoNamed.insertNamedTextContent(doc, &quot;com.sun.star.text.Bookmark&quot;, name, range, absorb);</span>
+    }
+
+    /**
+     * Remove the named bookmark if it exists.
+     */
+    public static void removeIfExists(XTextDocument doc, String name)
+            throws
+            NoDocumentException,
+            WrappedTargetException {
+
+<span class="nc" id="L75">        XNameAccess marks = UnoBookmark.getNameAccess(doc);</span>
+
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (marks.hasByName(name)) {</span>
+<span class="nc" id="L78">            Optional&lt;XTextContent&gt; mark = UnoNameAccess.getTextContentByName(marks, name);</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">            if (mark.isEmpty()) {</span>
+<span class="nc" id="L80">                return;</span>
+            }
+            try {
+<span class="nc" id="L83">                doc.getText().removeTextContent(mark.get());</span>
+<span class="nc" id="L84">            } catch (NoSuchElementException ex) {</span>
+                // The caller gets what it expects.
+<span class="nc" id="L86">            }</span>
+        }
+<span class="nc" id="L88">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

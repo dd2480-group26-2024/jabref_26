@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryEditorPreferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor</a> &gt; <span class="el_source">EntryEditorPreferences.java</span></div><h1>EntryEditorPreferences.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor;
+
+import java.util.Map;
+import java.util.Set;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.MapProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.SimpleMapProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableMap;
+
+import org.jabref.model.entry.field.Field;
+
+public class EntryEditorPreferences {
+
+    /**
+     * Specifies the different possible enablement states for online services
+     */
+<span class="nc" id="L24">    public enum JournalPopupEnabled {</span>
+<span class="nc" id="L25">        FIRST_START, // The first time a user uses this service</span>
+<span class="nc" id="L26">        ENABLED,</span>
+<span class="nc" id="L27">        DISABLED;</span>
+
+        public static JournalPopupEnabled fromString(String status) {
+<span class="nc bnc" id="L30" title="All 2 branches missed.">            for (JournalPopupEnabled value : JournalPopupEnabled.values()) {</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">                if (value.toString().equalsIgnoreCase(status)) {</span>
+<span class="nc" id="L32">                    return value;</span>
+                }
+            }
+<span class="nc" id="L35">            throw new IllegalArgumentException(&quot;No enum found with value: &quot; + status);</span>
+        }
+    }
+
+    private final MapProperty&lt;String, Set&lt;Field&gt;&gt; entryEditorTabList;
+    private final MapProperty&lt;String, Set&lt;Field&gt;&gt; defaultEntryEditorTabList;
+    private final BooleanProperty shouldOpenOnNewEntry;
+    private final BooleanProperty shouldShowRecommendationsTab;
+    private final BooleanProperty shouldShowLatexCitationsTab;
+    private final BooleanProperty showSourceTabByDefault;
+    private final BooleanProperty enableValidation;
+    private final BooleanProperty allowIntegerEditionBibtex;
+    private final DoubleProperty dividerPosition;
+    private final BooleanProperty autoLinkFiles;
+    private final ObjectProperty&lt;JournalPopupEnabled&gt; enablementStatus;
+    private final BooleanProperty shouldShowSciteTab;
+    private final BooleanProperty showUserCommentsFields;
+
+    public EntryEditorPreferences(Map&lt;String, Set&lt;Field&gt;&gt; entryEditorTabList,
+                                  Map&lt;String, Set&lt;Field&gt;&gt; defaultEntryEditorTabList,
+                                  boolean shouldOpenOnNewEntry,
+                                  boolean shouldShowRecommendationsTab,
+                                  boolean shouldShowLatexCitationsTab,
+                                  boolean showSourceTabByDefault,
+                                  boolean enableValidation,
+                                  boolean allowIntegerEditionBibtex,
+                                  double dividerPosition,
+                                  boolean autolinkFilesEnabled,
+                                  JournalPopupEnabled journalPopupEnabled,
+                                  boolean showSciteTab,
+<span class="nc" id="L65">                                  boolean showUserCommentsFields) {</span>
+
+<span class="nc" id="L67">        this.entryEditorTabList = new SimpleMapProperty&lt;&gt;(FXCollections.observableMap(entryEditorTabList));</span>
+<span class="nc" id="L68">        this.defaultEntryEditorTabList = new SimpleMapProperty&lt;&gt;(FXCollections.observableMap(defaultEntryEditorTabList));</span>
+<span class="nc" id="L69">        this.shouldOpenOnNewEntry = new SimpleBooleanProperty(shouldOpenOnNewEntry);</span>
+<span class="nc" id="L70">        this.shouldShowRecommendationsTab = new SimpleBooleanProperty(shouldShowRecommendationsTab);</span>
+<span class="nc" id="L71">        this.shouldShowLatexCitationsTab = new SimpleBooleanProperty(shouldShowLatexCitationsTab);</span>
+<span class="nc" id="L72">        this.showSourceTabByDefault = new SimpleBooleanProperty(showSourceTabByDefault);</span>
+<span class="nc" id="L73">        this.enableValidation = new SimpleBooleanProperty(enableValidation);</span>
+<span class="nc" id="L74">        this.allowIntegerEditionBibtex = new SimpleBooleanProperty(allowIntegerEditionBibtex);</span>
+<span class="nc" id="L75">        this.dividerPosition = new SimpleDoubleProperty(dividerPosition);</span>
+<span class="nc" id="L76">        this.autoLinkFiles = new SimpleBooleanProperty(autolinkFilesEnabled);</span>
+<span class="nc" id="L77">        this.enablementStatus = new SimpleObjectProperty&lt;&gt;(journalPopupEnabled);</span>
+<span class="nc" id="L78">        this.shouldShowSciteTab = new SimpleBooleanProperty(showSciteTab);</span>
+<span class="nc" id="L79">        this.showUserCommentsFields = new SimpleBooleanProperty(showUserCommentsFields);</span>
+<span class="nc" id="L80">    }</span>
+
+    public ObservableMap&lt;String, Set&lt;Field&gt;&gt; getEntryEditorTabs() {
+<span class="nc" id="L83">        return entryEditorTabList.get();</span>
+    }
+
+    public MapProperty&lt;String, Set&lt;Field&gt;&gt; entryEditorTabs() {
+<span class="nc" id="L87">        return entryEditorTabList;</span>
+    }
+
+    public void setEntryEditorTabList(Map&lt;String, Set&lt;Field&gt;&gt; entryEditorTabList) {
+<span class="nc" id="L91">        this.entryEditorTabList.set(FXCollections.observableMap(entryEditorTabList));</span>
+<span class="nc" id="L92">    }</span>
+
+    public ObservableMap&lt;String, Set&lt;Field&gt;&gt; getDefaultEntryEditorTabs() {
+<span class="nc" id="L95">        return defaultEntryEditorTabList.get();</span>
+    }
+
+    public boolean shouldOpenOnNewEntry() {
+<span class="nc" id="L99">        return shouldOpenOnNewEntry.get();</span>
+    }
+
+    public BooleanProperty shouldOpenOnNewEntryProperty() {
+<span class="nc" id="L103">        return shouldOpenOnNewEntry;</span>
+    }
+
+    public void setShouldOpenOnNewEntry(boolean shouldOpenOnNewEntry) {
+<span class="nc" id="L107">        this.shouldOpenOnNewEntry.set(shouldOpenOnNewEntry);</span>
+<span class="nc" id="L108">    }</span>
+
+    public boolean shouldShowRecommendationsTab() {
+<span class="nc" id="L111">        return shouldShowRecommendationsTab.get();</span>
+    }
+
+    public BooleanProperty shouldShowRecommendationsTabProperty() {
+<span class="nc" id="L115">        return shouldShowRecommendationsTab;</span>
+    }
+
+    public void setShouldShowRecommendationsTab(boolean shouldShowRecommendationsTab) {
+<span class="nc" id="L119">        this.shouldShowRecommendationsTab.set(shouldShowRecommendationsTab);</span>
+<span class="nc" id="L120">    }</span>
+
+    public boolean shouldShowLatexCitationsTab() {
+<span class="nc" id="L123">        return shouldShowLatexCitationsTab.get();</span>
+    }
+
+    public BooleanProperty shouldShowLatexCitationsTabProperty() {
+<span class="nc" id="L127">        return shouldShowLatexCitationsTab;</span>
+    }
+
+    public void setShouldShowLatexCitationsTab(boolean shouldShowLatexCitationsTab) {
+<span class="nc" id="L131">        this.shouldShowLatexCitationsTab.set(shouldShowLatexCitationsTab);</span>
+<span class="nc" id="L132">    }</span>
+
+    public boolean showSourceTabByDefault() {
+<span class="nc" id="L135">        return showSourceTabByDefault.get();</span>
+    }
+
+    public BooleanProperty showSourceTabByDefaultProperty() {
+<span class="nc" id="L139">        return showSourceTabByDefault;</span>
+    }
+
+    public void setShowSourceTabByDefault(boolean showSourceTabByDefault) {
+<span class="nc" id="L143">        this.showSourceTabByDefault.set(showSourceTabByDefault);</span>
+<span class="nc" id="L144">    }</span>
+
+    public boolean shouldEnableValidation() {
+<span class="nc" id="L147">        return enableValidation.get();</span>
+    }
+
+    public BooleanProperty enableValidationProperty() {
+<span class="nc" id="L151">        return enableValidation;</span>
+    }
+
+    public void setEnableValidation(boolean enableValidation) {
+<span class="nc" id="L155">        this.enableValidation.set(enableValidation);</span>
+<span class="nc" id="L156">    }</span>
+
+    public boolean shouldAllowIntegerEditionBibtex() {
+<span class="nc" id="L159">        return allowIntegerEditionBibtex.get();</span>
+    }
+
+    public BooleanProperty allowIntegerEditionBibtexProperty() {
+<span class="nc" id="L163">        return allowIntegerEditionBibtex;</span>
+    }
+
+    public void setAllowIntegerEditionBibtex(boolean allowIntegerEditionBibtex) {
+<span class="nc" id="L167">        this.allowIntegerEditionBibtex.set(allowIntegerEditionBibtex);</span>
+<span class="nc" id="L168">    }</span>
+
+    public double getDividerPosition() {
+<span class="nc" id="L171">        return dividerPosition.get();</span>
+    }
+
+    public DoubleProperty dividerPositionProperty() {
+<span class="nc" id="L175">        return dividerPosition;</span>
+    }
+
+    public void setDividerPosition(double dividerPosition) {
+<span class="nc" id="L179">        this.dividerPosition.set(dividerPosition);</span>
+<span class="nc" id="L180">    }</span>
+
+    public boolean autoLinkFilesEnabled() {
+<span class="nc" id="L183">        return this.autoLinkFiles.getValue();</span>
+    }
+
+    public BooleanProperty autoLinkEnabledProperty() {
+<span class="nc" id="L187">        return this.autoLinkFiles;</span>
+    }
+
+    public void setAutoLinkFilesEnabled(boolean enabled) {
+<span class="nc" id="L191">        this.autoLinkFiles.setValue(enabled);</span>
+<span class="nc" id="L192">    }</span>
+
+    public JournalPopupEnabled shouldEnableJournalPopup() {
+<span class="nc" id="L195">        return enablementStatus.get();</span>
+    }
+
+    public ObjectProperty&lt;JournalPopupEnabled&gt; enableJournalPopupProperty() {
+<span class="nc" id="L199">        return enablementStatus;</span>
+    }
+
+    public void setEnableJournalPopup(JournalPopupEnabled journalPopupEnabled) {
+<span class="nc" id="L203">        this.enablementStatus.set(journalPopupEnabled);</span>
+<span class="nc" id="L204">    }</span>
+
+    public boolean shouldShowSciteTab() {
+<span class="nc" id="L207">        return this.shouldShowSciteTab.get();</span>
+    }
+
+    public BooleanProperty shouldShowLSciteTabProperty() {
+<span class="nc" id="L211">        return this.shouldShowSciteTab;</span>
+    }
+
+    public void setShouldShowSciteTab(boolean shouldShowSciteTab) {
+<span class="nc" id="L215">        this.shouldShowSciteTab.set(shouldShowSciteTab);</span>
+<span class="nc" id="L216">    }</span>
+
+    public boolean shouldShowUserCommentsFields() {
+<span class="nc" id="L219">        return showUserCommentsFields.get();</span>
+    }
+
+    public BooleanProperty showUserCommentsFieldsProperty() {
+<span class="nc" id="L223">        return showUserCommentsFields;</span>
+    }
+
+    public void setShowUserCommentsFields(boolean showUserCommentsFields) {
+<span class="nc" id="L227">        this.showUserCommentsFields.set(showUserCommentsFields);</span>
+<span class="nc" id="L228">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

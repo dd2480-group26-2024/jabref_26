@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutoCompletionTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.autocompletion</a> &gt; <span class="el_source">AutoCompletionTabViewModel.java</span></div><h1>AutoCompletionTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.autocompletion;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+import org.jabref.gui.autocompleter.AutoCompleteFirstNameMode;
+import org.jabref.gui.autocompleter.AutoCompletePreferences;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.field.FieldFactory;
+
+public class AutoCompletionTabViewModel implements PreferenceTabViewModel {
+
+<span class="nc" id="L19">    private final BooleanProperty enableAutoCompleteProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L20">    private final StringProperty autoCompleteFieldsProperty = new SimpleStringProperty();</span>
+<span class="nc" id="L21">    private final BooleanProperty autoCompleteFirstLastProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L22">    private final BooleanProperty autoCompleteLastFirstProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L23">    private final BooleanProperty autoCompleteBothProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L24">    private final BooleanProperty firstNameModeAbbreviatedProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L25">    private final BooleanProperty firstNameModeFullProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L26">    private final BooleanProperty firstNameModeBothProperty = new SimpleBooleanProperty();</span>
+
+    private final AutoCompletePreferences autoCompletePreferences;
+
+<span class="nc" id="L30">    private final List&lt;String&gt; restartWarnings = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L32">    public AutoCompletionTabViewModel(AutoCompletePreferences autoCompletePreferences) {</span>
+<span class="nc" id="L33">        this.autoCompletePreferences = autoCompletePreferences;</span>
+<span class="nc" id="L34">    }</span>
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L38">        enableAutoCompleteProperty.setValue(autoCompletePreferences.shouldAutoComplete());</span>
+<span class="nc" id="L39">        autoCompleteFieldsProperty.setValue(autoCompletePreferences.getCompleteNamesAsString());</span>
+
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (autoCompletePreferences.getNameFormat() == AutoCompletePreferences.NameFormat.FIRST_LAST) {</span>
+<span class="nc" id="L42">            autoCompleteFirstLastProperty.setValue(true);</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        } else if (autoCompletePreferences.getNameFormat() == AutoCompletePreferences.NameFormat.LAST_FIRST) {</span>
+<span class="nc" id="L44">            autoCompleteLastFirstProperty.setValue(true);</span>
+        } else {
+<span class="nc" id="L46">            autoCompleteBothProperty.setValue(true);</span>
+        }
+
+<span class="nc bnc" id="L49" title="All 3 branches missed.">        switch (autoCompletePreferences.getFirstNameMode()) {</span>
+<span class="nc" id="L50">            case ONLY_ABBREVIATED -&gt; firstNameModeAbbreviatedProperty.setValue(true);</span>
+<span class="nc" id="L51">            case ONLY_FULL -&gt; firstNameModeFullProperty.setValue(true);</span>
+<span class="nc" id="L52">            default -&gt; firstNameModeBothProperty.setValue(true);</span>
+        }
+<span class="nc" id="L54">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L58">        autoCompletePreferences.setAutoComplete(enableAutoCompleteProperty.getValue());</span>
+
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (autoCompleteBothProperty.getValue()) {</span>
+<span class="nc" id="L61">            autoCompletePreferences.setNameFormat(AutoCompletePreferences.NameFormat.BOTH);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        } else if (autoCompleteFirstLastProperty.getValue()) {</span>
+<span class="nc" id="L63">            autoCompletePreferences.setNameFormat(AutoCompletePreferences.NameFormat.FIRST_LAST);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        } else if (autoCompleteLastFirstProperty.getValue()) {</span>
+<span class="nc" id="L65">            autoCompletePreferences.setNameFormat(AutoCompletePreferences.NameFormat.LAST_FIRST);</span>
+        }
+
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (firstNameModeBothProperty.getValue()) {</span>
+<span class="nc" id="L69">            autoCompletePreferences.setFirstNameMode(AutoCompleteFirstNameMode.BOTH);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        } else if (firstNameModeAbbreviatedProperty.getValue()) {</span>
+<span class="nc" id="L71">            autoCompletePreferences.setFirstNameMode(AutoCompleteFirstNameMode.ONLY_ABBREVIATED);</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        } else if (firstNameModeFullProperty.getValue()) {</span>
+<span class="nc" id="L73">            autoCompletePreferences.setFirstNameMode(AutoCompleteFirstNameMode.ONLY_FULL);</span>
+        }
+
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (autoCompletePreferences.shouldAutoComplete() != enableAutoCompleteProperty.getValue()) {</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            if (enableAutoCompleteProperty.getValue()) {</span>
+<span class="nc" id="L78">                restartWarnings.add(Localization.lang(&quot;Auto complete enabled.&quot;));</span>
+            } else {
+<span class="nc" id="L80">                restartWarnings.add(Localization.lang(&quot;Auto complete disabled.&quot;));</span>
+            }
+        }
+
+<span class="nc" id="L84">        autoCompletePreferences.getCompleteFields().clear();</span>
+<span class="nc" id="L85">        autoCompletePreferences.getCompleteFields().addAll(FieldFactory.parseFieldList(autoCompleteFieldsProperty.getValue()));</span>
+<span class="nc" id="L86">    }</span>
+
+    @Override
+    public List&lt;String&gt; getRestartWarnings() {
+<span class="nc" id="L90">        return restartWarnings;</span>
+    }
+
+    public BooleanProperty enableAutoCompleteProperty() {
+<span class="nc" id="L94">        return enableAutoCompleteProperty;</span>
+    }
+
+    public StringProperty autoCompleteFieldsProperty() {
+<span class="nc" id="L98">        return autoCompleteFieldsProperty;</span>
+    }
+
+    public BooleanProperty autoCompleteFirstLastProperty() {
+<span class="nc" id="L102">        return autoCompleteFirstLastProperty;</span>
+    }
+
+    public BooleanProperty autoCompleteLastFirstProperty() {
+<span class="nc" id="L106">        return autoCompleteLastFirstProperty;</span>
+    }
+
+    public BooleanProperty autoCompleteBothProperty() {
+<span class="nc" id="L110">        return autoCompleteBothProperty;</span>
+    }
+
+    public BooleanProperty firstNameModeAbbreviatedProperty() {
+<span class="nc" id="L114">        return firstNameModeAbbreviatedProperty;</span>
+    }
+
+    public BooleanProperty firstNameModeFullProperty() {
+<span class="nc" id="L118">        return firstNameModeFullProperty;</span>
+    }
+
+    public BooleanProperty firstNameModeBothProperty() {
+<span class="nc" id="L122">        return firstNameModeBothProperty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

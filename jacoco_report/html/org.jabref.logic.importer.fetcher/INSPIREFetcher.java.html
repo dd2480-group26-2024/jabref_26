@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>INSPIREFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">INSPIREFetcher.java</span></div><h1>INSPIREFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.jabref.logic.cleanup.FieldFormatterCleanup;
+import org.jabref.logic.formatter.bibtexfields.ClearFormatter;
+import org.jabref.logic.formatter.bibtexfields.RemoveBracesFormatter;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.importer.EntryBasedFetcher;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.SearchBasedParserFetcher;
+import org.jabref.logic.importer.fetcher.transformers.DefaultLuceneQueryTransformer;
+import org.jabref.logic.importer.fileformat.BibtexParser;
+import org.jabref.logic.importer.util.MediaTypes;
+import org.jabref.logic.layout.format.LatexToUnicodeFormatter;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+
+/**
+ * Fetches data from the INSPIRE database.
+ */
+public class INSPIREFetcher implements SearchBasedParserFetcher, EntryBasedFetcher {
+
+    private static final String INSPIRE_HOST = &quot;https://inspirehep.net/api/literature/&quot;;
+    private static final String INSPIRE_DOI_HOST = &quot;https://inspirehep.net/api/doi/&quot;;
+    private static final String INSPIRE_ARXIV_HOST = &quot;https://inspirehep.net/api/arxiv/&quot;;
+
+    private final ImportFormatPreferences importFormatPreferences;
+
+<span class="fc" id="L45">    public INSPIREFetcher(ImportFormatPreferences preferences) {</span>
+<span class="fc" id="L46">        this.importFormatPreferences = preferences;</span>
+<span class="fc" id="L47">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L51">        return &quot;INSPIRE&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;HelpFile&gt; getHelpPage() {
+<span class="nc" id="L56">        return Optional.of(HelpFile.FETCHER_INSPIRE);</span>
+    }
+
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="fc" id="L61">        URIBuilder uriBuilder = new URIBuilder(INSPIRE_HOST);</span>
+<span class="fc" id="L62">        uriBuilder.addParameter(&quot;q&quot;, new DefaultLuceneQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;));</span>
+<span class="fc" id="L63">        return uriBuilder.build().toURL();</span>
+    }
+
+    @Override
+    public URLDownload getUrlDownload(URL url) {
+<span class="fc" id="L68">        URLDownload download = new URLDownload(url);</span>
+<span class="fc" id="L69">        download.addHeader(&quot;Accept&quot;, MediaTypes.APPLICATION_BIBTEX);</span>
+<span class="fc" id="L70">        return download;</span>
+    }
+
+    @Override
+    public void doPostCleanup(BibEntry entry) {
+        // Remove strange &quot;SLACcitation&quot; field
+<span class="fc" id="L76">        new FieldFormatterCleanup(new UnknownField(&quot;SLACcitation&quot;), new ClearFormatter()).cleanup(entry);</span>
+
+        // Remove braces around content of &quot;title&quot; field
+<span class="fc" id="L79">        new FieldFormatterCleanup(StandardField.TITLE, new RemoveBracesFormatter()).cleanup(entry);</span>
+
+<span class="fc" id="L81">        new FieldFormatterCleanup(StandardField.TITLE, new LatexToUnicodeFormatter()).cleanup(entry);</span>
+<span class="fc" id="L82">    }</span>
+
+    @Override
+    public Parser getParser() {
+<span class="fc" id="L86">        return new BibtexParser(importFormatPreferences);</span>
+    }
+
+    @Override
+    public List&lt;BibEntry&gt; performSearch(BibEntry entry) throws FetcherException {
+<span class="fc" id="L91">        List&lt;BibEntry&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L92">        Optional&lt;String&gt; doi = entry.getField(StandardField.DOI);</span>
+<span class="fc" id="L93">        Optional&lt;String&gt; archiveprefix = entry.getFieldOrAlias(StandardField.ARCHIVEPREFIX);</span>
+<span class="fc" id="L94">        Optional&lt;String&gt; eprint = entry.getField(StandardField.EPRINT);</span>
+        String url;
+
+<span class="pc bpc" id="L97" title="3 of 4 branches missed.">        if (archiveprefix.filter(&quot;arxiv&quot;::equals).isPresent() &amp;&amp; eprint.isPresent()) {</span>
+<span class="nc" id="L98">            url = INSPIRE_ARXIV_HOST + eprint.get();</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        } else if (doi.isPresent()) {</span>
+<span class="fc" id="L100">            url = INSPIRE_DOI_HOST + doi.get();</span>
+        } else {
+<span class="nc" id="L102">            return results;</span>
+        }
+
+        try {
+<span class="fc" id="L106">            URLDownload download = getUrlDownload(new URI(url).toURL());</span>
+<span class="fc" id="L107">            results = getParser().parseEntries(download.asInputStream());</span>
+<span class="fc" id="L108">            results.forEach(this::doPostCleanup);</span>
+<span class="fc" id="L109">            return results;</span>
+<span class="nc" id="L110">        } catch (IOException | ParseException | URISyntaxException e) {</span>
+<span class="nc" id="L111">            throw new FetcherException(&quot;Error occurred during fetching&quot;, e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

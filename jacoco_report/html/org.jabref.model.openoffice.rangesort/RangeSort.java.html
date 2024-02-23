@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RangeSort.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.rangesort</a> &gt; <span class="el_source">RangeSort.java</span></div><h1>RangeSort.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.rangesort;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.jabref.model.openoffice.uno.UnoCast;
+import org.jabref.model.openoffice.uno.UnoTextRange;
+
+import com.sun.star.text.XText;
+import com.sun.star.text.XTextRangeCompare;
+
+/**
+ * RangeSort provides sorting based on XTextRangeCompare, which only provides comparison between XTextRange values within the same XText.
+ */
+public class RangeSort {
+
+    private RangeSort() {
+    }
+
+    /**
+     * Compare two RangeHolders (using RangeHolder.getRange()) within an XText.
+     * &lt;p&gt;
+     * Note: since we only look at the ranges, this comparison is generally not consistent with `equals` on the RangeHolders. Probably should not be used for key comparison in {@code TreeMap&lt;RangeHolder&gt;} or {@code Set&lt;RangeHolder&gt;}
+     */
+    private static class HolderComparatorWithinPartition implements Comparator&lt;RangeHolder&gt; {
+
+        private final XTextRangeCompare cmp;
+
+<span class="nc" id="L32">        HolderComparatorWithinPartition(XText text) {</span>
+<span class="nc" id="L33">            cmp = UnoCast.cast(XTextRangeCompare.class, text)</span>
+<span class="nc" id="L34">                          .orElseThrow(java.lang.IllegalArgumentException::new);</span>
+<span class="nc" id="L35">        }</span>
+
+        /**
+         * Assumes a and b belong to the same XText as cmp.
+         */
+        @Override
+        public int compare(RangeHolder a, RangeHolder b) {
+<span class="nc" id="L42">            return UnoTextRange.compareStartsThenEndsUnsafe(cmp, a.getRange(), b.getRange());</span>
+        }
+    }
+
+    /**
+     * Sort a list of RangeHolder values known to share the same getText().
+     * &lt;p&gt;
+     * Note: RangeHolder.getRange() is called many times.
+     */
+    public static &lt;V extends RangeHolder&gt; void sortWithinPartition(List&lt;V&gt; rangeHolders) {
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (rangeHolders.isEmpty()) {</span>
+<span class="nc" id="L53">            return;</span>
+        }
+<span class="nc" id="L55">        XText text = rangeHolders.getFirst().getRange().getText();</span>
+<span class="nc" id="L56">        rangeHolders.sort(new HolderComparatorWithinPartition(text));</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Represent a partitioning of RangeHolders by XText
+     */
+    public static class RangePartitions&lt;V extends RangeHolder&gt; {
+        private final Map&lt;XText, List&lt;V&gt;&gt; partitions;
+
+<span class="nc" id="L65">        public RangePartitions() {</span>
+<span class="nc" id="L66">            this.partitions = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L67">        }</span>
+
+        public void add(V holder) {
+<span class="nc" id="L70">            XText partitionKey = holder.getRange().getText();</span>
+<span class="nc" id="L71">            List&lt;V&gt; partition = partitions.computeIfAbsent(partitionKey, unused -&gt; new ArrayList&lt;&gt;());</span>
+<span class="nc" id="L72">            partition.add(holder);</span>
+<span class="nc" id="L73">        }</span>
+
+        public List&lt;List&lt;V&gt;&gt; getPartitions() {
+<span class="nc" id="L76">            return new ArrayList&lt;&gt;(partitions.values());</span>
+        }
+    }
+
+    /**
+     * Partition RangeHolders by the corresponding XText.
+     */
+    public static &lt;V extends RangeHolder&gt; RangePartitions&lt;V&gt; partitionRanges(List&lt;V&gt; holders) {
+<span class="nc" id="L84">        RangePartitions&lt;V&gt; result = new RangePartitions&lt;&gt;();</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        for (V holder : holders) {</span>
+<span class="nc" id="L86">            result.add(holder);</span>
+<span class="nc" id="L87">        }</span>
+<span class="nc" id="L88">        return result;</span>
+    }
+
+    /**
+     * Note: RangeHolder.getRange() is called many times.
+     */
+    public static &lt;V extends RangeHolder&gt; RangePartitions&lt;V&gt; partitionAndSortRanges(List&lt;V&gt; holders) {
+<span class="nc" id="L95">        RangePartitions&lt;V&gt; result = partitionRanges(holders);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        for (List&lt;V&gt; partition : result.getPartitions()) {</span>
+<span class="nc" id="L97">            sortWithinPartition(partition);</span>
+<span class="nc" id="L98">        }</span>
+<span class="nc" id="L99">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

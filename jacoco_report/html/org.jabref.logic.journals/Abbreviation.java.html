@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Abbreviation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.journals</a> &gt; <span class="el_source">Abbreviation.java</span></div><h1>Abbreviation.java</h1><pre class="source lang-java linenums">package org.jabref.logic.journals;
+
+import java.io.Serializable;
+import java.util.Objects;
+
+public class Abbreviation implements Comparable&lt;Abbreviation&gt;, Serializable {
+
+    private static final long serialVersionUID = 1;
+
+    private transient String name;
+    private final String abbreviation;
+    private transient String dotlessAbbreviation;
+
+    // Is the empty string if not available
+    private String shortestUniqueAbbreviation;
+
+    public Abbreviation(String name, String abbreviation) {
+<span class="fc" id="L18">        this(name, abbreviation, &quot;&quot;);</span>
+<span class="fc" id="L19">    }</span>
+
+    public Abbreviation(String name, String abbreviation, String shortestUniqueAbbreviation) {
+<span class="fc" id="L22">        this(name,</span>
+                abbreviation,
+                // &quot;L. N.&quot; becomes &quot;L  N &quot;, we need to remove the double spaces inbetween
+<span class="fc" id="L25">                abbreviation.replace(&quot;.&quot;, &quot; &quot;).replace(&quot;  &quot;, &quot; &quot;).trim(),</span>
+<span class="fc" id="L26">                shortestUniqueAbbreviation.trim());</span>
+<span class="fc" id="L27">    }</span>
+
+<span class="fc" id="L29">    private Abbreviation(String name, String abbreviation, String dotlessAbbreviation, String shortestUniqueAbbreviation) {</span>
+<span class="fc" id="L30">        this.name = name.intern();</span>
+<span class="fc" id="L31">        this.abbreviation = abbreviation.intern();</span>
+<span class="fc" id="L32">        this.dotlessAbbreviation = dotlessAbbreviation.intern();</span>
+<span class="fc" id="L33">        this.shortestUniqueAbbreviation = shortestUniqueAbbreviation.trim().intern();</span>
+<span class="fc" id="L34">    }</span>
+
+    public String getName() {
+<span class="fc" id="L37">        return name;</span>
+    }
+
+    public String getAbbreviation() {
+<span class="fc" id="L41">        return abbreviation;</span>
+    }
+
+    public String getShortestUniqueAbbreviation() {
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (shortestUniqueAbbreviation.isEmpty()) {</span>
+<span class="fc" id="L46">            shortestUniqueAbbreviation = getAbbreviation();</span>
+        }
+<span class="fc" id="L48">        return shortestUniqueAbbreviation;</span>
+    }
+
+    public boolean isDefaultShortestUniqueAbbreviation() {
+<span class="fc bfc" id="L52" title="All 4 branches covered.">        return (shortestUniqueAbbreviation.isEmpty()) || this.shortestUniqueAbbreviation.equals(this.abbreviation);</span>
+    }
+
+    public String getDotlessAbbreviation() {
+<span class="fc" id="L56">        return this.dotlessAbbreviation;</span>
+    }
+
+    @Override
+    public int compareTo(Abbreviation toCompare) {
+<span class="fc" id="L61">        int nameComparison = getName().compareTo(toCompare.getName());</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (nameComparison != 0) {</span>
+<span class="fc" id="L63">            return nameComparison;</span>
+        }
+
+<span class="fc" id="L66">        int abbreviationComparison = getAbbreviation().compareTo(toCompare.getAbbreviation());</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (abbreviationComparison != 0) {</span>
+<span class="fc" id="L68">            return abbreviationComparison;</span>
+        }
+
+<span class="fc" id="L71">        return getShortestUniqueAbbreviation().compareTo(toCompare.getShortestUniqueAbbreviation());</span>
+    }
+
+    public String getNext(String current) {
+<span class="fc" id="L75">        String currentTrimmed = current.trim();</span>
+
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (getDotlessAbbreviation().equals(currentTrimmed)) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            return getShortestUniqueAbbreviation().equals(getAbbreviation()) ? getName() : getShortestUniqueAbbreviation();</span>
+<span class="fc bfc" id="L79" title="All 4 branches covered.">        } else if (getShortestUniqueAbbreviation().equals(currentTrimmed) &amp;&amp; !getShortestUniqueAbbreviation().equals(getAbbreviation())) {</span>
+<span class="fc" id="L80">            return getName();</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        } else if (getName().equals(currentTrimmed)) {</span>
+<span class="fc" id="L82">            return getAbbreviation();</span>
+        } else {
+<span class="fc" id="L84">            return getDotlessAbbreviation();</span>
+        }
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L90">        return &quot;Abbreviation{name=%s, abbreviation=%s, dotlessAbbreviation=%s, shortestUniqueAbbreviation=%s}&quot;.formatted(</span>
+                this.name,
+                this.abbreviation,
+                this.dotlessAbbreviation,
+                this.shortestUniqueAbbreviation);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L100">            return true;</span>
+        }
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L103">            return false;</span>
+        }
+<span class="fc" id="L105">        Abbreviation that = (Abbreviation) o;</span>
+<span class="pc bpc" id="L106" title="2 of 6 branches missed.">        return getName().equals(that.getName()) &amp;&amp; getAbbreviation().equals(that.getAbbreviation()) &amp;&amp; getShortestUniqueAbbreviation().equals(that.getShortestUniqueAbbreviation());</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L111">        return Objects.hash(getName(), getAbbreviation(), getShortestUniqueAbbreviation());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

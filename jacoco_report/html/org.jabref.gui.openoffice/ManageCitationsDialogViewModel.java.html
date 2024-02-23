@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManageCitationsDialogViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.openoffice</a> &gt; <span class="el_source">ManageCitationsDialogViewModel.java</span></div><h1>ManageCitationsDialogViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.openoffice;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.collections.FXCollections;
+
+import org.jabref.gui.DialogService;
+import org.jabref.model.openoffice.CitationEntry;
+
+public class ManageCitationsDialogViewModel {
+
+    public final boolean failedToGetCitationEntries;
+<span class="nc" id="L17">    private final ListProperty&lt;CitationEntryViewModel&gt; citations = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+    private final OOBibBase ooBase;
+    private final DialogService dialogService;
+
+<span class="nc" id="L21">    public ManageCitationsDialogViewModel(OOBibBase ooBase, DialogService dialogService) {</span>
+<span class="nc" id="L22">        this.ooBase = ooBase;</span>
+<span class="nc" id="L23">        this.dialogService = dialogService;</span>
+
+<span class="nc" id="L25">        Optional&lt;List&lt;CitationEntry&gt;&gt; citationEntries = ooBase.guiActionGetCitationEntries();</span>
+<span class="nc" id="L26">        this.failedToGetCitationEntries = citationEntries.isEmpty();</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        if (citationEntries.isEmpty()) {</span>
+<span class="nc" id="L28">            return;</span>
+        }
+
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        for (CitationEntry entry : citationEntries.get()) {</span>
+<span class="nc" id="L32">            CitationEntryViewModel itemViewModelEntry = new CitationEntryViewModel(entry);</span>
+<span class="nc" id="L33">            citations.add(itemViewModelEntry);</span>
+<span class="nc" id="L34">        }</span>
+<span class="nc" id="L35">    }</span>
+
+    public void storeSettings() {
+<span class="nc" id="L38">        List&lt;CitationEntry&gt; citationEntries = citations.stream().map(CitationEntryViewModel::toCitationEntry).collect(Collectors.toList());</span>
+<span class="nc" id="L39">        ooBase.guiActionApplyCitationEntries(citationEntries);</span>
+<span class="nc" id="L40">    }</span>
+
+    public ListProperty&lt;CitationEntryViewModel&gt; citationsProperty() {
+<span class="nc" id="L43">        return citations;</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

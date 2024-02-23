@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalLinkCreator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.util</a> &gt; <span class="el_source">ExternalLinkCreator.java</span></div><h1>ExternalLinkCreator.java</h1><pre class="source lang-java linenums">package org.jabref.logic.util;
+
+import java.net.URISyntaxException;
+import java.util.Optional;
+
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+
+import org.apache.http.client.utils.URIBuilder;
+
+<span class="nc" id="L11">public class ExternalLinkCreator {</span>
+    private static final String SHORTSCIENCE_SEARCH_URL = &quot;https://www.shortscience.org/internalsearch&quot;;
+
+    /**
+     * Get a URL to the search results of ShortScience for the BibEntry's title
+     *
+     * @param entry The entry to search for. Expects the BibEntry's title to be set for successful return.
+     * @return The URL if it was successfully created
+     */
+    public static Optional&lt;String&gt; getShortScienceSearchURL(BibEntry entry) {
+<span class="fc" id="L21">        return entry.getField(StandardField.TITLE).map(title -&gt; {</span>
+            URIBuilder uriBuilder;
+            try {
+<span class="fc" id="L24">                uriBuilder = new URIBuilder(SHORTSCIENCE_SEARCH_URL);</span>
+<span class="nc" id="L25">            } catch (URISyntaxException e) {</span>
+                // This should never be able to happen as it would require the field to be misconfigured.
+<span class="nc" id="L27">                throw new AssertionError(&quot;ShortScience URL is invalid.&quot;, e);</span>
+<span class="fc" id="L28">            }</span>
+            // Direct the user to the search results for the title.
+<span class="fc" id="L30">            uriBuilder.addParameter(&quot;q&quot;, title);</span>
+<span class="fc" id="L31">            return uriBuilder.toString();</span>
+        });
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SelfContainedSaveOrder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.metadata</a> &gt; <span class="el_source">SelfContainedSaveOrder.java</span></div><h1>SelfContainedSaveOrder.java</h1><pre class="source lang-java linenums">package org.jabref.model.metadata;
+
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * With this class, the user of an instance can directly sort things. Without looking up anything in the preferences or in the UI.
+ *
+ * To avoid confusion at the caller, we offer ORIGINAL and SPECIFIED only. Not TABLE.
+ */
+public class SelfContainedSaveOrder extends SaveOrder {
+
+<span class="fc" id="L15">    public static final Logger LOGGER = LoggerFactory.getLogger(SelfContainedSaveOrder.class);</span>
+
+    public SelfContainedSaveOrder(OrderType orderType, List&lt;SortCriterion&gt; sortCriteria) {
+<span class="fc" id="L18">        super(orderType, sortCriteria);</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (orderType == OrderType.TABLE) {</span>
+<span class="nc" id="L20">            LOGGER.debug(&quot;TABLE with sort criteria {}&quot;, sortCriteria);</span>
+<span class="nc" id="L21">            throw new IllegalArgumentException(&quot;TABLE might require external lookup.&quot;);</span>
+        }
+<span class="fc" id="L23">    }</span>
+
+    /**
+     * Converts a SaveOrder to a SelfContainedSaveOrder
+     *
+     * @throws IllegalArgumentException if {@code saveOrder} has {@link OrderType#TABLE}
+     */
+    public static SelfContainedSaveOrder of(SaveOrder saveOrder) {
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (saveOrder instanceof SelfContainedSaveOrder order) {</span>
+<span class="fc" id="L32">            return order;</span>
+        }
+<span class="pc bpc" id="L34" title="3 of 4 branches missed.">        if ((saveOrder.getOrderType() == OrderType.TABLE) &amp;&amp; (!saveOrder.getSortCriteria().isEmpty())) {</span>
+            // We map from TABLE to SPECIFIED to have the users of this class just to `switch` between
+            //   ORIGINAL and SPECIFIED
+<span class="nc" id="L37">            return new SelfContainedSaveOrder(OrderType.SPECIFIED, saveOrder.getSortCriteria());</span>
+        }
+<span class="fc" id="L39">        return new SelfContainedSaveOrder(saveOrder.getOrderType(), saveOrder.getSortCriteria());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

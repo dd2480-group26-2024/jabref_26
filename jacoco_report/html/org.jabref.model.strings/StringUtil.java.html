@@ -1,0 +1,759 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StringUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.strings</a> &gt; <span class="el_source">StringUtil.java</span></div><h1>StringUtil.java</h1><pre class="source lang-java linenums">package org.jabref.model.strings;
+
+import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.architecture.ApacheCommonsLang3Allowed;
+import org.jabref.logic.bibtex.FieldWriter;
+
+import com.google.common.base.CharMatcher;
+import org.apache.commons.lang3.StringUtils;
+
+@ApacheCommonsLang3Allowed(&quot;There is no equivalent in Google's Guava&quot;)
+<span class="nc" id="L21">public class StringUtil {</span>
+
+    // Non-letters which are used to denote accents in LaTeX-commands, e.g., in {\&quot;{a}}
+    public static final String SPECIAL_COMMAND_CHARS = &quot;\&quot;`^~'=.|&quot;;
+    // contains all possible line breaks, not omitting any break such as &quot;\\n&quot;
+<span class="fc" id="L26">    private static final Pattern LINE_BREAKS = Pattern.compile(&quot;\\r\\n|\\r|\\n&quot;);</span>
+<span class="fc" id="L27">    private static final Pattern BRACED_TITLE_CAPITAL_PATTERN = Pattern.compile(&quot;\\{[A-Z]+\\}&quot;);</span>
+<span class="fc" id="L28">    private static final UnicodeToReadableCharMap UNICODE_CHAR_MAP = new UnicodeToReadableCharMap();</span>
+
+    public static String booleanToBinaryString(boolean expression) {
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        return expression ? &quot;1&quot; : &quot;0&quot;;</span>
+    }
+
+    /**
+     * Quote special characters.
+     *
+     * @param toQuote   The String which may contain special characters.
+     * @param specials  A String containing all special characters except the quoting character itself, which is automatically quoted.
+     * @param quoteChar The quoting character.
+     * @return A String with every special character (including the quoting character itself) quoted.
+     */
+    public static String quote(String toQuote, String specials, char quoteChar) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (toQuote == null) {</span>
+<span class="fc" id="L44">            return &quot;&quot;;</span>
+        }
+
+<span class="fc" id="L47">        StringBuilder result = new StringBuilder();</span>
+        char c;
+        boolean isSpecial;
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (int i = 0; i &lt; toQuote.length(); ++i) {</span>
+<span class="fc" id="L51">            c = toQuote.charAt(i);</span>
+
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            isSpecial = c == quoteChar;</span>
+            // If non-null specials performs logic-or with specials.indexOf(c) &gt;= 0
+<span class="fc bfc" id="L55" title="All 4 branches covered.">            isSpecial |= (specials != null) &amp;&amp; (specials.indexOf(c) &gt;= 0);</span>
+
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (isSpecial) {</span>
+<span class="fc" id="L58">                result.append(quoteChar);</span>
+            }
+<span class="fc" id="L60">            result.append(c);</span>
+        }
+<span class="fc" id="L62">        return result.toString();</span>
+    }
+
+    /**
+     * Creates a substring from a text
+     */
+    public static String getPart(String text, int startIndex, boolean terminateOnEndBraceOnly) {
+        char c;
+<span class="fc" id="L70">        int count = 0;</span>
+
+<span class="fc" id="L72">        StringBuilder part = new StringBuilder();</span>
+
+        // advance to first char and skip whitespace
+<span class="fc" id="L75">        int index = startIndex + 1;</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        while ((index &lt; text.length()) &amp;&amp; Character.isWhitespace(text.charAt(index))) {</span>
+<span class="nc" id="L77">            index++;</span>
+        }
+
+        // then grab whatever is the first token (counting braces)
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        while (index &lt; text.length()) {</span>
+<span class="fc" id="L82">            c = text.charAt(index);</span>
+<span class="fc bfc" id="L83" title="All 6 branches covered.">            if (!terminateOnEndBraceOnly &amp;&amp; (count == 0) &amp;&amp; Character.isWhitespace(c)) {</span>
+                // end argument and leave whitespace for further processing
+<span class="fc" id="L85">                break;</span>
+            }
+<span class="fc bfc" id="L87" title="All 4 branches covered.">            if ((c == '}') &amp;&amp; (--count &lt; 0)) {</span>
+<span class="fc" id="L88">                break;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            } else if (c == '{') {</span>
+<span class="fc" id="L90">                count++;</span>
+            }
+<span class="fc" id="L92">            part.append(c);</span>
+<span class="fc" id="L93">            index++;</span>
+        }
+<span class="fc" id="L95">        return part.toString();</span>
+    }
+
+    /**
+     * Returns the string, after shaving off whitespace at the beginning and end,
+     * and removing (at most) one pair of braces or &quot; surrounding it.
+     */
+    public static String shaveString(String toShave) {
+<span class="fc bfc" id="L103" title="All 4 branches covered.">        if ((toShave == null) || (toShave.isEmpty())) {</span>
+<span class="fc" id="L104">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L106">        String shaved = toShave.trim();</span>
+<span class="fc bfc" id="L107" title="All 4 branches covered.">        if (isInCurlyBrackets(shaved) || isInCitationMarks(shaved)) {</span>
+<span class="fc" id="L108">            return shaved.substring(1, shaved.length() - 1);</span>
+        }
+<span class="fc" id="L110">        return shaved;</span>
+    }
+
+    /**
+     * Concatenate all strings in the array from index 'from' to 'to' (excluding
+     * to) with the given separator.
+     * &lt;p&gt;
+     * Example:
+     * &lt;p&gt;
+     * String[] s = &quot;ab/cd/ed&quot;.split(&quot;/&quot;); join(s, &quot;\\&quot;, 0, s.length) -&gt;
+     * &quot;ab\\cd\\ed&quot;
+     *
+     * @param to        Excluding strings[to]
+     */
+    public static String join(String[] strings, String separator, int from, int to) {
+<span class="fc bfc" id="L125" title="All 4 branches covered.">        if ((strings.length == 0) || (from &gt;= to)) {</span>
+<span class="fc" id="L126">            return &quot;&quot;;</span>
+        }
+
+<span class="fc" id="L129">        int updatedFrom = Math.max(0, from);</span>
+<span class="fc" id="L130">        int updatedTo = Math.min(strings.length, to);</span>
+
+<span class="fc" id="L132">        StringBuilder stringBuilder = new StringBuilder();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (int i = updatedFrom; i &lt; (updatedTo - 1); i++) {</span>
+<span class="fc" id="L134">            stringBuilder.append(strings[i]).append(separator);</span>
+        }
+<span class="fc" id="L136">        return stringBuilder.append(strings[updatedTo - 1]).toString();</span>
+    }
+
+    /**
+     * Removes optional square brackets from the string s
+     */
+    public static String stripBrackets(String toStrip) {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (isInSquareBrackets(toStrip)) {</span>
+<span class="fc" id="L144">            return toStrip.substring(1, toStrip.length() - 1);</span>
+        }
+<span class="fc" id="L146">        return toStrip;</span>
+    }
+
+    /**
+     * extends the filename with a default Extension, if no Extension '.x' could
+     * be found
+     */
+    public static String getCorrectFileName(String orgName, String defaultExtension) {
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (orgName == null) {</span>
+<span class="fc" id="L155">            return &quot;&quot;;</span>
+        }
+
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (orgName.toLowerCase(Locale.ROOT).endsWith(&quot;.&quot; + defaultExtension.toLowerCase(Locale.ROOT))) {</span>
+<span class="fc" id="L159">            return orgName;</span>
+        }
+
+<span class="fc" id="L162">        int hiddenChar = orgName.indexOf('.', 1); // hidden files Linux/Unix (?)</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (hiddenChar &lt; 1) {</span>
+<span class="fc" id="L164">            return orgName + &quot;.&quot; + defaultExtension;</span>
+        }
+
+<span class="fc" id="L167">        return orgName;</span>
+    }
+
+    /**
+     * Formats field contents for output. Must be &quot;symmetric&quot; with the parse method above, so stored and reloaded fields
+     * are not mangled.
+     *
+     * @param in         the string to wrap
+     * @param wrapAmount the number of characters belonging to a line of text
+     * @param newline    the newline character(s)
+     * @return the wrapped string
+     */
+    public static String wrap(String in, int wrapAmount, String newline) {
+<span class="fc" id="L180">        String[] lines = in.split(&quot;\n&quot;);</span>
+<span class="fc" id="L181">        StringBuilder result = new StringBuilder();</span>
+        // remove all whitespace at the end of the string, this especially includes \r created when the field content has \r\n as line separator
+<span class="fc" id="L183">        addWrappedLine(result, CharMatcher.whitespace().trimTrailingFrom(lines[0]), wrapAmount, newline);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (int i = 1; i &lt; lines.length; i++) {</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (lines[i].trim().isEmpty()) {</span>
+<span class="fc" id="L186">                result.append(newline);</span>
+<span class="fc" id="L187">                result.append('\t');</span>
+            } else {
+<span class="fc" id="L189">                result.append(newline);</span>
+<span class="fc" id="L190">                result.append('\t');</span>
+<span class="fc" id="L191">                result.append(newline);</span>
+<span class="fc" id="L192">                result.append('\t');</span>
+                // remove all whitespace at the end of the string, this especially includes \r created when the field content has \r\n as line separator
+<span class="fc" id="L194">                String line = CharMatcher.whitespace().trimTrailingFrom(lines[i]);</span>
+<span class="fc" id="L195">                addWrappedLine(result, line, wrapAmount, newline);</span>
+            }
+        }
+<span class="fc" id="L198">        return result.toString();</span>
+    }
+
+    /**
+     * Appends a text to a string builder. Wraps the text so that each line is approx wrapAmount characters long.
+     * Wrapping is done using newline and tab character.
+     *
+     * @param line          the line of text to be wrapped and appended
+     * @param wrapAmount    the number of characters belonging to a line of text
+     * @param newlineString a string containing the newline character(s)
+     */
+    private static void addWrappedLine(StringBuilder result, String line, int wrapAmount, String newlineString) {
+        // Set our pointer to the beginning of the new line in the StringBuffer:
+<span class="fc" id="L211">        int length = result.length();</span>
+        // Add the line, unmodified:
+<span class="fc" id="L213">        result.append(line);</span>
+
+        // insert newlines and one tab character at each position, where wrapping is necessary
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        while (length &lt; result.length()) {</span>
+<span class="fc" id="L217">            int current = result.indexOf(&quot; &quot;, length + wrapAmount);</span>
+<span class="pc bpc" id="L218" title="1 of 4 branches missed.">            if ((current &lt; 0) || (current &gt;= result.length())) {</span>
+<span class="nc" id="L219">                break;</span>
+            }
+
+<span class="fc" id="L222">            result.deleteCharAt(current);</span>
+<span class="fc" id="L223">            result.insert(current, newlineString + &quot;\t&quot;);</span>
+<span class="fc" id="L224">            length = current + newlineString.length();</span>
+<span class="fc" id="L225">        }</span>
+<span class="fc" id="L226">    }</span>
+
+    /**
+     * Quotes each and every character, e.g. '!' as &amp;#33;. Used for verbatim
+     * display of arbitrary strings that may contain HTML entities.
+     */
+    public static String quoteForHTML(String toQuote) {
+<span class="fc" id="L233">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        for (int i = 0; i &lt; toQuote.length(); ++i) {</span>
+<span class="fc" id="L235">            result.append(&quot;&amp;#&quot;).append((int) toQuote.charAt(i)).append(';');</span>
+        }
+<span class="fc" id="L237">        return result.toString();</span>
+    }
+
+    /**
+     * Decodes an encoded double String array back into array form. The array
+     * is assumed to be square, and delimited by the characters ';' (first dim) and
+     * ':' (second dim).
+     *
+     * @param value The encoded String to be decoded.
+     * @return The decoded String array.
+     */
+    public static String[][] decodeStringDoubleArray(String value) {
+<span class="fc" id="L249">        List&lt;List&lt;String&gt;&gt; newList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L250">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L251">        List&lt;String&gt; thisEntry = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L252">        boolean escaped = false;</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L254">            char c = value.charAt(i);</span>
+<span class="fc bfc" id="L255" title="All 4 branches covered.">            if (!escaped &amp;&amp; (c == '\\')) {</span>
+<span class="fc" id="L256">                escaped = true;</span>
+<span class="fc" id="L257">                continue;</span>
+<span class="fc bfc" id="L258" title="All 4 branches covered.">            } else if (!escaped &amp;&amp; (c == ':')) {</span>
+<span class="fc" id="L259">                thisEntry.add(sb.toString());</span>
+<span class="fc" id="L260">                sb = new StringBuilder();</span>
+<span class="fc bfc" id="L261" title="All 4 branches covered.">            } else if (!escaped &amp;&amp; (c == ';')) {</span>
+<span class="fc" id="L262">                thisEntry.add(sb.toString());</span>
+<span class="fc" id="L263">                sb = new StringBuilder();</span>
+<span class="fc" id="L264">                newList.add(thisEntry);</span>
+<span class="fc" id="L265">                thisEntry = new ArrayList&lt;&gt;();</span>
+            } else {
+<span class="fc" id="L267">                sb.append(c);</span>
+            }
+<span class="fc" id="L269">            escaped = false;</span>
+        }
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (sb.length() &gt; 0) {</span>
+<span class="fc" id="L272">            thisEntry.add(sb.toString());</span>
+        }
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (!thisEntry.isEmpty()) {</span>
+<span class="fc" id="L275">            newList.add(thisEntry);</span>
+        }
+
+        // Convert to String[][]:
+<span class="fc" id="L279">        String[][] res = new String[newList.size()][];</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        for (int i = 0; i &lt; res.length; i++) {</span>
+<span class="fc" id="L281">            res[i] = new String[newList.get(i).size()];</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            for (int j = 0; j &lt; res[i].length; j++) {</span>
+<span class="fc" id="L283">                res[i][j] = newList.get(i).get(j);</span>
+            }
+        }
+<span class="fc" id="L286">        return res;</span>
+    }
+
+    /**
+     * Wrap all uppercase letters, or sequences of uppercase letters, in curly
+     * braces. Ignore letters within a pair of # character, as these are part of
+     * a string label that should not be modified.
+     *
+     * @param s The string to modify.
+     * @return The resulting string after wrapping capitals.
+     */
+    public static String putBracesAroundCapitals(String s) {
+<span class="fc" id="L298">        boolean inString = false;</span>
+<span class="fc" id="L299">        boolean isBracing = false;</span>
+<span class="fc" id="L300">        boolean escaped = false;</span>
+<span class="fc" id="L301">        int inBrace = 0;</span>
+<span class="fc" id="L302">        StringBuilder buf = new StringBuilder();</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+            // Update variables based on special characters:
+<span class="fc" id="L305">            int c = s.charAt(i);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            if (c == '{') {</span>
+<span class="fc" id="L307">                inBrace++;</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">            } else if (c == '}') {</span>
+<span class="fc" id="L309">                inBrace--;</span>
+<span class="pc bpc" id="L310" title="1 of 4 branches missed.">            } else if (!escaped &amp;&amp; (c == FieldWriter.BIBTEX_STRING_START_END_SYMBOL)) {</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">                inString = !inString;</span>
+            }
+
+            // See if we should start bracing:
+<span class="fc bfc" id="L315" title="All 8 branches covered.">            if ((inBrace == 0) &amp;&amp; !isBracing &amp;&amp; !inString &amp;&amp; Character.isLetter((char) c)</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">                    &amp;&amp; Character.isUpperCase((char) c)) {</span>
+<span class="fc" id="L317">                buf.append('{');</span>
+<span class="fc" id="L318">                isBracing = true;</span>
+            }
+
+            // See if we should close a brace set:
+<span class="pc bpc" id="L322" title="1 of 6 branches missed.">            if (isBracing &amp;&amp; !(Character.isLetter((char) c) &amp;&amp; Character.isUpperCase((char) c))) {</span>
+<span class="fc" id="L323">                buf.append('}');</span>
+<span class="fc" id="L324">                isBracing = false;</span>
+            }
+
+            // Add the current character:
+<span class="fc" id="L328">            buf.append((char) c);</span>
+
+            // Check if we are entering an escape sequence:
+<span class="pc bpc" id="L331" title="3 of 4 branches missed.">            escaped = (c == '\\') &amp;&amp; !escaped;</span>
+        }
+        // Check if we have an unclosed brace:
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (isBracing) {</span>
+<span class="fc" id="L335">            buf.append('}');</span>
+        }
+
+<span class="fc" id="L338">        return buf.toString();</span>
+    }
+
+    /**
+     * This method looks for occurrences of capital letters enclosed in an
+     * arbitrary number of pairs of braces, e.g. &quot;{AB}&quot; or &quot;{{T}}&quot;. All of these
+     * pairs of braces are removed.
+     *
+     * @param s The String to analyze.
+     * @return A new String with braces removed.
+     */
+    public static String removeBracesAroundCapitals(String s) {
+<span class="fc" id="L350">        String current = s;</span>
+<span class="fc" id="L351">        String previous = s;</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        while ((current = removeSingleBracesAroundCapitals(current)).length() &lt; previous.length()) {</span>
+<span class="fc" id="L353">            previous = current;</span>
+        }
+<span class="fc" id="L355">        return current;</span>
+    }
+
+    /**
+     * This method looks for occurrences of capital letters enclosed in one pair
+     * of braces, e.g. &quot;{AB}&quot;. All these are replaced by only the capitals in
+     * between the braces.
+     *
+     * @param s The String to analyze.
+     * @return A new String with braces removed.
+     */
+    private static String removeSingleBracesAroundCapitals(String s) {
+<span class="fc" id="L367">        Matcher mcr = BRACED_TITLE_CAPITAL_PATTERN.matcher(s);</span>
+<span class="fc" id="L368">        StringBuilder buf = new StringBuilder();</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">        while (mcr.find()) {</span>
+<span class="fc" id="L370">            String replaceStr = mcr.group();</span>
+<span class="fc" id="L371">            mcr.appendReplacement(buf, replaceStr.substring(1, replaceStr.length() - 1));</span>
+<span class="fc" id="L372">        }</span>
+<span class="fc" id="L373">        mcr.appendTail(buf);</span>
+<span class="fc" id="L374">        return buf.toString();</span>
+    }
+
+    /**
+     * Replaces all platform-dependent line breaks by OS.NEWLINE line breaks.
+     * AKA normalize newlines
+     * &lt;p&gt;
+     * We do NOT use UNIX line breaks as the user explicitly configures its linebreaks and this method is used in bibtex field writing
+     *
+     * &lt;example&gt;
+     * Legacy Macintosh \r -&gt; OS.NEWLINE
+     * Windows \r\n -&gt; OS.NEWLINE
+     * &lt;/example&gt;
+     *
+     * @return a String with only OS.NEWLINE as line breaks
+     */
+    public static String unifyLineBreaks(String s, String newline) {
+<span class="fc" id="L391">        return LINE_BREAKS.matcher(s).replaceAll(newline);</span>
+    }
+
+    /**
+     * Checks if the given String has exactly one pair of surrounding curly braces &lt;br&gt;
+     * Strings with escaped characters in curly braces at the beginning and end are respected, too
+     *
+     * @param toCheck The string to check
+     * @return True, if the check was succesful. False otherwise.
+     */
+    public static boolean isInCurlyBrackets(String toCheck) {
+<span class="fc" id="L402">        int count = 0;</span>
+<span class="fc" id="L403">        int brackets = 0;</span>
+<span class="fc bfc" id="L404" title="All 4 branches covered.">        if ((toCheck == null) || toCheck.isEmpty()) {</span>
+<span class="fc" id="L405">            return false;</span>
+        } else {
+<span class="fc bfc" id="L407" title="All 4 branches covered.">            if ((toCheck.charAt(0) == '{') &amp;&amp; (toCheck.charAt(toCheck.length() - 1) == '}')) {</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">                for (char c : toCheck.toCharArray()) {</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">                    if (c == '{') {</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">                        if (brackets == 0) {</span>
+<span class="fc" id="L411">                            count++;</span>
+                        }
+<span class="fc" id="L413">                        brackets++;</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">                    } else if (c == '}') {</span>
+<span class="fc" id="L415">                        brackets--;</span>
+                    }
+                }
+
+<span class="fc bfc" id="L419" title="All 2 branches covered.">                return count == 1;</span>
+            }
+<span class="fc" id="L421">            return false;</span>
+        }
+    }
+
+    public static boolean isInSquareBrackets(String toCheck) {
+<span class="fc bfc" id="L426" title="All 4 branches covered.">        if ((toCheck == null) || toCheck.isEmpty()) {</span>
+<span class="fc" id="L427">            return false; // In case of null or empty string</span>
+        } else {
+<span class="fc bfc" id="L429" title="All 4 branches covered.">            return (toCheck.charAt(0) == '[') &amp;&amp; (toCheck.charAt(toCheck.length() - 1) == ']');</span>
+        }
+    }
+
+    public static boolean isInCitationMarks(String toCheck) {
+<span class="fc bfc" id="L434" title="All 4 branches covered.">        if ((toCheck == null) || (toCheck.length() &lt;= 1)) {</span>
+<span class="fc" id="L435">            return false; // In case of null, empty string, or a single citation mark</span>
+        } else {
+<span class="fc bfc" id="L437" title="All 4 branches covered.">            return (toCheck.charAt(0) == '&quot;') &amp;&amp; (toCheck.charAt(toCheck.length() - 1) == '&quot;');</span>
+        }
+    }
+
+    /**
+     * Optimized method for converting a String into an Integer
+     * &lt;p&gt;
+     * From http://stackoverflow.com/questions/1030479/most-efficient-way-of-converting-string-to-integer-in-java
+     *
+     * @param str the String holding an Integer value
+     * @return the int value of str
+     * @throws NumberFormatException if str cannot be parsed to an int
+     */
+    public static int intValueOf(String str) {
+<span class="fc" id="L451">        int idx = 0;</span>
+        int end;
+<span class="fc" id="L453">        boolean sign = false;</span>
+        char ch;
+
+<span class="fc bfc" id="L456" title="All 18 branches covered.">        if ((str == null) || ((end = str.length()) == 0) || ((((ch = str.charAt(0)) &lt; '0') || (ch &gt; '9')) &amp;&amp; (!(sign = ch == '-') || (++idx == end) || ((ch = str.charAt(idx)) &lt; '0') || (ch &gt; '9')))) {</span>
+<span class="fc" id="L457">            throw new NumberFormatException(str);</span>
+        }
+
+<span class="fc" id="L460">        int ival = 0;</span>
+<span class="fc" id="L461">        for (; ; ival *= 10) {</span>
+<span class="fc" id="L462">            ival += '0' - ch;</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">            if (++idx == end) {</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">                return sign ? ival : -ival;</span>
+            }
+<span class="fc bfc" id="L466" title="All 4 branches covered.">            if (((ch = str.charAt(idx)) &lt; '0') || (ch &gt; '9')) {</span>
+<span class="fc" id="L467">                throw new NumberFormatException(str);</span>
+            }
+        }
+    }
+
+    /**
+     * Optimized method for converting a String into an Integer
+     * &lt;p&gt;
+     * From http://stackoverflow.com/questions/1030479/most-efficient-way-of-converting-string-to-integer-in-java
+     *
+     * @param str the String holding an Integer value
+     * @return the int value of str or Optional.empty() if not possible
+     */
+    public static Optional&lt;Integer&gt; intValueOfOptional(String str) {
+<span class="fc" id="L481">        int idx = 0;</span>
+        int end;
+<span class="fc" id="L483">        boolean sign = false;</span>
+        char ch;
+
+<span class="pc bpc" id="L486" title="12 of 18 branches missed.">        if ((str == null) || ((end = str.length()) == 0) || ((((ch = str.charAt(0)) &lt; '0') || (ch &gt; '9')) &amp;&amp; (!(sign = ch == '-') || (++idx == end) || ((ch = str.charAt(idx)) &lt; '0') || (ch &gt; '9')))) {</span>
+<span class="fc" id="L487">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L490">        int ival = 0;</span>
+<span class="fc" id="L491">        for (; ; ival *= 10) {</span>
+<span class="fc" id="L492">            ival += '0' - ch;</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">            if (++idx == end) {</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">                return Optional.of(sign ? ival : -ival);</span>
+            }
+<span class="pc bpc" id="L496" title="1 of 4 branches missed.">            if (((ch = str.charAt(idx)) &lt; '0') || (ch &gt; '9')) {</span>
+<span class="fc" id="L497">                return Optional.empty();</span>
+            }
+        }
+    }
+
+    /**
+     * This method ensures that the output String has only
+     * valid XML unicode characters as specified by the
+     * XML 1.0 standard. For reference, please see
+     * &lt;a href=&quot;http://www.w3.org/TR/2000/REC-xml-20001006#NT-Char&quot;&gt;the
+     * standard&lt;/a&gt;. This method will return an empty
+     * String if the input is null or empty.
+     * &lt;p&gt;
+     * URL: http://cse-mjmcl.cse.bris.ac.uk/blog/2007/02/14/1171465494443.html
+     *
+     * @param in The String whose non-valid characters we want to remove.
+     * @return The in String, stripped of non-valid characters.
+     */
+    public static String stripNonValidXMLCharacters(String in) {
+<span class="pc bpc" id="L516" title="2 of 4 branches missed.">        if ((in == null) || in.isEmpty()) {</span>
+<span class="nc" id="L517">            return &quot;&quot;; // vacancy test.</span>
+        }
+<span class="fc" id="L519">        StringBuilder out = new StringBuilder(); // Used to hold the output.</span>
+        char current; // Used to reference the current character.
+
+<span class="fc bfc" id="L522" title="All 2 branches covered.">        for (int i = 0; i &lt; in.length(); i++) {</span>
+<span class="fc" id="L523">            current = in.charAt(i); // NOTE: No IndexOutOfBoundsException caught here; it should not happen.</span>
+<span class="pc bpc" id="L524" title="9 of 14 branches missed.">            if ((current == 0x9) || (current == 0xA) || (current == 0xD) || ((current &gt;= 0x20) &amp;&amp; (current &lt;= 0xD7FF))</span>
+                    || ((current &gt;= 0xE000) &amp;&amp; (current &lt;= 0xFFFD))) {
+<span class="fc" id="L526">                out.append(current);</span>
+            }
+        }
+<span class="fc" id="L529">        return out.toString();</span>
+    }
+
+    /*
+     * @param  buf       String to be tokenized
+     * @param  delimstr  Delimiter string
+     * @return list      {@link java.util.List} of &lt;tt&gt;String&lt;/tt&gt;
+     */
+    public static List&lt;String&gt; tokenizeToList(String buf, String delimstr) {
+<span class="fc" id="L538">        List&lt;String&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L539">        String buffer = buf + '\n';</span>
+
+<span class="fc" id="L541">        StringTokenizer st = new StringTokenizer(buffer, delimstr);</span>
+
+<span class="fc bfc" id="L543" title="All 2 branches covered.">        while (st.hasMoreTokens()) {</span>
+<span class="fc" id="L544">            list.add(st.nextToken());</span>
+        }
+
+<span class="fc" id="L547">        return list;</span>
+    }
+
+    public static String limitStringLength(String s, int maxLength) {
+<span class="fc bfc" id="L551" title="All 2 branches covered.">        if (s == null) {</span>
+<span class="fc" id="L552">            return &quot;&quot;;</span>
+        }
+
+<span class="fc bfc" id="L555" title="All 2 branches covered.">        if (s.length() &lt;= maxLength) {</span>
+<span class="fc" id="L556">            return s;</span>
+        }
+
+<span class="fc" id="L559">        return s.substring(0, maxLength - 3) + &quot;...&quot;;</span>
+    }
+
+    /**
+     * Replace non-English characters like umlauts etc. with a sensible letter or letter combination that bibtex can
+     * accept. The basis for replacement is the HashMap UnicodeToReadableCharMap.
+     */
+    public static String replaceSpecialCharacters(String s) {
+        /* Some unicode characters can be encoded in multiple ways. This uses &lt;a href=&quot;https://docs.oracle.com/en/java/javase/14/docs/api/java.base/java/text/Normalizer.Form.html#NFC&quot;&gt;NFC&lt;/a&gt;
+         * to re-encode the characters so that these characters can be found.
+         * Most people expect Unicode to work similar to NFC, i.e., if characters looks the same, it is likely that they are equivalent.
+         * Hence, if someone debugs issues in the `UNICODE_CHAR_MAP`, they will expect NFC.
+         * A more holistic approach should likely start with the &lt;a href=&quot;http://unicode.org/reports/tr15/#Compatibility_Equivalence_Figure&quot;&gt;compatibility equivalence&lt;/a&gt;. */
+<span class="fc" id="L572">        String result = Normalizer.normalize(s, Normalizer.Form.NFC);</span>
+<span class="fc bfc" id="L573" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; chrAndReplace : UNICODE_CHAR_MAP.entrySet()) {</span>
+<span class="fc" id="L574">            result = result.replace(chrAndReplace.getKey(), chrAndReplace.getValue());</span>
+<span class="fc" id="L575">        }</span>
+<span class="fc" id="L576">        return result;</span>
+    }
+
+    /**
+     * Return a String with n spaces
+     *
+     * @param n Number of spaces
+     * @return String with n spaces
+     */
+    public static String repeatSpaces(int n) {
+<span class="fc" id="L586">        return repeat(Math.max(0, n), ' ');</span>
+    }
+
+    /**
+     * Return a String with n copies of the char c
+     *
+     * @param n Number of copies
+     * @param c char to copy
+     * @return String with n copies of c
+     */
+    public static String repeat(int n, char c) {
+<span class="fc" id="L597">        StringBuilder resultSB = new StringBuilder(n);</span>
+
+<span class="fc bfc" id="L599" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L600">            resultSB.append(c);</span>
+        }
+
+<span class="fc" id="L603">        return resultSB.toString();</span>
+    }
+
+    public static boolean isNullOrEmpty(String toTest) {
+<span class="fc bfc" id="L607" title="All 4 branches covered.">        return (toTest == null) || toTest.isEmpty();</span>
+    }
+
+    public static boolean isBlank(String string) {
+<span class="fc bfc" id="L611" title="All 2 branches covered.">        return !isNotBlank(string);</span>
+    }
+
+    public static boolean isBlank(Optional&lt;String&gt; string) {
+<span class="fc bfc" id="L615" title="All 2 branches covered.">        return !isNotBlank(string);</span>
+    }
+
+    /**
+     * Checks if a CharSequence is not empty (&quot;&quot;), not null and not whitespace only.
+     */
+    public static boolean isNotBlank(String string) {
+        // No Guava equivalent existing
+<span class="fc" id="L623">        return StringUtils.isNotBlank(string);</span>
+    }
+
+    public static boolean isNotBlank(Optional&lt;String&gt; string) {
+<span class="pc bpc" id="L627" title="1 of 4 branches missed.">        return string.isPresent() &amp;&amp; isNotBlank(string.get());</span>
+    }
+
+    /**
+     * Return string enclosed in HTML bold tags
+     */
+    public static String boldHTML(String input) {
+<span class="fc" id="L634">        return &quot;&lt;b&gt;&quot; + input + &quot;&lt;/b&gt;&quot;;</span>
+    }
+
+    /**
+     * Return string enclosed in HTML bold tags  if not null, otherwise return alternative text in HTML bold tags
+     */
+    public static String boldHTML(String input, String alternative) {
+<span class="fc bfc" id="L641" title="All 2 branches covered.">        if (input == null) {</span>
+<span class="fc" id="L642">            return &quot;&lt;b&gt;&quot; + alternative + &quot;&lt;/b&gt;&quot;;</span>
+        }
+<span class="fc" id="L644">        return &quot;&lt;b&gt;&quot; + input + &quot;&lt;/b&gt;&quot;;</span>
+    }
+
+    /**
+     * Unquote special characters.
+     *
+     * @param toUnquote The String which may contain quoted special characters.
+     * @param quoteChar The quoting character.
+     * @return A String with all quoted characters unquoted.
+     */
+    public static String unquote(String toUnquote, char quoteChar) {
+<span class="fc" id="L655">        StringBuilder result = new StringBuilder();</span>
+        char c;
+<span class="fc" id="L657">        boolean quoted = false;</span>
+<span class="fc bfc" id="L658" title="All 2 branches covered.">        for (int i = 0; i &lt; toUnquote.length(); ++i) {</span>
+<span class="fc" id="L659">            c = toUnquote.charAt(i);</span>
+<span class="fc bfc" id="L660" title="All 2 branches covered.">            if (quoted) { // append literally...</span>
+<span class="pc bpc" id="L661" title="1 of 2 branches missed.">                if (c != '\n') {</span>
+<span class="fc" id="L662">                    result.append(c);</span>
+                }
+<span class="fc" id="L664">                quoted = false;</span>
+<span class="fc bfc" id="L665" title="All 2 branches covered.">            } else if (c == quoteChar) {</span>
+                // quote char
+<span class="fc" id="L667">                quoted = true;</span>
+            } else {
+<span class="fc" id="L669">                result.append(c);</span>
+            }
+        }
+<span class="fc" id="L672">        return result.toString();</span>
+    }
+
+    @ApacheCommonsLang3Allowed(&quot;No Guava equivalent existing - see https://stackoverflow.com/q/3322152/873282 for a list of other implementations&quot;)
+    public static String stripAccents(String searchQuery) {
+<span class="fc" id="L677">        return StringUtils.stripAccents(searchQuery);</span>
+    }
+
+    /**
+     * Make first character of String uppercase, and the rest lowercase.
+     */
+    public static String capitalizeFirst(String toCapitalize) {
+<span class="fc bfc" id="L684" title="All 2 branches covered.">        if (toCapitalize.length() &gt; 1) {</span>
+<span class="fc" id="L685">            return toCapitalize.substring(0, 1).toUpperCase(Locale.ROOT)</span>
+<span class="fc" id="L686">                    + toCapitalize.substring(1).toLowerCase(Locale.ROOT);</span>
+        } else {
+<span class="fc" id="L688">            return toCapitalize.toUpperCase(Locale.ROOT);</span>
+        }
+    }
+
+    /**
+     * Returns a list of words contained in the given text.
+     * Whitespace, comma and semicolon are considered as separator between words.
+     *
+     * @param text the input
+     * @return a list of words
+     */
+    public static List&lt;String&gt; getStringAsWords(String text) {
+<span class="fc" id="L700">        return Arrays.asList(text.split(&quot;[\\s,;]+&quot;));</span>
+    }
+
+    /**
+     * Returns a list of sentences contained in the given text.
+     */
+    public static List&lt;String&gt; getStringAsSentences(String text) {
+        // A sentence ends with a .?!;, but not in the case of &quot;Mr.&quot;, &quot;Ms.&quot;, &quot;Mrs.&quot;, &quot;Dr.&quot;, &quot;st.&quot;, &quot;jr.&quot;, &quot;co.&quot;, &quot;inc.&quot;, and &quot;ltd.&quot;
+<span class="fc" id="L708">        Pattern splitTextPattern = Pattern.compile(&quot;(?&lt;=[\\.!;\\?])(?&lt;![Mm](([Rr]|[Rr][Ss])|[Ss])\\.|[Dd][Rr]\\.|[Ss][Tt]\\.|[Jj][Rr]\\.|[Cc][Oo]\\.|[Ii][Nn][Cc]\\.|[Ll][Tt][Dd]\\.)\\s+&quot;);</span>
+<span class="fc" id="L709">        return Arrays.asList(splitTextPattern.split(text));</span>
+    }
+
+    @ApacheCommonsLang3Allowed(&quot;No direct Guava equivalent existing - see https://stackoverflow.com/q/16560635/873282&quot;)
+    public static boolean containsIgnoreCase(String text, String searchString) {
+<span class="fc" id="L714">        return StringUtils.containsIgnoreCase(text, searchString);</span>
+    }
+
+    public static String substringBetween(String str, String open, String close) {
+<span class="fc" id="L718">        return StringUtils.substringBetween(str, open, close);</span>
+    }
+
+    public static String ignoreCurlyBracket(String title) {
+<span class="pc bpc" id="L722" title="1 of 2 branches missed.">        return isNotBlank(title) ? title.replace(&quot;{&quot;, &quot;&quot;).replace(&quot;}&quot;, &quot;&quot;) : title;</span>
+    }
+
+    /**
+     * Encloses the given string with &quot; if there is a space contained
+     *
+     * @return Returns a string
+     */
+    public static String quoteStringIfSpaceIsContained(String string) {
+<span class="fc bfc" id="L731" title="All 2 branches covered.">        if (string.contains(&quot; &quot;)) {</span>
+<span class="fc" id="L732">            return &quot;\&quot;&quot; + string + &quot;\&quot;&quot;;</span>
+        } else {
+<span class="fc" id="L734">            return string;</span>
+        }
+    }
+
+    /**
+     * Checks if the given string contains any whitespace characters. The supported whitespace characters
+     * are the set of characters matched by {@code \s} in regular expressions, which are {@code [ \t\n\x0B\f\r]}.
+     *
+     * @param s The string to check
+     * @return {@code True} if the given string does contain at least one whitespace character, {@code False} otherwise
+     * */
+    public static boolean containsWhitespace(String s) {
+<span class="fc" id="L746">        return s.chars().anyMatch(Character::isWhitespace);</span>
+    }
+
+    @ApacheCommonsLang3Allowed(&quot;No Guava equivalent existing - see https://stackoverflow.com/a/23825984&quot;)
+    public static String removeStringAtTheEnd(String string, String stringToBeRemoved) {
+<span class="fc" id="L751">        return StringUtils.removeEndIgnoreCase(string, stringToBeRemoved);</span>
+    }
+
+    @ApacheCommonsLang3Allowed(&quot;No Guava equivalent existing&quot;)
+    public static boolean endsWithIgnoreCase(String string, String suffix) {
+<span class="fc" id="L756">        return StringUtils.endsWithIgnoreCase(string, suffix);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

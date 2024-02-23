@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UndoRedoAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.undo</a> &gt; <span class="el_source">UndoRedoAction.java</span></div><h1>UndoRedoAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.undo;
+
+import java.util.function.Supplier;
+
+import javax.swing.undo.CannotRedoException;
+import javax.swing.undo.CannotUndoException;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.logic.l10n.Localization;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class UndoRedoAction extends SimpleCommand {
+
+<span class="nc" id="L21">    private static final Logger LOGGER = LoggerFactory.getLogger(UndoRedoAction.class);</span>
+
+    private final StandardActions action;
+    private final Supplier&lt;LibraryTab&gt; tabSupplier;
+    private final DialogService dialogService;
+
+<span class="nc" id="L27">    public UndoRedoAction(StandardActions action, Supplier&lt;LibraryTab&gt; tabSupplier, DialogService dialogService, StateManager stateManager) {</span>
+<span class="nc" id="L28">        this.action = action;</span>
+<span class="nc" id="L29">        this.tabSupplier = tabSupplier;</span>
+<span class="nc" id="L30">        this.dialogService = dialogService;</span>
+
+        // ToDo: Rework the UndoManager to something like the following, if it had a property.
+        //  this.executable.bind(frame.getCurrentBasePanel().getUndoManager().canUndo())
+<span class="nc" id="L34">        this.executable.bind(ActionHelper.needsDatabase(stateManager));</span>
+<span class="nc" id="L35">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc" id="L39">        LibraryTab libraryTab = this.tabSupplier.get();</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (action == StandardActions.UNDO) {</span>
+            try {
+<span class="nc" id="L42">                libraryTab.getUndoManager().undo();</span>
+<span class="nc" id="L43">                libraryTab.markBaseChanged();</span>
+<span class="nc" id="L44">                dialogService.notify(Localization.lang(&quot;Undo&quot;));</span>
+<span class="nc" id="L45">            } catch (CannotUndoException ex) {</span>
+<span class="nc" id="L46">                dialogService.notify(Localization.lang(&quot;Nothing to undo&quot;) + '.');</span>
+<span class="nc" id="L47">            }</span>
+<span class="nc" id="L48">            this.tabSupplier.get().markChangedOrUnChanged();</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        } else if (action == StandardActions.REDO) {</span>
+            try {
+<span class="nc" id="L51">                libraryTab.getUndoManager().redo();</span>
+<span class="nc" id="L52">                libraryTab.markBaseChanged();</span>
+<span class="nc" id="L53">                dialogService.notify(Localization.lang(&quot;Redo&quot;));</span>
+<span class="nc" id="L54">            } catch (CannotRedoException ex) {</span>
+<span class="nc" id="L55">                dialogService.notify(Localization.lang(&quot;Nothing to redo&quot;) + '.');</span>
+<span class="nc" id="L56">            }</span>
+
+<span class="nc" id="L58">            libraryTab.markChangedOrUnChanged();</span>
+        } else {
+<span class="nc" id="L60">            LOGGER.debug(&quot;No undo/redo action: &quot; + action.name());</span>
+        }
+<span class="nc" id="L62">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

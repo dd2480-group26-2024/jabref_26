@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BibEntryTableViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.maintable</a> &gt; <span class="el_source">BibEntryTableViewModel.java</span></div><h1>BibEntryTableViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.maintable;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+import javafx.beans.Observable;
+import javafx.beans.binding.Binding;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.StringProperty;
+import javafx.beans.value.ObservableValue;
+
+import org.jabref.gui.specialfields.SpecialFieldValueViewModel;
+import org.jabref.gui.util.uithreadaware.UiThreadBinding;
+import org.jabref.logic.importer.util.FileFieldParser;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.LinkedFile;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.OrFields;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.groups.AbstractGroup;
+import org.jabref.model.groups.GroupTreeNode;
+
+import com.tobiasdiez.easybind.EasyBind;
+import com.tobiasdiez.easybind.EasyBinding;
+import com.tobiasdiez.easybind.optional.OptionalBinding;
+
+public class BibEntryTableViewModel {
+
+    private final BibEntry entry;
+    private final ObservableValue&lt;MainTableFieldValueFormatter&gt; fieldValueFormatter;
+<span class="fc" id="L41">    private final Map&lt;OrFields, ObservableValue&lt;String&gt;&gt; fieldValues = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L42">    private final Map&lt;SpecialField, OptionalBinding&lt;SpecialFieldValueViewModel&gt;&gt; specialFieldValues = new HashMap&lt;&gt;();</span>
+    private final EasyBinding&lt;List&lt;LinkedFile&gt;&gt; linkedFiles;
+    private final EasyBinding&lt;Map&lt;Field, String&gt;&gt; linkedIdentifiers;
+    private final Binding&lt;List&lt;AbstractGroup&gt;&gt; matchedGroups;
+    private final BibDatabaseContext bibDatabaseContext;
+
+<span class="fc" id="L48">    public BibEntryTableViewModel(BibEntry entry, BibDatabaseContext bibDatabaseContext, ObservableValue&lt;MainTableFieldValueFormatter&gt; fieldValueFormatter) {</span>
+<span class="fc" id="L49">        this.entry = entry;</span>
+<span class="fc" id="L50">        this.fieldValueFormatter = fieldValueFormatter;</span>
+
+<span class="fc" id="L52">        this.linkedFiles = getField(StandardField.FILE).mapOpt(FileFieldParser::parse).orElseOpt(Collections.emptyList());</span>
+<span class="fc" id="L53">        this.linkedIdentifiers = createLinkedIdentifiersBinding(entry);</span>
+<span class="fc" id="L54">        this.matchedGroups = createMatchedGroupsBinding(bibDatabaseContext, entry);</span>
+<span class="fc" id="L55">        this.bibDatabaseContext = bibDatabaseContext;</span>
+<span class="fc" id="L56">    }</span>
+
+    private static EasyBinding&lt;Map&lt;Field, String&gt;&gt; createLinkedIdentifiersBinding(BibEntry entry) {
+<span class="fc" id="L59">        return EasyBind.combine(</span>
+<span class="fc" id="L60">                entry.getFieldBinding(StandardField.URL),</span>
+<span class="fc" id="L61">                entry.getFieldBinding(StandardField.DOI),</span>
+<span class="fc" id="L62">                entry.getFieldBinding(StandardField.URI),</span>
+<span class="fc" id="L63">                entry.getFieldBinding(StandardField.EPRINT),</span>
+<span class="fc" id="L64">                entry.getFieldBinding(StandardField.ISBN),</span>
+                (url, doi, uri, eprint, isbn) -&gt; {
+<span class="nc" id="L66">                    Map&lt;Field, String&gt; identifiers = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L67">                    url.ifPresent(value -&gt; identifiers.put(StandardField.URL, value));</span>
+<span class="nc" id="L68">                    doi.ifPresent(value -&gt; identifiers.put(StandardField.DOI, value));</span>
+<span class="nc" id="L69">                    uri.ifPresent(value -&gt; identifiers.put(StandardField.URI, value));</span>
+<span class="nc" id="L70">                    eprint.ifPresent(value -&gt; identifiers.put(StandardField.EPRINT, value));</span>
+<span class="nc" id="L71">                    isbn.ifPresent(value -&gt; identifiers.put(StandardField.ISBN, value));</span>
+<span class="nc" id="L72">                    return identifiers;</span>
+                });
+    }
+
+    public BibEntry getEntry() {
+<span class="fc" id="L77">        return entry;</span>
+    }
+
+    private static Binding&lt;List&lt;AbstractGroup&gt;&gt; createMatchedGroupsBinding(BibDatabaseContext database, BibEntry entry) {
+<span class="fc" id="L81">        return new UiThreadBinding&lt;&gt;(EasyBind.combine(entry.getFieldBinding(StandardField.GROUPS), database.getMetaData().groupsBinding(),</span>
+                (a, b) -&gt;
+<span class="nc" id="L83">                        database.getMetaData().getGroups().map(groupTreeNode -&gt;</span>
+<span class="nc" id="L84">                                groupTreeNode.getMatchingGroups(entry).stream()</span>
+<span class="nc" id="L85">                                             .map(GroupTreeNode::getGroup)</span>
+<span class="nc" id="L86">                                             .filter(Predicate.not(Predicate.isEqual(groupTreeNode.getGroup())))</span>
+<span class="nc" id="L87">                                             .collect(Collectors.toList()))</span>
+<span class="nc" id="L88">                                .orElse(Collections.emptyList())));</span>
+    }
+
+    public OptionalBinding&lt;String&gt; getField(Field field) {
+<span class="fc" id="L92">        return entry.getFieldBinding(field);</span>
+    }
+
+    public ObservableValue&lt;List&lt;LinkedFile&gt;&gt; getLinkedFiles() {
+<span class="nc" id="L96">        return linkedFiles;</span>
+    }
+
+    public ObservableValue&lt;Map&lt;Field, String&gt;&gt; getLinkedIdentifiers() {
+<span class="nc" id="L100">        return linkedIdentifiers;</span>
+    }
+
+    public ObservableValue&lt;List&lt;AbstractGroup&gt;&gt; getMatchedGroups() {
+<span class="nc" id="L104">        return matchedGroups;</span>
+    }
+
+    public ObservableValue&lt;Optional&lt;SpecialFieldValueViewModel&gt;&gt; getSpecialField(SpecialField field) {
+<span class="nc" id="L108">        OptionalBinding&lt;SpecialFieldValueViewModel&gt; value = specialFieldValues.get(field);</span>
+        // Fetch possibly updated value from BibEntry entry
+<span class="nc" id="L110">        Optional&lt;String&gt; currentValue = this.entry.getField(field);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (value != null) {</span>
+<span class="nc bnc" id="L112" title="All 4 branches missed.">            if (currentValue.isEmpty() &amp;&amp; value.getValue().isEmpty()) {</span>
+<span class="nc" id="L113">                var zeroValue = getField(field).flatMapOpt(fieldValue -&gt; field.parseValue(&quot;CLEAR_RANK&quot;).map(SpecialFieldValueViewModel::new));</span>
+<span class="nc" id="L114">                specialFieldValues.put(field, zeroValue);</span>
+<span class="nc" id="L115">                return zeroValue;</span>
+<span class="nc bnc" id="L116" title="All 4 branches missed.">            } else if (value.getValue().isEmpty() || !value.getValue().get().getValue().getFieldValue().equals(currentValue)) {</span>
+                // specialFieldValues value and BibEntry value differ =&gt; Set specialFieldValues value to BibEntry value
+<span class="nc" id="L118">                value = getField(field).flatMapOpt(fieldValue -&gt; field.parseValue(fieldValue).map(SpecialFieldValueViewModel::new));</span>
+<span class="nc" id="L119">                specialFieldValues.put(field, value);</span>
+<span class="nc" id="L120">                return value;</span>
+            }
+        } else {
+<span class="nc" id="L123">            value = getField(field).flatMapOpt(fieldValue -&gt; field.parseValue(fieldValue).map(SpecialFieldValueViewModel::new));</span>
+<span class="nc" id="L124">            specialFieldValues.put(field, value);</span>
+        }
+<span class="nc" id="L126">        return value;</span>
+    }
+
+    public ObservableValue&lt;String&gt; getFields(OrFields fields) {
+<span class="nc" id="L130">        ObservableValue&lt;String&gt; value = fieldValues.get(fields);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if (value != null) {</span>
+<span class="nc" id="L132">            return value;</span>
+        }
+
+<span class="nc" id="L135">        ArrayList&lt;Observable&gt; observables = new ArrayList&lt;&gt;(List.of(entry.getObservables()));</span>
+<span class="nc" id="L136">        observables.add(fieldValueFormatter);</span>
+
+<span class="nc" id="L138">        value = Bindings.createStringBinding(() -&gt;</span>
+<span class="nc" id="L139">                        fieldValueFormatter.getValue().formatFieldsValues(fields, entry),</span>
+<span class="nc" id="L140">                observables.toArray(Observable[]::new));</span>
+<span class="nc" id="L141">        fieldValues.put(fields, value);</span>
+<span class="nc" id="L142">        return value;</span>
+    }
+
+    public StringProperty bibDatabaseContextProperty() {
+<span class="nc" id="L146">        return new ReadOnlyStringWrapper(bibDatabaseContext.getDatabasePath().map(Path::toString).orElse(&quot;&quot;));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

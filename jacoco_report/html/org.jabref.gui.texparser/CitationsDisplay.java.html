@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitationsDisplay.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.texparser</a> &gt; <span class="el_source">CitationsDisplay.java</span></div><h1>CitationsDisplay.java</h1><pre class="source lang-java linenums">package org.jabref.gui.texparser;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.scene.Node;
+import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
+
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.model.strings.LatexToUnicodeAdapter;
+import org.jabref.model.texparser.Citation;
+
+public class CitationsDisplay extends ListView&lt;Citation&gt; {
+
+    private final ObjectProperty&lt;Path&gt; basePath;
+
+<span class="fc" id="L28">    public CitationsDisplay() {</span>
+<span class="fc" id="L29">        this.basePath = new SimpleObjectProperty&lt;&gt;(null);</span>
+<span class="fc" id="L30">        new ViewModelListCellFactory&lt;Citation&gt;().withGraphic(this::getDisplayGraphic)</span>
+<span class="fc" id="L31">                                                .withTooltip(this::getDisplayTooltip)</span>
+<span class="fc" id="L32">                                                .install(this);</span>
+
+<span class="fc" id="L34">        this.getStyleClass().add(&quot;citationsList&quot;);</span>
+<span class="fc" id="L35">    }</span>
+
+    public ObjectProperty&lt;Path&gt; basePathProperty() {
+<span class="nc" id="L38">        return basePath;</span>
+    }
+
+    private Node getDisplayGraphic(Citation item) {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (basePath.get() == null) {</span>
+<span class="nc" id="L43">            basePath.set(item.getPath().getRoot());</span>
+        }
+
+<span class="nc" id="L46">        Node citationIcon = IconTheme.JabRefIcons.LATEX_COMMENT.getGraphicNode();</span>
+<span class="nc" id="L47">        Text contextText = new Text(LatexToUnicodeAdapter.format(item.getContext()));</span>
+<span class="nc" id="L48">        contextText.wrappingWidthProperty().bind(this.widthProperty().subtract(85));</span>
+<span class="nc" id="L49">        HBox contextBox = new HBox(8, citationIcon, contextText);</span>
+<span class="nc" id="L50">        contextBox.getStyleClass().add(&quot;contextBox&quot;);</span>
+
+<span class="nc" id="L52">        Label fileNameLabel = new Label(String.format(&quot;%s&quot;, basePath.get().relativize(item.getPath())));</span>
+<span class="nc" id="L53">        fileNameLabel.setGraphic(IconTheme.JabRefIcons.LATEX_FILE.getGraphicNode());</span>
+<span class="nc" id="L54">        Label positionLabel = new Label(&quot;(%s:%s-%s)&quot;.formatted(item.getLine(), item.getColStart(), item.getColEnd()));</span>
+<span class="nc" id="L55">        positionLabel.setGraphic(IconTheme.JabRefIcons.LATEX_LINE.getGraphicNode());</span>
+<span class="nc" id="L56">        HBox dataBox = new HBox(5, fileNameLabel, positionLabel);</span>
+
+<span class="nc" id="L58">        return new VBox(contextBox, dataBox);</span>
+    }
+
+    private Tooltip getDisplayTooltip(Citation item) {
+<span class="nc" id="L62">        String line = item.getLineText();</span>
+<span class="nc" id="L63">        int start = item.getColStart();</span>
+<span class="nc" id="L64">        int end = item.getColEnd();</span>
+
+<span class="nc" id="L66">        List&lt;Text&gt; texts = new ArrayList&lt;&gt;(3);</span>
+
+        // Text before the citation.
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (start &gt; 0) {</span>
+<span class="nc" id="L70">            texts.add(new Text(line.substring(0, start)));</span>
+        }
+
+        // Citation text (highlighted).
+<span class="nc" id="L74">        Text citation = new Text(line.substring(start, end));</span>
+<span class="nc" id="L75">        citation.getStyleClass().setAll(&quot;tooltip-text-bold&quot;);</span>
+<span class="nc" id="L76">        texts.add(citation);</span>
+
+        // Text after the citation.
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (end &lt; line.length()) {</span>
+<span class="nc" id="L80">            texts.add(new Text(line.substring(end)));</span>
+        }
+
+<span class="nc" id="L83">        Tooltip tooltip = new Tooltip();</span>
+<span class="nc" id="L84">        tooltip.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);</span>
+<span class="nc" id="L85">        tooltip.setGraphic(new TextFlow(texts.toArray(new Text[0])));</span>
+<span class="nc" id="L86">        tooltip.setMaxHeight(10);</span>
+<span class="nc" id="L87">        tooltip.setMinWidth(200);</span>
+<span class="nc" id="L88">        tooltip.maxWidthProperty().bind(this.widthProperty().subtract(85));</span>
+<span class="nc" id="L89">        tooltip.setWrapText(true);</span>
+
+<span class="nc" id="L91">        return tooltip;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebViewStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.util</a> &gt; <span class="el_source">WebViewStore.java</span></div><h1>WebViewStore.java</h1><pre class="source lang-java linenums">package org.jabref.logic.util;
+
+import java.util.ArrayDeque;
+import java.util.Queue;
+
+import javafx.application.Platform;
+import javafx.scene.web.WebView;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A dynamic web view store. This is used primarily to prevent UI freezes while constructing web view instances.
+ */
+<span class="nc" id="L15">public class WebViewStore {</span>
+<span class="nc" id="L16">    private static final Logger LOGGER = LoggerFactory.getLogger(WebViewStore.class);</span>
+<span class="nc" id="L17">    private final static Queue&lt;WebView&gt; WEB_VIEWS = new ArrayDeque&lt;&gt;();</span>
+<span class="nc" id="L18">    private static boolean isInitialized = false;</span>
+    private static Configuration config;
+
+    /**
+     * Initialize {@code WebViewStore} and preload web view instances.
+     * &lt;p&gt; Note that this method must be called at application startup. &lt;/p&gt;
+     */
+    public static void init(Configuration config) {
+<span class="nc" id="L26">        WebViewStore.config = config;</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        for (int i = 0; i &lt; config.getNumberOfPreloadedInstances(); i++) {</span>
+<span class="nc" id="L28">            addWebViewLater();</span>
+        }
+<span class="nc" id="L30">        isInitialized = true;</span>
+<span class="nc" id="L31">    }</span>
+
+    /**
+     * Initialize {@code WebViewStore} and preload web view instance.
+     * &lt;p&gt; Note that this method must be called at application startup. &lt;/p&gt;
+     */
+    public static void init() {
+<span class="nc" id="L38">        init(new Configuration(4, 2));</span>
+<span class="nc" id="L39">    }</span>
+
+    /**
+     * Returns a preloaded web view instance if available; And it will create a new one if not.
+     *
+     * @return {@code WebView} instance
+     * @throws IllegalStateException if the webViewStore has not been initialized
+     */
+    public static WebView get() {
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (!isInitialized) {</span>
+<span class="nc" id="L49">            throw new IllegalStateException(&quot;WebViewStore is uninitialized&quot;);</span>
+        }
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (WEB_VIEWS.size() &lt;= config.getMinimumNumberOfInstances()) {</span>
+<span class="nc" id="L52">            addWebViewLater();</span>
+        }
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (hasMore()) {</span>
+<span class="nc" id="L55">            return WEB_VIEWS.poll();</span>
+        } else {
+<span class="nc" id="L57">            return new WebView();</span>
+        }
+    }
+
+    private static void addWebViewLater() {
+<span class="nc" id="L62">        Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L63">            WEB_VIEWS.add(new WebView());</span>
+<span class="nc" id="L64">            LOGGER.debug(&quot;Cached Web views: {}&quot;, WEB_VIEWS.size());</span>
+<span class="nc" id="L65">        });</span>
+<span class="nc" id="L66">    }</span>
+
+    /**
+     * @return {@code true} if the store has at least one web view instance available; {@code false} otherwise
+     */
+    public static boolean hasMore() {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        return !WEB_VIEWS.isEmpty();</span>
+    }
+
+<span class="nc" id="L75">    public record Configuration(</span>
+            int numberOfPreloadedInstances,
+            int minimumNumberOfInstances) {
+
+        /**
+         * @return The number of web view instances to be loaded at application startup
+         */
+        public int getNumberOfPreloadedInstances() {
+<span class="nc" id="L83">            return numberOfPreloadedInstances;</span>
+        }
+
+        /**
+         * @return The minimum number of web views the store can reach. The store needs to load more instances once it reaches this threshold
+         */
+        public int getMinimumNumberOfInstances() {
+<span class="nc" id="L90">            return minimumNumberOfInstances;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

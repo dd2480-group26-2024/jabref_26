@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenDatabase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer</a> &gt; <span class="el_source">OpenDatabase.java</span></div><h1>OpenDatabase.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+
+import org.jabref.logic.importer.fileformat.BibtexImporter;
+import org.jabref.migrations.ConvertLegacyExplicitGroups;
+import org.jabref.migrations.ConvertMarkingToGroups;
+import org.jabref.migrations.PostOpenMigration;
+import org.jabref.migrations.SpecialFieldsToSeparateFields;
+import org.jabref.model.util.FileUpdateMonitor;
+
+public class OpenDatabase {
+
+    private OpenDatabase() {
+    }
+
+    /**
+     * Load database (bib-file)
+     *
+     * @param fileToOpen Name of the BIB-file to open
+     * @return ParserResult which never is null
+     */
+    public static ParserResult loadDatabase(Path fileToOpen, ImportFormatPreferences importFormatPreferences, FileUpdateMonitor fileMonitor)
+            throws IOException {
+<span class="fc" id="L28">        ParserResult result = new BibtexImporter(importFormatPreferences, fileMonitor).importDatabase(fileToOpen);</span>
+<span class="fc" id="L29">        performLoadDatabaseMigrations(result, importFormatPreferences.bibEntryPreferences().getKeywordSeparator());</span>
+<span class="fc" id="L30">        return result;</span>
+    }
+
+    private static void performLoadDatabaseMigrations(ParserResult parserResult,
+                                                      Character keywordDelimited) {
+<span class="fc" id="L35">        List&lt;PostOpenMigration&gt; postOpenMigrations = Arrays.asList(</span>
+                new ConvertLegacyExplicitGroups(),
+                new ConvertMarkingToGroups(),
+                new SpecialFieldsToSeparateFields(keywordDelimited)
+        );
+
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (PostOpenMigration migration : postOpenMigrations) {</span>
+<span class="fc" id="L42">            migration.performMigration(parserResult);</span>
+<span class="fc" id="L43">        }</span>
+<span class="fc" id="L44">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExistingStudySearchAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.slr</a> &gt; <span class="el_source">ExistingStudySearchAction.java</span></div><h1>ExistingStudySearchAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.slr;
+
+import java.io.IOException;
+import java.nio.file.Path;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.ActionHelper;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.importer.actions.OpenDatabaseAction;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.crawler.Crawler;
+import org.jabref.logic.git.SlrGitHandler;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ExistingStudySearchAction extends SimpleCommand {
+<span class="nc" id="L28">    private static final Logger LOGGER = LoggerFactory.getLogger(ExistingStudySearchAction.class);</span>
+
+    protected final DialogService dialogService;
+
+    protected Path studyDirectory;
+    protected final PreferencesService preferencesService;
+    protected final StateManager stateManager;
+
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final TaskExecutor taskExecutor;
+    private final LibraryTabContainer tabContainer;
+    private final OpenDatabaseAction openDatabaseAction;
+
+    /**
+     * @param tabContainer Required to close the tab before the study is updated
+     * @param openDatabaseAction Required to open the tab after the study is exectued
+     */
+    public ExistingStudySearchAction(
+            LibraryTabContainer tabContainer,
+            OpenDatabaseAction openDatabaseAction,
+            DialogService dialogService,
+            FileUpdateMonitor fileUpdateMonitor,
+            TaskExecutor taskExecutor,
+            PreferencesService preferencesService,
+            StateManager stateManager) {
+<span class="nc" id="L53">        this(tabContainer,</span>
+                openDatabaseAction,
+                dialogService,
+                fileUpdateMonitor,
+                taskExecutor,
+                preferencesService,
+                stateManager,
+                false);
+<span class="nc" id="L61">    }</span>
+
+    protected ExistingStudySearchAction(
+            LibraryTabContainer tabContainer,
+            OpenDatabaseAction openDatabaseAction,
+            DialogService dialogService,
+            FileUpdateMonitor fileUpdateMonitor,
+            TaskExecutor taskExecutor,
+            PreferencesService preferencesService,
+            StateManager stateManager,
+<span class="nc" id="L71">            boolean isNew) {</span>
+<span class="nc" id="L72">        this.tabContainer = tabContainer;</span>
+<span class="nc" id="L73">        this.openDatabaseAction = openDatabaseAction;</span>
+<span class="nc" id="L74">        this.dialogService = dialogService;</span>
+<span class="nc" id="L75">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="nc" id="L76">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L77">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L78">        this.stateManager = stateManager;</span>
+
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (!isNew) {</span>
+<span class="nc" id="L81">            this.executable.bind(ActionHelper.needsStudyDatabase(stateManager));</span>
+        }
+<span class="nc" id="L83">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (stateManager.getActiveDatabase().isEmpty()) {</span>
+<span class="nc" id="L88">            LOGGER.error(&quot;Database is not present, even if it should&quot;);</span>
+<span class="nc" id="L89">            return;</span>
+        }
+<span class="nc" id="L91">        BibDatabaseContext bibDatabaseContext = stateManager.getActiveDatabase().get();</span>
+
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (bibDatabaseContext.getDatabasePath().isEmpty()) {</span>
+<span class="nc" id="L94">            LOGGER.error(&quot;Database path is not present, even if it should&quot;);</span>
+<span class="nc" id="L95">            return;</span>
+        }
+<span class="nc" id="L97">        this.studyDirectory = bibDatabaseContext.getDatabasePath().get().getParent();</span>
+
+<span class="nc" id="L99">        crawl();</span>
+<span class="nc" id="L100">    }</span>
+
+    protected void crawl() {
+        try {
+<span class="nc" id="L104">            crawlPreparation(this.studyDirectory);</span>
+<span class="nc" id="L105">        } catch (IOException | GitAPIException e) {</span>
+<span class="nc" id="L106">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Study repository could not be created&quot;), e);</span>
+<span class="nc" id="L107">            return;</span>
+<span class="nc" id="L108">        }</span>
+
+        final Crawler crawler;
+        try {
+<span class="nc" id="L112">            crawler = new Crawler(</span>
+                    this.studyDirectory,
+                    new SlrGitHandler(this.studyDirectory),
+                    preferencesService,
+                    new BibEntryTypesManager(),
+                    fileUpdateMonitor);
+<span class="nc" id="L118">        } catch (IOException | ParseException e) {</span>
+<span class="nc" id="L119">            LOGGER.error(&quot;Error during reading of study definition file.&quot;, e);</span>
+<span class="nc" id="L120">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Error during reading of study definition file.&quot;), e);</span>
+<span class="nc" id="L121">            return;</span>
+<span class="nc" id="L122">        }</span>
+
+<span class="nc" id="L124">        dialogService.notify(Localization.lang(&quot;Searching...&quot;));</span>
+<span class="nc" id="L125">        BackgroundTask.wrap(() -&gt; {</span>
+<span class="nc" id="L126">                          crawler.performCrawl();</span>
+<span class="nc" id="L127">                          return 0; // Return any value to make this a callable instead of a runnable. This allows throwing exceptions.</span>
+                      })
+<span class="nc" id="L129">                      .onFailure(e -&gt; {</span>
+<span class="nc" id="L130">                          LOGGER.error(&quot;Error during persistence of crawling results.&quot;);</span>
+<span class="nc" id="L131">                          dialogService.showErrorDialogAndWait(Localization.lang(&quot;Error during persistence of crawling results.&quot;), e);</span>
+<span class="nc" id="L132">                      })</span>
+<span class="nc" id="L133">                      .onSuccess(unused -&gt; {</span>
+<span class="nc" id="L134">                          dialogService.notify(Localization.lang(&quot;Finished Searching&quot;));</span>
+<span class="nc" id="L135">                          openDatabaseAction.openFile(Path.of(this.studyDirectory.toString(), Crawler.FILENAME_STUDY_RESULT_BIB));</span>
+<span class="nc" id="L136">                      })</span>
+<span class="nc" id="L137">                      .executeWith(taskExecutor);</span>
+<span class="nc" id="L138">    }</span>
+
+    /**
+     * Hook for setting up the crawl phase (e.g., initialization the repository)
+     */
+    protected void crawlPreparation(Path studyRepositoryRoot) throws IOException, GitAPIException {
+        // Do nothing with the repository as repository is already setup
+
+        // The user focused an SLR
+        // We hard close the tab
+        // Future work: Properly close the tab (with saving, ...)
+<span class="nc" id="L149">        tabContainer.closeCurrentTab();</span>
+<span class="nc" id="L150">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DOI.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.identifier</a> &gt; <span class="el_source">DOI.java</span></div><h1>DOI.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.identifier;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.architecture.AllowedToUseLogic;
+import org.jabref.logic.layout.format.LatexToUnicodeFormatter;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Class for working with &lt;a href=&quot;https://en.wikipedia.org/wiki/Digital_object_identifier&quot;&gt;Digital object identifiers (DOIs)&lt;/a&gt; and &lt;a href=&quot;http://shortdoi.org&quot;&gt;Short DOIs&lt;/a&gt;
+ */
+@AllowedToUseLogic(&quot;because we want to have this class 'smart' an be able to parse obscure DOIs, too. For this, we need the LatexToUnicodeformatter.&quot;)
+public class DOI implements Identifier {
+
+<span class="fc" id="L27">    public static final URI AGENCY_RESOLVER = URI.create(&quot;https://doi.org/doiRA&quot;);</span>
+<span class="fc" id="L28">    public static final URI RESOLVER = URI.create(&quot;https://doi.org/&quot;);</span>
+
+<span class="fc" id="L30">    private static final Logger LOGGER = LoggerFactory.getLogger(DOI.class);</span>
+
+    // Regex
+    // (see http://www.doi.org/doi_handbook/2_Numbering.html)
+    private static final String DOI_EXP = &quot;&quot;
+            + &quot;(?:urn:)?&quot;                       // optional urn
+            + &quot;(?:doi:)?&quot;                       // optional doi
+            + &quot;(&quot;                               // begin group \1
+            + &quot;10&quot;                              // directory indicator
+            + &quot;(?:\\.[0-9]+)+&quot;                  // registrant codes
+            + &quot;[/:%]&quot;                           // divider
+            + &quot;(?:.+)&quot;                          // suffix alphanumeric string
+            + &quot;)&quot;;                              // end group \1
+    private static final String FIND_DOI_EXP = &quot;&quot;
+            + &quot;(?:urn:)?&quot;                       // optional urn
+            + &quot;(?:doi:)?&quot;                       // optional doi
+            + &quot;(&quot;                               // begin group \1
+            + &quot;10&quot;                              // directory indicator
+            + &quot;(?:\\.[0-9]+)+&quot;                  // registrant codes
+            + &quot;[/:]&quot;                            // divider
+            + &quot;(?:[^\\s,;]+[^,;(\\.\\s)])&quot;      // suffix alphanumeric without &quot; &quot;/&quot;,&quot;/&quot;;&quot; and not ending on &quot;.&quot;/&quot;,&quot;/&quot;;&quot;
+            + &quot;)&quot;;                              // end group \1
+
+    // Regex (Short DOI)
+    private static final String SHORT_DOI_SHORTCUT = &quot;&quot;
+            + &quot;^\\s*(?:https?://)?(?:www\\.)?(?:doi\\.org/)([a-z0-9]{4,10})\\s*$&quot;; // eg https://doi.org/bfrhmx
+    private static final String IN_TEXT_SHORT_DOI_SHORTCUT = &quot;&quot;
+            + &quot;(?:https?://)?(?:www\\.)?(?:doi\\.org/)([a-z0-9]{4,10})&quot;; // eg https://doi.org/bfrhmx somewhere in the text
+    private static final String SHORT_DOI_EXP_PREFIX = &quot;&quot;
+            + &quot;^(?:&quot; // can begin with...
+            + &quot;\\s*(?:https?://)?(?:www\\.)?&quot;   // optional url parts &quot;http(s)://&quot;+&quot;www.&quot;
+            + &quot;[a-zA-Z\\.]*doi[a-zA-Z\\.]*&quot;     //  eg &quot;dx.doi.&quot; or &quot;doi.acm.&quot; or &quot;doi.&quot; if with url, must include &quot;doi&quot;, otherwise too ambiguous
+            + &quot;\\.[a-zA-Z]{2,10}/)?&quot;;           // &quot;.org&quot; or &quot;.de&quot; or &quot;.academy&quot;
+    private static final String SHORT_DOI_EXP = &quot;&quot;
+            + &quot;(?:&quot;                             // begin &quot;any one of these&quot;
+            + &quot;(?:[\\s/]?(?:(?:urn:)|(?:doi:)|(?:urn:doi:)))&quot; // &quot;doi:10/12ab&quot; or &quot; urn:10/12ab&quot; or &quot;/urn:doi:/10/12ab&quot; ...
+            + &quot;|(?:\\s?/?)&quot;                     // or &quot;/10/12ab&quot; or &quot; /10/12ab&quot; or &quot;10/12ab&quot; or &quot; 10/12ab&quot;
+            + &quot;)&quot;                               // end &quot;any one of these&quot;
+            + &quot;(&quot;                               // begin group \1
+            + &quot;10&quot;                              // directory indicator
+            + &quot;[/%:]&quot;                           // divider
+            + &quot;[a-zA-Z0-9]{3,}&quot;                 // at least 3 characters
+            + &quot;)&quot;                               // end group  \1
+            + &quot;\\s*$&quot;;                          // must be the end
+    private static final String FIND_SHORT_DOI_EXP = &quot;&quot;
+            + &quot;(?:&quot;                             // begin &quot;any one of these&quot; (but not none of those!)
+            + &quot;(?:(?:www\\.)?doi\\.org/)&quot;       // either doi.org
+            + &quot;|&quot;                               // or any of the following with doi.org or not...
+            + &quot;(?:(?:doi.org/)?(?:(?:urn:)|(?:doi:)|(?:urn:doi:)))&quot; // &quot;doi:10/12ab&quot; or &quot; urn:10/12ab&quot; or &quot;/urn:doi:/10/12ab&quot; or &quot;doi.org/doi:10/12ab&quot;...
+            + &quot;)&quot;                               // end &quot;any one of these&quot;
+            + &quot;(&quot;                               // begin group \1
+            + &quot;10&quot;                              // directory indicator
+            + &quot;[/%:]&quot;                           // divider
+            + &quot;[a-zA-Z0-9]{3,}&quot;                 // at least 3 characters
+            + &quot;)&quot;;                              // end group  \1
+
+    private static final String HTTP_EXP = &quot;https?://[^\\s]+?&quot; + DOI_EXP;
+    private static final String SHORT_DOI_HTTP_EXP = &quot;https?://[^\\s]+?&quot; + SHORT_DOI_EXP;
+    // Pattern
+<span class="fc" id="L89">    private static final Pattern EXACT_DOI_PATT = Pattern.compile(&quot;^(?:https?://[^\\s]+?)?&quot; + DOI_EXP + &quot;$&quot;, Pattern.CASE_INSENSITIVE);</span>
+<span class="fc" id="L90">    private static final Pattern FIND_DOI_PATT = Pattern.compile(&quot;(?:https?://[^\\s]+?)?&quot; + FIND_DOI_EXP, Pattern.CASE_INSENSITIVE);</span>
+    // Pattern (short DOI)
+<span class="fc" id="L92">    private static final Pattern EXACT_SHORT_DOI_SHORTCUT = Pattern.compile(SHORT_DOI_SHORTCUT, Pattern.CASE_INSENSITIVE); // eg doi.org/bfrhmx (no &quot;10/&quot;)</span>
+<span class="fc" id="L93">    private static final Pattern FIND_SHORT_DOI_SHORTCUT = Pattern.compile(IN_TEXT_SHORT_DOI_SHORTCUT, Pattern.CASE_INSENSITIVE); // eg doi.org/bfrhmx (no &quot;10/&quot;)</span>
+<span class="fc" id="L94">    private static final Pattern EXACT_SHORT_DOI_PATT = Pattern.compile(SHORT_DOI_EXP_PREFIX + SHORT_DOI_EXP, Pattern.CASE_INSENSITIVE);</span>
+<span class="fc" id="L95">    private static final Pattern FIND_SHORT_DOI_PATT = Pattern.compile(&quot;(?:https?://[^\\s]+?)?&quot; + FIND_SHORT_DOI_EXP, Pattern.CASE_INSENSITIVE);</span>
+
+    // See https://www.baeldung.com/java-regex-s-splus for explanation of \\s+
+    // See https://stackoverflow.com/questions/3203190/regex-any-ascii-character for the regexp that includes ASCII characters only
+    // Another reference for regexp for ASCII characters: https://howtodoinjava.com/java/regex/java-clean-ascii-text-non-printable-chars/
+    private static final String CHARS_TO_REMOVE = &quot;[\\s+&quot; // remove white space characters, i.e, \t, \n, \x0B, \f, \r . + is a greedy quantifier
+            + &quot;[^\\x00-\\x7F]&quot; // strips off all non-ASCII characters
+            + &quot;]&quot;;
+
+    // DOI
+    private final String doi;
+    // Short DOI
+<span class="fc" id="L107">    private boolean isShortDoi = false;</span>
+
+    /**
+     * Creates a DOI from various schemes including URL, URN, and plain DOIs/Short DOIs.
+     *
+     * @param doi the DOI/Short DOI string
+     * @throws NullPointerException     if DOI/Short DOI is null
+     * @throws IllegalArgumentException if doi does not include a valid DOI/Short DOI
+     */
+<span class="fc" id="L116">    public DOI(String doi) {</span>
+<span class="fc" id="L117">        Objects.requireNonNull(doi);</span>
+
+        // Remove whitespace
+<span class="fc" id="L120">        String trimmedDoi = doi.trim();</span>
+
+        // HTTP URL decoding
+<span class="fc bfc" id="L123" title="All 4 branches covered.">        if (doi.matches(HTTP_EXP) || doi.matches(SHORT_DOI_HTTP_EXP)) {</span>
+            try {
+                // decodes path segment
+<span class="fc" id="L126">                URI url = new URI(trimmedDoi);</span>
+<span class="fc" id="L127">                trimmedDoi = url.getScheme() + &quot;://&quot; + url.getHost() + url.getPath();</span>
+<span class="fc" id="L128">            } catch (URISyntaxException e) {</span>
+<span class="fc" id="L129">                throw new IllegalArgumentException(doi + &quot; is not a valid HTTP DOI/Short DOI.&quot;);</span>
+<span class="fc" id="L130">            }</span>
+        }
+
+        // Extract DOI/Short DOI
+<span class="fc" id="L134">        Matcher matcher = EXACT_DOI_PATT.matcher(trimmedDoi);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (matcher.find()) {</span>
+            // match only group \1
+<span class="fc" id="L137">            this.doi = matcher.group(1);</span>
+        } else {
+            // Short DOI
+<span class="fc" id="L140">            Matcher shortDoiMatcher = EXACT_SHORT_DOI_PATT.matcher(trimmedDoi);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (shortDoiMatcher.find()) {</span>
+<span class="fc" id="L142">                this.doi = shortDoiMatcher.group(1);</span>
+<span class="fc" id="L143">                isShortDoi = true;</span>
+            } else {
+                // Shortcut DOI without the &quot;10/&quot; as in &quot;doi.org/d8dn&quot;
+<span class="fc" id="L146">                Matcher shortcutDoiMatcher = EXACT_SHORT_DOI_SHORTCUT.matcher(trimmedDoi);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                if (shortcutDoiMatcher.find()) {</span>
+<span class="fc" id="L148">                    this.doi = &quot;10/&quot; + shortcutDoiMatcher.group(1);</span>
+<span class="fc" id="L149">                    isShortDoi = true;</span>
+                } else {
+<span class="fc" id="L151">                    throw new IllegalArgumentException(trimmedDoi + &quot; is not a valid DOI/Short DOI.&quot;);</span>
+                }
+            }
+        }
+<span class="fc" id="L155">    }</span>
+
+    /**
+     * Creates an Optional&amp;lt;DOI&gt; from various schemes including URL, URN, and plain DOIs.
+     * &lt;p&gt;
+     * Useful for suppressing the &lt;c&gt;IllegalArgumentException&lt;/c&gt; of the Constructor and checking for Optional.isPresent() instead.
+     *
+     * @param doi the DOI/Short DOI string
+     * @return an Optional containing the DOI or an empty Optional
+     */
+    public static Optional&lt;DOI&gt; parse(String doi) {
+        try {
+<span class="fc" id="L167">            LatexToUnicodeFormatter formatter = new LatexToUnicodeFormatter();</span>
+<span class="fc" id="L168">            String cleanedDOI = doi;</span>
+<span class="fc" id="L169">            cleanedDOI = URLDecoder.decode(cleanedDOI, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L170">            cleanedDOI = formatter.format(cleanedDOI);</span>
+<span class="fc" id="L171">            cleanedDOI = cleanedDOI.replaceAll(CHARS_TO_REMOVE, &quot;&quot;);</span>
+
+<span class="pc bpc" id="L173" title="1 of 4 branches missed.">            if (cleanedDOI.startsWith(&quot;_&quot;) &amp;&amp; cleanedDOI.endsWith(&quot;_&quot;)) {</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                if (cleanedDOI.length() == 1) {</span>
+<span class="fc" id="L175">                    return Optional.empty();</span>
+                }
+<span class="fc" id="L177">                cleanedDOI = cleanedDOI.substring(1, cleanedDOI.length() - 1);</span>
+            }
+
+<span class="fc" id="L180">            return Optional.of(new DOI(cleanedDOI));</span>
+<span class="fc" id="L181">        } catch (IllegalArgumentException | NullPointerException e) {</span>
+<span class="fc" id="L182">            return Optional.empty();</span>
+        }
+    }
+
+    /**
+     * Determines whether a DOI/Short DOI is valid or not
+     *
+     * @param doi the DOI/Short DOI string
+     * @return true if DOI is valid, false otherwise
+     */
+    public static boolean isValid(String doi) {
+<span class="fc" id="L193">        return parse(doi).isPresent();</span>
+    }
+
+    /**
+     * Tries to find a DOI/Short DOI inside the given text.
+     *
+     * @param text the Text which might contain a DOI/Short DOI
+     * @return an Optional containing the DOI or an empty Optional
+     */
+    public static Optional&lt;DOI&gt; findInText(String text) {
+<span class="fc" id="L203">        Optional&lt;DOI&gt; result = Optional.empty();</span>
+
+<span class="fc" id="L205">        Matcher matcher = FIND_DOI_PATT.matcher(text);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (matcher.find()) {</span>
+            // match only group \1
+<span class="fc" id="L208">            result = Optional.of(new DOI(matcher.group(1)));</span>
+        }
+
+<span class="fc" id="L211">        matcher = FIND_SHORT_DOI_PATT.matcher(text);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (matcher.find()) {</span>
+<span class="fc" id="L213">            result = Optional.of(new DOI(matcher.group(1)));</span>
+        }
+
+<span class="fc" id="L216">        matcher = FIND_SHORT_DOI_SHORTCUT.matcher(text);</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (matcher.find()) {</span>
+<span class="fc" id="L218">            result = Optional.of(new DOI(matcher.group(0)));</span>
+        }
+
+<span class="fc" id="L221">        return result;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L226">        return &quot;DOI{&quot; +</span>
+                &quot;doi='&quot; + doi + '\'' +
+                '}';
+    }
+
+    /**
+     * Return the plain DOI/Short DOI
+     *
+     * @return the plain DOI/Short DOI value.
+     */
+    public String getDOI() {
+<span class="fc" id="L237">        return doi;</span>
+    }
+
+    /**
+     * Determines whether DOI is short DOI or not
+     *
+     * @return true if DOI is short DOI, false otherwise
+     */
+    public boolean isShortDoi() {
+<span class="fc" id="L246">        return isShortDoi;</span>
+    }
+
+    /**
+     * Return a URI presentation for the DOI/Short DOI
+     *
+     * @return an encoded URI representation of the DOI/Short DOI
+     */
+    @Override
+    public Optional&lt;URI&gt; getExternalURI() {
+        // TODO: We need dependency injection here. It should never happen that this method is called.
+        //       Always, the user preferences should be honored --&gt; #getExternalURIWithCustomBase
+<span class="fc" id="L258">        return getExternalURIFromBase(RESOLVER);</span>
+    }
+
+    public Optional&lt;URI&gt; getExternalURIWithCustomBase(String customBase) {
+<span class="nc" id="L262">        return getExternalURIFromBase(URI.create(customBase));</span>
+    }
+
+    public Optional&lt;URI&gt; getExternalURIFromBase(URI base) {
+        try {
+<span class="fc" id="L267">            URI uri = new URI(base.getScheme(), base.getHost(), &quot;/&quot; + doi, null);</span>
+<span class="fc" id="L268">            return Optional.of(uri);</span>
+<span class="nc" id="L269">        } catch (URISyntaxException e) {</span>
+            // should never happen
+<span class="nc" id="L271">            LOGGER.error(doi + &quot; could not be encoded as URI.&quot;, e);</span>
+<span class="nc" id="L272">            return Optional.empty();</span>
+        }
+    }
+
+    /**
+     * Return an ASCII URL presentation for the DOI/Short DOI
+     *
+     * @return an encoded URL representation of the DOI/Short DOI
+     */
+    public String getURIAsASCIIString() {
+<span class="fc" id="L282">        return getExternalURI().map(URI::toASCIIString).orElse(&quot;&quot;);</span>
+    }
+
+    @Override
+    public Field getDefaultField() {
+<span class="nc" id="L287">        return StandardField.DOI;</span>
+    }
+
+    @Override
+    public String getNormalized() {
+<span class="fc" id="L292">        return doi;</span>
+    }
+
+    /**
+     * DOIs are case-insensitive. Thus, 10.1109/cloud.2017.89 equals 10.1109/CLOUD.2017.89
+     */
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L301">            return true;</span>
+        }
+<span class="pc bpc" id="L303" title="2 of 4 branches missed.">        if ((o == null) || (getClass() != o.getClass())) {</span>
+<span class="nc" id="L304">            return false;</span>
+        }
+<span class="fc" id="L306">        DOI other = (DOI) o;</span>
+<span class="fc" id="L307">        return doi.equalsIgnoreCase(other.doi);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L312">        return Objects.hash(doi.toLowerCase(Locale.ENGLISH));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

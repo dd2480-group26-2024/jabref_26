@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StudyYamlParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.crawler</a> &gt; <span class="el_source">StudyYamlParser.java</span></div><h1>StudyYamlParser.java</h1><pre class="source lang-java linenums">package org.jabref.logic.crawler;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Path;
+
+import org.jabref.model.study.Study;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+
+/**
+ * Example use: &lt;code&gt;new StudyYamlParser().parseStudyYamlFile(studyDefinitionFile);&lt;/code&gt;
+ */
+<span class="fc" id="L17">public class StudyYamlParser {</span>
+
+    /**
+     * Parses the given yaml study definition file into a study instance
+     */
+    public Study parseStudyYamlFile(Path studyYamlFile) throws IOException {
+<span class="fc" id="L23">        ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());</span>
+<span class="fc" id="L24">        try (InputStream fileInputStream = new FileInputStream(studyYamlFile.toFile())) {</span>
+<span class="fc" id="L25">            return yamlMapper.readValue(fileInputStream, Study.class);</span>
+        }
+    }
+
+    /**
+     * Writes the given study instance into a yaml file to the given path
+     */
+    public void writeStudyYamlFile(Study study, Path studyYamlFile) throws IOException {
+<span class="fc" id="L33">        ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory().disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)</span>
+<span class="fc" id="L34">                                                                    .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));</span>
+<span class="fc" id="L35">        yamlMapper.writeValue(studyYamlFile.toFile(), study);</span>
+<span class="fc" id="L36">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

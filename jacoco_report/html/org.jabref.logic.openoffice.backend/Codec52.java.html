@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Codec52.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice.backend</a> &gt; <span class="el_source">Codec52.java</span></div><h1>Codec52.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice.backend;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import org.jabref.model.openoffice.style.CitationType;
+
+/**
+ * How and what is encoded in reference mark names under JabRef 5.2.
+ * &lt;p&gt;
+ * - pageInfo does not appear here. It is not encoded in the mark name.
+ */
+class Codec52 {
+    private static final String BIB_CITATION = &quot;JR_cite&quot;;
+<span class="nc" id="L21">    private static final Pattern CITE_PATTERN =</span>
+            // Pattern.compile(BIB_CITATION + &quot;(\\d*)_(\\d*)_(.*)&quot;);
+            // citationType is always &quot;1&quot; &quot;2&quot; or &quot;3&quot;
+<span class="nc" id="L24">            Pattern.compile(BIB_CITATION + &quot;(\\d*)_([123])_(.*)&quot;);</span>
+
+    private Codec52() {
+    }
+
+    /**
+     * This is what we get back from parsing a refMarkName.
+     */
+    public static class ParsedMarkName {
+        /**
+         * &quot;&quot;, &quot;0&quot;, &quot;1&quot; ...
+         */
+        public final String index;
+        /**
+         * in-text-citation type
+         */
+        public final CitationType citationType;
+        /**
+         * Citation keys embedded in the reference mark.
+         */
+        public final List&lt;String&gt; citationKeys;
+
+<span class="nc" id="L46">        ParsedMarkName(String index, CitationType citationType, List&lt;String&gt; citationKeys) {</span>
+<span class="nc" id="L47">            Objects.requireNonNull(index);</span>
+<span class="nc" id="L48">            Objects.requireNonNull(citationKeys);</span>
+<span class="nc" id="L49">            this.index = index;</span>
+<span class="nc" id="L50">            this.citationType = citationType;</span>
+<span class="nc" id="L51">            this.citationKeys = citationKeys;</span>
+<span class="nc" id="L52">        }</span>
+    }
+
+    /**
+     * Integer representation was written into the document in JabRef52, keep it for compatibility.
+     */
+    private static CitationType citationTypeFromInt(int code) {
+<span class="nc bnc" id="L59" title="All 4 branches missed.">        return switch (code) {</span>
+<span class="nc" id="L60">            case 1 -&gt; CitationType.AUTHORYEAR_PAR;</span>
+<span class="nc" id="L61">            case 2 -&gt; CitationType.AUTHORYEAR_INTEXT;</span>
+<span class="nc" id="L62">            case 3 -&gt; CitationType.INVISIBLE_CIT;</span>
+<span class="nc" id="L63">            default -&gt; throw new IllegalArgumentException(&quot;Invalid CitationType code&quot;);</span>
+        };
+    }
+
+    private static int citationTypeToInt(CitationType type) {
+<span class="nc bnc" id="L68" title="All 4 branches missed.">        return switch (type) {</span>
+<span class="nc" id="L69">            case AUTHORYEAR_PAR -&gt; 1;</span>
+<span class="nc" id="L70">            case AUTHORYEAR_INTEXT -&gt; 2;</span>
+<span class="nc" id="L71">            case INVISIBLE_CIT -&gt; 3;</span>
+        };
+    }
+
+    /**
+     * Produce a reference mark name for JabRef for the given citationType and list citation keys that does not yet appear among the reference marks of the document.
+     *
+     * @param usedNames    Reference mark names already in use.
+     * @param citationKeys Identifies the cited sources.
+     * @param citationType Encodes the effect of withText and inParenthesis options.
+     *                     &lt;p&gt;
+     *                     The first occurrence of citationKeys gets no serial number, the second gets 0, the third 1 ...
+     *                     &lt;p&gt;
+     *                     Or the first unused in this series, after removals.
+     */
+    public static String getUniqueMarkName(Set&lt;String&gt; usedNames,
+                                           List&lt;String&gt; citationKeys,
+                                           CitationType citationType) {
+
+<span class="nc" id="L90">        String citationKeysPart = String.join(&quot;,&quot;, citationKeys);</span>
+
+<span class="nc" id="L92">        int index = 0;</span>
+<span class="nc" id="L93">        int citTypeCode = citationTypeToInt(citationType);</span>
+<span class="nc" id="L94">        String name = BIB_CITATION + '_' + citTypeCode + '_' + citationKeysPart;</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        while (usedNames.contains(name)) {</span>
+<span class="nc" id="L96">            name = BIB_CITATION + index + '_' + citTypeCode + '_' + citationKeysPart;</span>
+<span class="nc" id="L97">            index++;</span>
+        }
+<span class="nc" id="L99">        return name;</span>
+    }
+
+    /**
+     * Parse a JabRef (reference) mark name.
+     *
+     * @return Optional.empty() on failure.
+     */
+    public static Optional&lt;ParsedMarkName&gt; parseMarkName(String refMarkName) {
+<span class="nc" id="L108">        Matcher citeMatcher = CITE_PATTERN.matcher(refMarkName);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (!citeMatcher.find()) {</span>
+<span class="nc" id="L110">            return Optional.empty();</span>
+        }
+
+<span class="nc" id="L113">        List&lt;String&gt; keys = Arrays.asList(citeMatcher.group(3).split(&quot;,&quot;));</span>
+<span class="nc" id="L114">        String index = citeMatcher.group(1);</span>
+<span class="nc" id="L115">        int citTypeCode = Integer.parseInt(citeMatcher.group(2));</span>
+<span class="nc" id="L116">        CitationType citationType = citationTypeFromInt(citTypeCode);</span>
+<span class="nc" id="L117">        return Optional.of(new Codec52.ParsedMarkName(index, citationType, keys));</span>
+    }
+
+    /**
+     * @return true if name matches the pattern used for JabRef reference mark names.
+     */
+    public static boolean isJabRefReferenceMarkName(String name) {
+<span class="nc" id="L124">        return CITE_PATTERN.matcher(name).find();</span>
+    }
+
+    /**
+     * Filter a list of reference mark names by `isJabRefReferenceMarkName`
+     *
+     * @param names The list to be filtered.
+     */
+    public static List&lt;String&gt; filterIsJabRefReferenceMarkName(List&lt;String&gt; names) {
+<span class="nc" id="L133">        return names.stream()</span>
+<span class="nc" id="L134">                     .filter(Codec52::isJabRefReferenceMarkName)</span>
+<span class="nc" id="L135">                     .collect(Collectors.toList());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

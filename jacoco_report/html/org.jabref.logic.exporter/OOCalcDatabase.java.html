@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OOCalcDatabase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.exporter</a> &gt; <span class="el_source">OOCalcDatabase.java</span></div><h1>OOCalcDatabase.java</h1><pre class="source lang-java linenums">package org.jabref.logic.exporter;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.jabref.logic.bibtex.comparator.FieldComparator;
+import org.jabref.logic.bibtex.comparator.FieldComparatorStack;
+import org.jabref.logic.layout.format.GetOpenOfficeType;
+import org.jabref.logic.layout.format.RemoveBrackets;
+import org.jabref.logic.layout.format.RemoveWhitespace;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.InternalField;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Text;
+
+class OOCalcDatabase {
+
+<span class="fc" id="L31">    private static final Logger LOGGER = LoggerFactory.getLogger(OOCalcDatabase.class);</span>
+<span class="fc" id="L32">    private static final Field REPORT_TYPE_FIELD = new UnknownField(&quot;reporttype&quot;);</span>
+
+<span class="fc" id="L34">    private final List&lt;BibEntry&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L35">    private final List&lt;Field&gt; toExportFields = Stream.concat(FieldFactory.getStandardFieldsWithCitationKey().stream(), Stream.of(REPORT_TYPE_FIELD))</span>
+<span class="fc" id="L36">                                                     .collect(Collectors.toList());</span>
+
+<span class="fc" id="L38">    public OOCalcDatabase(BibDatabase bibtex, List&lt;BibEntry&gt; entries) {</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        this.entries.addAll(entries != null ? entries : bibtex.getEntries());</span>
+
+<span class="fc" id="L41">        List&lt;FieldComparator&gt; comparators = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L42">        comparators.add(new FieldComparator(StandardField.AUTHOR));</span>
+<span class="fc" id="L43">        comparators.add(new FieldComparator(StandardField.YEAR));</span>
+<span class="fc" id="L44">        comparators.add(new FieldComparator(InternalField.KEY_FIELD));</span>
+
+<span class="fc" id="L46">        this.entries.sort(new FieldComparatorStack&lt;&gt;(comparators));</span>
+<span class="fc" id="L47">    }</span>
+
+    private static String getField(BibEntry e, Field field) {
+<span class="fc" id="L50">        return e.getField(field).orElse(&quot;&quot;);</span>
+    }
+
+    public Document getDOMrepresentation() {
+<span class="fc" id="L54">        Document document = null;</span>
+        try {
+<span class="fc" id="L56">            document = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();</span>
+<span class="fc" id="L57">            Element root = createRootElement(document);</span>
+<span class="fc" id="L58">            Element body = document.createElement(&quot;office:body&quot;);</span>
+<span class="fc" id="L59">            Element table = createTableElement(document);</span>
+
+<span class="fc" id="L61">            body.appendChild(table);</span>
+<span class="fc" id="L62">            root.appendChild(body);</span>
+<span class="fc" id="L63">            document.appendChild(root);</span>
+
+<span class="fc" id="L65">            addTableHeader(table, document);</span>
+
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            for (BibEntry entry : entries) {</span>
+<span class="fc" id="L68">                addEntryRow(entry, table, document);</span>
+<span class="fc" id="L69">            }</span>
+<span class="nc" id="L70">        } catch (Exception e) {</span>
+<span class="nc" id="L71">            LOGGER.warn(&quot;Exception caught...&quot;, e);</span>
+<span class="fc" id="L72">        }</span>
+<span class="fc" id="L73">        return document;</span>
+    }
+
+    private void addEntryRow(BibEntry entry, Element table, Document document) {
+<span class="fc" id="L77">        final Element row = document.createElement(&quot;table:table-row&quot;);</span>
+
+<span class="fc" id="L79">        addTableCell(document, row, new GetOpenOfficeType().format(entry.getType().getName()));</span>
+<span class="fc" id="L80">        toExportFields.forEach(field -&gt; {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (field.equals(StandardField.TITLE)) {</span>
+<span class="fc" id="L82">                addTableCell(document, row, new RemoveWhitespace().format(new RemoveBrackets().format(getField(entry, StandardField.TITLE))));</span>
+            } else {
+<span class="fc" id="L84">                addTableCell(document, row, getField(entry, field));</span>
+            }
+<span class="fc" id="L86">        });</span>
+
+<span class="fc" id="L88">        table.appendChild(row);</span>
+<span class="fc" id="L89">    }</span>
+
+    private Element createTableElement(Document document) {
+<span class="fc" id="L92">        Element table = document.createElement(&quot;table:table&quot;);</span>
+<span class="fc" id="L93">        table.setAttribute(&quot;table:name&quot;, &quot;biblio&quot;);</span>
+<span class="fc" id="L94">        table.setAttribute(&quot;table.style-name&quot;, &quot;ta1&quot;);</span>
+<span class="fc" id="L95">        return table;</span>
+    }
+
+    private Element createRootElement(Document document) {
+<span class="fc" id="L99">        Element root = document.createElement(&quot;office:document-content&quot;);</span>
+<span class="fc" id="L100">        root.setAttribute(&quot;xmlns:office&quot;, &quot;http://openoffice.org/2000/office&quot;);</span>
+<span class="fc" id="L101">        root.setAttribute(&quot;xmlns:style&quot;, &quot;http://openoffice.org/2000/style&quot;);</span>
+<span class="fc" id="L102">        root.setAttribute(&quot;xmlns:text&quot;, &quot;http://openoffice.org/2000/text&quot;);</span>
+<span class="fc" id="L103">        root.setAttribute(&quot;xmlns:table&quot;, &quot;http://openoffice.org/2000/table&quot;);</span>
+<span class="fc" id="L104">        root.setAttribute(&quot;xmlns:office:class&quot;, &quot;spreadsheet&quot;);</span>
+<span class="fc" id="L105">        root.setAttribute(&quot;xmlns:office:version&quot;, &quot;1.0&quot;);</span>
+<span class="fc" id="L106">        root.setAttribute(&quot;xmlns:fo&quot;, &quot;http://www.w3.org/1999/XSL/Format&quot;);</span>
+<span class="fc" id="L107">        Element el = document.createElement(&quot;office:script&quot;);</span>
+<span class="fc" id="L108">        root.appendChild(el);</span>
+
+<span class="fc" id="L110">        el = document.createElement(&quot;office:automatic-styles&quot;);</span>
+<span class="fc" id="L111">        Element el2 = document.createElement(&quot;style:style&quot;);</span>
+<span class="fc" id="L112">        el2.setAttribute(&quot;style:name&quot;, &quot;ro1&quot;);</span>
+<span class="fc" id="L113">        el2.setAttribute(&quot;style:family&quot;, &quot;table-row&quot;);</span>
+<span class="fc" id="L114">        Element el3 = document.createElement(&quot;style.properties&quot;);</span>
+<span class="fc" id="L115">        el3.setAttribute(&quot;style:row-height&quot;, &quot;0.1681inch&quot;);</span>
+<span class="fc" id="L116">        el3.setAttribute(&quot;fo:break-before&quot;, &quot;auto&quot;);</span>
+<span class="fc" id="L117">        el3.setAttribute(&quot;style:use-optimal-row-height&quot;, &quot;true&quot;);</span>
+<span class="fc" id="L118">        el2.appendChild(el3);</span>
+<span class="fc" id="L119">        el.appendChild(el2);</span>
+<span class="fc" id="L120">        el2 = document.createElement(&quot;style:style&quot;);</span>
+<span class="fc" id="L121">        el2.setAttribute(&quot;style:name&quot;, &quot;ta1&quot;);</span>
+<span class="fc" id="L122">        el2.setAttribute(&quot;style:family&quot;, &quot;table&quot;);</span>
+<span class="fc" id="L123">        el2.setAttribute(&quot;style:master-page-name&quot;, &quot;Default&quot;);</span>
+<span class="fc" id="L124">        el3 = document.createElement(&quot;style:properties&quot;);</span>
+<span class="fc" id="L125">        el3.setAttribute(&quot;table:display&quot;, &quot;true&quot;);</span>
+<span class="fc" id="L126">        el2.appendChild(el3);</span>
+<span class="fc" id="L127">        el.appendChild(el2);</span>
+<span class="fc" id="L128">        root.appendChild(el);</span>
+
+<span class="fc" id="L130">        return root;</span>
+    }
+
+    private static void addTableCell(Document doc, Element parent, String content) {
+<span class="fc" id="L134">        Element cell = doc.createElement(&quot;table:table-cell&quot;);</span>
+<span class="fc" id="L135">        Element text = doc.createElement(&quot;text:p&quot;);</span>
+<span class="fc" id="L136">        Text textNode = doc.createTextNode(content);</span>
+<span class="fc" id="L137">        text.appendChild(textNode);</span>
+<span class="fc" id="L138">        cell.appendChild(text);</span>
+<span class="fc" id="L139">        parent.appendChild(cell);</span>
+<span class="fc" id="L140">    }</span>
+
+    private void addTableHeader(Element table, Document document) {
+<span class="fc" id="L143">        Element firstRow = document.createElement(&quot;table:table-row&quot;);</span>
+<span class="fc" id="L144">        firstRow.setAttribute(&quot;table.style-name&quot;, &quot;ro1&quot;);</span>
+<span class="fc" id="L145">        addTableCell(document, firstRow, &quot;Type&quot;);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (Field field : toExportFields) {</span>
+<span class="fc" id="L147">            addTableCell(document, firstRow, field.getDisplayName());</span>
+<span class="fc" id="L148">        }</span>
+
+<span class="fc" id="L150">        table.appendChild(firstRow);</span>
+<span class="fc" id="L151">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

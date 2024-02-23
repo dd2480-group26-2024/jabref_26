@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DOABFetcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">DOABFetcher.java</span></div><h1>DOABFetcher.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.StringJoiner;
+
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.Parser;
+import org.jabref.logic.importer.SearchBasedParserFetcher;
+import org.jabref.logic.importer.fetcher.transformers.DefaultQueryTransformer;
+import org.jabref.logic.importer.util.JsonReader;
+import org.jabref.model.entry.Author;
+import org.jabref.model.entry.AuthorList;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+
+import kong.unirest.json.JSONArray;
+import kong.unirest.json.JSONException;
+import kong.unirest.json.JSONObject;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+
+/**
+ * fetches books from https://www.doabooks.org/ through
+ * &lt;a href=&quot;https://www.doabooks.org/en/resources/metadata-harvesting-and-content-dissemination&quot;&gt;their API&lt;/a&gt;.
+ */
+<span class="fc" id="L33">public class DOABFetcher implements SearchBasedParserFetcher {</span>
+    private static final String SEARCH_URL = &quot;https://directory.doabooks.org/rest/search?&quot;;
+
+    @Override
+    public String getName() {
+<span class="fc" id="L38">        return &quot;DOAB&quot;;</span>
+    }
+
+    @Override
+    public URL getURLForQuery(QueryNode luceneQuery) throws URISyntaxException, MalformedURLException, FetcherException {
+<span class="nc" id="L43">        URIBuilder builder = new URIBuilder(SEARCH_URL);</span>
+<span class="nc" id="L44">        String query = new DefaultQueryTransformer().transformLuceneQuery(luceneQuery).orElse(&quot;&quot;);</span>
+        // adding quotations for the query for more specified results
+        // without the quotation the results returned are not relevant to the query
+<span class="nc" id="L47">        query = (&quot;\&quot;&quot;.concat(query)).concat(&quot;\&quot;&quot;);</span>
+<span class="nc" id="L48">        builder.addParameter(&quot;query&quot;, query);</span>
+        // bitstreams included in URL building to acquire ISBN's.
+<span class="nc" id="L50">        builder.addParameter(&quot;expand&quot;, &quot;metadata,bitstreams&quot;);</span>
+
+<span class="nc" id="L52">        return builder.build().toURL();</span>
+    }
+
+    @Override
+    public Parser getParser() {
+<span class="nc" id="L57">        return InputStream -&gt; {</span>
+            // can't use this method JsonReader.toJsonObject(inputStream) because the results are sent in an array
+            // like format resulting in an error when trying to convert them into a json object
+            // created a similar method suitable for this case &quot;toJsonArray&quot;
+<span class="nc" id="L61">            JSONArray response = JsonReader.toJsonArray(InputStream);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">            if (response.isEmpty()) {</span>
+<span class="nc" id="L63">                return Collections.emptyList();</span>
+            }
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (response.length() == 1) {</span>
+                // the information used for bibtex entries are in an array inside the resulting jsonarray
+                // see this query for reference https://directory.doabooks.org/rest/search?query=&quot;i open fire&quot;&amp;expand=metadata
+<span class="nc" id="L68">                JSONArray metadataArray = response.getJSONObject(0).getJSONArray(&quot;metadata&quot;);</span>
+<span class="nc" id="L69">                JSONArray bitstreamArray = response.getJSONObject(0).getJSONArray(&quot;bitstreams&quot;);</span>
+<span class="nc" id="L70">                BibEntry entry = jsonToBibEntry(metadataArray, bitstreamArray);</span>
+<span class="nc" id="L71">                return Collections.singletonList(entry);</span>
+            }
+<span class="nc" id="L73">            List&lt;BibEntry&gt; entries = new ArrayList&lt;&gt;(response.length());</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            for (int i = 0; i &lt; response.length(); i++) {</span>
+<span class="nc" id="L75">                JSONArray metadataArray = response.getJSONObject(i).getJSONArray(&quot;metadata&quot;);</span>
+<span class="nc" id="L76">                JSONArray bitstreamArray = response.getJSONObject(i).getJSONArray(&quot;bitstreams&quot;);</span>
+<span class="nc" id="L77">                BibEntry entry = jsonToBibEntry(metadataArray, bitstreamArray);</span>
+<span class="nc" id="L78">                entries.add(entry);</span>
+            }
+<span class="nc" id="L80">            return entries;</span>
+        };
+    }
+
+    private BibEntry jsonToBibEntry(JSONArray metadataArray, JSONArray bitstreamArray) {
+<span class="nc" id="L85">        BibEntry entry = new BibEntry();</span>
+<span class="nc" id="L86">        List&lt;Author&gt; authorsList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L87">        List&lt;Author&gt; editorsList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L88">        StringJoiner keywordJoiner = new StringJoiner(&quot;, &quot;);</span>
+<span class="nc" id="L89">        String publisherImprint = &quot;&quot;;</span>
+
+        // Get the ISBN within the BITSTREAM. See the link below:
+        // https://directory.doabooks.org/rest/search?query=handle:%2220.500.12854/26303%22&amp;expand=metadata,bitstreams
+        // Note that in many cases, an ISBN cannot be obtained in the metadata, even in the BITSTREAM. See the link below:
+        // https://directory.doabooks.org/rest/search?query=%22i%20open%20fire%22&amp;expand=metadata,bitstreams
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        for (int i = 0; i &lt; bitstreamArray.length(); i++) {</span>
+<span class="nc" id="L96">            JSONObject bitstreamObject = bitstreamArray.getJSONObject(i);</span>
+            // Subcategorise each instance of the BITSTREAM by &quot;metadata&quot; key
+<span class="nc" id="L98">            JSONArray array = bitstreamObject.getJSONArray(&quot;metadata&quot;);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            for (int k = 0; k &lt; array.length(); k++) {</span>
+<span class="nc" id="L100">                JSONObject metadataInBitstreamObject = array.getJSONObject(k);</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                if (metadataInBitstreamObject.getString(&quot;key&quot;).equals(&quot;dc.identifier.isbn&quot;)) {</span>
+<span class="nc" id="L102">                    entry.setField(StandardField.ISBN, metadataInBitstreamObject.getString(&quot;value&quot;));</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                } else if (metadataInBitstreamObject.getString(&quot;key&quot;).equals(&quot;oapen.relation.isbn&quot;)) {</span>
+<span class="nc" id="L104">                    entry.setField(StandardField.ISBN, metadataInBitstreamObject.getString(&quot;value&quot;));</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        for (int i = 0; i &lt; metadataArray.length(); i++) {</span>
+<span class="nc" id="L110">            JSONObject dataObject = metadataArray.getJSONObject(i);</span>
+<span class="nc bnc" id="L111" title="All 18 branches missed.">            switch (dataObject.getString(&quot;key&quot;)) {</span>
+                case &quot;dc.contributor.author&quot; -&gt; {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                    if (dataObject.getString(&quot;value&quot;).contains(&quot;(Ed.)&quot;)) {</span>
+<span class="nc" id="L114">                       editorsList.add(toAuthor(namePreprocessing(dataObject.getString(&quot;value&quot;))));</span>
+                    } else {
+<span class="nc" id="L116">                        authorsList.add(toAuthor(dataObject.getString(&quot;value&quot;)));</span>
+                    }
+<span class="nc" id="L118">                }</span>
+<span class="nc" id="L119">                case &quot;dc.type&quot; -&gt; entry.setType(StandardEntryType.Book);</span>
+<span class="nc" id="L120">                case &quot;dc.date.issued&quot; -&gt; entry.setField(StandardField.DATE, String.valueOf(</span>
+<span class="nc" id="L121">                        dataObject.getString(&quot;value&quot;)));</span>
+<span class="nc" id="L122">                case &quot;oapen.identifier.doi&quot; -&gt; entry.setField(StandardField.DOI,</span>
+<span class="nc" id="L123">                        dataObject.getString(&quot;value&quot;));</span>
+<span class="nc" id="L124">                case &quot;dc.title&quot; -&gt; entry.setField(StandardField.TITLE,</span>
+<span class="nc" id="L125">                        dataObject.getString(&quot;value&quot;));</span>
+                case &quot;oapen.pages&quot; -&gt; {
+                    try {
+<span class="nc" id="L128">                        entry.setField(StandardField.PAGES, String.valueOf(dataObject.getInt(&quot;value&quot;)));</span>
+<span class="nc" id="L129">                    } catch (JSONException e) {</span>
+<span class="nc" id="L130">                        entry.setField(StandardField.PAGES, dataObject.getString(&quot;value&quot;));</span>
+<span class="nc" id="L131">                    }</span>
+<span class="nc" id="L132">                }</span>
+<span class="nc" id="L133">                case &quot;dc.description.abstract&quot; -&gt; entry.setField(StandardField.ABSTRACT,</span>
+<span class="nc" id="L134">                        dataObject.getString(&quot;value&quot;));</span>
+<span class="nc" id="L135">                case &quot;dc.language&quot; -&gt; entry.setField(StandardField.LANGUAGE,</span>
+<span class="nc" id="L136">                        dataObject.getString(&quot;value&quot;));</span>
+<span class="nc" id="L137">                case &quot;publisher.name&quot; -&gt; entry.setField(StandardField.PUBLISHER,</span>
+<span class="nc" id="L138">                        dataObject.getString(&quot;value&quot;));</span>
+<span class="nc" id="L139">                case &quot;dc.identifier.uri&quot; -&gt; entry.setField(StandardField.URI,</span>
+<span class="nc" id="L140">                        dataObject.getString(&quot;value&quot;));</span>
+                case &quot;dc.identifier&quot; -&gt; {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                    if (dataObject.getString(&quot;value&quot;).contains(&quot;http&quot;)) {</span>
+<span class="nc" id="L143">                       entry.setField(StandardField.URL, dataObject.getString(&quot;value&quot;));</span>
+                    }
+                }
+<span class="nc" id="L146">                case &quot;dc.subject.other&quot; -&gt; keywordJoiner.add(dataObject.getString(&quot;value&quot;));</span>
+<span class="nc" id="L147">                case &quot;dc.contributor.editor&quot; -&gt; editorsList.add(toAuthor(dataObject.getString(&quot;value&quot;)));</span>
+<span class="nc" id="L148">                case &quot;oapen.volume&quot; -&gt; entry.setField(StandardField.VOLUME,</span>
+<span class="nc" id="L149">                        dataObject.getString(&quot;value&quot;));</span>
+<span class="nc" id="L150">                case &quot;oapen.relation.isbn&quot;, &quot;dc.identifier.isbn&quot; -&gt; entry.setField(StandardField.ISBN,</span>
+<span class="nc" id="L151">                        dataObject.getString(&quot;value&quot;));</span>
+<span class="nc" id="L152">                case &quot;dc.title.alternative&quot; -&gt; entry.setField(StandardField.SUBTITLE,</span>
+<span class="nc" id="L153">                        dataObject.getString(&quot;value&quot;));</span>
+<span class="nc" id="L154">                case &quot;oapen.imprint&quot; -&gt; publisherImprint = dataObject.getString(&quot;value&quot;);</span>
+            }
+        }
+
+<span class="nc" id="L158">        entry.setField(StandardField.AUTHOR, AuthorList.of(authorsList).getAsFirstLastNamesWithAnd());</span>
+<span class="nc" id="L159">        entry.setField(StandardField.EDITOR, AuthorList.of(editorsList).getAsFirstLastNamesWithAnd());</span>
+<span class="nc" id="L160">        entry.setField(StandardField.KEYWORDS, String.valueOf(keywordJoiner));</span>
+
+        // Special condition to check if publisher field is empty. If so, retrieve imprint (if available)
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (entry.getField(StandardField.PUBLISHER).isEmpty()) {</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            if (!StringUtil.isNullOrEmpty(publisherImprint)) {</span>
+<span class="nc" id="L165">                entry.setField(StandardField.PUBLISHER, publisherImprint);</span>
+            }
+        }
+<span class="nc" id="L168">        return entry;</span>
+    }
+
+    private Author toAuthor(String author) {
+<span class="nc" id="L172">        return AuthorList.parse(author).getAuthor(0);</span>
+    }
+
+    private String namePreprocessing(String name) {
+<span class="nc" id="L176">        return name.replace(&quot;(Ed.)&quot;, &quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

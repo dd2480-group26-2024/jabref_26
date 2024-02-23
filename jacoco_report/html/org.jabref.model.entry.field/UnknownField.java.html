@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnknownField.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.field</a> &gt; <span class="el_source">UnknownField.java</span></div><h1>UnknownField.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.field;
+
+import java.util.EnumSet;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+
+import org.jabref.model.strings.StringUtil;
+
+public class UnknownField implements Field {
+    private String name;
+    private final Set&lt;FieldProperty&gt; properties;
+    private final String displayName;
+
+    public UnknownField(String name) {
+<span class="fc" id="L16">        this(name, StringUtil.capitalizeFirst(name));</span>
+<span class="fc" id="L17">    }</span>
+
+<span class="fc" id="L19">    public UnknownField(String name, String displayName) {</span>
+<span class="fc" id="L20">        this.name = name;</span>
+<span class="fc" id="L21">        this.displayName = displayName;</span>
+<span class="fc" id="L22">        this.properties = EnumSet.noneOf(FieldProperty.class);</span>
+<span class="fc" id="L23">    }</span>
+
+    public UnknownField(String name, FieldProperty first, FieldProperty... rest) {
+<span class="nc" id="L26">        this(name, StringUtil.capitalizeFirst(name), first, rest);</span>
+<span class="nc" id="L27">    }</span>
+
+<span class="nc" id="L29">    public UnknownField(String name, String displayName, FieldProperty first, FieldProperty... rest) {</span>
+<span class="nc" id="L30">        this.name = name;</span>
+<span class="nc" id="L31">        this.displayName = displayName;</span>
+<span class="nc" id="L32">        this.properties = EnumSet.of(first, rest);</span>
+<span class="nc" id="L33">    }</span>
+
+    public static UnknownField fromDisplayName(String displayName) {
+<span class="fc" id="L36">        return new UnknownField(displayName.toLowerCase(Locale.ROOT), displayName);</span>
+    }
+
+    @Override
+    public Set&lt;FieldProperty&gt; getProperties() {
+<span class="nc" id="L41">        return properties;</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L46">        return name;</span>
+    }
+
+    public void setName(String name) {
+<span class="nc" id="L50">        this.name = name;</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    public String getDisplayName() {
+<span class="fc" id="L55">        return displayName;</span>
+    }
+
+    @Override
+    public boolean isStandardField() {
+<span class="nc" id="L60">        return false;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L66">            return true;</span>
+        }
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (!(o instanceof Field)) {</span>
+<span class="nc" id="L69">            return false;</span>
+        }
+<span class="fc" id="L71">        Field other = (Field) o;</span>
+<span class="fc" id="L72">        return name.equalsIgnoreCase(other.getName());</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L77">        return Objects.hash(name.toLowerCase(Locale.ENGLISH));</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L82">        return &quot;UnknownField{&quot; +</span>
+               &quot;name='&quot; + name + '\'' +
+               '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

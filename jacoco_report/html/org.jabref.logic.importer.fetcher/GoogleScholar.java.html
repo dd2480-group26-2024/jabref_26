@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GoogleScholar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.importer.fetcher</a> &gt; <span class="el_source">GoogleScholar.java</span></div><h1>GoogleScholar.java</h1><pre class="source lang-java linenums">package org.jabref.logic.importer.fetcher;
+
+import java.io.IOException;
+import java.io.StringReader;
+import java.net.HttpCookie;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.FulltextFetcher;
+import org.jabref.logic.importer.ImportFormatPreferences;
+import org.jabref.logic.importer.PagedSearchBasedFetcher;
+import org.jabref.logic.importer.ParserResult;
+import org.jabref.logic.importer.fetcher.transformers.ScholarQueryTransformer;
+import org.jabref.logic.importer.fileformat.BibtexParser;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.net.URLDownload;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.paging.Page;
+
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * FulltextFetcher implementation that attempts to find a PDF URL at GoogleScholar.
+ * &lt;p&gt;
+ * Search String infos: https://scholar.google.com/intl/en/scholar/help.html#searching
+ */
+public class GoogleScholar implements FulltextFetcher, PagedSearchBasedFetcher {
+<span class="fc" id="L44">    private static final Logger LOGGER = LoggerFactory.getLogger(GoogleScholar.class);</span>
+
+<span class="fc" id="L46">    private static final Pattern LINK_TO_BIB_PATTERN = Pattern.compile(&quot;(https:\\/\\/scholar.googleusercontent.com\\/scholar.bib[^\&quot;]*)&quot;);</span>
+
+    private static final String BASIC_SEARCH_URL = &quot;https://scholar.google.ch/scholar?&quot;;
+
+    private static final int NUM_RESULTS = 10;
+
+    private final ImportFormatPreferences importFormatPreferences;
+
+<span class="fc" id="L54">    public GoogleScholar(ImportFormatPreferences importFormatPreferences) {</span>
+<span class="fc" id="L55">        Objects.requireNonNull(importFormatPreferences);</span>
+<span class="fc" id="L56">        this.importFormatPreferences = importFormatPreferences;</span>
+<span class="fc" id="L57">    }</span>
+
+    @Override
+    public Optional&lt;URL&gt; findFullText(BibEntry entry) throws IOException, FetcherException {
+<span class="fc" id="L61">        Objects.requireNonNull(entry);</span>
+
+        // Search in title
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (!entry.hasField(StandardField.TITLE)) {</span>
+<span class="nc" id="L65">            return Optional.empty();</span>
+        }
+
+        try {
+            // title search
+<span class="fc" id="L70">            URIBuilder uriBuilder = new URIBuilder(BASIC_SEARCH_URL);</span>
+<span class="fc" id="L71">            uriBuilder.addParameter(&quot;as_q&quot;, &quot;&quot;);</span>
+            // as_epq as exact phrase
+<span class="fc" id="L73">            uriBuilder.addParameter(&quot;as_epq&quot;, entry.getField(StandardField.TITLE).orElse(&quot;&quot;));</span>
+            // as_occt field to search in
+<span class="fc" id="L75">            uriBuilder.addParameter(&quot;as_occt&quot;, &quot;title&quot;);</span>
+
+<span class="fc" id="L77">            return search(uriBuilder.toString());</span>
+<span class="nc" id="L78">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L79">            throw new FetcherException(&quot;Building URI failed.&quot;, e);</span>
+        }
+    }
+
+    @Override
+    public TrustLevel getTrustLevel() {
+<span class="nc" id="L85">        return TrustLevel.META_SEARCH;</span>
+    }
+
+    private Optional&lt;URL&gt; search(String url) throws IOException {
+<span class="fc" id="L89">        Optional&lt;URL&gt; pdfLink = Optional.empty();</span>
+
+<span class="fc" id="L91">        Document doc = Jsoup.connect(url).userAgent(URLDownload.USER_AGENT).get();</span>
+
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (needsCaptcha(doc.body().html())) {</span>
+<span class="nc" id="L94">            LOGGER.warn(&quot;Hit Google traffic limitation. Captcha prevents automatic fetching.&quot;);</span>
+<span class="nc" id="L95">            return Optional.empty();</span>
+        }
+        // Check results for PDF link
+        // TODO: link always on first result or none?
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        for (int i = 0; i &lt; NUM_RESULTS; i++) {</span>
+<span class="fc" id="L100">            Elements link = doc.select(&quot;div[data-rp=%S] div.gs_or_ggsm a&quot;.formatted(i));</span>
+
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (link.first() != null) {</span>
+<span class="fc" id="L103">                String target = link.first().attr(&quot;href&quot;);</span>
+                // link present?
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">                if (!target.isEmpty() &amp;&amp; new URLDownload(target).isPdf()) {</span>
+                    // TODO: check title inside pdf + length?
+                    // TODO: report error function needed?! query -&gt; result
+<span class="fc" id="L108">                    LOGGER.info(&quot;Fulltext PDF found @ Google: &quot; + target);</span>
+<span class="fc" id="L109">                    pdfLink = Optional.of(new URL(target));</span>
+<span class="fc" id="L110">                    break;</span>
+                }
+            }
+        }
+<span class="fc" id="L114">        return pdfLink;</span>
+    }
+
+    private boolean needsCaptcha(String body) {
+<span class="fc" id="L118">        return body.contains(&quot;id=\&quot;gs_captcha_ccl\&quot;&quot;);</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="fc" id="L123">        return &quot;Google Scholar&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;HelpFile&gt; getHelpPage() {
+<span class="nc" id="L128">        return Optional.of(HelpFile.FETCHER_GOOGLE_SCHOLAR);</span>
+    }
+
+    private void addHitsFromQuery(List&lt;BibEntry&gt; entryList, String queryURL) throws IOException, FetcherException {
+<span class="nc" id="L132">        String content = new URLDownload(queryURL).asString();</span>
+
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (needsCaptcha(content)) {</span>
+<span class="nc" id="L135">            throw new FetcherException(&quot;Fetching from Google Scholar failed: Captacha hit at &quot; + queryURL + &quot;.&quot;,</span>
+<span class="nc" id="L136">                    Localization.lang(&quot;This might be caused by reaching the traffic limitation of Google Scholar (see 'Help' for details).&quot;), null);</span>
+        }
+
+<span class="nc" id="L139">        Matcher matcher = LINK_TO_BIB_PATTERN.matcher(content);</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L141">            String citationsPageURL = matcher.group().replace(&quot;&amp;amp;&quot;, &quot;&amp;&quot;);</span>
+<span class="nc" id="L142">            BibEntry newEntry = downloadEntry(citationsPageURL);</span>
+<span class="nc" id="L143">            entryList.add(newEntry);</span>
+<span class="nc" id="L144">        }</span>
+<span class="nc" id="L145">    }</span>
+
+    private BibEntry downloadEntry(String link) throws IOException, FetcherException {
+<span class="nc" id="L148">        String downloadedContent = new URLDownload(link).asString();</span>
+<span class="nc" id="L149">        BibtexParser parser = new BibtexParser(importFormatPreferences);</span>
+<span class="nc" id="L150">        ParserResult result = parser.parse(new StringReader(downloadedContent));</span>
+<span class="nc bnc" id="L151" title="All 4 branches missed.">        if ((result == null) || (result.getDatabase() == null)) {</span>
+<span class="nc" id="L152">            throw new FetcherException(&quot;Parsing entries from Google Scholar bib file failed.&quot;);</span>
+        } else {
+<span class="nc" id="L154">            Collection&lt;BibEntry&gt; entries = result.getDatabase().getEntries();</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            if (entries.size() != 1) {</span>
+<span class="nc" id="L156">                LOGGER.debug(entries.size() + &quot; entries found! (&quot; + link + &quot;)&quot;);</span>
+<span class="nc" id="L157">                throw new FetcherException(&quot;Parsing entries from Google Scholar bib file failed.&quot;);</span>
+            } else {
+<span class="nc" id="L159">                BibEntry entry = entries.iterator().next();</span>
+<span class="nc" id="L160">                return entry;</span>
+            }
+        }
+    }
+
+    private void obtainAndModifyCookie() throws FetcherException {
+        try {
+<span class="fc" id="L167">            URLDownload downloader = new URLDownload(&quot;https://scholar.google.com&quot;);</span>
+<span class="fc" id="L168">            List&lt;HttpCookie&gt; cookies = downloader.getCookieFromUrl();</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            for (HttpCookie cookie : cookies) {</span>
+                // append &quot;CF=4&quot; which represents &quot;Citation format bibtex&quot;
+<span class="fc" id="L171">                cookie.setValue(cookie.getValue() + &quot;:CF=4&quot;);</span>
+<span class="fc" id="L172">            }</span>
+<span class="nc" id="L173">        } catch (IOException e) {</span>
+<span class="nc" id="L174">            throw new FetcherException(&quot;Cookie configuration for Google Scholar failed.&quot;, e);</span>
+<span class="fc" id="L175">        }</span>
+<span class="fc" id="L176">    }</span>
+
+    @Override
+    public Page&lt;BibEntry&gt; performSearchPaged(QueryNode luceneQuery, int pageNumber) throws FetcherException {
+<span class="fc" id="L180">        ScholarQueryTransformer queryTransformer = new ScholarQueryTransformer();</span>
+<span class="fc" id="L181">        String transformedQuery = queryTransformer.transformLuceneQuery(luceneQuery).orElse(&quot;&quot;);</span>
+        try {
+<span class="fc" id="L183">            obtainAndModifyCookie();</span>
+<span class="fc" id="L184">            List&lt;BibEntry&gt; foundEntries = new ArrayList&lt;&gt;(10);</span>
+<span class="fc" id="L185">            URIBuilder uriBuilder = new URIBuilder(BASIC_SEARCH_URL);</span>
+<span class="fc" id="L186">            uriBuilder.addParameter(&quot;hl&quot;, &quot;en&quot;);</span>
+<span class="fc" id="L187">            uriBuilder.addParameter(&quot;btnG&quot;, &quot;Search&quot;);</span>
+<span class="fc" id="L188">            uriBuilder.addParameter(&quot;q&quot;, transformedQuery);</span>
+<span class="fc" id="L189">            uriBuilder.addParameter(&quot;start&quot;, String.valueOf(pageNumber * getPageSize()));</span>
+<span class="fc" id="L190">            uriBuilder.addParameter(&quot;num&quot;, String.valueOf(getPageSize()));</span>
+<span class="fc" id="L191">            uriBuilder.addParameter(&quot;as_ylo&quot;, String.valueOf(queryTransformer.getStartYear()));</span>
+<span class="fc" id="L192">            uriBuilder.addParameter(&quot;as_yhi&quot;, String.valueOf(queryTransformer.getEndYear()));</span>
+
+            try {
+<span class="nc" id="L195">                addHitsFromQuery(foundEntries, uriBuilder.toString());</span>
+
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                if (foundEntries.size() == 10) {</span>
+<span class="nc" id="L198">                    uriBuilder.addParameter(&quot;start&quot;, &quot;10&quot;);</span>
+<span class="nc" id="L199">                    addHitsFromQuery(foundEntries, uriBuilder.toString());</span>
+                }
+<span class="fc" id="L201">            } catch (IOException e) {</span>
+<span class="fc" id="L202">                LOGGER.info(&quot;IOException for URL {}&quot;, uriBuilder.toString());</span>
+                // if there are too much requests from the same IP adress google is answering with a 503 and redirecting to a captcha challenge
+                // The caught IOException looks for example like this:
+                // java.io.IOException: Server returned HTTP response code: 503 for URL: https://ipv4.google.com/sorry/index?continue=https://scholar.google.com/scholar%3Fhl%3Den%26btnG%3DSearch%26q%3Dbpmn&amp;hl=en&amp;q=CGMSBI0NBDkYuqy9wAUiGQDxp4NLQCWbIEY1HjpH5zFJhv4ANPGdWj0
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                if (e.getMessage().contains(&quot;Server returned HTTP response code: 503 for URL&quot;)) {</span>
+<span class="nc" id="L207">                    throw new FetcherException(&quot;Fetching from Google Scholar failed.&quot;,</span>
+<span class="nc" id="L208">                            Localization.lang(&quot;This might be caused by reaching the traffic limitation of Google Scholar (see 'Help' for details).&quot;), e);</span>
+                } else {
+<span class="fc" id="L210">                    throw new FetcherException(&quot;Error while fetching from &quot; + getName(), e);</span>
+                }
+<span class="nc" id="L212">            }</span>
+<span class="nc" id="L213">            return new Page&lt;&gt;(transformedQuery, pageNumber, foundEntries);</span>
+<span class="nc" id="L214">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L215">            throw new FetcherException(&quot;Error while fetching from &quot; + getName(), e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

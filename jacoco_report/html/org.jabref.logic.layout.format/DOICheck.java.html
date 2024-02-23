@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DOICheck.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.layout.format</a> &gt; <span class="el_source">DOICheck.java</span></div><h1>DOICheck.java</h1><pre class="source lang-java linenums">package org.jabref.logic.layout.format;
+
+import java.net.URI;
+
+import org.jabref.logic.layout.LayoutFormatter;
+import org.jabref.logic.preferences.DOIPreferences;
+import org.jabref.model.entry.identifier.DOI;
+
+/**
+ * Used to fix [ 1588028 ] export HTML table DOI URL.
+ * &lt;p&gt;
+ * Will prepend &quot;&lt;a href=&quot;http://doi.org/&quot;&gt;http://doi.org/&lt;/a&gt;&quot; or the DOI url with a custom base URL defined in the {@link DOIPreferences}
+ * if only DOI and not an URL is given.
+ */
+public class DOICheck implements LayoutFormatter {
+
+    private final DOIPreferences doiPreferences;
+
+<span class="fc" id="L19">    public DOICheck(DOIPreferences doiPreferences) {</span>
+<span class="fc" id="L20">        this.doiPreferences = doiPreferences;</span>
+<span class="fc" id="L21">    }</span>
+
+    @Override
+    public String format(String fieldText) {
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (fieldText == null) {</span>
+<span class="fc" id="L26">            return null;</span>
+        }
+<span class="fc" id="L28">        String result = fieldText;</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (result.startsWith(&quot;/&quot;)) {</span>
+<span class="fc" id="L30">            result = result.substring(1);</span>
+        }
+
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (doiPreferences.isUseCustom()) {</span>
+<span class="fc" id="L34">            var base = URI.create(doiPreferences.getDefaultBaseURI());</span>
+<span class="fc" id="L35">            return DOI.parse(result).flatMap(doi -&gt; doi.getExternalURIFromBase(base))</span>
+<span class="fc" id="L36">                      .map(URI::toASCIIString)</span>
+<span class="fc" id="L37">                      .orElse(result);</span>
+        }
+
+<span class="fc" id="L40">        return DOI.parse(result).map(DOI::getURIAsASCIIString).orElse(result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

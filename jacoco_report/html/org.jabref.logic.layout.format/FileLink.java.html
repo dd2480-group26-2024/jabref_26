@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileLink.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.layout.format</a> &gt; <span class="el_source">FileLink.java</span></div><h1>FileLink.java</h1><pre class="source lang-java linenums">package org.jabref.logic.layout.format;
+
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+
+import org.jabref.logic.importer.util.FileFieldParser;
+import org.jabref.logic.layout.ParamLayoutFormatter;
+import org.jabref.model.entry.LinkedFile;
+
+/**
+ * Export formatter that handles the file link list of JabRef 2.3 and later, by
+ * selecting the first file link, if any, specified by the field.
+ */
+public class FileLink implements ParamLayoutFormatter {
+
+    private final List&lt;Path&gt; fileDirectories;
+    private final String mainFileDirectory;
+    private String fileType;
+
+<span class="fc" id="L21">    public FileLink(List&lt;Path&gt; fileDirectories, String mainFileDirectory) {</span>
+<span class="fc" id="L22">        this.fileDirectories = fileDirectories;</span>
+<span class="fc" id="L23">        this.mainFileDirectory = mainFileDirectory;</span>
+<span class="fc" id="L24">    }</span>
+
+    @Override
+    public String format(String field) {
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (field == null) {</span>
+<span class="fc" id="L29">            return &quot;&quot;;</span>
+        }
+
+<span class="fc" id="L32">        List&lt;LinkedFile&gt; fileList = FileFieldParser.parse(field);</span>
+
+<span class="fc" id="L34">        LinkedFile link = null;</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (fileType == null) {</span>
+            // No file type specified. Simply take the first link.
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (!fileList.isEmpty()) {</span>
+<span class="fc" id="L38">                link = fileList.getFirst();</span>
+            }
+        } else {
+            // A file type is specified:
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            for (LinkedFile flEntry : fileList) {</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                if (flEntry.getFileType().equalsIgnoreCase(fileType)) {</span>
+<span class="fc" id="L44">                    link = flEntry;</span>
+<span class="fc" id="L45">                    break;</span>
+                }
+<span class="fc" id="L47">            }</span>
+        }
+
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (link == null) {</span>
+<span class="fc" id="L51">            return &quot;&quot;;</span>
+        }
+
+        List&lt;Path&gt; dirs;
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (fileDirectories.isEmpty()) {</span>
+<span class="fc" id="L56">            dirs = Collections.singletonList(Path.of(mainFileDirectory));</span>
+        } else {
+<span class="nc" id="L58">            dirs = fileDirectories;</span>
+        }
+
+<span class="fc" id="L61">        return link.findIn(dirs)</span>
+<span class="pc" id="L62">                   .map(path -&gt; path.normalize().toString())</span>
+<span class="fc" id="L63">                   .orElse(link.getLink());</span>
+    }
+
+    /**
+     * This method is called if the layout file specifies an argument for this
+     * formatter. We use it as an indicator of which file type we should look for.
+     *
+     * @param arg The file type.
+     */
+    @Override
+    public void setArgument(String arg) {
+<span class="fc" id="L74">        fileType = arg;</span>
+<span class="fc" id="L75">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

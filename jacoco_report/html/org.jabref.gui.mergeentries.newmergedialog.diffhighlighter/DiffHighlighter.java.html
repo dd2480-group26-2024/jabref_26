@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiffHighlighter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries.newmergedialog.diffhighlighter</a> &gt; <span class="el_source">DiffHighlighter.java</span></div><h1>DiffHighlighter.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries.newmergedialog.diffhighlighter;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+import org.jabref.gui.mergeentries.newmergedialog.DiffMethod;
+
+import org.fxmisc.richtext.StyleClassedTextArea;
+
+public abstract sealed class DiffHighlighter permits SplitDiffHighlighter, UnifiedDiffHighlighter {
+    protected final StyleClassedTextArea sourceTextview;
+    protected final StyleClassedTextArea targetTextview;
+
+    protected DiffMethod diffMethod;
+
+<span class="nc" id="L17">    public DiffHighlighter(StyleClassedTextArea sourceTextview, StyleClassedTextArea targetTextview, DiffMethod diffMethod) {</span>
+<span class="nc" id="L18">        Objects.requireNonNull(sourceTextview, &quot;source text view MUST NOT be null.&quot;);</span>
+<span class="nc" id="L19">        Objects.requireNonNull(targetTextview, &quot;target text view MUST NOT be null.&quot;);</span>
+
+<span class="nc" id="L21">        this.sourceTextview = sourceTextview;</span>
+<span class="nc" id="L22">        this.targetTextview = targetTextview;</span>
+<span class="nc" id="L23">        this.diffMethod = diffMethod;</span>
+<span class="nc" id="L24">    }</span>
+
+    abstract void highlight();
+
+    protected List&lt;String&gt; splitString(String str) {
+<span class="nc" id="L29">        return Arrays.asList(str.split(diffMethod.separator()));</span>
+    }
+
+    private void setDiffMethod(DiffMethod diffMethod) {
+<span class="nc" id="L33">        this.diffMethod = diffMethod;</span>
+<span class="nc" id="L34">    }</span>
+
+    public DiffMethod getDiffMethod() {
+<span class="nc" id="L37">        return diffMethod;</span>
+    }
+
+    public String getSeparator() {
+<span class="nc" id="L41">        return diffMethod.separator();</span>
+    }
+
+<span class="nc" id="L44">    public enum BasicDiffMethod implements DiffMethod {</span>
+<span class="nc" id="L45">        WORDS(&quot; &quot;), CHARS(&quot;&quot;), COMMA(&quot;,&quot;);</span>
+
+        private final String separator;
+
+<span class="nc" id="L49">        BasicDiffMethod(String separator) {</span>
+<span class="nc" id="L50">            this.separator = separator;</span>
+<span class="nc" id="L51">        }</span>
+
+        @Override
+        public String separator() {
+<span class="nc" id="L55">            return separator;</span>
+        }
+    }
+
+    protected String join(List&lt;String&gt; stringList) {
+<span class="nc" id="L60">        return String.join(getSeparator(), stringList);</span>
+    }
+
+<span class="nc" id="L63">    enum ChangeType {</span>
+<span class="nc" id="L64">        ADDITION, DELETION, CHANGE_DELETION</span>
+    }
+
+<span class="nc" id="L67">    record Change(</span>
+            int position,
+            int spanSize,
+            ChangeType type) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

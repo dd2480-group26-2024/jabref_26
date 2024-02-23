@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldMergerFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.mergeentries.newmergedialog.fieldsmerger</a> &gt; <span class="el_source">FieldMergerFactory.java</span></div><h1>FieldMergerFactory.java</h1><pre class="source lang-java linenums">package org.jabref.gui.mergeentries.newmergedialog.fieldsmerger;
+
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.preferences.BibEntryPreferences;
+
+public class FieldMergerFactory {
+    private final BibEntryPreferences bibEntryPreferences;
+
+<span class="fc" id="L10">    public FieldMergerFactory(BibEntryPreferences bibEntryPreferences) {</span>
+<span class="fc" id="L11">        this.bibEntryPreferences = bibEntryPreferences;</span>
+<span class="fc" id="L12">    }</span>
+
+    public FieldMerger create(Field field) {
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        if (field == StandardField.GROUPS) {</span>
+<span class="fc" id="L16">            return new GroupMerger();</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        } else if (field == StandardField.KEYWORDS) {</span>
+<span class="fc" id="L18">            return new KeywordMerger(bibEntryPreferences);</span>
+<span class="nc bnc" id="L19" title="All 2 branches missed.">        } else if (field == StandardField.COMMENT) {</span>
+<span class="nc" id="L20">            return new CommentMerger();</span>
+<span class="nc bnc" id="L21" title="All 2 branches missed.">        } else if (field == StandardField.FILE) {</span>
+<span class="nc" id="L22">            return new FileMerger();</span>
+        } else {
+<span class="nc" id="L24">            throw new IllegalArgumentException(&quot;No implementation found for merging the given field: &quot; + field.getDisplayName());</span>
+        }
+    }
+
+    public static boolean canMerge(Field field) {
+<span class="pc bpc" id="L29" title="2 of 8 branches missed.">        return field == StandardField.GROUPS || field == StandardField.KEYWORDS || field == StandardField.COMMENT || field == StandardField.FILE;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

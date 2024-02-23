@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParseLatexDialogView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.texparser</a> &gt; <span class="el_source">ParseLatexDialogView.java</span></div><h1>ParseLatexDialogView.java</h1><pre class="source lang-java linenums">package org.jabref.gui.texparser;
+
+import javafx.beans.binding.Bindings;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBoxTreeItem;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.SelectionMode;
+import javafx.scene.control.TextField;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.util.BaseDialog;
+import org.jabref.gui.util.ControlHelper;
+import org.jabref.gui.util.FileNodeViewModel;
+import org.jabref.gui.util.IconValidationDecorator;
+import org.jabref.gui.util.RecursiveTreeItem;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.gui.util.ViewModelTreeCellFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+import jakarta.inject.Inject;
+import org.controlsfx.control.CheckTreeView;
+
+public class ParseLatexDialogView extends BaseDialog&lt;Void&gt; {
+
+    private final BibDatabaseContext databaseContext;
+    private final ControlsFxVisualizer validationVisualizer;
+    @FXML private TextField latexDirectoryField;
+    @FXML private Button browseButton;
+    @FXML private Button searchButton;
+    @FXML private ProgressIndicator progressIndicator;
+    @FXML private CheckTreeView&lt;FileNodeViewModel&gt; fileTreeView;
+    @FXML private Button selectAllButton;
+    @FXML private Button unselectAllButton;
+    @FXML private ButtonType parseButtonType;
+    @Inject private DialogService dialogService;
+    @Inject private TaskExecutor taskExecutor;
+    @Inject private PreferencesService preferencesService;
+    @Inject private FileUpdateMonitor fileMonitor;
+    @Inject private ThemeManager themeManager;
+    private ParseLatexDialogViewModel viewModel;
+
+<span class="nc" id="L51">    public ParseLatexDialogView(BibDatabaseContext databaseContext) {</span>
+<span class="nc" id="L52">        this.databaseContext = databaseContext;</span>
+<span class="nc" id="L53">        this.validationVisualizer = new ControlsFxVisualizer();</span>
+
+<span class="nc" id="L55">        setTitle(Localization.lang(&quot;Search for citations in LaTeX files...&quot;));</span>
+
+<span class="nc" id="L57">        ViewLoader.view(this).load().setAsDialogPane(this);</span>
+
+<span class="nc" id="L59">        ControlHelper.setAction(parseButtonType, getDialogPane(), event -&gt; viewModel.parseButtonClicked());</span>
+<span class="nc" id="L60">        Button parseButton = (Button) getDialogPane().lookupButton(parseButtonType);</span>
+<span class="nc" id="L61">        parseButton.disableProperty().bind(viewModel.noFilesFoundProperty().or(</span>
+<span class="nc" id="L62">                Bindings.isEmpty(viewModel.getCheckedFileList())));</span>
+
+<span class="nc" id="L64">        themeManager.updateFontStyle(getDialogPane().getScene());</span>
+<span class="nc" id="L65">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L69">        viewModel = new ParseLatexDialogViewModel(databaseContext, dialogService, taskExecutor, preferencesService, fileMonitor);</span>
+
+<span class="nc" id="L71">        fileTreeView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);</span>
+<span class="nc" id="L72">        fileTreeView.showRootProperty().bindBidirectional(viewModel.successfulSearchProperty());</span>
+<span class="nc" id="L73">        fileTreeView.rootProperty().bind(EasyBind.map(viewModel.rootProperty(), fileNode -&gt;</span>
+<span class="nc" id="L74">                new RecursiveTreeItem&lt;&gt;(fileNode, FileNodeViewModel::getChildren)));</span>
+
+<span class="nc" id="L76">        new ViewModelTreeCellFactory&lt;FileNodeViewModel&gt;()</span>
+<span class="nc" id="L77">                .withText(FileNodeViewModel::getDisplayText)</span>
+<span class="nc" id="L78">                .install(fileTreeView);</span>
+
+<span class="nc" id="L80">        EasyBind.subscribe(fileTreeView.rootProperty(), root -&gt; {</span>
+<span class="nc" id="L81">            ((CheckBoxTreeItem&lt;FileNodeViewModel&gt;) root).setSelected(true);</span>
+<span class="nc" id="L82">            root.setExpanded(true);</span>
+<span class="nc" id="L83">            EasyBind.bindContent(viewModel.getCheckedFileList(), fileTreeView.getCheckModel().getCheckedItems());</span>
+<span class="nc" id="L84">        });</span>
+
+<span class="nc" id="L86">        latexDirectoryField.textProperty().bindBidirectional(viewModel.latexFileDirectoryProperty());</span>
+<span class="nc" id="L87">        validationVisualizer.setDecoration(new IconValidationDecorator());</span>
+<span class="nc" id="L88">        validationVisualizer.initVisualization(viewModel.latexDirectoryValidation(), latexDirectoryField);</span>
+<span class="nc" id="L89">        browseButton.disableProperty().bindBidirectional(viewModel.searchInProgressProperty());</span>
+<span class="nc" id="L90">        searchButton.disableProperty().bind(viewModel.latexDirectoryValidation().validProperty().not());</span>
+<span class="nc" id="L91">        selectAllButton.disableProperty().bindBidirectional(viewModel.noFilesFoundProperty());</span>
+<span class="nc" id="L92">        unselectAllButton.disableProperty().bindBidirectional(viewModel.noFilesFoundProperty());</span>
+<span class="nc" id="L93">        progressIndicator.visibleProperty().bindBidirectional(viewModel.searchInProgressProperty());</span>
+<span class="nc" id="L94">    }</span>
+
+    @FXML
+    private void browseButtonClicked() {
+<span class="nc" id="L98">        viewModel.browseButtonClicked();</span>
+<span class="nc" id="L99">    }</span>
+
+    @FXML
+    private void searchButtonClicked() {
+<span class="nc" id="L103">        viewModel.searchButtonClicked();</span>
+<span class="nc" id="L104">    }</span>
+
+    @FXML
+    private void selectAll() {
+<span class="nc" id="L108">        fileTreeView.getCheckModel().checkAll();</span>
+<span class="nc" id="L109">    }</span>
+
+    @FXML
+    private void unselectAll() {
+<span class="nc" id="L113">        fileTreeView.getCheckModel().clearChecks();</span>
+<span class="nc" id="L114">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

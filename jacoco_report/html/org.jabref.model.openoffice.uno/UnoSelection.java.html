@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnoSelection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.openoffice.uno</a> &gt; <span class="el_source">UnoSelection.java</span></div><h1>UnoSelection.java</h1><pre class="source lang-java linenums">package org.jabref.model.openoffice.uno;
+
+import java.util.Objects;
+import java.util.Optional;
+
+import com.sun.star.frame.XController;
+import com.sun.star.lang.XServiceInfo;
+import com.sun.star.text.XTextDocument;
+import com.sun.star.view.XSelectionSupplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Selection in the document.
+ */
+public class UnoSelection {
+
+<span class="nc" id="L18">    private static final Logger LOGGER = LoggerFactory.getLogger(UnoSelection.class);</span>
+
+    private UnoSelection() {
+    }
+
+    private static Optional&lt;XSelectionSupplier&gt; getSelectionSupplier(XTextDocument doc) {
+<span class="nc bnc" id="L24" title="All 2 branches missed.">        if (doc == null) {</span>
+<span class="nc" id="L25">            LOGGER.warn(&quot;UnoSelection.getSelectionSupplier: doc is null&quot;);</span>
+<span class="nc" id="L26">            return Optional.empty();</span>
+        }
+<span class="nc" id="L28">        Optional&lt;XController&gt; controller = UnoTextDocument.getCurrentController(doc);</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">        if (controller.isEmpty()) {</span>
+<span class="nc" id="L30">            LOGGER.warn(&quot;UnoSelection.getSelectionSupplier: getCurrentController(doc) returned empty&quot;);</span>
+<span class="nc" id="L31">            return Optional.empty();</span>
+        }
+<span class="nc" id="L33">        Optional&lt;XSelectionSupplier&gt; supplier = UnoCast.cast(XSelectionSupplier.class, controller.get());</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        if (supplier.isEmpty()) {</span>
+<span class="nc" id="L35">            LOGGER.warn(&quot;UnoSelection.getSelectionSupplier: cast to XSelectionSupplier returned empty&quot;);</span>
+<span class="nc" id="L36">            return Optional.empty();</span>
+        }
+<span class="nc" id="L38">        return supplier;</span>
+    }
+
+    /**
+     * @return may be Optional.empty(), or some type supporting XServiceInfo
+     * So far it seems the first thing we have to do with a selection is to decide what do we have.
+     * &lt;p&gt;
+     * One way to do that is accessing its XServiceInfo interface.
+     * &lt;p&gt;
+     * Experiments using printServiceInfo with cursor in various positions in the document:
+     * &lt;p&gt;
+     * With cursor within the frame, in text: *** xserviceinfo.getImplementationName: &quot;SwXTextRanges&quot; &quot;com.sun.star.text.TextRanges&quot;
+     * &lt;p&gt;
+     * With cursor somewhere else in text: *** xserviceinfo.getImplementationName: &quot;SwXTextRanges&quot; &quot;com.sun.star.text.TextRanges&quot;
+     * &lt;p&gt;
+     * With cursor in comment (also known as &quot;annotation&quot;): *** XSelectionSupplier is OK *** Object initialSelection is null *** xserviceinfo is null
+     * &lt;p&gt;
+     * With frame selected: *** xserviceinfo.getImplementationName: &quot;SwXTextFrame&quot; &quot;com.sun.star.text.BaseFrame&quot; &quot;com.sun.star.text.TextContent&quot; &quot;com.sun.star.document.LinkTarget&quot; &quot;com.sun.star.text.TextFrame&quot; &quot;com.sun.star.text.Text&quot;
+     * &lt;p&gt;
+     * With cursor selecting an inserted image: *** XSelectionSupplier is OK *** Object initialSelection is OK *** xserviceinfo is OK *** xserviceinfo.getImplementationName: &quot;SwXTextGraphicObject&quot; &quot;com.sun.star.text.BaseFrame&quot; &quot;com.sun.star.text.TextContent&quot; &quot;com.sun.star.document.LinkTarget&quot; &quot;com.sun.star.text.TextGraphicObject&quot;
+     */
+    public static Optional&lt;XServiceInfo&gt; getSelectionAsXServiceInfo(XTextDocument doc) {
+<span class="nc" id="L60">        Objects.requireNonNull(doc);</span>
+<span class="nc" id="L61">        Optional&lt;XSelectionSupplier&gt; supplier = getSelectionSupplier(doc);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (supplier.isEmpty()) {</span>
+<span class="nc" id="L63">            LOGGER.warn(&quot;getSelectionSupplier returned empty&quot;);</span>
+<span class="nc" id="L64">            return Optional.empty();</span>
+        }
+<span class="nc" id="L66">        Object selection = supplier.get().getSelection();</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (selection == null) {</span>
+<span class="nc" id="L68">            return Optional.empty();</span>
+        }
+<span class="nc" id="L70">        Optional&lt;XServiceInfo&gt; result = UnoCast.cast(XServiceInfo.class, selection);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (result.isEmpty()) {</span>
+<span class="nc" id="L72">            LOGGER.warn(&quot;cast to XServiceInfo returned empty&quot;);</span>
+<span class="nc" id="L73">            return Optional.empty();</span>
+        }
+<span class="nc" id="L75">        return result;</span>
+    }
+
+    /**
+     * Select the object represented by {@code newSelection} if it is known and selectable in this {@code XSelectionSupplier} object.
+     * &lt;p&gt;
+     * Presumably result from {@code XSelectionSupplier.getSelection()} is usually OK. It also accepted {@code XTextRange newSelection = doc.getText().getStart();}
+     */
+    public static void select(XTextDocument doc, Object newSelection) {
+<span class="nc" id="L84">        Objects.requireNonNull(doc);</span>
+<span class="nc" id="L85">        getSelectionSupplier(doc).ifPresent(e -&gt; e.select(newSelection));</span>
+<span class="nc" id="L86">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

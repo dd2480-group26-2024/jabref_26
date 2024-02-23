@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseChangeList.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.collab</a> &gt; <span class="el_source">DatabaseChangeList.java</span></div><h1>DatabaseChangeList.java</h1><pre class="source lang-java linenums">package org.jabref.gui.collab;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import org.jabref.gui.collab.entryadd.EntryAdd;
+import org.jabref.gui.collab.entrychange.EntryChange;
+import org.jabref.gui.collab.entrydelete.EntryDelete;
+import org.jabref.gui.collab.groupchange.GroupChange;
+import org.jabref.gui.collab.metedatachange.MetadataChange;
+import org.jabref.gui.collab.preamblechange.PreambleChange;
+import org.jabref.gui.collab.stringadd.BibTexStringAdd;
+import org.jabref.gui.collab.stringchange.BibTexStringChange;
+import org.jabref.gui.collab.stringdelete.BibTexStringDelete;
+import org.jabref.gui.collab.stringrename.BibTexStringRename;
+import org.jabref.logic.bibtex.comparator.BibDatabaseDiff;
+import org.jabref.logic.bibtex.comparator.BibEntryDiff;
+import org.jabref.logic.bibtex.comparator.BibStringDiff;
+import org.jabref.model.database.BibDatabaseContext;
+
+public class DatabaseChangeList {
+    private DatabaseChangeList() {
+    }
+
+    /**
+     * Compares the given two databases, and returns the list of changes required to change the {@code originalDatabase} into the {@code otherDatabase}
+     *
+     * @param originalDatabase This is the original database
+     * @param otherDatabase    This is the other database.
+     * @return an unmodifiable list of {@code DatabaseChange} required to change {@code originalDatabase} into {@code otherDatabase}
+     */
+    public static List&lt;DatabaseChange&gt; compareAndGetChanges(BibDatabaseContext originalDatabase, BibDatabaseContext otherDatabase, DatabaseChangeResolverFactory databaseChangeResolverFactory) {
+<span class="nc" id="L34">        List&lt;DatabaseChange&gt; changes = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L36">        BibDatabaseDiff differences = BibDatabaseDiff.compare(originalDatabase, otherDatabase);</span>
+
+<span class="nc" id="L38">        differences.getMetaDataDifferences().ifPresent(diff -&gt; {</span>
+<span class="nc" id="L39">            changes.add(new MetadataChange(diff, originalDatabase, databaseChangeResolverFactory));</span>
+<span class="nc" id="L40">            diff.getGroupDifferences().ifPresent(groupDiff -&gt; changes.add(new GroupChange(</span>
+                    groupDiff, originalDatabase, databaseChangeResolverFactory
+            )));
+<span class="nc" id="L43">        });</span>
+<span class="nc" id="L44">        differences.getPreambleDifferences().ifPresent(diff -&gt; changes.add(new PreambleChange(diff, originalDatabase, databaseChangeResolverFactory)));</span>
+<span class="nc" id="L45">        differences.getBibStringDifferences().forEach(diff -&gt; changes.add(createBibStringDiff(originalDatabase, databaseChangeResolverFactory, diff)));</span>
+<span class="nc" id="L46">        differences.getEntryDifferences().forEach(diff -&gt; changes.add(createBibEntryDiff(originalDatabase, databaseChangeResolverFactory, diff)));</span>
+
+<span class="nc" id="L48">        return Collections.unmodifiableList(changes);</span>
+    }
+
+    private static DatabaseChange createBibStringDiff(BibDatabaseContext originalDatabase, DatabaseChangeResolverFactory databaseChangeResolverFactory, BibStringDiff diff) {
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (diff.getOriginalString() == null) {</span>
+<span class="nc" id="L53">            return new BibTexStringAdd(diff.getNewString(), originalDatabase, databaseChangeResolverFactory);</span>
+        }
+
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (diff.getNewString() == null) {</span>
+<span class="nc" id="L57">            return new BibTexStringDelete(diff.getOriginalString(), originalDatabase, databaseChangeResolverFactory);</span>
+        }
+
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (diff.getOriginalString().getName().equals(diff.getNewString().getName())) {</span>
+<span class="nc" id="L61">            return new BibTexStringChange(diff.getOriginalString(), diff.getNewString(), originalDatabase, databaseChangeResolverFactory);</span>
+        }
+
+<span class="nc" id="L64">        return new BibTexStringRename(diff.getOriginalString(), diff.getNewString(), originalDatabase, databaseChangeResolverFactory);</span>
+    }
+
+    private static DatabaseChange createBibEntryDiff(BibDatabaseContext originalDatabase, DatabaseChangeResolverFactory databaseChangeResolverFactory, BibEntryDiff diff) {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (diff.getOriginalEntry() == null) {</span>
+<span class="nc" id="L69">            return new EntryAdd(diff.getNewEntry(), originalDatabase, databaseChangeResolverFactory);</span>
+        }
+
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (diff.getNewEntry() == null) {</span>
+<span class="nc" id="L73">            return new EntryDelete(diff.getOriginalEntry(), originalDatabase, databaseChangeResolverFactory);</span>
+        }
+
+<span class="nc" id="L76">        return new EntryChange(diff.getOriginalEntry(), diff.getNewEntry(), originalDatabase, databaseChangeResolverFactory);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

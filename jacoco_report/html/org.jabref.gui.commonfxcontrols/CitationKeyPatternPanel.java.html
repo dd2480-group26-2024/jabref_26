@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitationKeyPatternPanel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.commonfxcontrols</a> &gt; <span class="el_source">CitationKeyPatternPanel.java</span></div><h1>CitationKeyPatternPanel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.commonfxcontrols;
+
+import java.util.Collection;
+
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.fxml.FXML;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
+import javafx.scene.control.TableView;
+import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.input.KeyEvent;
+
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.logic.citationkeypattern.AbstractCitationKeyPattern;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntryType;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import jakarta.inject.Inject;
+
+public class CitationKeyPatternPanel extends TableView&lt;CitationKeyPatternPanelItemModel&gt; {
+
+    @FXML public TableColumn&lt;CitationKeyPatternPanelItemModel, EntryType&gt; entryTypeColumn;
+    @FXML public TableColumn&lt;CitationKeyPatternPanelItemModel, String&gt; patternColumn;
+    @FXML public TableColumn&lt;CitationKeyPatternPanelItemModel, EntryType&gt; actionsColumn;
+
+    @Inject private PreferencesService preferences;
+
+    private CitationKeyPatternPanelViewModel viewModel;
+
+    private long lastKeyPressTime;
+    private String tableSearchTerm;
+
+    public CitationKeyPatternPanel() {
+<span class="fc" id="L39">        super();</span>
+
+<span class="fc" id="L41">        ViewLoader.view(this)</span>
+<span class="fc" id="L42">                  .root(this)</span>
+<span class="fc" id="L43">                  .load();</span>
+<span class="fc" id="L44">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L48">        viewModel = new CitationKeyPatternPanelViewModel(preferences.getCitationKeyPatternPreferences());</span>
+
+<span class="nc" id="L50">        this.setEditable(true);</span>
+
+<span class="nc" id="L52">        entryTypeColumn.setSortable(true);</span>
+<span class="nc" id="L53">        entryTypeColumn.setReorderable(false);</span>
+<span class="nc" id="L54">        entryTypeColumn.setCellValueFactory(cellData -&gt; cellData.getValue().entryType());</span>
+<span class="nc" id="L55">        new ValueTableCellFactory&lt;CitationKeyPatternPanelItemModel, EntryType&gt;()</span>
+<span class="nc" id="L56">                .withText(EntryType::getDisplayName)</span>
+<span class="nc" id="L57">                .install(entryTypeColumn);</span>
+<span class="nc" id="L58">        this.setOnSort(event -&gt;</span>
+<span class="nc" id="L59">                viewModel.patternListProperty().sort(CitationKeyPatternPanelViewModel.defaultOnTopComparator));</span>
+
+<span class="nc" id="L61">        patternColumn.setSortable(true);</span>
+<span class="nc" id="L62">        patternColumn.setReorderable(false);</span>
+<span class="nc" id="L63">        patternColumn.setCellValueFactory(cellData -&gt; cellData.getValue().pattern());</span>
+<span class="nc" id="L64">        patternColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+<span class="nc" id="L65">        patternColumn.setEditable(true);</span>
+<span class="nc" id="L66">        patternColumn.setOnEditCommit(</span>
+                (TableColumn.CellEditEvent&lt;CitationKeyPatternPanelItemModel, String&gt; event) -&gt;
+<span class="nc" id="L68">                        event.getRowValue().setPattern(event.getNewValue()));</span>
+
+<span class="nc" id="L70">        actionsColumn.setSortable(false);</span>
+<span class="nc" id="L71">        actionsColumn.setReorderable(false);</span>
+<span class="nc" id="L72">        actionsColumn.setCellValueFactory(cellData -&gt; cellData.getValue().entryType());</span>
+<span class="nc" id="L73">        new ValueTableCellFactory&lt;CitationKeyPatternPanelItemModel, EntryType&gt;()</span>
+<span class="nc" id="L74">                .withGraphic(entryType -&gt; IconTheme.JabRefIcons.REFRESH.getGraphicNode())</span>
+<span class="nc" id="L75">                .withTooltip(entryType -&gt;</span>
+<span class="nc" id="L76">                        String.format(Localization.lang(&quot;Reset %s to default value&quot;), entryType.getDisplayName()))</span>
+<span class="nc" id="L77">                .withOnMouseClickedEvent(item -&gt; evt -&gt;</span>
+<span class="nc" id="L78">                        viewModel.setItemToDefaultPattern(this.getFocusModel().getFocusedItem()))</span>
+<span class="nc" id="L79">                .install(actionsColumn);</span>
+
+<span class="nc" id="L81">        this.setRowFactory(item -&gt; new HighlightTableRow());</span>
+<span class="nc" id="L82">        this.setOnKeyTyped(this::jumpToSearchKey);</span>
+<span class="nc" id="L83">        this.itemsProperty().bindBidirectional(viewModel.patternListProperty());</span>
+<span class="nc" id="L84">    }</span>
+
+    public void setValues(Collection&lt;BibEntryType&gt; entryTypeList, AbstractCitationKeyPattern keyPattern) {
+<span class="nc" id="L87">        viewModel.setValues(entryTypeList, keyPattern);</span>
+<span class="nc" id="L88">    }</span>
+
+    public void resetAll() {
+<span class="nc" id="L91">        viewModel.resetAll();</span>
+<span class="nc" id="L92">    }</span>
+
+    public ListProperty&lt;CitationKeyPatternPanelItemModel&gt; patternListProperty() {
+<span class="nc" id="L95">        return viewModel.patternListProperty();</span>
+    }
+
+    public ObjectProperty&lt;CitationKeyPatternPanelItemModel&gt; defaultKeyPatternProperty() {
+<span class="nc" id="L99">        return viewModel.defaultKeyPatternProperty();</span>
+    }
+
+    private void jumpToSearchKey(KeyEvent keypressed) {
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (keypressed.getCharacter() == null) {</span>
+<span class="nc" id="L104">            return;</span>
+        }
+
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (System.currentTimeMillis() - lastKeyPressTime &lt; 1000) {</span>
+<span class="nc" id="L108">            tableSearchTerm += keypressed.getCharacter().toLowerCase();</span>
+        } else {
+<span class="nc" id="L110">            tableSearchTerm = keypressed.getCharacter().toLowerCase();</span>
+        }
+
+<span class="nc" id="L113">        lastKeyPressTime = System.currentTimeMillis();</span>
+
+<span class="nc" id="L115">        this.getItems().stream().filter(item -&gt; item.getEntryType().getName().toLowerCase().startsWith(tableSearchTerm))</span>
+<span class="nc" id="L116">            .findFirst().ifPresent(this::scrollTo);</span>
+<span class="nc" id="L117">    }</span>
+
+    private static class HighlightTableRow extends TableRow&lt;CitationKeyPatternPanelItemModel&gt; {
+        @Override
+        public void updateItem(CitationKeyPatternPanelItemModel item, boolean empty) {
+<span class="nc" id="L122">            super.updateItem(item, empty);</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">            if (item == null || item.getEntryType() == null) {</span>
+<span class="nc" id="L124">                setStyle(&quot;&quot;);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            } else if (isSelected()) {</span>
+<span class="nc" id="L126">                setStyle(&quot;-fx-background-color: -fx-selection-bar&quot;);</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            } else if (item.getEntryType().getName().equals(CitationKeyPatternPanelViewModel.ENTRY_TYPE_DEFAULT_NAME)) {</span>
+<span class="nc" id="L128">                setStyle(&quot;-fx-background-color: -fx-default-button&quot;);</span>
+            } else {
+<span class="nc" id="L130">                setStyle(&quot;&quot;);</span>
+            }
+<span class="nc" id="L132">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

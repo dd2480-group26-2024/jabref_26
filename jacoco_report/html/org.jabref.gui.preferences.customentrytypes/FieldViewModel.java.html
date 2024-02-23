@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.customentrytypes</a> &gt; <span class="el_source">FieldViewModel.java</span></div><h1>FieldViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.customentrytypes;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.field.BibField;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.FieldPriority;
+import org.jabref.model.entry.field.FieldProperty;
+
+public class FieldViewModel {
+
+<span class="nc" id="L19">    private final StringProperty displayName = new SimpleStringProperty(&quot;&quot;);</span>
+<span class="nc" id="L20">    private final BooleanProperty required = new SimpleBooleanProperty();</span>
+<span class="nc" id="L21">    private final BooleanProperty multiline = new SimpleBooleanProperty();</span>
+<span class="nc" id="L22">    private final ObjectProperty&lt;FieldPriority&gt; priorityProperty = new SimpleObjectProperty&lt;&gt;();</span>
+
+    public FieldViewModel(Field field,
+                          Mandatory required,
+                          FieldPriority priorityProperty,
+<span class="nc" id="L27">                          boolean multiline) {</span>
+<span class="nc" id="L28">        this.displayName.setValue(field.getDisplayName());</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">        this.required.setValue(required == Mandatory.REQUIRED);</span>
+<span class="nc" id="L30">        this.priorityProperty.setValue(priorityProperty);</span>
+<span class="nc" id="L31">        this.multiline.setValue(multiline);</span>
+<span class="nc" id="L32">    }</span>
+
+    public StringProperty displayNameProperty() {
+<span class="nc" id="L35">        return displayName;</span>
+    }
+
+    public BooleanProperty requiredProperty() {
+<span class="nc" id="L39">        return required;</span>
+    }
+
+    public boolean isRequired() {
+<span class="nc" id="L43">        return required.getValue();</span>
+    }
+
+    public BooleanProperty multilineProperty() {
+<span class="nc" id="L47">        return multiline;</span>
+    }
+
+    public boolean isMultiline() {
+<span class="nc" id="L51">        return multiline.getValue();</span>
+    }
+
+    public FieldPriority getPriority() {
+<span class="nc" id="L55">        return priorityProperty.getValue();</span>
+    }
+
+    public Field toField() {
+        // If the field name is known by JabRef, JabRef's casing will win.
+        // If the field is not known by JabRef (UnknownField), the new casing will be taken.
+<span class="nc" id="L61">        Field field = FieldFactory.parseField(displayName.getValue());</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (multiline.getValue()) {</span>
+<span class="nc" id="L63">            field.getProperties().add(FieldProperty.MULTILINE_TEXT);</span>
+        }
+<span class="nc" id="L65">        return field;</span>
+    }
+
+    public BibField toBibField() {
+<span class="nc" id="L69">        return new BibField(toField(), priorityProperty.getValue());</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L74">        return displayName.getValue();</span>
+    }
+
+<span class="nc" id="L77">    public enum Mandatory {</span>
+<span class="nc" id="L78">        REQUIRED(Localization.lang(&quot;Required&quot;)),</span>
+<span class="nc" id="L79">        OPTIONAL(Localization.lang(&quot;Optional&quot;));</span>
+
+        private final String name;
+
+<span class="nc" id="L83">        Mandatory(String name) {</span>
+<span class="nc" id="L84">            this.name = name;</span>
+<span class="nc" id="L85">        }</span>
+
+        public String getDisplayName() {
+<span class="nc" id="L88">            return name;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

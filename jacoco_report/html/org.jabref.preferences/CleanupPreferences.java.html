@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CleanupPreferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.preferences</a> &gt; <span class="el_source">CleanupPreferences.java</span></div><h1>CleanupPreferences.java</h1><pre class="source lang-java linenums">package org.jabref.preferences;
+
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.Set;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableSet;
+
+import org.jabref.logic.cleanup.FieldFormatterCleanups;
+
+public class CleanupPreferences {
+
+    private final ObservableSet&lt;CleanupStep&gt; activeJobs;
+    private final ObjectProperty&lt;FieldFormatterCleanups&gt; fieldFormatterCleanups;
+
+    public CleanupPreferences(EnumSet&lt;CleanupStep&gt; activeJobs) {
+<span class="fc" id="L20">        this(activeJobs, new FieldFormatterCleanups(false, new ArrayList&lt;&gt;()));</span>
+<span class="fc" id="L21">    }</span>
+
+    public CleanupPreferences(CleanupStep activeJob) {
+<span class="fc" id="L24">        this(EnumSet.of(activeJob));</span>
+<span class="fc" id="L25">    }</span>
+
+    public CleanupPreferences(FieldFormatterCleanups formatterCleanups) {
+<span class="fc" id="L28">        this(EnumSet.noneOf(CleanupStep.class), formatterCleanups);</span>
+<span class="fc" id="L29">    }</span>
+
+<span class="fc" id="L31">    public CleanupPreferences(EnumSet&lt;CleanupStep&gt; activeJobs, FieldFormatterCleanups formatterCleanups) {</span>
+<span class="fc" id="L32">        this.activeJobs = FXCollections.observableSet(activeJobs);</span>
+<span class="fc" id="L33">        this.fieldFormatterCleanups = new SimpleObjectProperty&lt;&gt;(formatterCleanups);</span>
+<span class="fc" id="L34">    }</span>
+
+    public EnumSet&lt;CleanupStep&gt; getActiveJobs() {
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (activeJobs.isEmpty()) {</span>
+<span class="fc" id="L38">            return EnumSet.noneOf(CleanupStep.class);</span>
+        }
+
+<span class="fc" id="L41">        return EnumSet.copyOf(activeJobs);</span>
+    }
+
+    public void setActive(CleanupStep job, boolean value) {
+<span class="nc bnc" id="L45" title="All 4 branches missed.">        if (activeJobs.contains(job) &amp;&amp; !value) {</span>
+<span class="nc" id="L46">            activeJobs.remove(job);</span>
+<span class="nc bnc" id="L47" title="All 4 branches missed.">        } else if (!activeJobs.contains(job) &amp;&amp; value) {</span>
+<span class="nc" id="L48">            activeJobs.add(job);</span>
+        }
+<span class="nc" id="L50">    }</span>
+
+    protected ObservableSet&lt;CleanupStep&gt; getObservableActiveJobs() {
+<span class="nc" id="L53">        return activeJobs;</span>
+    }
+
+    public void setActiveJobs(Set&lt;CleanupStep&gt; jobs) {
+<span class="nc" id="L57">        activeJobs.clear();</span>
+<span class="nc" id="L58">        activeJobs.addAll(jobs);</span>
+<span class="nc" id="L59">    }</span>
+
+    public Boolean isActive(CleanupStep step) {
+<span class="nc" id="L62">        return activeJobs.contains(step);</span>
+    }
+
+    public FieldFormatterCleanups getFieldFormatterCleanups() {
+<span class="fc" id="L66">        return fieldFormatterCleanups.get();</span>
+    }
+
+    protected ObjectProperty&lt;FieldFormatterCleanups&gt; fieldFormatterCleanupsProperty() {
+<span class="nc" id="L70">        return fieldFormatterCleanups;</span>
+    }
+
+    public void setFieldFormatterCleanups(FieldFormatterCleanups fieldFormatters) {
+<span class="nc" id="L74">        fieldFormatterCleanups.setValue(fieldFormatters);</span>
+<span class="nc" id="L75">    }</span>
+
+<span class="fc" id="L77">    public enum CleanupStep {</span>
+        /**
+         * Removes the http://... for each DOI. Moves DOIs from URL and NOTE filed to DOI field.
+         */
+<span class="fc" id="L81">        CLEAN_UP_DOI,</span>
+<span class="fc" id="L82">        CLEANUP_EPRINT,</span>
+<span class="fc" id="L83">        CLEAN_UP_URL,</span>
+<span class="fc" id="L84">        MAKE_PATHS_RELATIVE,</span>
+<span class="fc" id="L85">        RENAME_PDF,</span>
+<span class="fc" id="L86">        RENAME_PDF_ONLY_RELATIVE_PATHS,</span>
+        /**
+         * Collects file links from the pdf or ps field, and adds them to the list contained in the file field.
+         */
+<span class="fc" id="L90">        CLEAN_UP_UPGRADE_EXTERNAL_LINKS,</span>
+        /**
+         * Converts to biblatex format
+         */
+<span class="fc" id="L94">        CONVERT_TO_BIBLATEX,</span>
+        /**
+         * Converts to bibtex format
+         */
+<span class="fc" id="L98">        CONVERT_TO_BIBTEX,</span>
+<span class="fc" id="L99">        CONVERT_TIMESTAMP_TO_CREATIONDATE,</span>
+<span class="fc" id="L100">        CONVERT_TIMESTAMP_TO_MODIFICATIONDATE,</span>
+<span class="fc" id="L101">        DO_NOT_CONVERT_TIMESTAMP,</span>
+<span class="fc" id="L102">        MOVE_PDF,</span>
+<span class="fc" id="L103">        FIX_FILE_LINKS,</span>
+<span class="fc" id="L104">        CLEAN_UP_ISSN</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

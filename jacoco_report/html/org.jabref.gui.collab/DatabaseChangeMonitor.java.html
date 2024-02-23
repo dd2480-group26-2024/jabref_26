@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseChangeMonitor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.collab</a> &gt; <span class="el_source">DatabaseChangeMonitor.java</span></div><h1>DatabaseChangeMonitor.java</h1><pre class="source lang-java linenums">package org.jabref.gui.collab;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import javafx.util.Duration;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.util.FileUpdateListener;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import org.controlsfx.control.action.Action;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class DatabaseChangeMonitor implements FileUpdateListener {
+
+<span class="nc" id="L26">    private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseChangeMonitor.class);</span>
+
+    private final BibDatabaseContext database;
+    private final FileUpdateMonitor fileMonitor;
+    private final List&lt;DatabaseChangeListener&gt; listeners;
+    private final TaskExecutor taskExecutor;
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+
+    public DatabaseChangeMonitor(BibDatabaseContext database,
+                                 FileUpdateMonitor fileMonitor,
+                                 TaskExecutor taskExecutor,
+                                 DialogService dialogService,
+                                 PreferencesService preferencesService,
+<span class="nc" id="L40">                                 LibraryTab.DatabaseNotification notificationPane) {</span>
+<span class="nc" id="L41">        this.database = database;</span>
+<span class="nc" id="L42">        this.fileMonitor = fileMonitor;</span>
+<span class="nc" id="L43">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L44">        this.dialogService = dialogService;</span>
+<span class="nc" id="L45">        this.preferencesService = preferencesService;</span>
+
+<span class="nc" id="L47">        this.listeners = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L49">        this.database.getDatabasePath().ifPresent(path -&gt; {</span>
+            try {
+<span class="nc" id="L51">                fileMonitor.addListenerForFile(path, this);</span>
+<span class="nc" id="L52">            } catch (IOException e) {</span>
+<span class="nc" id="L53">                LOGGER.error(&quot;Error while trying to monitor {}&quot;, path, e);</span>
+<span class="nc" id="L54">            }</span>
+<span class="nc" id="L55">        });</span>
+
+<span class="nc" id="L57">        addListener(changes -&gt; notificationPane.notify(</span>
+<span class="nc" id="L58">                IconTheme.JabRefIcons.SAVE.getGraphicNode(),</span>
+<span class="nc" id="L59">                Localization.lang(&quot;The library has been modified by another program.&quot;),</span>
+<span class="nc" id="L60">                List.of(new Action(Localization.lang(&quot;Dismiss changes&quot;), event -&gt; notificationPane.hide()),</span>
+<span class="nc" id="L61">                        new Action(Localization.lang(&quot;Review changes&quot;), event -&gt; {</span>
+<span class="nc" id="L62">                            dialogService.showCustomDialogAndWait(new DatabaseChangesResolverDialog(changes, database, Localization.lang(&quot;External Changes Resolver&quot;)));</span>
+<span class="nc" id="L63">                            notificationPane.hide();</span>
+<span class="nc" id="L64">                        })),</span>
+                Duration.ZERO));
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    public void fileUpdated() {
+<span class="nc" id="L70">        synchronized (database) {</span>
+            // File on disk has changed, thus look for notable changes and notify listeners in case there are such changes
+<span class="nc" id="L72">            ChangeScanner scanner = new ChangeScanner(database, dialogService, preferencesService);</span>
+<span class="nc" id="L73">            BackgroundTask.wrap(scanner::scanForChanges)</span>
+<span class="nc" id="L74">                          .onSuccess(changes -&gt; {</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                              if (!changes.isEmpty()) {</span>
+<span class="nc" id="L76">                                  listeners.forEach(listener -&gt; listener.databaseChanged(changes));</span>
+                              }
+<span class="nc" id="L78">                          })</span>
+<span class="nc" id="L79">                          .onFailure(e -&gt; LOGGER.error(&quot;Error while watching for changes&quot;, e))</span>
+<span class="nc" id="L80">                          .executeWith(taskExecutor);</span>
+<span class="nc" id="L81">        }</span>
+<span class="nc" id="L82">    }</span>
+
+    public void addListener(DatabaseChangeListener listener) {
+<span class="nc" id="L85">        listeners.add(listener);</span>
+<span class="nc" id="L86">    }</span>
+
+    public void unregister() {
+<span class="nc" id="L89">        database.getDatabasePath().ifPresent(file -&gt; fileMonitor.removeListener(file, this));</span>
+<span class="nc" id="L90">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

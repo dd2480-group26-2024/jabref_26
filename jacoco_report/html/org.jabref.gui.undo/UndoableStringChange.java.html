@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UndoableStringChange.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.undo</a> &gt; <span class="el_source">UndoableStringChange.java</span></div><h1>UndoableStringChange.java</h1><pre class="source lang-java linenums">package org.jabref.gui.undo;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibtexString;
+import org.jabref.model.strings.StringUtil;
+
+public class UndoableStringChange extends AbstractUndoableJabRefEdit {
+
+    private final BibtexString string;
+    private final String oldValue;
+    private final String newValue;
+    private final boolean nameChange;
+
+<span class="nc" id="L14">    public UndoableStringChange(BibtexString string, boolean nameChange, String oldValue, String newValue) {</span>
+<span class="nc" id="L15">        this.string = string;</span>
+<span class="nc" id="L16">        this.oldValue = oldValue;</span>
+<span class="nc" id="L17">        this.newValue = newValue;</span>
+<span class="nc" id="L18">        this.nameChange = nameChange;</span>
+<span class="nc" id="L19">    }</span>
+
+    @Override
+    public String getPresentationName() {
+<span class="nc bnc" id="L23" title="All 2 branches missed.">        return nameChange ? Localization.lang(&quot;change string name %0 to %1&quot;, StringUtil.boldHTML(oldValue),</span>
+<span class="nc" id="L24">                StringUtil.boldHTML(newValue)) :</span>
+<span class="nc" id="L25">                Localization.lang(&quot;change string content %0 to %1&quot;,</span>
+<span class="nc" id="L26">                        StringUtil.boldHTML(oldValue), StringUtil.boldHTML(newValue));</span>
+    }
+
+    @Override
+    public void undo() {
+<span class="nc" id="L31">        super.undo();</span>
+
+        // Revert the change.
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        if (nameChange) {</span>
+<span class="nc" id="L35">            string.setName(oldValue);</span>
+        } else {
+<span class="nc" id="L37">            string.setContent(oldValue);</span>
+        }
+<span class="nc" id="L39">    }</span>
+
+    @Override
+    public void redo() {
+<span class="nc" id="L43">        super.redo();</span>
+
+        // Redo the change.
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (nameChange) {</span>
+<span class="nc" id="L47">            string.setName(newValue);</span>
+        } else {
+<span class="nc" id="L49">            string.setContent(newValue);</span>
+        }
+<span class="nc" id="L51">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

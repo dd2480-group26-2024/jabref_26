@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ISSNEditor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors</a> &gt; <span class="el_source">ISSNEditor.java</span></div><h1>ISSNEditor.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors;
+
+import java.util.Optional;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.fxml.FXML;
+import javafx.scene.Parent;
+import javafx.scene.control.Button;
+import javafx.scene.layout.HBox;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.autocompleter.SuggestionProvider;
+import org.jabref.gui.fieldeditors.contextmenu.DefaultMenu;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.integrity.FieldCheckers;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
+import org.jabref.preferences.PreferencesService;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import jakarta.inject.Inject;
+
+public class ISSNEditor extends HBox implements FieldEditorFX {
+    @FXML private ISSNEditorViewModel viewModel;
+    @FXML private EditorTextArea textArea;
+    @FXML private Button journalInfoButton;
+    @FXML private Button fetchInformationByIdentifierButton;
+
+    @Inject private DialogService dialogService;
+    @Inject private PreferencesService preferencesService;
+    @Inject private UndoManager undoManager;
+    @Inject private TaskExecutor taskExecutor;
+    @Inject private StateManager stateManager;
+<span class="nc" id="L36">    private Optional&lt;BibEntry&gt; entry = Optional.empty();</span>
+
+    public ISSNEditor(Field field,
+                      SuggestionProvider&lt;?&gt; suggestionProvider,
+<span class="nc" id="L40">                      FieldCheckers fieldCheckers) {</span>
+
+<span class="nc" id="L42">        ViewLoader.view(this)</span>
+<span class="nc" id="L43">                  .root(this)</span>
+<span class="nc" id="L44">                  .load();</span>
+
+<span class="nc" id="L46">        this.viewModel = new ISSNEditorViewModel(</span>
+                field,
+                suggestionProvider,
+                fieldCheckers,
+                taskExecutor,
+                dialogService,
+                undoManager,
+                stateManager,
+                preferencesService);
+
+<span class="nc" id="L56">        textArea.textProperty().bindBidirectional(viewModel.textProperty());</span>
+<span class="nc" id="L57">        textArea.initContextMenu(new DefaultMenu(textArea));</span>
+
+<span class="nc" id="L59">        new EditorValidator(preferencesService).configureValidation(viewModel.getFieldValidator().getValidationStatus(), textArea);</span>
+<span class="nc" id="L60">    }</span>
+
+    public ISSNEditorViewModel getViewModel() {
+<span class="nc" id="L63">        return viewModel;</span>
+    }
+
+    @Override
+    public void bindToEntry(BibEntry entry) {
+<span class="nc" id="L68">        this.entry = Optional.of(entry);</span>
+<span class="nc" id="L69">        viewModel.bindToEntry(entry);</span>
+<span class="nc" id="L70">    }</span>
+
+    @Override
+    public Parent getNode() {
+<span class="nc" id="L74">        return this;</span>
+    }
+
+    @Override
+    public void requestFocus() {
+<span class="nc" id="L79">        textArea.requestFocus();</span>
+<span class="nc" id="L80">    }</span>
+
+    @FXML
+    private void fetchInformationByIdentifier() {
+<span class="nc" id="L84">        entry.ifPresent(viewModel::fetchBibliographyInformation);</span>
+<span class="nc" id="L85">    }</span>
+
+    @FXML
+    private void showJournalInfo() {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (JournalInfoOptInDialogHelper.isJournalInfoEnabled(dialogService, preferencesService.getEntryEditorPreferences())) {</span>
+<span class="nc" id="L90">            viewModel.showJournalInfo(journalInfoButton);</span>
+        }
+<span class="nc" id="L92">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

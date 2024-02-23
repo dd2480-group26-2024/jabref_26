@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GrammarBasedSearchRuleDescriber.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.search.rules.describer</a> &gt; <span class="el_source">GrammarBasedSearchRuleDescriber.java</span></div><h1>GrammarBasedSearchRuleDescriber.java</h1><pre class="source lang-java linenums">package org.jabref.gui.search.rules.describer;
+
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
+
+import org.jabref.gui.util.TooltipTextUtil;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.search.rules.GrammarBasedSearchRule;
+import org.jabref.model.search.rules.SearchRules;
+import org.jabref.model.search.rules.SearchRules.SearchFlags;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.search.SearchBaseVisitor;
+import org.jabref.search.SearchParser;
+
+import org.antlr.v4.runtime.tree.ParseTree;
+
+public class GrammarBasedSearchRuleDescriber implements SearchDescriber {
+
+    private final EnumSet&lt;SearchFlags&gt; searchFlags;
+    private final ParseTree parseTree;
+
+<span class="nc" id="L29">    public GrammarBasedSearchRuleDescriber(EnumSet&lt;SearchFlags&gt; searchFlags, ParseTree parseTree) {</span>
+<span class="nc" id="L30">        this.searchFlags = searchFlags;</span>
+<span class="nc" id="L31">        this.parseTree = Objects.requireNonNull(parseTree);</span>
+<span class="nc" id="L32">    }</span>
+
+    @Override
+    public TextFlow getDescription() {
+<span class="nc" id="L36">        TextFlow textFlow = new TextFlow();</span>
+<span class="nc" id="L37">        DescriptionSearchBaseVisitor descriptionSearchBaseVisitor = new DescriptionSearchBaseVisitor();</span>
+
+        // describe advanced search expression
+<span class="nc" id="L40">        textFlow.getChildren().add(TooltipTextUtil.createText(&quot;%s &quot;.formatted(Localization.lang(&quot;This search contains entries in which&quot;)), TooltipTextUtil.TextType.NORMAL));</span>
+<span class="nc" id="L41">        textFlow.getChildren().addAll(descriptionSearchBaseVisitor.visit(parseTree));</span>
+<span class="nc" id="L42">        textFlow.getChildren().add(TooltipTextUtil.createText(&quot;. &quot;, TooltipTextUtil.TextType.NORMAL));</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        textFlow.getChildren().add(TooltipTextUtil.createText(searchFlags.contains(SearchRules.SearchFlags.CASE_SENSITIVE) ? Localization</span>
+<span class="nc" id="L44">                .lang(&quot;The search is case-sensitive.&quot;) :</span>
+<span class="nc" id="L45">                Localization.lang(&quot;The search is case-insensitive.&quot;), TooltipTextUtil.TextType.NORMAL));</span>
+<span class="nc" id="L46">        return textFlow;</span>
+    }
+
+<span class="nc" id="L49">    private class DescriptionSearchBaseVisitor extends SearchBaseVisitor&lt;List&lt;Text&gt;&gt; {</span>
+
+        @Override
+        public List&lt;Text&gt; visitStart(SearchParser.StartContext context) {
+<span class="nc" id="L53">            return visit(context.expression());</span>
+        }
+
+        @Override
+        public List&lt;Text&gt; visitUnaryExpression(SearchParser.UnaryExpressionContext context) {
+<span class="nc" id="L58">            List&lt;Text&gt; textList = visit(context.expression());</span>
+<span class="nc" id="L59">            textList.add(0, TooltipTextUtil.createText(Localization.lang(&quot;not&quot;).concat(&quot; &quot;), TooltipTextUtil.TextType.NORMAL));</span>
+<span class="nc" id="L60">            return textList;</span>
+        }
+
+        @Override
+        public List&lt;Text&gt; visitParenExpression(SearchParser.ParenExpressionContext context) {
+<span class="nc" id="L65">            ArrayList&lt;Text&gt; textList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L66">            textList.add(TooltipTextUtil.createText(&quot;%s&quot;.formatted(context.expression()), TooltipTextUtil.TextType.NORMAL));</span>
+<span class="nc" id="L67">            return textList;</span>
+        }
+
+        @Override
+        public List&lt;Text&gt; visitBinaryExpression(SearchParser.BinaryExpressionContext context) {
+<span class="nc" id="L72">            List&lt;Text&gt; textList = visit(context.left);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            if (&quot;AND&quot;.equalsIgnoreCase(context.operator.getText())) {</span>
+<span class="nc" id="L74">                textList.add(TooltipTextUtil.createText(&quot; %s &quot;.formatted(Localization.lang(&quot;and&quot;)), TooltipTextUtil.TextType.NORMAL));</span>
+            } else {
+<span class="nc" id="L76">                textList.add(TooltipTextUtil.createText(&quot; %s &quot;.formatted(Localization.lang(&quot;or&quot;)), TooltipTextUtil.TextType.NORMAL));</span>
+            }
+<span class="nc" id="L78">            textList.addAll(visit(context.right));</span>
+<span class="nc" id="L79">            return textList;</span>
+        }
+
+        @Override
+        public List&lt;Text&gt; visitComparison(SearchParser.ComparisonContext context) {
+<span class="nc" id="L84">            final List&lt;Text&gt; textList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L85">            final Optional&lt;SearchParser.NameContext&gt; fieldDescriptor = Optional.ofNullable(context.left);</span>
+<span class="nc" id="L86">            final String value = StringUtil.unquote(context.right.getText(), '&quot;');</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (!fieldDescriptor.isPresent()) {</span>
+<span class="nc" id="L88">                TextFlow description = new ContainsAndRegexBasedSearchRuleDescriber(searchFlags, value).getDescription();</span>
+<span class="nc" id="L89">                description.getChildren().forEach(it -&gt; textList.add((Text) it));</span>
+<span class="nc" id="L90">                return textList;</span>
+            }
+
+<span class="nc" id="L93">            final String field = StringUtil.unquote(fieldDescriptor.get().getText(), '&quot;');</span>
+<span class="nc" id="L94">            final GrammarBasedSearchRule.ComparisonOperator operator = GrammarBasedSearchRule.ComparisonOperator.build(context.operator.getText());</span>
+
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            final boolean regExpFieldSpec = !Pattern.matches(&quot;\\w+&quot;, field);</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            String temp = regExpFieldSpec ? Localization.lang(</span>
+<span class="nc" id="L98">                    &quot;any field that matches the regular expression &lt;b&gt;%0&lt;/b&gt;&quot;) : Localization.lang(&quot;the field &lt;b&gt;%0&lt;/b&gt;&quot;);</span>
+
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (operator == GrammarBasedSearchRule.ComparisonOperator.CONTAINS) {</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                if (searchFlags.contains(SearchRules.SearchFlags.REGULAR_EXPRESSION)) {</span>
+<span class="nc" id="L102">                    temp = Localization.lang(&quot;%0 contains the regular expression &lt;b&gt;%1&lt;/b&gt;&quot;, temp);</span>
+                } else {
+<span class="nc" id="L104">                    temp = Localization.lang(&quot;%0 contains the term &lt;b&gt;%1&lt;/b&gt;&quot;, temp);</span>
+                }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            } else if (operator == GrammarBasedSearchRule.ComparisonOperator.EXACT) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                if (searchFlags.contains(SearchRules.SearchFlags.REGULAR_EXPRESSION)) {</span>
+<span class="nc" id="L108">                    temp = Localization.lang(&quot;%0 matches the regular expression &lt;b&gt;%1&lt;/b&gt;&quot;, temp);</span>
+                } else {
+<span class="nc" id="L110">                    temp = Localization.lang(&quot;%0 matches the term &lt;b&gt;%1&lt;/b&gt;&quot;, temp);</span>
+                }
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            } else if (operator == GrammarBasedSearchRule.ComparisonOperator.DOES_NOT_CONTAIN) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                if (searchFlags.contains(SearchRules.SearchFlags.REGULAR_EXPRESSION)) {</span>
+<span class="nc" id="L114">                    temp = Localization.lang(&quot;%0 doesn't contain the regular expression &lt;b&gt;%1&lt;/b&gt;&quot;, temp);</span>
+                } else {
+<span class="nc" id="L116">                    temp = Localization.lang(&quot;%0 doesn't contain the term &lt;b&gt;%1&lt;/b&gt;&quot;, temp);</span>
+                }
+            } else {
+<span class="nc" id="L119">                throw new IllegalStateException(&quot;CANNOT HAPPEN!&quot;);</span>
+            }
+
+<span class="nc" id="L122">            List&lt;Text&gt; formattedTexts = TooltipTextUtil.formatToTexts(temp,</span>
+                    new TooltipTextUtil.TextReplacement(&quot;&lt;b&gt;%0&lt;/b&gt;&quot;, field, TooltipTextUtil.TextType.BOLD),
+                    new TooltipTextUtil.TextReplacement(&quot;&lt;b&gt;%1&lt;/b&gt;&quot;, value, TooltipTextUtil.TextType.BOLD));
+<span class="nc" id="L125">            textList.addAll(formattedTexts);</span>
+<span class="nc" id="L126">            return textList;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

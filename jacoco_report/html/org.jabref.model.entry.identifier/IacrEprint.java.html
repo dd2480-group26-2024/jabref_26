@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IacrEprint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.identifier</a> &gt; <span class="el_source">IacrEprint.java</span></div><h1>IacrEprint.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.identifier;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class IacrEprint implements Identifier {
+<span class="fc" id="L17">    public static final URI RESOLVER = URI.create(&quot;https://ia.cr&quot;);</span>
+<span class="fc" id="L18">    private static final Logger LOGGER = LoggerFactory.getLogger(IacrEprint.class);</span>
+
+    private static final String IACR_EPRINT_EXP = &quot;\\d{4}\\/\\d{3,5}&quot;;
+    private final String iacrEprint;
+
+<span class="fc" id="L23">    IacrEprint(String iacrEprint) {</span>
+<span class="fc" id="L24">        Objects.requireNonNull(iacrEprint);</span>
+
+<span class="fc" id="L26">        String trimmedId = iacrEprint.trim();</span>
+
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (matchesExcepted(trimmedId)) {</span>
+<span class="fc" id="L29">            Matcher matcher = Pattern.compile(IACR_EPRINT_EXP).matcher(trimmedId);</span>
+<span class="fc" id="L30">            matcher.find();</span>
+<span class="fc" id="L31">            this.iacrEprint = matcher.group(0);</span>
+<span class="fc" id="L32">        } else {</span>
+<span class="fc" id="L33">            throw new IllegalArgumentException(trimmedId + &quot; is not a valid IacrEprint identifier.&quot;);</span>
+        }
+<span class="fc" id="L35">    }</span>
+
+    private static boolean matchesExcepted(String identifier) {
+<span class="fc" id="L38">        return identifier.matches(</span>
+                &quot;(https\\:\\/\\/)?(ia\\.cr\\/|eprint\\.iacr\\.org\\/)?&quot; + IACR_EPRINT_EXP
+        );
+    }
+
+    public static Optional&lt;IacrEprint&gt; parse(String identifier) {
+<span class="nc" id="L44">        String trimmed = identifier.strip();</span>
+        try {
+<span class="nc" id="L46">            return Optional.of(new IacrEprint(trimmed));</span>
+<span class="nc" id="L47">        } catch (IllegalArgumentException illegalArgumentException) {</span>
+<span class="nc" id="L48">            return Optional.empty();</span>
+        }
+    }
+
+    @Override
+    public String getNormalized() {
+<span class="fc" id="L54">        return iacrEprint;</span>
+    }
+
+    @Override
+    public Field getDefaultField() {
+<span class="nc" id="L59">        return StandardField.EPRINT;</span>
+    }
+
+    @Override
+    public Optional&lt;URI&gt; getExternalURI() {
+        try {
+<span class="fc" id="L65">            URI uri = new URI(RESOLVER.getScheme(), RESOLVER.getHost(), &quot;/&quot; + iacrEprint, null);</span>
+<span class="fc" id="L66">            return Optional.of(uri);</span>
+<span class="nc" id="L67">        } catch (URISyntaxException e) {</span>
+            // should never happen
+<span class="nc" id="L69">            LOGGER.error(iacrEprint + &quot; could not be encoded as URI.&quot;, e);</span>
+<span class="nc" id="L70">            return Optional.empty();</span>
+        }
+    }
+
+    public String getAsciiUrl() {
+<span class="fc" id="L75">        return getExternalURI().map(URI::toASCIIString).orElse(&quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

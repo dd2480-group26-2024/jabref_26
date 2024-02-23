@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CSLAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.citationstyle</a> &gt; <span class="el_source">CSLAdapter.java</span></div><h1>CSLAdapter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.citationstyle;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.BibEntryTypesManager;
+
+import de.undercouch.citeproc.CSL;
+import de.undercouch.citeproc.DefaultAbbreviationProvider;
+import de.undercouch.citeproc.output.Bibliography;
+
+/**
+ * Provides an adapter class to CSL. It holds a CSL instance under the hood that is only recreated when
+ * the style changes.
+ *
+ * Note on the API: The first call to {@link #makeBibliography} is expensive since the
+ * CSL instance will be created. As long as the style stays the same, we can reuse this instance. On style-change, the
+ * engine is re-instantiated. Therefore, the use-case of this class is many calls to {@link #makeBibliography} with the
+ * same style. Changing the output format is cheap.
+ *
+ * Note on the implementation:
+ * The main function {@link #makeBibliography} will enforce
+ * synchronized calling. The main CSL engine under the hood is not thread-safe. Since this class is usually called from
+ * a BackgroundTask, the only other option would be to create several CSL instances which is wasting a lot of resources and very slow.
+ * In the current scheme, {@link #makeBibliography} can be called as usual
+ * background task and to the best of my knowledge, concurrent calls will pile up and processed sequentially.
+ */
+<span class="fc" id="L32">public class CSLAdapter {</span>
+
+<span class="fc" id="L34">    private final JabRefItemDataProvider dataProvider = new JabRefItemDataProvider();</span>
+    private String style;
+    private CitationStyleOutputFormat format;
+    private CSL cslInstance;
+
+    /**
+     * Creates the bibliography of the provided items. This method needs to run synchronized because the underlying
+     * CSL engine is not thread-safe.
+     *
+     * @param databaseContext {@link BibDatabaseContext} is used to be able to resolve fields and their aliases
+     */
+    public synchronized List&lt;String&gt; makeBibliography(List&lt;BibEntry&gt; bibEntries, String style, CitationStyleOutputFormat outputFormat, BibDatabaseContext databaseContext, BibEntryTypesManager entryTypesManager) throws IOException, IllegalArgumentException {
+<span class="fc" id="L46">        dataProvider.setData(bibEntries, databaseContext, entryTypesManager);</span>
+<span class="nc" id="L47">        initialize(style, outputFormat);</span>
+<span class="nc" id="L48">        cslInstance.registerCitationItems(dataProvider.getIds());</span>
+<span class="nc" id="L49">        final Bibliography bibliography = cslInstance.makeBibliography();</span>
+<span class="nc" id="L50">        return Arrays.asList(bibliography.getEntries());</span>
+    }
+
+    /**
+     * Initialized the static CSL instance if needed.
+     *
+     * @param newStyle  journal style of the output
+     * @param newFormat usually HTML or RTF.
+     * @throws IOException An error occurred in the underlying JavaScript framework
+     */
+    private void initialize(String newStyle, CitationStyleOutputFormat newFormat) throws IOException {
+<span class="pc bpc" id="L61" title="3 of 4 branches missed.">        final boolean newCslInstanceNeedsToBeCreated = (cslInstance == null) || !Objects.equals(newStyle, style);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (newCslInstanceNeedsToBeCreated) {</span>
+            // lang and forceLang are set to the default values of other CSL constructors
+<span class="nc" id="L64">            cslInstance = new CSL(dataProvider, new JabRefLocaleProvider(),</span>
+                    new DefaultAbbreviationProvider(), newStyle, &quot;en-US&quot;);
+<span class="nc" id="L66">            style = newStyle;</span>
+        }
+
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        if (newCslInstanceNeedsToBeCreated || (!Objects.equals(newFormat, format))) {</span>
+<span class="nc" id="L70">            cslInstance.setOutputFormat(newFormat.getFormat());</span>
+<span class="nc" id="L71">            format = newFormat;</span>
+        }
+<span class="nc" id="L73">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

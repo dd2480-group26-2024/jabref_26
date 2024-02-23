@@ -1,0 +1,936 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OOBibStyle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.openoffice.style</a> &gt; <span class="el_source">OOBibStyle.java</span></div><h1>OOBibStyle.java</h1><pre class="source lang-java linenums">package org.jabref.logic.openoffice.style;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
+
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.logic.layout.Layout;
+import org.jabref.logic.layout.LayoutFormatter;
+import org.jabref.logic.layout.LayoutFormatterPreferences;
+import org.jabref.logic.layout.LayoutHelper;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.OrFields;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.EntryTypeFactory;
+import org.jabref.model.openoffice.ootext.OOFormat;
+import org.jabref.model.openoffice.ootext.OOText;
+import org.jabref.model.openoffice.style.CitationMarkerEntry;
+import org.jabref.model.openoffice.style.CitationMarkerNormEntry;
+import org.jabref.model.openoffice.style.CitationMarkerNumericBibEntry;
+import org.jabref.model.openoffice.style.CitationMarkerNumericEntry;
+import org.jabref.model.openoffice.style.NonUniqueCitationMarker;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class embodies a bibliography formatting for OpenOffice, which is composed
+ * of the following elements:
+ * &lt;p&gt;
+ * 1) Each OO BIB entry type must have a formatting. A formatting is an array of elements, each
+ * of which is either a piece of constant text, an entry field value, or a tab. Each element has
+ * a character format associated with it.
+ * &lt;p&gt;
+ * 2) Many field values (e.g. author) need to be formatted before input to OpenOffice. The style
+ * has the responsibility of formatting all field values. Formatting is handled by 0-n
+ * JabRef LayoutFormatter classes.
+ * &lt;p&gt;
+ * 3) If the entries are not numbered, a citation marker must be produced for each entry. This
+ * operation is performed for each JabRef BibEntry.
+ */
+public class OOBibStyle implements Comparable&lt;OOBibStyle&gt; {
+
+    public static final String ITALIC_ET_AL = &quot;ItalicEtAl&quot;;
+    public static final String MULTI_CITE_CHRONOLOGICAL = &quot;MultiCiteChronological&quot;;
+    public static final String MINIMUM_GROUPING_COUNT = &quot;MinimumGroupingCount&quot;;
+    public static final String ET_AL_STRING = &quot;EtAlString&quot;;
+    public static final String MAX_AUTHORS_FIRST = &quot;MaxAuthorsFirst&quot;;
+    public static final String REFERENCE_HEADER_PARAGRAPH_FORMAT = &quot;ReferenceHeaderParagraphFormat&quot;;
+    public static final String REFERENCE_PARAGRAPH_FORMAT = &quot;ReferenceParagraphFormat&quot;;
+
+    public static final String TITLE = &quot;Title&quot;;
+    public static final String UNDEFINED_CITATION_MARKER = &quot;??&quot;;
+<span class="fc" id="L70">    private static final Pattern NUM_PATTERN = Pattern.compile(&quot;-?\\d+&quot;);</span>
+    private static final String LAYOUT_MRK = &quot;LAYOUT&quot;;
+    private static final String PROPERTIES_MARK = &quot;PROPERTIES&quot;;
+    private static final String CITATION_MARK = &quot;CITATION&quot;;
+    private static final String NAME_MARK = &quot;NAME&quot;;
+    private static final String JOURNALS_MARK = &quot;JOURNALS&quot;;
+    private static final String DEFAULT_MARK = &quot;default&quot;;
+    private static final String BRACKET_AFTER_IN_LIST = &quot;BracketAfterInList&quot;;
+    private static final String BRACKET_BEFORE_IN_LIST = &quot;BracketBeforeInList&quot;;
+    private static final String UNIQUEFIER_SEPARATOR = &quot;UniquefierSeparator&quot;;
+    private static final String CITATION_KEY_CITATIONS = &quot;BibTeXKeyCitations&quot;;
+    private static final String SUBSCRIPT_CITATIONS = &quot;SubscriptCitations&quot;;
+    private static final String SUPERSCRIPT_CITATIONS = &quot;SuperscriptCitations&quot;;
+    private static final String BOLD_CITATIONS = &quot;BoldCitations&quot;;
+    private static final String ITALIC_CITATIONS = &quot;ItalicCitations&quot;;
+    private static final String CITATION_CHARACTER_FORMAT = &quot;CitationCharacterFormat&quot;;
+    private static final String FORMAT_CITATIONS = &quot;FormatCitations&quot;;
+    private static final String GROUPED_NUMBERS_SEPARATOR = &quot;GroupedNumbersSeparator&quot;;
+
+    // These two can do what ItalicCitations, BoldCitations,
+    // SuperscriptCitations and SubscriptCitations were supposed to do,
+    // as well as underline smallcaps and strikeout.
+    private static final String CITATION_GROUP_MARKUP_BEFORE = &quot;CitationGroupMarkupBefore&quot;;
+    private static final String CITATION_GROUP_MARKUP_AFTER = &quot;CitationGroupMarkupAfter&quot;;
+
+    private static final String AUTHORS_PART_MARKUP_BEFORE = &quot;AuthorsPartMarkupBefore&quot;;
+    private static final String AUTHORS_PART_MARKUP_AFTER = &quot;AuthorsPartMarkupAfter&quot;;
+
+    private static final String AUTHOR_NAMES_LIST_MARKUP_BEFORE = &quot;AuthorNamesListMarkupBefore&quot;;
+    private static final String AUTHOR_NAMES_LIST_MARKUP_AFTER = &quot;AuthorNamesListMarkupAfter&quot;;
+
+    private static final String AUTHOR_NAME_MARKUP_BEFORE = &quot;AuthorNameMarkupBefore&quot;;
+    private static final String AUTHOR_NAME_MARKUP_AFTER = &quot;AuthorNameMarkupAfter&quot;;
+
+    private static final String PAGE_INFO_SEPARATOR = &quot;PageInfoSeparator&quot;;
+    private static final String CITATION_SEPARATOR = &quot;CitationSeparator&quot;;
+    private static final String IN_TEXT_YEAR_SEPARATOR = &quot;InTextYearSeparator&quot;;
+    private static final String MAX_AUTHORS = &quot;MaxAuthors&quot;;
+    private static final String YEAR_FIELD = &quot;YearField&quot;;
+    private static final String AUTHOR_FIELD = &quot;AuthorField&quot;;
+    private static final String BRACKET_AFTER = &quot;BracketAfter&quot;;
+    private static final String BRACKET_BEFORE = &quot;BracketBefore&quot;;
+    private static final String SPACE_BEFORE = &quot;SpaceBefore&quot;;
+    private static final String IS_NUMBER_ENTRIES = &quot;IsNumberEntries&quot;;
+    private static final String IS_SORT_BY_POSITION = &quot;IsSortByPosition&quot;;
+    private static final String SORT_ALGORITHM = &quot;SortAlgorithm&quot;;
+    private static final String OXFORD_COMMA = &quot;OxfordComma&quot;;
+    private static final String YEAR_SEPARATOR = &quot;YearSeparator&quot;;
+    private static final String AUTHOR_LAST_SEPARATOR_IN_TEXT = &quot;AuthorLastSeparatorInText&quot;;
+    private static final String AUTHOR_LAST_SEPARATOR = &quot;AuthorLastSeparator&quot;;
+
+    private static final String AUTHOR_SEPARATOR = &quot;AuthorSeparator&quot;;
+
+<span class="fc" id="L123">    private static final Pattern QUOTED = Pattern.compile(&quot;\&quot;.*\&quot;&quot;);</span>
+
+<span class="fc" id="L125">    private static final Logger LOGGER = LoggerFactory.getLogger(OOBibStyle.class);</span>
+<span class="fc" id="L126">    private final SortedSet&lt;String&gt; journals = new TreeSet&lt;&gt;();</span>
+    // Formatter to be run on fields before they are used as part of citation marker:
+<span class="fc" id="L128">    private final LayoutFormatter fieldFormatter = new OOPreFormatter();</span>
+    // reference layout mapped from entry type:
+<span class="fc" id="L130">    private final Map&lt;EntryType, Layout&gt; bibLayout = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L131">    private final Map&lt;String, Object&gt; properties = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L132">    private final Map&lt;String, Object&gt; citProperties = new HashMap&lt;&gt;();</span>
+    private final boolean fromResource;
+    private final String path;
+    private final LayoutFormatterPreferences layoutPreferences;
+    private final JournalAbbreviationRepository abbreviationRepository;
+<span class="fc" id="L137">    private String name = &quot;&quot;;</span>
+    private Layout defaultBibLayout;
+    private boolean valid;
+    private Path styleFile;
+<span class="fc" id="L141">    private long styleFileModificationTime = Long.MIN_VALUE;</span>
+    private String localCopy;
+    private boolean isDefaultLayoutPresent;
+
+<span class="fc" id="L145">    public OOBibStyle(Path styleFile, LayoutFormatterPreferences layoutPreferences, JournalAbbreviationRepository abbreviationRepository) throws IOException {</span>
+<span class="fc" id="L146">        this.layoutPreferences = Objects.requireNonNull(layoutPreferences);</span>
+<span class="fc" id="L147">        this.abbreviationRepository = abbreviationRepository;</span>
+<span class="fc" id="L148">        this.styleFile = Objects.requireNonNull(styleFile);</span>
+<span class="fc" id="L149">        setDefaultProperties();</span>
+<span class="fc" id="L150">        reload();</span>
+<span class="fc" id="L151">        fromResource = false;</span>
+<span class="fc" id="L152">        path = styleFile.toAbsolutePath().toString();</span>
+<span class="fc" id="L153">    }</span>
+
+<span class="fc" id="L155">    public OOBibStyle(String resourcePath, LayoutFormatterPreferences layoutPreferences, JournalAbbreviationRepository abbreviationRepository) throws IOException {</span>
+<span class="fc" id="L156">        this.layoutPreferences = Objects.requireNonNull(layoutPreferences);</span>
+<span class="fc" id="L157">        this.abbreviationRepository = abbreviationRepository;</span>
+
+<span class="fc" id="L159">        Objects.requireNonNull(resourcePath);</span>
+<span class="fc" id="L160">        setDefaultProperties();</span>
+<span class="fc" id="L161">        initialize(OOBibStyle.class.getResourceAsStream(resourcePath));</span>
+<span class="fc" id="L162">        fromResource = true;</span>
+<span class="fc" id="L163">        path = resourcePath;</span>
+<span class="fc" id="L164">    }</span>
+
+    public Layout getDefaultBibLayout() {
+<span class="nc" id="L167">        return defaultBibLayout;</span>
+    }
+
+    private void setDefaultProperties() {
+        // Set default property values:
+<span class="fc" id="L172">        properties.put(TITLE, &quot;Bibliography&quot;);</span>
+<span class="fc" id="L173">        properties.put(SORT_ALGORITHM, &quot;alphanumeric&quot;);</span>
+<span class="fc" id="L174">        properties.put(IS_SORT_BY_POSITION, Boolean.FALSE);</span>
+<span class="fc" id="L175">        properties.put(IS_NUMBER_ENTRIES, Boolean.FALSE);</span>
+<span class="fc" id="L176">        properties.put(BRACKET_BEFORE, &quot;[&quot;);</span>
+<span class="fc" id="L177">        properties.put(BRACKET_AFTER, &quot;]&quot;);</span>
+<span class="fc" id="L178">        properties.put(REFERENCE_PARAGRAPH_FORMAT, &quot;Standard&quot;);</span>
+<span class="fc" id="L179">        properties.put(REFERENCE_HEADER_PARAGRAPH_FORMAT, &quot;Heading 1&quot;);</span>
+
+        // Set default properties for the citation marker:
+<span class="fc" id="L182">        citProperties.put(AUTHOR_FIELD, FieldFactory.serializeOrFields(StandardField.AUTHOR, StandardField.EDITOR));</span>
+
+<span class="fc" id="L184">        citProperties.put(CITATION_GROUP_MARKUP_BEFORE, &quot;&quot;);</span>
+<span class="fc" id="L185">        citProperties.put(CITATION_GROUP_MARKUP_AFTER, &quot;&quot;);</span>
+
+<span class="fc" id="L187">        citProperties.put(AUTHORS_PART_MARKUP_BEFORE, &quot;&quot;);</span>
+<span class="fc" id="L188">        citProperties.put(AUTHORS_PART_MARKUP_AFTER, &quot;&quot;);</span>
+
+<span class="fc" id="L190">        citProperties.put(AUTHOR_NAMES_LIST_MARKUP_BEFORE, &quot;&quot;);</span>
+<span class="fc" id="L191">        citProperties.put(AUTHOR_NAMES_LIST_MARKUP_AFTER, &quot;&quot;);</span>
+
+<span class="fc" id="L193">        citProperties.put(AUTHOR_NAME_MARKUP_BEFORE, &quot;&quot;);</span>
+<span class="fc" id="L194">        citProperties.put(AUTHOR_NAME_MARKUP_AFTER, &quot;&quot;);</span>
+
+<span class="fc" id="L196">        citProperties.put(YEAR_FIELD, StandardField.YEAR.getName());</span>
+<span class="fc" id="L197">        citProperties.put(MAX_AUTHORS, 3);</span>
+<span class="fc" id="L198">        citProperties.put(MAX_AUTHORS_FIRST, -1);</span>
+<span class="fc" id="L199">        citProperties.put(AUTHOR_SEPARATOR, &quot;, &quot;);</span>
+<span class="fc" id="L200">        citProperties.put(AUTHOR_LAST_SEPARATOR, &quot; &amp; &quot;);</span>
+<span class="fc" id="L201">        citProperties.put(AUTHOR_LAST_SEPARATOR_IN_TEXT, null);</span>
+<span class="fc" id="L202">        citProperties.put(ET_AL_STRING, &quot; et al.&quot;);</span>
+<span class="fc" id="L203">        citProperties.put(YEAR_SEPARATOR, &quot;, &quot;);</span>
+<span class="fc" id="L204">        citProperties.put(IN_TEXT_YEAR_SEPARATOR, &quot; &quot;);</span>
+<span class="fc" id="L205">        citProperties.put(BRACKET_BEFORE, &quot;(&quot;);</span>
+<span class="fc" id="L206">        citProperties.put(BRACKET_AFTER, &quot;)&quot;);</span>
+<span class="fc" id="L207">        citProperties.put(SPACE_BEFORE, Boolean.TRUE);</span>
+<span class="fc" id="L208">        citProperties.put(CITATION_SEPARATOR, &quot;; &quot;);</span>
+<span class="fc" id="L209">        citProperties.put(PAGE_INFO_SEPARATOR, &quot;; &quot;);</span>
+<span class="fc" id="L210">        citProperties.put(GROUPED_NUMBERS_SEPARATOR, &quot;-&quot;);</span>
+<span class="fc" id="L211">        citProperties.put(MINIMUM_GROUPING_COUNT, 3);</span>
+<span class="fc" id="L212">        citProperties.put(FORMAT_CITATIONS, Boolean.FALSE);</span>
+<span class="fc" id="L213">        citProperties.put(CITATION_CHARACTER_FORMAT, &quot;Standard&quot;);</span>
+<span class="fc" id="L214">        citProperties.put(ITALIC_CITATIONS, Boolean.FALSE);</span>
+<span class="fc" id="L215">        citProperties.put(BOLD_CITATIONS, Boolean.FALSE);</span>
+<span class="fc" id="L216">        citProperties.put(SUPERSCRIPT_CITATIONS, Boolean.FALSE);</span>
+<span class="fc" id="L217">        citProperties.put(SUBSCRIPT_CITATIONS, Boolean.FALSE);</span>
+<span class="fc" id="L218">        citProperties.put(MULTI_CITE_CHRONOLOGICAL, Boolean.TRUE);</span>
+<span class="fc" id="L219">        citProperties.put(CITATION_KEY_CITATIONS, Boolean.FALSE);</span>
+<span class="fc" id="L220">        citProperties.put(ITALIC_ET_AL, Boolean.FALSE);</span>
+<span class="fc" id="L221">        citProperties.put(OXFORD_COMMA, &quot;&quot;);</span>
+<span class="fc" id="L222">    }</span>
+
+    public String getName() {
+<span class="fc" id="L225">        return name;</span>
+    }
+
+    public String getPath() {
+<span class="fc" id="L229">        return path;</span>
+    }
+
+    public Path getFile() {
+<span class="nc" id="L233">        return styleFile;</span>
+    }
+
+    public Set&lt;String&gt; getJournals() {
+<span class="fc" id="L237">        return Collections.unmodifiableSet(journals);</span>
+    }
+
+    private void initialize(InputStream stream) throws IOException {
+<span class="fc" id="L241">        Objects.requireNonNull(stream);</span>
+
+<span class="fc" id="L243">        try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {</span>
+<span class="fc" id="L244">            readFormatFile(reader);</span>
+        }
+<span class="fc" id="L246">    }</span>
+
+    /**
+     * If this style was initialized from a file on disk, reload the style
+     * if the file has been modified since it was read.
+     *
+     * @throws IOException
+     */
+    public void ensureUpToDate() throws IOException {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        if (!isUpToDate()) {</span>
+<span class="nc" id="L256">            reload();</span>
+        }
+<span class="nc" id="L258">    }</span>
+
+    /**
+     * If this style was initialized from a file on disk, reload the style
+     * information.
+     *
+     * @throws IOException
+     */
+    private void reload() throws IOException {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (styleFile != null) {</span>
+<span class="fc" id="L268">            this.styleFileModificationTime = Files.getLastModifiedTime(styleFile).toMillis();</span>
+<span class="fc" id="L269">            try (InputStream stream = Files.newInputStream(styleFile)) {</span>
+<span class="fc" id="L270">                initialize(stream);</span>
+            }
+        }
+<span class="fc" id="L273">    }</span>
+
+    /**
+     * If this style was initialized from a file on disk, check whether the file
+     * is unmodified since initialization.
+     *
+     * @return true if the file has not been modified, false otherwise.
+     */
+    private boolean isUpToDate() {
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (styleFile == null) {</span>
+<span class="nc" id="L283">            return true;</span>
+        } else {
+            try {
+<span class="nc bnc" id="L286" title="All 2 branches missed.">                return Files.getLastModifiedTime(styleFile).toMillis() == this.styleFileModificationTime;</span>
+<span class="nc" id="L287">            } catch (IOException e) {</span>
+<span class="nc" id="L288">                return false;</span>
+            }
+        }
+    }
+
+    private void readFormatFile(Reader input) throws IOException {
+
+        // First read all the contents of the file:
+<span class="fc" id="L296">        StringBuilder stringBuilder = new StringBuilder();</span>
+        int chr;
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        while ((chr = input.read()) != -1) {</span>
+<span class="fc" id="L299">            stringBuilder.append((char) chr);</span>
+        }
+
+        // Store a local copy for viewing
+<span class="fc" id="L303">        localCopy = stringBuilder.toString();</span>
+
+        // Break into separate lines:
+<span class="fc" id="L306">        String[] lines = stringBuilder.toString().split(&quot;\n&quot;);</span>
+<span class="fc" id="L307">        BibStyleMode mode = BibStyleMode.NONE;</span>
+
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        for (String line1 : lines) {</span>
+<span class="fc" id="L310">            String line = line1;</span>
+<span class="pc bpc" id="L311" title="2 of 4 branches missed.">            if (!line.isEmpty() &amp;&amp; (line.charAt(line.length() - 1) == '\r')) {</span>
+<span class="fc" id="L312">                line = line.substring(0, line.length() - 1);</span>
+            }
+            // Check for empty line or comment:
+<span class="fc bfc" id="L315" title="All 4 branches covered.">            if (line.trim().isEmpty() || (line.charAt(0) == '#')) {</span>
+<span class="fc" id="L316">                continue;</span>
+            }
+            // Check if we should change mode:
+<span class="fc bfc" id="L319" title="All 6 branches covered.">            switch (line) {</span>
+                case NAME_MARK:
+<span class="fc" id="L321">                    mode = BibStyleMode.NAME;</span>
+<span class="fc" id="L322">                    continue;</span>
+                case LAYOUT_MRK:
+<span class="fc" id="L324">                    mode = BibStyleMode.LAYOUT;</span>
+<span class="fc" id="L325">                    continue;</span>
+                case PROPERTIES_MARK:
+<span class="fc" id="L327">                    mode = BibStyleMode.PROPERTIES;</span>
+<span class="fc" id="L328">                    continue;</span>
+                case CITATION_MARK:
+<span class="fc" id="L330">                    mode = BibStyleMode.CITATION;</span>
+<span class="fc" id="L331">                    continue;</span>
+                case JOURNALS_MARK:
+<span class="fc" id="L333">                    mode = BibStyleMode.JOURNALS;</span>
+<span class="fc" id="L334">                    continue;</span>
+                default:
+                    break;
+            }
+
+<span class="pc bpc" id="L339" title="1 of 6 branches missed.">            switch (mode) {</span>
+                case NAME:
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">                    if (!line.trim().isEmpty()) {</span>
+<span class="fc" id="L342">                        name = line.trim();</span>
+                    }
+                    break;
+                case LAYOUT:
+<span class="fc" id="L346">                    handleStructureLine(line);</span>
+<span class="fc" id="L347">                    break;</span>
+                case PROPERTIES:
+<span class="fc" id="L349">                    handlePropertiesLine(line, properties);</span>
+<span class="fc" id="L350">                    break;</span>
+                case CITATION:
+<span class="fc" id="L352">                    handlePropertiesLine(line, citProperties);</span>
+<span class="fc" id="L353">                    break;</span>
+                case JOURNALS:
+<span class="fc" id="L355">                    handleJournalsLine(line);</span>
+<span class="fc" id="L356">                    break;</span>
+                default:
+                    break;
+            }
+        }
+        // Set validity boolean based on whether we found anything interesting
+        // in the file:
+<span class="pc bpc" id="L363" title="2 of 4 branches missed.">        if ((mode != BibStyleMode.NONE) &amp;&amp; isDefaultLayoutPresent) {</span>
+<span class="fc" id="L364">            valid = true;</span>
+        }
+<span class="fc" id="L366">    }</span>
+
+    /**
+     * After initializing this style from a file, this method can be used to check
+     * whether the file appeared to be a proper style file.
+     *
+     * @return true if the file could be parsed as a style file, false otherwise.
+     */
+    public boolean isValid() {
+<span class="fc" id="L375">        return valid;</span>
+    }
+
+    /**
+     * Parse a line providing bibliography structure information for an entry type.
+     *
+     * @param line The string containing the structure description.
+     */
+    private void handleStructureLine(String line) {
+<span class="fc" id="L384">        int index = line.indexOf('=');</span>
+<span class="pc bpc" id="L385" title="2 of 4 branches missed.">        if ((index &gt; 0) &amp;&amp; (index &lt; (line.length() - 1))) {</span>
+            try {
+<span class="fc" id="L387">                final String typeName = line.substring(0, index);</span>
+<span class="fc" id="L388">                final String formatString = line.substring(index + 1);</span>
+<span class="fc" id="L389">                Layout layout = new LayoutHelper(new StringReader(formatString), layoutPreferences, abbreviationRepository).getLayoutFromText();</span>
+<span class="fc" id="L390">                EntryType type = EntryTypeFactory.parse(typeName);</span>
+
+<span class="fc bfc" id="L392" title="All 4 branches covered.">                if (!isDefaultLayoutPresent &amp;&amp; OOBibStyle.DEFAULT_MARK.equals(typeName)) {</span>
+<span class="fc" id="L393">                    isDefaultLayoutPresent = true;</span>
+<span class="fc" id="L394">                    defaultBibLayout = layout;</span>
+                } else {
+<span class="fc" id="L396">                    bibLayout.put(type, layout);</span>
+                }
+<span class="nc" id="L398">            } catch (IOException ex) {</span>
+<span class="nc" id="L399">                LOGGER.warn(&quot;Cannot parse bibliography structure&quot;, ex);</span>
+<span class="fc" id="L400">            }</span>
+        }
+<span class="fc" id="L402">    }</span>
+
+    /**
+     * Parse a line providing a property name and value.
+     *
+     * @param line The line containing the formatter names.
+     */
+    private void handlePropertiesLine(String line, Map&lt;String, Object&gt; map) {
+<span class="fc" id="L410">        int index = line.indexOf('=');</span>
+<span class="pc bpc" id="L411" title="2 of 4 branches missed.">        if ((index &gt; 0) &amp;&amp; (index &lt;= (line.length() - 1))) {</span>
+<span class="fc" id="L412">            String propertyName = line.substring(0, index).trim();</span>
+<span class="fc" id="L413">            String value = line.substring(index + 1);</span>
+<span class="pc bpc" id="L414" title="1 of 4 branches missed.">            if ((value.trim().length() &gt; 1) &amp;&amp; QUOTED.matcher(value.trim()).matches()) {</span>
+<span class="fc" id="L415">                value = value.trim().substring(1, value.trim().length() - 1);</span>
+            }
+<span class="fc" id="L417">            Object toSet = value;</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">            if (NUM_PATTERN.matcher(value.trim()).matches()) {</span>
+<span class="fc" id="L419">                toSet = Integer.parseInt(value.trim());</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">            } else if (&quot;true&quot;.equalsIgnoreCase(value.trim())) {</span>
+<span class="fc" id="L421">                toSet = Boolean.TRUE;</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">            } else if (&quot;false&quot;.equalsIgnoreCase(value.trim())) {</span>
+<span class="fc" id="L423">                toSet = Boolean.FALSE;</span>
+            }
+<span class="fc" id="L425">            map.put(propertyName, toSet);</span>
+        }
+<span class="fc" id="L427">    }</span>
+
+    /**
+     * Parse a line providing a journal name for which this style is valid.
+     */
+    private void handleJournalsLine(String line) {
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">        if (!line.trim().isEmpty()) {</span>
+<span class="fc" id="L434">            journals.add(line.trim());</span>
+        }
+<span class="fc" id="L436">    }</span>
+
+    public Layout getReferenceFormat(EntryType type) {
+<span class="fc" id="L439">        Layout layout = bibLayout.get(type);</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (layout == null) {</span>
+<span class="fc" id="L441">            return defaultBibLayout;</span>
+        } else {
+<span class="fc" id="L443">            return layout;</span>
+        }
+    }
+
+    /**
+     * Convenience method for checking the property for whether we use number citations or
+     * author-year citations.
+     *
+     * @return true if we use numbered citations, false otherwise.
+     */
+    public boolean isNumberEntries() {
+<span class="fc" id="L454">        return (Boolean) getProperty(IS_NUMBER_ENTRIES);</span>
+    }
+
+    /**
+     * Convenience method for checking the property for whether we sort the bibliography
+     * according to their order of appearance in the text.
+     *
+     * @return true to sort by appearance, false to sort alphabetically.
+     */
+    public boolean isSortByPosition() {
+<span class="fc" id="L464">        return (Boolean) getProperty(IS_SORT_BY_POSITION);</span>
+    }
+
+    /**
+     * Convenience method for checking whether citation markers should be italicized.
+     * Will only be relevant if isFormatCitations() returns true.
+     *
+     * @return true to indicate that citations should be in italics.
+     */
+    public boolean isItalicCitations() {
+<span class="fc" id="L474">        return (Boolean) citProperties.get(ITALIC_CITATIONS);</span>
+    }
+
+    /**
+     * Convenience method for checking whether citation markers should be bold.
+     * Will only be relevant if isFormatCitations() returns true.
+     *
+     * @return true to indicate that citations should be in bold.
+     */
+    public boolean isBoldCitations() {
+<span class="fc" id="L484">        return (Boolean) citProperties.get(BOLD_CITATIONS);</span>
+    }
+
+    /**
+     * Convenience method for checking whether citation markers formatted
+     * according to the results of the isItalicCitations() and
+     * isBoldCitations() methods.
+     *
+     * @return true to indicate that citations should be in italics.
+     */
+    public boolean isFormatCitations() {
+<span class="fc" id="L495">        return (Boolean) citProperties.get(FORMAT_CITATIONS);</span>
+    }
+
+    public boolean spaceBeforeCitation() {
+<span class="nc" id="L499">        return (Boolean) citProperties.get(SPACE_BEFORE);</span>
+    }
+
+    public boolean isCitationKeyCiteMarkers() {
+<span class="fc" id="L503">        return (Boolean) citProperties.get(CITATION_KEY_CITATIONS);</span>
+    }
+
+    /**
+     * Get boolean property.
+     *
+     * @param key The property key
+     * @return the value
+     */
+    public boolean getBooleanCitProperty(String key) {
+<span class="fc" id="L513">        return (Boolean) citProperties.get(key);</span>
+    }
+
+    public int getIntCitProperty(String key) {
+<span class="fc" id="L517">        return (Integer) citProperties.get(key);</span>
+    }
+
+    public String getStringCitProperty(String key) {
+<span class="fc" id="L521">        return (String) citProperties.get(key);</span>
+    }
+
+    public String getCitationCharacterFormat() {
+<span class="fc" id="L525">        return getStringCitProperty(CITATION_CHARACTER_FORMAT);</span>
+    }
+
+    /**
+     * Get a style property.
+     *
+     * @param propName The property name.
+     * @return The property value, or null if it doesn't exist.
+     */
+    public Object getProperty(String propName) {
+<span class="fc" id="L535">        return properties.get(propName);</span>
+    }
+
+    /**
+     * Indicate if it is an internal style
+     *
+     * @return True if an internal style
+     */
+    public boolean isInternalStyle() {
+<span class="fc" id="L544">        return fromResource;</span>
+    }
+
+    public String getLocalCopy() {
+<span class="nc" id="L548">        return localCopy;</span>
+    }
+
+    @Override
+    public int compareTo(OOBibStyle other) {
+<span class="fc" id="L553">        return getName().compareTo(other.getName());</span>
+    }
+
+    @Override
+    public boolean equals(Object object) {
+<span class="fc bfc" id="L558" title="All 2 branches covered.">        if (this == object) {</span>
+<span class="fc" id="L559">            return true;</span>
+        }
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        if (object instanceof OOBibStyle otherStyle) {</span>
+<span class="fc bfc" id="L562" title="All 2 branches covered.">            return Objects.equals(path, otherStyle.path)</span>
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">                    &amp;&amp; Objects.equals(name, otherStyle.name)</span>
+<span class="pc bpc" id="L564" title="1 of 2 branches missed.">                    &amp;&amp; Objects.equals(citProperties, otherStyle.citProperties)</span>
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">                    &amp;&amp; Objects.equals(properties, otherStyle.properties);</span>
+        }
+<span class="nc" id="L567">        return false;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L572">        return Objects.hash(path, name, citProperties, properties);</span>
+    }
+
+<span class="fc" id="L575">    enum BibStyleMode {</span>
+<span class="fc" id="L576">        NONE,</span>
+<span class="fc" id="L577">        LAYOUT,</span>
+<span class="fc" id="L578">        PROPERTIES,</span>
+<span class="fc" id="L579">        CITATION,</span>
+<span class="fc" id="L580">        NAME,</span>
+<span class="fc" id="L581">        JOURNALS</span>
+    }
+
+    /** The String to represent authors that are not mentioned,
+     * e.g. &quot; et al.&quot;
+     */
+    public String getEtAlString() {
+<span class="fc" id="L588">        return getStringCitProperty(OOBibStyle.ET_AL_STRING);</span>
+    }
+
+    /** The String to add between author names except the last two:
+     *  &quot;[Smith{, }Jones and Brown]&quot;
+     */
+    protected String getAuthorSeparator() {
+<span class="fc" id="L595">        return getStringCitProperty(OOBibStyle.AUTHOR_SEPARATOR);</span>
+    }
+
+    /** The String to put after the second to last author in case
+     *  of three or more authors: (A, B{,} and C)
+     */
+    protected String getOxfordComma() {
+<span class="fc" id="L602">        return getStringCitProperty(OOBibStyle.OXFORD_COMMA);</span>
+    }
+
+    /**
+     * Title for the bibliography.
+     */
+    public OOText getReferenceHeaderText() {
+<span class="nc" id="L609">        return OOText.fromString(getStringProperty(OOBibStyle.TITLE));</span>
+    }
+
+    /**
+     * Name of paragraph format (within OO/LO) to be used for
+     * the title of the bibliography.
+     */
+    public String getReferenceHeaderParagraphFormat() {
+<span class="nc" id="L617">        return getStringProperty(OOBibStyle.REFERENCE_HEADER_PARAGRAPH_FORMAT);</span>
+    }
+
+    /**
+     * Name of paragraph format (within OO/LO) to be used for
+     * the entries in the bibliography.
+     */
+    public String getReferenceParagraphFormat() {
+<span class="nc" id="L625">        return getStringProperty(OOBibStyle.REFERENCE_PARAGRAPH_FORMAT);</span>
+    }
+
+    protected LayoutFormatter getFieldFormatter() {
+<span class="fc" id="L629">        return fieldFormatter;</span>
+    }
+
+    protected Map&lt;EntryType, Layout&gt; getBibLayout() {
+<span class="nc" id="L633">        return bibLayout;</span>
+    }
+
+    protected Map&lt;String, Object&gt; getProperties() {
+<span class="nc" id="L637">        return properties;</span>
+    }
+
+    protected Map&lt;String, Object&gt; getCitProperties() {
+<span class="nc" id="L641">        return citProperties;</span>
+    }
+
+    protected void addJournal(String journalName) {
+<span class="nc" id="L645">        journals.add(journalName);</span>
+<span class="nc" id="L646">    }</span>
+
+    protected void setLocalCopy(String contentsOfJstyleFile) {
+<span class="nc" id="L649">        localCopy = contentsOfJstyleFile;</span>
+<span class="nc" id="L650">    }</span>
+
+    protected void setName(String nameOfTheStyle) {
+<span class="nc" id="L653">        name = nameOfTheStyle;</span>
+<span class="nc" id="L654">    }</span>
+
+    protected boolean getIsDefaultLayoutPresent() {
+<span class="nc" id="L657">        return isDefaultLayoutPresent;</span>
+    }
+
+    protected void setIsDefaultLayoutPresent(boolean isPresent) {
+<span class="nc" id="L661">        isDefaultLayoutPresent = isPresent;</span>
+<span class="nc" id="L662">    }</span>
+
+    protected void setValid(boolean isValid) {
+<span class="nc" id="L665">        valid = isValid;</span>
+<span class="nc" id="L666">    }</span>
+
+    protected LayoutFormatterPreferences getLayoutPreferences() {
+<span class="nc" id="L669">        return layoutPreferences;</span>
+    }
+
+    protected void setDefaultBibLayout(Layout layout) {
+<span class="nc" id="L673">        defaultBibLayout = layout;</span>
+<span class="nc" id="L674">    }</span>
+
+    /**
+     * Format a number-based citation marker for the given entries.
+     *
+     * @return The text for the citation.
+     */
+    public OOText getNumCitationMarker2(List&lt;CitationMarkerNumericEntry&gt; entries) {
+<span class="nc" id="L682">        final int minGroupingCount = this.getMinimumGroupingCount();</span>
+<span class="nc" id="L683">        return OOBibStyleGetNumCitationMarker.getNumCitationMarker2(this,</span>
+                                                                    entries,
+                                                                    minGroupingCount);
+    }
+
+    /**
+     * For some tests we need to override minGroupingCount.
+     */
+    public OOText getNumCitationMarker2(List&lt;CitationMarkerNumericEntry&gt; entries,
+                                        int minGroupingCount) {
+<span class="fc" id="L693">        return OOBibStyleGetNumCitationMarker.getNumCitationMarker2(this,</span>
+                                                                    entries,
+                                                                    minGroupingCount);
+    }
+
+    /**
+     * Format a number-based bibliography label for the given number.
+     */
+    public OOText getNumCitationMarkerForBibliography(CitationMarkerNumericBibEntry entry) {
+<span class="fc" id="L702">        return OOBibStyleGetNumCitationMarker.getNumCitationMarkerForBibliography(this, entry);</span>
+    }
+
+    public OOText getNormalizedCitationMarker(CitationMarkerNormEntry entry) {
+<span class="nc" id="L706">        return OOBibStyleGetCitationMarker.getNormalizedCitationMarker(this, entry, Optional.empty());</span>
+    }
+
+    /**
+     * Format the marker for the in-text citation according to this
+     * BIB style. Uniquefier letters are added as provided by the
+     * citationMarkerEntries argument. If successive entries within
+     * the citation are uniquefied from each other, this method will
+     * perform a grouping of these entries.
+     *
+     * If successive entries within the citation are uniquefied from
+     * each other, this method will perform a grouping of these
+     * entries.
+     *
+     * @param citationMarkerEntries The list of entries providing the
+     *                              data.
+     *
+     * @param inParenthesis Signals whether a parenthesized citation
+     *                      or an in-text citation is wanted.
+     *
+     * @param nonUniqueCitationMarkerHandling
+     *
+     *             THROWS : Should throw if finds that uniqueLetters
+     *                      provided do not make the entries unique.
+     *
+     *             FORGIVEN : is needed to allow preliminary markers
+     *                        for freshly inserted citations without
+     *                        going throw the uniquefication process.
+     *
+     * @return The formatted citation. The result does not include
+     *         the standard wrappers:
+     *         OOFormat.setLocaleNone() and OOFormat.setCharStyle().
+     *         These are added by decorateCitationMarker()
+     */
+    public OOText createCitationMarker(List&lt;CitationMarkerEntry&gt; citationMarkerEntries,
+                                       boolean inParenthesis,
+                                       NonUniqueCitationMarker nonUniqueCitationMarkerHandling) {
+<span class="fc" id="L743">        return OOBibStyleGetCitationMarker.createCitationMarker(this,</span>
+                                                                citationMarkerEntries,
+                                                                inParenthesis,
+                                                                nonUniqueCitationMarkerHandling);
+    }
+
+    /**
+     * Add setLocaleNone and optionally setCharStyle(CitationCharacterFormat) around
+     * citationText.  Called in fillCitationMarkInCursor, so these are
+     * also applied to &quot;Unresolved()&quot; entries and numeric styles.
+     */
+    public OOText decorateCitationMarker(OOText citationText) {
+<span class="nc" id="L755">        OOBibStyle style = this;</span>
+<span class="nc" id="L756">        OOText citationText2 = OOFormat.setLocaleNone(citationText);</span>
+<span class="nc bnc" id="L757" title="All 2 branches missed.">        if (style.isFormatCitations()) {</span>
+<span class="nc" id="L758">            String charStyle = style.getCitationCharacterFormat();</span>
+<span class="nc" id="L759">            citationText2 = OOFormat.setCharStyle(citationText2, charStyle);</span>
+        }
+<span class="nc" id="L761">        return citationText2;</span>
+    }
+
+    /*
+     *
+     *  Property getters
+     *
+     */
+
+    /**
+     * Minimal number of consecutive citation numbers needed to start
+     * replacing with an range like &quot;10-13&quot;.
+     */
+    public int getMinimumGroupingCount() {
+<span class="nc" id="L775">        return getIntCitProperty(OOBibStyle.MINIMUM_GROUPING_COUNT);</span>
+    }
+
+    /**
+     * Used in number ranges like &quot;10-13&quot; in numbered citations.
+     */
+    public String getGroupedNumbersSeparator() {
+<span class="fc" id="L782">        return getStringCitProperty(OOBibStyle.GROUPED_NUMBERS_SEPARATOR);</span>
+    }
+
+    private String getStringProperty(String propName) {
+<span class="nc" id="L786">        return (String) properties.get(propName);</span>
+    }
+
+    /**
+     * Should citation markers be italicized?
+     *
+     */
+    public String getCitationGroupMarkupBefore() {
+<span class="fc" id="L794">        return getStringCitProperty(CITATION_GROUP_MARKUP_BEFORE);</span>
+    }
+
+    public String getCitationGroupMarkupAfter() {
+<span class="fc" id="L798">        return getStringCitProperty(CITATION_GROUP_MARKUP_AFTER);</span>
+    }
+
+    /** Author list, including &quot; et al.&quot; */
+    public String getAuthorsPartMarkupBefore() {
+<span class="fc" id="L803">        return getStringCitProperty(AUTHORS_PART_MARKUP_BEFORE);</span>
+    }
+
+    public String getAuthorsPartMarkupAfter() {
+<span class="fc" id="L807">        return getStringCitProperty(AUTHORS_PART_MARKUP_AFTER);</span>
+    }
+
+    /** Author list, excluding &quot; et al.&quot; */
+    public String getAuthorNamesListMarkupBefore() {
+<span class="fc" id="L812">        return getStringCitProperty(AUTHOR_NAMES_LIST_MARKUP_BEFORE);</span>
+    }
+
+    public String getAuthorNamesListMarkupAfter() {
+<span class="fc" id="L816">        return getStringCitProperty(AUTHOR_NAMES_LIST_MARKUP_AFTER);</span>
+    }
+
+    /** Author names. Excludes Author separators */
+    public String getAuthorNameMarkupBefore() {
+<span class="fc" id="L821">        return getStringCitProperty(AUTHOR_NAME_MARKUP_BEFORE);</span>
+    }
+
+    public String getAuthorNameMarkupAfter() {
+<span class="fc" id="L825">        return getStringCitProperty(AUTHOR_NAME_MARKUP_AFTER);</span>
+    }
+
+    public boolean getMultiCiteChronological() {
+        // &quot;MultiCiteChronological&quot;
+<span class="fc" id="L830">        return this.getBooleanCitProperty(OOBibStyle.MULTI_CITE_CHRONOLOGICAL);</span>
+    }
+
+    // Probably obsolete, now we can use &quot; &lt;i&gt;et al.&lt;/i&gt;&quot; instead in EtAlString
+    public boolean getItalicEtAl() {
+        // &quot;ItalicEtAl&quot;
+<span class="fc" id="L836">        return this.getBooleanCitProperty(OOBibStyle.ITALIC_ET_AL);</span>
+    }
+
+    /**
+     *  @return Names of fields containing authors: the first
+     *  non-empty field will be used.
+     */
+    protected OrFields getAuthorFieldNames() {
+<span class="fc" id="L844">        String authorFieldNamesString = this.getStringCitProperty(OOBibStyle.AUTHOR_FIELD);</span>
+<span class="fc" id="L845">        return FieldFactory.parseOrFields(authorFieldNamesString);</span>
+    }
+
+    /**
+     *  @return Field containing year, with fallback fields.
+     */
+    protected OrFields getYearFieldNames() {
+<span class="fc" id="L852">        String yearFieldNamesString = this.getStringCitProperty(OOBibStyle.YEAR_FIELD);</span>
+<span class="fc" id="L853">        return FieldFactory.parseOrFields(yearFieldNamesString);</span>
+    }
+
+    /* The String to add between the two last author names, e.g. &quot; &amp; &quot;. */
+    protected String getAuthorLastSeparator() {
+<span class="fc" id="L858">        return getStringCitProperty(OOBibStyle.AUTHOR_LAST_SEPARATOR);</span>
+    }
+
+    /* As getAuthorLastSeparator, for in-text citation. */
+    protected String getAuthorLastSeparatorInTextWithFallBack() {
+<span class="fc" id="L863">        String preferred = getStringCitProperty(OOBibStyle.AUTHOR_LAST_SEPARATOR_IN_TEXT);</span>
+<span class="fc" id="L864">        String fallback = getStringCitProperty(OOBibStyle.AUTHOR_LAST_SEPARATOR);</span>
+<span class="fc" id="L865">        return Objects.requireNonNullElse(preferred, fallback);</span>
+    }
+
+    protected String getPageInfoSeparator() {
+<span class="fc" id="L869">        return getStringCitProperty(OOBibStyle.PAGE_INFO_SEPARATOR);</span>
+    }
+
+    protected String getUniquefierSeparator() {
+<span class="fc" id="L873">        return getStringCitProperty(OOBibStyle.UNIQUEFIER_SEPARATOR);</span>
+    }
+
+    protected String getCitationSeparator() {
+<span class="fc" id="L877">        return getStringCitProperty(OOBibStyle.CITATION_SEPARATOR);</span>
+    }
+
+    protected String getYearSeparator() {
+<span class="fc" id="L881">        return getStringCitProperty(OOBibStyle.YEAR_SEPARATOR);</span>
+    }
+
+    protected String getYearSeparatorInText() {
+<span class="fc" id="L885">        return getStringCitProperty(OOBibStyle.IN_TEXT_YEAR_SEPARATOR);</span>
+    }
+
+    /** The maximum number of authors to write out in full without
+     *  using &quot;et al.&quot; Set to -1 to always write out all authors.
+     */
+    protected int getMaxAuthors() {
+<span class="fc" id="L892">        return getIntCitProperty(OOBibStyle.MAX_AUTHORS);</span>
+    }
+
+    public int getMaxAuthorsFirst() {
+<span class="fc" id="L896">        return getIntCitProperty(OOBibStyle.MAX_AUTHORS_FIRST);</span>
+    }
+
+    /** Opening parenthesis before citation (or year, for in-text) */
+    protected String getBracketBefore() {
+<span class="fc" id="L901">        return getStringCitProperty(OOBibStyle.BRACKET_BEFORE);</span>
+    }
+
+    /** Closing parenthesis after citation */
+    protected String getBracketAfter() {
+<span class="fc" id="L906">        return getStringCitProperty(OOBibStyle.BRACKET_AFTER);</span>
+    }
+
+    /** Opening parenthesis before citation marker in the bibliography. */
+    private String getBracketBeforeInList() {
+<span class="fc" id="L911">        return getStringCitProperty(OOBibStyle.BRACKET_BEFORE_IN_LIST);</span>
+    }
+
+    public String getBracketBeforeInListWithFallBack() {
+<span class="fc" id="L915">        return Objects.requireNonNullElse(getBracketBeforeInList(), getBracketBefore());</span>
+    }
+
+    /** Closing parenthesis after citation marker in the bibliography */
+    private String getBracketAfterInList() {
+<span class="fc" id="L920">        return getStringCitProperty(OOBibStyle.BRACKET_AFTER_IN_LIST);</span>
+    }
+
+    String getBracketAfterInListWithFallBack() {
+<span class="fc" id="L924">        return Objects.requireNonNullElse(getBracketAfterInList(), getBracketAfter());</span>
+    }
+
+    public OOText getFormattedBibliographyTitle() {
+<span class="nc" id="L928">        OOBibStyle style = this;</span>
+<span class="nc" id="L929">        OOText title = style.getReferenceHeaderText();</span>
+<span class="nc" id="L930">        String parStyle = style.getReferenceHeaderParagraphFormat();</span>
+<span class="nc bnc" id="L931" title="All 2 branches missed.">        return parStyle == null</span>
+<span class="nc" id="L932">                ? OOFormat.paragraph(title)</span>
+<span class="nc" id="L933">                : OOFormat.paragraph(title, parStyle);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

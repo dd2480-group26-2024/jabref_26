@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NewSubLibraryAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.auximport</a> &gt; <span class="el_source">NewSubLibraryAction.java</span></div><h1>NewSubLibraryAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui.auximport;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTabContainer;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.actions.SimpleCommand;
+
+import static org.jabref.gui.actions.ActionHelper.needsDatabase;
+
+/**
+ * The action concerned with generate a new (sub-)database from latex AUX file.
+ *
+ * A new library is created by {@link org.jabref.gui.importer.NewDatabaseAction}
+ */
+public class NewSubLibraryAction extends SimpleCommand {
+
+    private final LibraryTabContainer tabContainer;
+    private final DialogService dialogService;
+
+<span class="nc" id="L20">    public NewSubLibraryAction(LibraryTabContainer tabContainer, StateManager stateManager, DialogService dialogService) {</span>
+<span class="nc" id="L21">        this.tabContainer = tabContainer;</span>
+<span class="nc" id="L22">        this.dialogService = dialogService;</span>
+
+<span class="nc" id="L24">        this.executable.bind(needsDatabase(stateManager));</span>
+<span class="nc" id="L25">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc" id="L29">        dialogService.showCustomDialogAndWait(new FromAuxDialog(tabContainer));</span>
+<span class="nc" id="L30">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

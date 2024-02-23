@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DBMSSynchronizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.shared</a> &gt; <span class="el_source">DBMSSynchronizer.java</span></div><h1>DBMSSynchronizer.java</h1><pre class="source lang-java linenums">package org.jabref.logic.shared;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.jabref.logic.citationkeypattern.GlobalCitationKeyPattern;
+import org.jabref.logic.exporter.BibDatabaseWriter;
+import org.jabref.logic.exporter.MetaDataSerializer;
+import org.jabref.logic.importer.ParseException;
+import org.jabref.logic.importer.util.MetaDataParser;
+import org.jabref.logic.shared.event.ConnectionLostEvent;
+import org.jabref.logic.shared.event.SharedEntriesNotPresentEvent;
+import org.jabref.logic.shared.event.UpdateRefusedEvent;
+import org.jabref.logic.shared.exception.OfflineLockException;
+import org.jabref.model.database.BibDatabase;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.event.EntriesAddedEvent;
+import org.jabref.model.database.event.EntriesRemovedEvent;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.event.EntriesEvent;
+import org.jabref.model.entry.event.EntriesEventSource;
+import org.jabref.model.entry.event.FieldChangedEvent;
+import org.jabref.model.metadata.MetaData;
+import org.jabref.model.metadata.event.MetaDataChangedEvent;
+import org.jabref.model.util.FileUpdateMonitor;
+
+import com.google.common.eventbus.EventBus;
+import com.google.common.eventbus.Subscribe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Synchronizes the shared or local databases with their opposite side. Local changes are pushed by {@link EntriesEvent}
+ * using Google's Guava EventBus.
+ */
+public class DBMSSynchronizer implements DatabaseSynchronizer {
+
+<span class="nc" id="L45">    private static final Logger LOGGER = LoggerFactory.getLogger(DBMSSynchronizer.class);</span>
+
+    private DBMSProcessor dbmsProcessor;
+    private String dbName;
+    private final BibDatabaseContext bibDatabaseContext;
+    private MetaData metaData;
+    private final BibDatabase bibDatabase;
+    private final EventBus eventBus;
+    private Connection currentConnection;
+    private final Character keywordSeparator;
+    private final GlobalCitationKeyPattern globalCiteKeyPattern;
+    private final FileUpdateMonitor fileMonitor;
+    private Optional&lt;BibEntry&gt; lastEntryChanged;
+
+    public DBMSSynchronizer(BibDatabaseContext bibDatabaseContext, Character keywordSeparator,
+<span class="nc" id="L60">                            GlobalCitationKeyPattern globalCiteKeyPattern, FileUpdateMonitor fileMonitor) {</span>
+<span class="nc" id="L61">        this.bibDatabaseContext = Objects.requireNonNull(bibDatabaseContext);</span>
+<span class="nc" id="L62">        this.bibDatabase = bibDatabaseContext.getDatabase();</span>
+<span class="nc" id="L63">        this.metaData = bibDatabaseContext.getMetaData();</span>
+<span class="nc" id="L64">        this.fileMonitor = fileMonitor;</span>
+<span class="nc" id="L65">        this.eventBus = new EventBus();</span>
+<span class="nc" id="L66">        this.keywordSeparator = keywordSeparator;</span>
+<span class="nc" id="L67">        this.globalCiteKeyPattern = Objects.requireNonNull(globalCiteKeyPattern);</span>
+<span class="nc" id="L68">        this.lastEntryChanged = Optional.empty();</span>
+<span class="nc" id="L69">    }</span>
+
+    /**
+     * Listening method. Inserts a new {@link BibEntry} into shared database.
+     */
+    @Subscribe
+    public void listen(EntriesAddedEvent event) {
+        // While synchronizing the local database (see synchronizeLocalDatabase() below), some EntriesEvents may be posted.
+        // In this case DBSynchronizer should not try to insert the bibEntry entry again (but it would not harm).
+<span class="nc bnc" id="L78" title="All 4 branches missed.">        if (isEventSourceAccepted(event) &amp;&amp; checkCurrentConnection()) {</span>
+<span class="nc" id="L79">            synchronizeLocalMetaData();</span>
+<span class="nc" id="L80">            pullWithLastEntry();</span>
+<span class="nc" id="L81">            synchronizeLocalDatabase();</span>
+<span class="nc" id="L82">            dbmsProcessor.insertEntries(event.getBibEntries());</span>
+            // Reset last changed entry because it just has already been synchronized -&gt; Why necessary?
+<span class="nc" id="L84">            lastEntryChanged = Optional.empty();</span>
+        }
+<span class="nc" id="L86">    }</span>
+
+    /**
+     * Listening method. Updates an existing shared {@link BibEntry}.
+     */
+    @Subscribe
+    public void listen(FieldChangedEvent event) {
+<span class="nc" id="L93">        BibEntry bibEntry = event.getBibEntry();</span>
+        // While synchronizing the local database (see synchronizeLocalDatabase() below), some EntriesEvents may be posted.
+        // In this case DBSynchronizer should not try to update the bibEntry entry again (but it would not harm).
+<span class="nc bnc" id="L96" title="All 8 branches missed.">        if (isPresentLocalBibEntry(bibEntry) &amp;&amp; isEventSourceAccepted(event) &amp;&amp; checkCurrentConnection() &amp;&amp; !event.isFilteredOut()) {</span>
+<span class="nc" id="L97">            synchronizeLocalMetaData();</span>
+<span class="nc" id="L98">            pullWithLastEntry();</span>
+<span class="nc" id="L99">            synchronizeSharedEntry(bibEntry);</span>
+<span class="nc" id="L100">            synchronizeLocalDatabase(); // Pull changes for the case that there were some</span>
+        } else {
+            // Set new BibEntry that has been changed last
+<span class="nc" id="L103">            lastEntryChanged = Optional.of(bibEntry);</span>
+        }
+<span class="nc" id="L105">    }</span>
+
+    /**
+     * Listening method. Deletes the given list of {@link BibEntry} from shared database.
+     */
+    @Subscribe
+    public void listen(EntriesRemovedEvent event) {
+        // While synchronizing the local database (see synchronizeLocalDatabase() below), some EntriesEvents may be posted.
+        // In this case DBSynchronizer should not try to delete the bibEntry entry again (but it would not harm).
+<span class="nc bnc" id="L114" title="All 4 branches missed.">        if (isEventSourceAccepted(event) &amp;&amp; checkCurrentConnection()) {</span>
+<span class="nc" id="L115">            synchronizeLocalMetaData();</span>
+<span class="nc" id="L116">            pullWithLastEntry();</span>
+<span class="nc" id="L117">            dbmsProcessor.removeEntries(event.getBibEntries());</span>
+<span class="nc" id="L118">            synchronizeLocalDatabase();</span>
+        }
+<span class="nc" id="L120">    }</span>
+
+    /**
+     * Listening method. Synchronizes the shared {@link MetaData} and applies them locally.
+     */
+    @Subscribe
+    public void listen(MetaDataChangedEvent event) {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (checkCurrentConnection()) {</span>
+<span class="nc" id="L128">            synchronizeSharedMetaData(event.getMetaData(), globalCiteKeyPattern);</span>
+<span class="nc" id="L129">            synchronizeLocalDatabase();</span>
+<span class="nc" id="L130">            applyMetaData();</span>
+<span class="nc" id="L131">            dbmsProcessor.notifyClients();</span>
+        }
+<span class="nc" id="L133">    }</span>
+
+    /**
+     * Sets the table structure of shared database if needed and pulls all shared entries to the new local database.
+     *
+     * @throws DatabaseNotSupportedException if the version of shared database does not match the version of current
+     *                                       shared database support ({@link DBMSProcessor}).
+     */
+    public void initializeDatabases() throws DatabaseNotSupportedException {
+        try {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            if (!dbmsProcessor.checkBaseIntegrity()) {</span>
+<span class="nc" id="L144">                LOGGER.info(&quot;Integrity check failed. Fixing...&quot;);</span>
+
+                // This check should only be performed once on initial database setup.
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                if (dbmsProcessor.databaseIsAtMostJabRef35()) {</span>
+<span class="nc" id="L148">                    throw new DatabaseNotSupportedException();</span>
+                }
+
+                // Calling dbmsProcessor.setupSharedDatabase() lets dbmsProcessor.checkBaseIntegrity() be true.
+<span class="nc" id="L152">                dbmsProcessor.setupSharedDatabase();</span>
+            }
+<span class="nc" id="L154">        } catch (SQLException e) {</span>
+<span class="nc" id="L155">            LOGGER.error(&quot;Could not check intergrity&quot;, e);</span>
+<span class="nc" id="L156">            throw new IllegalStateException(e);</span>
+<span class="nc" id="L157">        }</span>
+
+<span class="nc" id="L159">        dbmsProcessor.startNotificationListener(this);</span>
+<span class="nc" id="L160">        synchronizeLocalMetaData();</span>
+<span class="nc" id="L161">        synchronizeLocalDatabase();</span>
+<span class="nc" id="L162">    }</span>
+
+    /**
+     * Synchronizes the local database with shared one. Possible update types are: removal, update, or insert of a
+     * {@link BibEntry}.
+     */
+    @Override
+    public void synchronizeLocalDatabase() {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (!checkCurrentConnection()) {</span>
+<span class="nc" id="L171">            return;</span>
+        }
+
+<span class="nc" id="L174">        List&lt;BibEntry&gt; localEntries = bibDatabase.getEntries();</span>
+<span class="nc" id="L175">        Map&lt;Integer, Integer&gt; idVersionMap = dbmsProcessor.getSharedIDVersionMapping();</span>
+
+        // remove old entries locally
+<span class="nc" id="L178">        removeNotSharedEntries(localEntries, idVersionMap.keySet());</span>
+<span class="nc" id="L179">        List&lt;Integer&gt; entriesToInsertIntoLocalDatabase = new ArrayList&lt;&gt;();</span>
+        // compare versions and update local entry if needed
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        for (Map.Entry&lt;Integer, Integer&gt; idVersionEntry : idVersionMap.entrySet()) {</span>
+<span class="nc" id="L182">            boolean remoteEntryMatchingOneLocalEntryFound = false;</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            for (BibEntry localEntry : localEntries) {</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                if (idVersionEntry.getKey().equals(localEntry.getSharedBibEntryData().getSharedID())) {</span>
+<span class="nc" id="L185">                    remoteEntryMatchingOneLocalEntryFound = true;</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                    if (idVersionEntry.getValue() &gt; localEntry.getSharedBibEntryData().getVersion()) {</span>
+<span class="nc" id="L187">                        Optional&lt;BibEntry&gt; sharedEntry = dbmsProcessor.getSharedEntry(idVersionEntry.getKey());</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                        if (sharedEntry.isPresent()) {</span>
+                            // update fields
+<span class="nc" id="L190">                            localEntry.setType(sharedEntry.get().getType(), EntriesEventSource.SHARED);</span>
+<span class="nc" id="L191">                            localEntry.getSharedBibEntryData()</span>
+<span class="nc" id="L192">                                      .setVersion(sharedEntry.get().getSharedBibEntryData().getVersion());</span>
+<span class="nc" id="L193">                            sharedEntry.get().getFieldMap().forEach(</span>
+                                    // copy remote values to local entry
+<span class="nc" id="L195">                                    (field, value) -&gt; localEntry.setField(field, value, EntriesEventSource.SHARED)</span>
+                            );
+
+                            // locally remove not existing fields
+<span class="nc" id="L199">                            localEntry.getFields().stream()</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                                      .filter(field -&gt; !sharedEntry.get().hasField(field))</span>
+<span class="nc" id="L201">                                      .forEach(</span>
+<span class="nc" id="L202">                                              field -&gt; localEntry.clearField(field, EntriesEventSource.SHARED)</span>
+                                      );
+                        }
+                    }
+                }
+<span class="nc" id="L207">            }</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">            if (!remoteEntryMatchingOneLocalEntryFound) {</span>
+<span class="nc" id="L209">                entriesToInsertIntoLocalDatabase.add(idVersionEntry.getKey());</span>
+            }
+<span class="nc" id="L211">        }</span>
+
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (!entriesToInsertIntoLocalDatabase.isEmpty()) {</span>
+            // in case entries should be added into the local database, insert them
+<span class="nc" id="L215">            bibDatabase.insertEntries(dbmsProcessor.partitionAndGetSharedEntries(entriesToInsertIntoLocalDatabase), EntriesEventSource.SHARED);</span>
+        }
+<span class="nc" id="L217">    }</span>
+
+    /**
+     * Removes all local entries which are not present on shared database.
+     *
+     * @param localEntries List of {@link BibEntry} the entries should be removed from
+     * @param sharedIDs    Set of all IDs which are present on shared database
+     */
+    private void removeNotSharedEntries(List&lt;BibEntry&gt; localEntries, Set&lt;Integer&gt; sharedIDs) {
+<span class="nc" id="L226">        List&lt;BibEntry&gt; entriesToRemove =</span>
+<span class="nc" id="L227">                localEntries.stream()</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                            .filter(localEntry -&gt; !sharedIDs.contains(localEntry.getSharedBibEntryData().getSharedID()))</span>
+<span class="nc" id="L229">                            .collect(Collectors.toList());</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (!entriesToRemove.isEmpty()) {</span>
+<span class="nc" id="L231">            eventBus.post(new SharedEntriesNotPresentEvent(entriesToRemove));</span>
+            // remove all non-shared entries without triggering listeners
+<span class="nc" id="L233">            bibDatabase.removeEntries(entriesToRemove, EntriesEventSource.SHARED);</span>
+        }
+<span class="nc" id="L235">    }</span>
+
+    /**
+     * Synchronizes the shared {@link BibEntry} with the local one.
+     */
+    @Override
+    public void synchronizeSharedEntry(BibEntry bibEntry) {
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        if (!checkCurrentConnection()) {</span>
+<span class="nc" id="L243">            return;</span>
+        }
+        try {
+<span class="nc" id="L246">            BibDatabaseWriter.applySaveActions(bibEntry, metaData); // perform possibly existing save actions</span>
+<span class="nc" id="L247">            dbmsProcessor.updateEntry(bibEntry);</span>
+<span class="nc" id="L248">        } catch (OfflineLockException exception) {</span>
+<span class="nc" id="L249">            eventBus.post(new UpdateRefusedEvent(bibDatabaseContext, exception.getLocalBibEntry(), exception.getSharedBibEntry()));</span>
+<span class="nc" id="L250">        } catch (SQLException e) {</span>
+<span class="nc" id="L251">            LOGGER.error(&quot;SQL Error&quot;, e);</span>
+<span class="nc" id="L252">        }</span>
+<span class="nc" id="L253">    }</span>
+
+    /**
+     * Synchronizes all meta data locally.
+     */
+    public void synchronizeLocalMetaData() {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (!checkCurrentConnection()) {</span>
+<span class="nc" id="L260">            return;</span>
+        }
+
+        try {
+<span class="nc" id="L264">            metaData.setEventPropagation(false);</span>
+<span class="nc" id="L265">            MetaDataParser parser = new MetaDataParser(fileMonitor);</span>
+<span class="nc" id="L266">            parser.parse(metaData, dbmsProcessor.getSharedMetaData(), keywordSeparator);</span>
+<span class="nc" id="L267">            metaData.setEventPropagation(true);</span>
+<span class="nc" id="L268">        } catch (ParseException e) {</span>
+<span class="nc" id="L269">            LOGGER.error(&quot;Parse error&quot;, e);</span>
+<span class="nc" id="L270">        }</span>
+<span class="nc" id="L271">    }</span>
+
+    /**
+     * Synchronizes all shared meta data.
+     */
+    private void synchronizeSharedMetaData(MetaData data, GlobalCitationKeyPattern globalCiteKeyPattern) {
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (!checkCurrentConnection()) {</span>
+<span class="nc" id="L278">            return;</span>
+        }
+        try {
+<span class="nc" id="L281">            dbmsProcessor.setSharedMetaData(MetaDataSerializer.getSerializedStringMap(data, globalCiteKeyPattern));</span>
+<span class="nc" id="L282">        } catch (SQLException e) {</span>
+<span class="nc" id="L283">            LOGGER.error(&quot;SQL Error: &quot;, e);</span>
+<span class="nc" id="L284">        }</span>
+<span class="nc" id="L285">    }</span>
+
+    /**
+     * Applies the {@link MetaData} on all local and shared BibEntries.
+     */
+    public void applyMetaData() {
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (!checkCurrentConnection()) {</span>
+<span class="nc" id="L292">            return;</span>
+        }
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        for (BibEntry bibEntry : bibDatabase.getEntries()) {</span>
+            try {
+                // synchronize only if changes were present
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                if (!BibDatabaseWriter.applySaveActions(bibEntry, metaData).isEmpty()) {</span>
+<span class="nc" id="L298">                    dbmsProcessor.updateEntry(bibEntry);</span>
+                }
+<span class="nc" id="L300">            } catch (OfflineLockException exception) {</span>
+<span class="nc" id="L301">                eventBus.post(new UpdateRefusedEvent(bibDatabaseContext, exception.getLocalBibEntry(), exception.getSharedBibEntry()));</span>
+<span class="nc" id="L302">            } catch (SQLException e) {</span>
+<span class="nc" id="L303">                LOGGER.error(&quot;SQL Error: &quot;, e);</span>
+<span class="nc" id="L304">            }</span>
+<span class="nc" id="L305">        }</span>
+<span class="nc" id="L306">    }</span>
+
+    /**
+     * Synchronizes the local BibEntries and applies the fetched MetaData on them.
+     */
+    @Override
+    public void pullChanges() {
+<span class="nc bnc" id="L313" title="All 2 branches missed.">        if (!checkCurrentConnection()) {</span>
+<span class="nc" id="L314">            return;</span>
+        }
+        // First synchronize entry, then synchronize database
+<span class="nc" id="L317">        pullWithLastEntry();</span>
+<span class="nc" id="L318">        synchronizeLocalDatabase();</span>
+<span class="nc" id="L319">        synchronizeLocalMetaData();</span>
+<span class="nc" id="L320">    }</span>
+
+    /**
+     * Synchronizes local BibEntries only if last entry changes still remain
+     */
+    public void pullLastEntryChanges() {
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if (!lastEntryChanged.isEmpty()) {</span>
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            if (!checkCurrentConnection()) {</span>
+<span class="nc" id="L328">                return;</span>
+            }
+<span class="nc" id="L330">            synchronizeLocalMetaData();</span>
+<span class="nc" id="L331">            pullWithLastEntry();</span>
+            // Pull changes for the case that there were some
+<span class="nc" id="L333">            synchronizeLocalDatabase();</span>
+        }
+<span class="nc" id="L335">    }</span>
+
+    /**
+     * Synchronizes local BibEntries and pulls remaining last entry changes
+     */
+    private void pullWithLastEntry() {
+<span class="nc bnc" id="L341" title="All 4 branches missed.">        if (!lastEntryChanged.isEmpty() &amp;&amp; isPresentLocalBibEntry(lastEntryChanged.get())) {</span>
+<span class="nc" id="L342">            synchronizeSharedEntry(lastEntryChanged.get());</span>
+        }
+<span class="nc" id="L344">        lastEntryChanged = Optional.empty();</span>
+<span class="nc" id="L345">    }</span>
+
+    /**
+     * Checks whether the current SQL connection is valid. In case that the connection is not valid a new {@link
+     * ConnectionLostEvent} is going to be sent.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; if the connection is valid, else &lt;code&gt;false&lt;/code&gt;.
+     */
+    public boolean checkCurrentConnection() {
+        try {
+<span class="nc" id="L355">            boolean isValid = currentConnection.isValid(0);</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">            if (!isValid) {</span>
+<span class="nc" id="L357">                LOGGER.warn(&quot;Lost SQL connection.&quot;);</span>
+<span class="nc" id="L358">                eventBus.post(new ConnectionLostEvent(bibDatabaseContext));</span>
+            }
+<span class="nc" id="L360">            return isValid;</span>
+<span class="nc" id="L361">        } catch (SQLException e) {</span>
+<span class="nc" id="L362">            LOGGER.error(&quot;SQL Error during connection check&quot;, e);</span>
+<span class="nc" id="L363">            return false;</span>
+        }
+    }
+
+    /**
+     * Checks whether the {@link EntriesEventSource} of an {@link EntriesEvent} is crucial for this class.
+     *
+     * @param event An {@link EntriesEvent}
+     * @return &lt;code&gt;true&lt;/code&gt; if the event is able to trigger operations in {@link DBMSSynchronizer}, else
+     * &lt;code&gt;false&lt;/code&gt;
+     */
+    public boolean isEventSourceAccepted(EntriesEvent event) {
+<span class="nc" id="L375">        EntriesEventSource eventSource = event.getEntriesEventSource();</span>
+<span class="nc bnc" id="L376" title="All 4 branches missed.">        return (eventSource == EntriesEventSource.LOCAL) || (eventSource == EntriesEventSource.UNDO);</span>
+    }
+
+    @Override
+    public void openSharedDatabase(DatabaseConnection connection) throws DatabaseNotSupportedException {
+<span class="nc" id="L381">        this.dbName = connection.getProperties().getDatabase();</span>
+<span class="nc" id="L382">        this.currentConnection = connection.getConnection();</span>
+<span class="nc" id="L383">        this.dbmsProcessor = DBMSProcessor.getProcessorInstance(connection);</span>
+<span class="nc" id="L384">        initializeDatabases();</span>
+<span class="nc" id="L385">    }</span>
+
+    @Override
+    public void closeSharedDatabase() {
+        // Submit remaining entry changes
+<span class="nc" id="L390">        pullLastEntryChanges();</span>
+        try {
+<span class="nc" id="L392">            dbmsProcessor.stopNotificationListener();</span>
+<span class="nc" id="L393">            currentConnection.close();</span>
+<span class="nc" id="L394">        } catch (SQLException e) {</span>
+<span class="nc" id="L395">            LOGGER.error(&quot;SQL Error:&quot;, e);</span>
+<span class="nc" id="L396">        }</span>
+<span class="nc" id="L397">    }</span>
+
+    private boolean isPresentLocalBibEntry(BibEntry bibEntry) {
+<span class="nc" id="L400">        return bibDatabase.getEntries().contains(bibEntry);</span>
+    }
+
+    @Override
+    public String getDBName() {
+<span class="nc" id="L405">        return dbName;</span>
+    }
+
+    public DBMSProcessor getDBProcessor() {
+<span class="nc" id="L409">        return dbmsProcessor;</span>
+    }
+
+    @Override
+    public DatabaseConnectionProperties getConnectionProperties() {
+<span class="nc" id="L414">        return dbmsProcessor.getDBMSConnectionProperties();</span>
+    }
+
+    public void setMetaData(MetaData metaData) {
+<span class="nc" id="L418">        this.metaData = metaData;</span>
+<span class="nc" id="L419">    }</span>
+
+    @Override
+    public void registerListener(Object listener) {
+<span class="nc" id="L423">        eventBus.register(listener);</span>
+<span class="nc" id="L424">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

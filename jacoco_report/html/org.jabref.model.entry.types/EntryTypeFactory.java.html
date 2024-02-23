@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryTypeFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.model.entry.types</a> &gt; <span class="el_source">EntryTypeFactory.java</span></div><h1>EntryTypeFactory.java</h1><pre class="source lang-java linenums">package org.jabref.model.entry.types;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+
+import org.jabref.model.entry.BibEntryType;
+
+public class EntryTypeFactory {
+
+    private EntryTypeFactory() {
+    }
+
+    /**
+     * Checks whether two EntryTypeFactory are equal
+     * based on the equality of the type names and on the equality of the required and optional field lists
+     *
+     * @return returns true if the two compared entry types have the same name and equal required and optional fields
+     */
+    public static boolean nameAndFieldsAreEqual(BibEntryType type1, BibEntryType type2) {
+<span class="nc bnc" id="L23" title="All 4 branches missed.">        if ((type1 == null) &amp;&amp; (type2 == null)) {</span>
+<span class="nc" id="L24">            return true;</span>
+<span class="nc bnc" id="L25" title="All 4 branches missed.">        } else if ((type1 == null) || (type2 == null)) {</span>
+<span class="nc" id="L26">            return false;</span>
+        } else {
+<span class="nc bnc" id="L28" title="All 2 branches missed.">            return Objects.equals(type1.getType(), type2.getType())</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">                    &amp;&amp; Objects.equals(type1.getRequiredFields(), type2.getRequiredFields())</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">                    &amp;&amp; Objects.equals(type1.getOptionalFields(), type2.getOptionalFields())</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">                    &amp;&amp; Objects.equals(type1.getSecondaryOptionalFields(), type2.getSecondaryOptionalFields());</span>
+        }
+    }
+
+    public static boolean isExclusiveBiblatex(EntryType type) {
+<span class="fc bfc" id="L36" title="All 4 branches covered.">        return isBiblatex(type) &amp;&amp; !isBibtex(type);</span>
+    }
+
+    private static boolean isBibtex(EntryType type) {
+<span class="fc" id="L40">        return BibtexEntryTypeDefinitions.ALL.stream().anyMatch(bibEntryType -&gt; bibEntryType.getType().equals(type));</span>
+    }
+
+    private static boolean isBiblatex(EntryType type) {
+<span class="fc" id="L44">        return BiblatexEntryTypeDefinitions.ALL.stream().anyMatch(bibEntryType -&gt; bibEntryType.getType().equals(type));</span>
+    }
+
+    public static EntryType parse(String typeName) {
+<span class="fc" id="L48">        List&lt;EntryType&gt; types = new ArrayList&lt;&gt;(Arrays.&lt;EntryType&gt;asList(StandardEntryType.values()));</span>
+<span class="fc" id="L49">        types.addAll(Arrays.&lt;EntryType&gt;asList(IEEETranEntryType.values()));</span>
+<span class="fc" id="L50">        types.addAll(Arrays.&lt;EntryType&gt;asList(BiblatexSoftwareEntryType.values()));</span>
+<span class="fc" id="L51">        types.addAll(Arrays.&lt;EntryType&gt;asList(BiblatexApaEntryType.values()));</span>
+<span class="fc" id="L52">        types.addAll(Arrays.&lt;EntryType&gt;asList(SystematicLiteratureReviewStudyEntryType.values()));</span>
+
+<span class="fc" id="L54">        return types.stream().filter(type -&gt; type.getName().equals(typeName.toLowerCase(Locale.ENGLISH))).findFirst().orElse(new UnknownEntryType(typeName));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

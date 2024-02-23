@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MarkdownFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.layout.format</a> &gt; <span class="el_source">MarkdownFormatter.java</span></div><h1>MarkdownFormatter.java</h1><pre class="source lang-java linenums">package org.jabref.logic.layout.format;
+
+import java.util.Objects;
+
+import org.jabref.logic.layout.LayoutFormatter;
+
+import com.vladsch.flexmark.html.HtmlRenderer;
+import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.util.ast.Node;
+import com.vladsch.flexmark.util.data.MutableDataSet;
+
+public class MarkdownFormatter implements LayoutFormatter {
+
+    private final Parser parser;
+    private final HtmlRenderer renderer;
+
+<span class="fc" id="L17">    public MarkdownFormatter() {</span>
+<span class="fc" id="L18">        MutableDataSet options = new MutableDataSet();</span>
+<span class="fc" id="L19">        parser = Parser.builder(options).build();</span>
+<span class="fc" id="L20">        renderer = HtmlRenderer.builder(options).build();</span>
+<span class="fc" id="L21">    }</span>
+
+    @Override
+    public String format(final String fieldText) {
+<span class="fc" id="L25">        Objects.requireNonNull(fieldText, &quot;Field Text should not be null, when handed to formatter&quot;);</span>
+
+<span class="fc" id="L27">        Node document = parser.parse(fieldText);</span>
+<span class="fc" id="L28">        String html = renderer.render(document);</span>
+
+        // workaround HTMLChars transforming &quot;\n&quot; into &lt;br&gt; by returning a one liner
+<span class="fc" id="L31">        return html.replaceAll(&quot;\\r\\n|\\r|\\n&quot;, &quot; &quot;).trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalFileTypesTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.externalfiletypes</a> &gt; <span class="el_source">ExternalFileTypesTab.java</span></div><h1>ExternalFileTypesTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.externalfiletypes;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.icon.JabRefIcon;
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.gui.util.BindingsHelper;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.logic.l10n.Localization;
+
+import com.airhacks.afterburner.views.ViewLoader;
+
+/**
+ * Editor for external file types.
+ */
+public class ExternalFileTypesTab extends AbstractPreferenceTabView&lt;ExternalFileTypesTabViewModel&gt; implements PreferencesTab {
+
+    @FXML private TableColumn&lt;ExternalFileTypeItemViewModel, JabRefIcon&gt; fileTypesTableIconColumn;
+    @FXML private TableColumn&lt;ExternalFileTypeItemViewModel, String&gt; fileTypesTableNameColumn;
+    @FXML private TableColumn&lt;ExternalFileTypeItemViewModel, String&gt; fileTypesTableExtensionColumn;
+    @FXML private TableColumn&lt;ExternalFileTypeItemViewModel, String&gt; fileTypesTableMimeTypeColumn;
+    @FXML private TableColumn&lt;ExternalFileTypeItemViewModel, String&gt; fileTypesTableApplicationColumn;
+    @FXML private TableColumn&lt;ExternalFileTypeItemViewModel, Boolean&gt; fileTypesTableEditColumn;
+    @FXML private TableColumn&lt;ExternalFileTypeItemViewModel, Boolean&gt; fileTypesTableDeleteColumn;
+    @FXML private TableView&lt;ExternalFileTypeItemViewModel&gt; fileTypesTable;
+
+<span class="nc" id="L31">    public ExternalFileTypesTab() {</span>
+<span class="nc" id="L32">        ViewLoader.view(this)</span>
+<span class="nc" id="L33">                  .root(this)</span>
+<span class="nc" id="L34">                  .load();</span>
+<span class="nc" id="L35">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L39">        return Localization.lang(&quot;External file types&quot;);</span>
+    }
+
+    @FXML
+    public void initialize() {
+<span class="nc" id="L44">        viewModel = new ExternalFileTypesTabViewModel(preferencesService.getFilePreferences(), dialogService);</span>
+
+<span class="nc" id="L46">        fileTypesTable.setItems(viewModel.getFileTypes());</span>
+
+<span class="nc" id="L48">        fileTypesTableIconColumn.setCellValueFactory(cellData -&gt; cellData.getValue().iconProperty());</span>
+<span class="nc" id="L49">        new ValueTableCellFactory&lt;ExternalFileTypeItemViewModel, JabRefIcon&gt;()</span>
+<span class="nc" id="L50">                .withGraphic(JabRefIcon::getGraphicNode)</span>
+<span class="nc" id="L51">                .install(fileTypesTableIconColumn);</span>
+
+<span class="nc" id="L53">        fileTypesTableNameColumn.setCellValueFactory(cellData -&gt; cellData.getValue().nameProperty());</span>
+<span class="nc" id="L54">        new ValueTableCellFactory&lt;ExternalFileTypeItemViewModel, String&gt;()</span>
+<span class="nc" id="L55">                .withText(name -&gt; name)</span>
+<span class="nc" id="L56">                .install(fileTypesTableNameColumn);</span>
+
+<span class="nc" id="L58">        fileTypesTableExtensionColumn.setCellValueFactory(cellData -&gt; cellData.getValue().extensionProperty());</span>
+<span class="nc" id="L59">        new ValueTableCellFactory&lt;ExternalFileTypeItemViewModel, String&gt;()</span>
+<span class="nc" id="L60">                .withText(extension -&gt; extension)</span>
+<span class="nc" id="L61">                .install(fileTypesTableExtensionColumn);</span>
+
+<span class="nc" id="L63">        fileTypesTableMimeTypeColumn.setCellValueFactory(cellData -&gt; cellData.getValue().mimetypeProperty());</span>
+<span class="nc" id="L64">        new ValueTableCellFactory&lt;ExternalFileTypeItemViewModel, String&gt;()</span>
+<span class="nc" id="L65">                .withText(mimetype -&gt; mimetype)</span>
+<span class="nc" id="L66">                .install(fileTypesTableMimeTypeColumn);</span>
+
+<span class="nc" id="L68">        fileTypesTableApplicationColumn.setCellValueFactory(cellData -&gt; cellData.getValue().applicationProperty());</span>
+<span class="nc" id="L69">        new ValueTableCellFactory&lt;ExternalFileTypeItemViewModel, String&gt;()</span>
+<span class="nc" id="L70">                .withText(extension -&gt; extension)</span>
+<span class="nc" id="L71">                .install(fileTypesTableApplicationColumn);</span>
+
+<span class="nc" id="L73">        fileTypesTableEditColumn.setCellValueFactory(data -&gt; BindingsHelper.constantOf(true));</span>
+<span class="nc" id="L74">        fileTypesTableDeleteColumn.setCellValueFactory(data -&gt; BindingsHelper.constantOf(true));</span>
+
+<span class="nc" id="L76">        new ValueTableCellFactory&lt;ExternalFileTypeItemViewModel, JabRefIcon&gt;()</span>
+<span class="nc" id="L77">                .withGraphic(JabRefIcon::getGraphicNode)</span>
+<span class="nc" id="L78">                .install(fileTypesTableIconColumn);</span>
+<span class="nc" id="L79">        new ValueTableCellFactory&lt;ExternalFileTypeItemViewModel, Boolean&gt;()</span>
+<span class="nc" id="L80">                .withGraphic(none -&gt; IconTheme.JabRefIcons.EDIT.getGraphicNode())</span>
+<span class="nc" id="L81">                .withOnMouseClickedEvent((type, none) -&gt; event -&gt; editType(type))</span>
+<span class="nc" id="L82">                .install(fileTypesTableEditColumn);</span>
+<span class="nc" id="L83">        new ValueTableCellFactory&lt;ExternalFileTypeItemViewModel, Boolean&gt;()</span>
+<span class="nc" id="L84">                .withGraphic(none -&gt; IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode())</span>
+<span class="nc" id="L85">                .withOnMouseClickedEvent((type, none) -&gt; event -&gt; viewModel.remove(type))</span>
+<span class="nc" id="L86">                .install(fileTypesTableDeleteColumn);</span>
+<span class="nc" id="L87">    }</span>
+
+    private void editType(ExternalFileTypeItemViewModel type) {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (viewModel.edit(type)) {</span>
+<span class="nc" id="L91">            fileTypesTable.getSelectionModel().selectLast();</span>
+<span class="nc" id="L92">            fileTypesTable.scrollTo(viewModel.getFileTypes().size() - 1);</span>
+        }
+<span class="nc" id="L94">    }</span>
+
+    @FXML
+    private void addNewType() {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (viewModel.addNewType()) {</span>
+<span class="nc" id="L99">            fileTypesTable.getSelectionModel().selectLast();</span>
+<span class="nc" id="L100">            fileTypesTable.scrollTo(viewModel.getFileTypes().size() - 1);</span>
+        }
+<span class="nc" id="L102">    }</span>
+
+    @FXML
+    private void resetToDefault() {
+<span class="nc" id="L106">        viewModel.resetToDefaults();</span>
+<span class="nc" id="L107">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

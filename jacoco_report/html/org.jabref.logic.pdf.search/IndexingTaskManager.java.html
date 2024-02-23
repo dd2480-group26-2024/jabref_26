@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IndexingTaskManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.pdf.search</a> &gt; <span class="el_source">IndexingTaskManager.java</span></div><h1>IndexingTaskManager.java</h1><pre class="source lang-java linenums">package org.jabref.logic.pdf.search;
+
+import java.util.List;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.LinkedFile;
+
+/**
+ * Wrapper around {@link PdfIndexer} to execute all operations in the background.
+ */
+public class IndexingTaskManager extends BackgroundTask&lt;Void&gt; {
+
+<span class="nc" id="L23">    private final Queue&lt;Runnable&gt; taskQueue = new ConcurrentLinkedQueue&lt;&gt;();</span>
+    private TaskExecutor taskExecutor;
+<span class="nc" id="L25">    private int numOfIndexedFiles = 0;</span>
+
+<span class="nc" id="L27">    private final Object lock = new Object();</span>
+<span class="nc" id="L28">    private boolean isRunning = false;</span>
+<span class="nc" id="L29">    private boolean isBlockingNewTasks = false;</span>
+
+<span class="nc" id="L31">    public IndexingTaskManager(TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L32">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L33">        showToUser(true);</span>
+<span class="nc" id="L34">        willBeRecoveredAutomatically(true);</span>
+<span class="nc" id="L35">        DefaultTaskExecutor.runInJavaFXThread(() -&gt; {</span>
+<span class="nc" id="L36">            this.updateProgress(1, 1);</span>
+<span class="nc" id="L37">            this.titleProperty().set(Localization.lang(&quot;Indexing pdf files&quot;));</span>
+<span class="nc" id="L38">        });</span>
+<span class="nc" id="L39">    }</span>
+
+    @Override
+    protected Void call() throws Exception {
+<span class="nc" id="L43">        synchronized (lock) {</span>
+<span class="nc" id="L44">            isRunning = true;</span>
+<span class="nc" id="L45">        }</span>
+<span class="nc" id="L46">        updateProgress();</span>
+<span class="nc bnc" id="L47" title="All 4 branches missed.">        while (!taskQueue.isEmpty() &amp;&amp; !isCanceled()) {</span>
+<span class="nc" id="L48">            taskQueue.poll().run();</span>
+<span class="nc" id="L49">            numOfIndexedFiles++;</span>
+<span class="nc" id="L50">            updateProgress();</span>
+        }
+<span class="nc" id="L52">        synchronized (lock) {</span>
+<span class="nc" id="L53">            isRunning = false;</span>
+<span class="nc" id="L54">        }</span>
+<span class="nc" id="L55">        return null;</span>
+    }
+
+    private void updateProgress() {
+<span class="nc" id="L59">        DefaultTaskExecutor.runInJavaFXThread(() -&gt; {</span>
+<span class="nc" id="L60">            updateMessage(Localization.lang(&quot;%0 of %1 linked files added to the index&quot;, numOfIndexedFiles, numOfIndexedFiles + taskQueue.size()));</span>
+<span class="nc" id="L61">            updateProgress(numOfIndexedFiles, numOfIndexedFiles + taskQueue.size());</span>
+<span class="nc" id="L62">        });</span>
+<span class="nc" id="L63">    }</span>
+
+    private void enqueueTask(Runnable indexingTask) {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (!isBlockingNewTasks) {</span>
+<span class="nc" id="L67">            taskQueue.add(indexingTask);</span>
+            // What if already running?
+<span class="nc" id="L69">            synchronized (lock) {</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">                if (!isRunning) {</span>
+<span class="nc" id="L71">                    isRunning = true;</span>
+<span class="nc" id="L72">                    this.executeWith(taskExecutor);</span>
+<span class="nc" id="L73">                    showToUser(false);</span>
+                }
+<span class="nc" id="L75">            }</span>
+        }
+<span class="nc" id="L77">    }</span>
+
+    public AutoCloseable blockNewTasks() {
+<span class="nc" id="L80">        synchronized (lock) {</span>
+<span class="nc" id="L81">            isBlockingNewTasks = true;</span>
+<span class="nc" id="L82">        }</span>
+<span class="nc" id="L83">        return () -&gt; {</span>
+<span class="nc" id="L84">            synchronized (lock) {</span>
+<span class="nc" id="L85">                isBlockingNewTasks = false;</span>
+<span class="nc" id="L86">            }</span>
+<span class="nc" id="L87">        };</span>
+    }
+
+    public void rebuildIndex(PdfIndexer indexer) {
+<span class="nc" id="L91">        enqueueTask(indexer::rebuildIndex);</span>
+<span class="nc" id="L92">    }</span>
+
+    /**
+     * Updates the index by performing a delta analysis of the files already existing in the index and the files in the library.
+     */
+    public void updateIndex(PdfIndexer indexer, BibDatabaseContext databaseContext) {
+<span class="nc" id="L98">        Set&lt;String&gt; pathsToRemove = indexer.getListOfFilePaths();</span>
+<span class="nc" id="L99">        databaseContext.getEntries().stream()</span>
+<span class="nc" id="L100">                       .flatMap(entry -&gt; entry.getFiles().stream())</span>
+<span class="nc" id="L101">                       .map(LinkedFile::getLink)</span>
+<span class="nc" id="L102">                       .forEach(pathsToRemove::remove);</span>
+        // The indexer checks the attached PDFs for modifications (based on the timestamp of the PDF) and reindexes the PDF if it is newer than the index. Therefore, we need to pass the whole library to the indexer for re-indexing.
+<span class="nc" id="L104">        addToIndex(indexer, databaseContext.getEntries());</span>
+<span class="nc" id="L105">        enqueueTask(() -&gt; indexer.removePathsFromIndex(pathsToRemove));</span>
+<span class="nc" id="L106">    }</span>
+
+    public void addToIndex(PdfIndexer indexer, List&lt;BibEntry&gt; entries) {
+<span class="nc" id="L109">        AtomicInteger counter = new AtomicInteger();</span>
+        // To enable seeing progress in the UI, we group the entries in chunks of 50
+        // Solution inspired by https://stackoverflow.com/a/27595803/873282
+<span class="nc" id="L112">        entries.stream().collect(Collectors.groupingBy(x -&gt; counter.getAndIncrement() / 50))</span>
+<span class="nc" id="L113">               .values()</span>
+<span class="nc" id="L114">               .forEach(list -&gt; enqueueTask(() -&gt; indexer.addToIndex(list)));</span>
+<span class="nc" id="L115">    }</span>
+
+    public void addToIndex(PdfIndexer indexer, BibEntry entry) {
+<span class="nc" id="L118">        enqueueTask(() -&gt; indexer.addToIndex(entry));</span>
+<span class="nc" id="L119">    }</span>
+
+    public void addToIndex(PdfIndexer indexer, BibEntry entry, List&lt;LinkedFile&gt; linkedFiles) {
+<span class="nc" id="L122">        enqueueTask(() -&gt; indexer.addToIndex(entry, linkedFiles));</span>
+<span class="nc" id="L123">    }</span>
+
+    public void removeFromIndex(PdfIndexer indexer, BibEntry entry) {
+<span class="nc" id="L126">        enqueueTask(() -&gt; indexer.removeFromIndex(entry));</span>
+<span class="nc" id="L127">    }</span>
+
+    public void removeFromIndex(PdfIndexer indexer, List&lt;LinkedFile&gt; linkedFiles) {
+<span class="nc" id="L130">        enqueueTask(() -&gt; indexer.removeFromIndex(linkedFiles));</span>
+<span class="nc" id="L131">    }</span>
+
+    public void updateDatabaseName(String name) {
+<span class="nc" id="L134">        DefaultTaskExecutor.runInJavaFXThread(() -&gt; this.titleProperty().set(Localization.lang(&quot;Indexing for %0&quot;, name)));</span>
+<span class="nc" id="L135">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

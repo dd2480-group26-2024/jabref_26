@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NetworkTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.network</a> &gt; <span class="el_source">NetworkTab.java</span></div><h1>NetworkTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.network;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
+import javafx.application.Platform;
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.MouseEvent;
+
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.gui.util.IconValidationDecorator;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.logic.l10n.Localization;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+import org.controlsfx.control.textfield.CustomPasswordField;
+
+public class NetworkTab extends AbstractPreferenceTabView&lt;NetworkTabViewModel&gt; implements PreferencesTab {
+    @FXML private CheckBox versionCheck;
+    @FXML private CheckBox proxyUse;
+    @FXML private Label proxyHostnameLabel;
+    @FXML private TextField proxyHostname;
+    @FXML private Label proxyPortLabel;
+    @FXML private TextField proxyPort;
+    @FXML private CheckBox proxyUseAuthentication;
+    @FXML private Label proxyUsernameLabel;
+    @FXML private TextField proxyUsername;
+    @FXML private Label proxyPasswordLabel;
+    @FXML private CustomPasswordField proxyPassword;
+    @FXML private Button checkConnectionButton;
+    @FXML private CheckBox proxyPersistPassword;
+    @FXML private SplitPane persistentTooltipWrapper; // The disabled persistPassword control does not show tooltips
+
+    @FXML private TableView&lt;CustomCertificateViewModel&gt; customCertificatesTable;
+    @FXML private TableColumn&lt;CustomCertificateViewModel, String&gt; certIssuer;
+    @FXML private TableColumn&lt;CustomCertificateViewModel, String&gt; certSerialNumber;
+    @FXML private TableColumn&lt;CustomCertificateViewModel, String&gt; certSignatureAlgorithm;
+    @FXML private TableColumn&lt;CustomCertificateViewModel, String&gt; certValidFrom;
+    @FXML private TableColumn&lt;CustomCertificateViewModel, String&gt; certValidTo;
+    @FXML private TableColumn&lt;CustomCertificateViewModel, String&gt; certVersion;
+    @FXML private TableColumn&lt;CustomCertificateViewModel, String&gt; actionsColumn;
+
+<span class="nc" id="L57">    private String proxyPasswordText = &quot;&quot;;</span>
+<span class="nc" id="L58">    private int proxyPasswordCaretPosition = 0;</span>
+
+<span class="nc" id="L60">    private final ControlsFxVisualizer validationVisualizer = new ControlsFxVisualizer();</span>
+
+<span class="nc" id="L62">    public NetworkTab() {</span>
+<span class="nc" id="L63">        ViewLoader.view(this)</span>
+<span class="nc" id="L64">                  .root(this)</span>
+<span class="nc" id="L65">                  .load();</span>
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L70">        return Localization.lang(&quot;Network&quot;);</span>
+    }
+
+    public void initialize() {
+<span class="nc" id="L74">        this.viewModel = new NetworkTabViewModel(dialogService, preferencesService);</span>
+
+<span class="nc" id="L76">        versionCheck.selectedProperty().bindBidirectional(viewModel.versionCheckProperty());</span>
+
+<span class="nc" id="L78">        proxyUse.selectedProperty().bindBidirectional(viewModel.proxyUseProperty());</span>
+<span class="nc" id="L79">        proxyHostnameLabel.disableProperty().bind(proxyUse.selectedProperty().not());</span>
+<span class="nc" id="L80">        proxyHostname.textProperty().bindBidirectional(viewModel.proxyHostnameProperty());</span>
+<span class="nc" id="L81">        proxyHostname.disableProperty().bind(proxyUse.selectedProperty().not());</span>
+<span class="nc" id="L82">        proxyPortLabel.disableProperty().bind(proxyUse.selectedProperty().not());</span>
+<span class="nc" id="L83">        proxyPort.textProperty().bindBidirectional(viewModel.proxyPortProperty());</span>
+<span class="nc" id="L84">        proxyPort.disableProperty().bind(proxyUse.selectedProperty().not());</span>
+<span class="nc" id="L85">        proxyUseAuthentication.selectedProperty().bindBidirectional(viewModel.proxyUseAuthenticationProperty());</span>
+<span class="nc" id="L86">        proxyUseAuthentication.disableProperty().bind(proxyUse.selectedProperty().not());</span>
+
+<span class="nc" id="L88">        BooleanBinding proxyCustomAndAuthentication = proxyUse.selectedProperty().and(proxyUseAuthentication.selectedProperty());</span>
+<span class="nc" id="L89">        proxyUsernameLabel.disableProperty().bind(proxyCustomAndAuthentication.not());</span>
+<span class="nc" id="L90">        proxyUsername.textProperty().bindBidirectional(viewModel.proxyUsernameProperty());</span>
+<span class="nc" id="L91">        proxyUsername.disableProperty().bind(proxyCustomAndAuthentication.not());</span>
+<span class="nc" id="L92">        proxyPasswordLabel.disableProperty().bind(proxyCustomAndAuthentication.not());</span>
+<span class="nc" id="L93">        proxyPassword.textProperty().bindBidirectional(viewModel.proxyPasswordProperty());</span>
+<span class="nc" id="L94">        proxyPassword.disableProperty().bind(proxyCustomAndAuthentication.not());</span>
+<span class="nc" id="L95">        proxyPersistPassword.selectedProperty().bindBidirectional(viewModel.proxyPersistPasswordProperty());</span>
+<span class="nc" id="L96">        proxyPersistPassword.disableProperty().bind(</span>
+<span class="nc" id="L97">                proxyCustomAndAuthentication.and(viewModel.passwordPersistAvailable()).not());</span>
+<span class="nc" id="L98">        EasyBind.subscribe(viewModel.passwordPersistAvailable(), available -&gt; {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (!available) {</span>
+<span class="nc" id="L100">                persistentTooltipWrapper.setTooltip(new Tooltip(Localization.lang(&quot;Credential store not available.&quot;)));</span>
+            } else {
+<span class="nc" id="L102">                persistentTooltipWrapper.setTooltip(null);</span>
+            }
+<span class="nc" id="L104">        });</span>
+
+<span class="nc" id="L106">        proxyPassword.setRight(IconTheme.JabRefIcons.PASSWORD_REVEALED.getGraphicNode());</span>
+<span class="nc" id="L107">        proxyPassword.getRight().addEventFilter(MouseEvent.MOUSE_PRESSED, this::proxyPasswordReveal);</span>
+<span class="nc" id="L108">        proxyPassword.getRight().addEventFilter(MouseEvent.MOUSE_RELEASED, this::proxyPasswordMask);</span>
+<span class="nc" id="L109">        proxyPassword.getRight().addEventFilter(MouseEvent.MOUSE_EXITED, this::proxyPasswordMask);</span>
+
+<span class="nc" id="L111">        validationVisualizer.setDecoration(new IconValidationDecorator());</span>
+<span class="nc" id="L112">        Platform.runLater(() -&gt; {</span>
+<span class="nc" id="L113">            validationVisualizer.initVisualization(viewModel.proxyHostnameValidationStatus(), proxyHostname);</span>
+<span class="nc" id="L114">            validationVisualizer.initVisualization(viewModel.proxyPortValidationStatus(), proxyPort);</span>
+<span class="nc" id="L115">            validationVisualizer.initVisualization(viewModel.proxyUsernameValidationStatus(), proxyUsername);</span>
+<span class="nc" id="L116">            validationVisualizer.initVisualization(viewModel.proxyPasswordValidationStatus(), proxyPassword);</span>
+<span class="nc" id="L117">        });</span>
+
+<span class="nc" id="L119">        certSerialNumber.setCellValueFactory(data -&gt; data.getValue().serialNumberProperty());</span>
+<span class="nc" id="L120">        certIssuer.setCellValueFactory(data -&gt; data.getValue().issuerProperty());</span>
+<span class="nc" id="L121">        certSignatureAlgorithm.setCellValueFactory(data -&gt; data.getValue().signatureAlgorithmProperty());</span>
+<span class="nc" id="L122">        certVersion.setCellValueFactory(data -&gt; EasyBind.map(data.getValue().versionProperty(), this::formatVersion));</span>
+
+<span class="nc" id="L124">        certValidFrom.setCellValueFactory(data -&gt; EasyBind.map(data.getValue().validFromProperty(), this::formatDate));</span>
+<span class="nc" id="L125">        certValidTo.setCellValueFactory(data -&gt; EasyBind.map(data.getValue().validToProperty(), this::formatDate));</span>
+
+<span class="nc" id="L127">        customCertificatesTable.itemsProperty().set(viewModel.customCertificateListProperty());</span>
+
+<span class="nc" id="L129">        actionsColumn.setCellValueFactory(cellData -&gt; new SimpleStringProperty(cellData.getValue().getThumbprint()));</span>
+<span class="nc" id="L130">        new ValueTableCellFactory&lt;CustomCertificateViewModel, String&gt;()</span>
+<span class="nc" id="L131">                .withGraphic(name -&gt; IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode())</span>
+<span class="nc" id="L132">                .withTooltip(name -&gt; Localization.lang(&quot;Remove formatter '%0'&quot;, name))</span>
+<span class="nc" id="L133">                .withOnMouseClickedEvent(thumbprint -&gt; evt -&gt; viewModel.customCertificateListProperty().removeIf(cert -&gt; cert.getThumbprint().equals(thumbprint)))</span>
+<span class="nc" id="L134">                .install(actionsColumn);</span>
+<span class="nc" id="L135">    }</span>
+
+    private String formatDate(LocalDate localDate) {
+<span class="nc" id="L138">        return localDate.format(DateTimeFormatter.ofPattern(&quot;dd-MMM-yyyy&quot;));</span>
+    }
+
+    private String formatVersion(String version) {
+<span class="nc" id="L142">        return &quot;V%s&quot;.formatted(version);</span>
+    }
+
+    private void proxyPasswordReveal(MouseEvent event) {
+<span class="nc" id="L146">        proxyPasswordText = proxyPassword.getText();</span>
+<span class="nc" id="L147">        proxyPasswordCaretPosition = proxyPassword.getCaretPosition();</span>
+<span class="nc" id="L148">        proxyPassword.clear();</span>
+<span class="nc" id="L149">        proxyPassword.setPromptText(proxyPasswordText);</span>
+<span class="nc" id="L150">    }</span>
+
+    private void proxyPasswordMask(MouseEvent event) {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (!&quot;&quot;.equals(proxyPasswordText)) {</span>
+<span class="nc" id="L154">            proxyPassword.setText(proxyPasswordText);</span>
+<span class="nc" id="L155">            proxyPassword.positionCaret(proxyPasswordCaretPosition);</span>
+<span class="nc" id="L156">            proxyPassword.setPromptText(&quot;&quot;);</span>
+<span class="nc" id="L157">            proxyPasswordText = &quot;&quot;;</span>
+<span class="nc" id="L158">            proxyPasswordCaretPosition = 0;</span>
+        }
+<span class="nc" id="L160">    }</span>
+
+    @FXML
+    void checkConnection() {
+<span class="nc" id="L164">        viewModel.checkConnection();</span>
+<span class="nc" id="L165">    }</span>
+
+    @FXML
+    void addCertificateFile() {
+<span class="nc" id="L169">        viewModel.addCertificateFile();</span>
+<span class="nc" id="L170">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

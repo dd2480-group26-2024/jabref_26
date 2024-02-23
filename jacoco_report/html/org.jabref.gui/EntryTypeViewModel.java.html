@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryTypeViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui</a> &gt; <span class="el_source">EntryTypeViewModel.java</span></div><h1>EntryTypeViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui;
+
+import java.util.Optional;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.concurrent.Task;
+import javafx.concurrent.Worker;
+
+import org.jabref.gui.externalfiles.ImportHandler;
+import org.jabref.gui.importer.NewEntryAction;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.importer.FetcherClientException;
+import org.jabref.logic.importer.FetcherException;
+import org.jabref.logic.importer.FetcherServerException;
+import org.jabref.logic.importer.IdBasedFetcher;
+import org.jabref.logic.importer.WebFetchers;
+import org.jabref.logic.importer.fetcher.DoiFetcher;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class EntryTypeViewModel {
+
+<span class="nc" id="L42">    private static final Logger LOGGER = LoggerFactory.getLogger(EntryTypeViewModel.class);</span>
+
+    private final PreferencesService preferencesService;
+<span class="nc" id="L45">    private final BooleanProperty searchingProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L46">    private final BooleanProperty searchSuccesfulProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L47">    private final ObjectProperty&lt;IdBasedFetcher&gt; selectedItemProperty = new SimpleObjectProperty&lt;&gt;();</span>
+<span class="nc" id="L48">    private final ListProperty&lt;IdBasedFetcher&gt; fetchers = new SimpleListProperty&lt;&gt;(FXCollections.observableArrayList());</span>
+<span class="nc" id="L49">    private final StringProperty idText = new SimpleStringProperty();</span>
+<span class="nc" id="L50">    private final BooleanProperty focusAndSelectAllProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L51">    private Task&lt;Optional&lt;BibEntry&gt;&gt; fetcherWorker = new FetcherWorker();</span>
+    private final LibraryTab libraryTab;
+    private final DialogService dialogService;
+    private final Validator idFieldValidator;
+    private final StateManager stateManager;
+    private final TaskExecutor taskExecutor;
+    private final FileUpdateMonitor fileUpdateMonitor;
+
+    public EntryTypeViewModel(PreferencesService preferences,
+                              LibraryTab libraryTab,
+                              DialogService dialogService,
+                              StateManager stateManager,
+                              TaskExecutor taskExecutor,
+<span class="nc" id="L64">                              FileUpdateMonitor fileUpdateMonitor) {</span>
+<span class="nc" id="L65">        this.libraryTab = libraryTab;</span>
+<span class="nc" id="L66">        this.preferencesService = preferences;</span>
+<span class="nc" id="L67">        this.dialogService = dialogService;</span>
+<span class="nc" id="L68">        this.stateManager = stateManager;</span>
+<span class="nc" id="L69">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L70">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+
+<span class="nc" id="L72">        fetchers.addAll(WebFetchers.getIdBasedFetchers(</span>
+<span class="nc" id="L73">                preferences.getImportFormatPreferences(),</span>
+<span class="nc" id="L74">                preferences.getImporterPreferences()));</span>
+<span class="nc" id="L75">        selectedItemProperty.setValue(getLastSelectedFetcher());</span>
+<span class="nc" id="L76">        idFieldValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                idText,
+                StringUtil::isNotBlank,
+<span class="nc" id="L79">                ValidationMessage.error(Localization.lang(&quot;Required field \&quot;%0\&quot; is empty.&quot;, Localization.lang(&quot;ID&quot;))));</span>
+<span class="nc" id="L80">    }</span>
+
+    public BooleanProperty searchSuccesfulProperty() {
+<span class="nc" id="L83">        return searchSuccesfulProperty;</span>
+    }
+
+    public BooleanProperty searchingProperty() {
+<span class="nc" id="L87">        return searchingProperty;</span>
+    }
+
+    public ObjectProperty&lt;IdBasedFetcher&gt; selectedItemProperty() {
+<span class="nc" id="L91">        return selectedItemProperty;</span>
+    }
+
+    public ValidationStatus idFieldValidationStatus() {
+<span class="nc" id="L95">        return idFieldValidator.getValidationStatus();</span>
+    }
+
+    public StringProperty idTextProperty() {
+<span class="nc" id="L99">        return idText;</span>
+    }
+
+    public BooleanProperty getFocusAndSelectAllProperty() {
+<span class="nc" id="L103">        return focusAndSelectAllProperty;</span>
+    }
+
+    public void storeSelectedFetcher() {
+<span class="nc" id="L107">        preferencesService.getGuiPreferences().setLastSelectedIdBasedFetcher(selectedItemProperty.getValue().getName());</span>
+<span class="nc" id="L108">    }</span>
+
+    private IdBasedFetcher getLastSelectedFetcher() {
+<span class="nc" id="L111">        return fetchers.stream().filter(fetcher -&gt; fetcher.getName()</span>
+<span class="nc" id="L112">                                                          .equals(preferencesService.getGuiPreferences()</span>
+<span class="nc" id="L113">                                                                                    .getLastSelectedIdBasedFetcher()))</span>
+<span class="nc" id="L114">                       .findFirst()</span>
+<span class="nc" id="L115">                       .orElse(new DoiFetcher(preferencesService.getImportFormatPreferences()));</span>
+    }
+
+    public ListProperty&lt;IdBasedFetcher&gt; fetcherItemsProperty() {
+<span class="nc" id="L119">        return fetchers;</span>
+    }
+
+    public void stopFetching() {
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (fetcherWorker.getState() == Worker.State.RUNNING) {</span>
+<span class="nc" id="L124">            fetcherWorker.cancel(true);</span>
+        }
+<span class="nc" id="L126">    }</span>
+
+<span class="nc" id="L128">    private class FetcherWorker extends Task&lt;Optional&lt;BibEntry&gt;&gt; {</span>
+<span class="nc" id="L129">        private IdBasedFetcher fetcher = null;</span>
+<span class="nc" id="L130">        private String searchID = &quot;&quot;;</span>
+
+        @Override
+        protected Optional&lt;BibEntry&gt; call() throws FetcherException {
+<span class="nc" id="L134">            storeSelectedFetcher();</span>
+<span class="nc" id="L135">            fetcher = selectedItemProperty().getValue();</span>
+<span class="nc" id="L136">            searchID = idText.getValue();</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (searchID.isEmpty()) {</span>
+<span class="nc" id="L138">                return Optional.empty();</span>
+            }
+<span class="nc" id="L140">            return fetcher.performSearchById(searchID);</span>
+        }
+    }
+
+    public void runFetcherWorker() {
+<span class="nc" id="L145">        fetcherWorker.setOnRunning(event -&gt; searchingProperty().setValue(true));</span>
+
+<span class="nc" id="L147">        fetcherWorker.setOnFailed(event -&gt; {</span>
+<span class="nc" id="L148">            searchSuccesfulProperty.set(false);</span>
+<span class="nc" id="L149">            Throwable exception = fetcherWorker.getException();</span>
+<span class="nc" id="L150">            String fetcherExceptionMessage = exception.getMessage();</span>
+<span class="nc" id="L151">            String fetcher = selectedItemProperty().getValue().getName();</span>
+<span class="nc" id="L152">            String searchId = idText.getValue();</span>
+
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            if (exception instanceof FetcherClientException) {</span>
+<span class="nc" id="L155">                dialogService.showInformationDialogAndWait(Localization.lang(&quot;Failed to import by ID&quot;), Localization.lang(&quot;Bibliographic data not found. Cause is likely the client side. Please check connection and identifier for correctness.&quot;) + &quot;\n&quot; + fetcherExceptionMessage);</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            } else if (exception instanceof FetcherServerException) {</span>
+<span class="nc" id="L157">                dialogService.showInformationDialogAndWait(Localization.lang(&quot;Failed to import by ID&quot;), Localization.lang(&quot;Bibliographic data not found. Cause is likely the server side. Please try again later.&quot;) + &quot;\n&quot; + fetcherExceptionMessage);</span>
+            } else {
+<span class="nc" id="L159">                dialogService.showInformationDialogAndWait(Localization.lang(&quot;Failed to import by ID&quot;), Localization.lang(&quot;Error message %0&quot;, fetcherExceptionMessage));</span>
+            }
+
+<span class="nc" id="L162">            LOGGER.error(&quot;Exception during fetching when using fetcher '{}' with entry id '{}'.&quot;, fetcher, searchId, exception);</span>
+
+<span class="nc" id="L164">            searchingProperty.set(false);</span>
+<span class="nc" id="L165">            fetcherWorker = new FetcherWorker();</span>
+<span class="nc" id="L166">        });</span>
+
+<span class="nc" id="L168">        fetcherWorker.setOnSucceeded(evt -&gt; {</span>
+<span class="nc" id="L169">            Optional&lt;BibEntry&gt; result = fetcherWorker.getValue();</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            if (result.isPresent()) {</span>
+<span class="nc" id="L171">                final BibEntry entry = result.get();</span>
+
+<span class="nc" id="L173">                ImportHandler handler = new ImportHandler(</span>
+<span class="nc" id="L174">                        libraryTab.getBibDatabaseContext(),</span>
+                        preferencesService,
+                        fileUpdateMonitor,
+<span class="nc" id="L177">                        libraryTab.getUndoManager(),</span>
+                        stateManager,
+                        dialogService,
+                        taskExecutor);
+<span class="nc" id="L181">                handler.importEntryWithDuplicateCheck(libraryTab.getBibDatabaseContext(), entry);</span>
+
+<span class="nc" id="L183">                searchSuccesfulProperty.set(true);</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">            } else if (StringUtil.isBlank(idText.getValue())) {</span>
+<span class="nc" id="L185">                dialogService.showWarningDialogAndWait(Localization.lang(&quot;Empty search ID&quot;), Localization.lang(&quot;The given search ID was empty.&quot;));</span>
+            } else {
+                // result is empty
+
+<span class="nc" id="L189">                String fetcher = selectedItemProperty().getValue().getName();</span>
+<span class="nc" id="L190">                String searchId = idText.getValue();</span>
+
+                // When DOI ID is not found, allow the user to either return to the dialog or add entry manually
+<span class="nc" id="L193">                boolean addEntryFlag = dialogService.showConfirmationDialogAndWait(Localization.lang(&quot;Identifier not found&quot;),</span>
+<span class="nc" id="L194">                        Localization.lang(&quot;Fetcher '%0' did not find an entry for id '%1'.&quot;, fetcher, searchId),</span>
+<span class="nc" id="L195">                        Localization.lang(&quot;Add entry manually&quot;),</span>
+<span class="nc" id="L196">                        Localization.lang(&quot;Return to dialog&quot;));</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                if (addEntryFlag) {</span>
+<span class="nc" id="L198">                    new NewEntryAction(</span>
+<span class="nc" id="L199">                            () -&gt; libraryTab,</span>
+                            StandardEntryType.Article,
+                            dialogService,
+                            preferencesService,
+<span class="nc" id="L203">                            stateManager).execute();</span>
+<span class="nc" id="L204">                    searchSuccesfulProperty.set(true);</span>
+                }
+            }
+
+<span class="nc" id="L208">            focusAndSelectAllProperty.set(true);</span>
+<span class="nc" id="L209">            searchingProperty().set(false);</span>
+<span class="nc" id="L210">            fetcherWorker = new FetcherWorker();</span>
+<span class="nc" id="L211">        });</span>
+<span class="nc" id="L212">        taskExecutor.execute(fetcherWorker);</span>
+<span class="nc" id="L213">    }</span>
+
+    public void cancelFetcherWorker() {
+<span class="nc" id="L216">        fetcherWorker.cancel();</span>
+<span class="nc" id="L217">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

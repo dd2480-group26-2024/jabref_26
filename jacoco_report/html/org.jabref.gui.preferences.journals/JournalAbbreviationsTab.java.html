@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JournalAbbreviationsTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.journals</a> &gt; <span class="el_source">JournalAbbreviationsTab.java</span></div><h1>JournalAbbreviationsTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.journals;
+
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.transformation.FilteredList;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.paint.Color;
+import javafx.util.Duration;
+
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.gui.util.ColorUtil;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.logic.journals.JournalAbbreviationRepository;
+import org.jabref.logic.l10n.Localization;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import com.tobiasdiez.easybind.EasyBind;
+import jakarta.inject.Inject;
+import org.controlsfx.control.textfield.CustomTextField;
+
+/**
+ * This class controls the user interface of the journal abbreviations dialog. The UI elements and their layout are
+ * defined in the FXML file.
+ */
+public class JournalAbbreviationsTab extends AbstractPreferenceTabView&lt;JournalAbbreviationsTabViewModel&gt; implements PreferencesTab {
+
+    @FXML private Label loadingLabel;
+    @FXML private ProgressIndicator progressIndicator;
+
+    @FXML private TableView&lt;AbbreviationViewModel&gt; journalAbbreviationsTable;
+    @FXML private TableColumn&lt;AbbreviationViewModel, String&gt; journalTableNameColumn;
+    @FXML private TableColumn&lt;AbbreviationViewModel, String&gt; journalTableAbbreviationColumn;
+    @FXML private TableColumn&lt;AbbreviationViewModel, String&gt; journalTableShortestUniqueAbbreviationColumn;
+    @FXML private TableColumn&lt;AbbreviationViewModel, String&gt; actionsColumn;
+
+    private FilteredList&lt;AbbreviationViewModel&gt; filteredAbbreviations;
+    @FXML private ComboBox&lt;AbbreviationsFileViewModel&gt; journalFilesBox;
+
+    @FXML private Button addAbbreviationButton;
+    @FXML private Button removeAbbreviationListButton;
+
+    @FXML private CustomTextField searchBox;
+    @FXML private CheckBox useFJournal;
+
+    @Inject private TaskExecutor taskExecutor;
+    @Inject private JournalAbbreviationRepository abbreviationRepository;
+
+    private Timeline invalidateSearch;
+
+<span class="nc" id="L68">    public JournalAbbreviationsTab() {</span>
+<span class="nc" id="L69">        ViewLoader.view(this)</span>
+<span class="nc" id="L70">                  .root(this)</span>
+<span class="nc" id="L71">                  .load();</span>
+<span class="nc" id="L72">    }</span>
+
+    @FXML
+    private void initialize() {
+<span class="nc" id="L76">        viewModel = new JournalAbbreviationsTabViewModel(</span>
+<span class="nc" id="L77">                preferencesService.getJournalAbbreviationPreferences(),</span>
+                dialogService,
+                taskExecutor,
+                abbreviationRepository);
+
+<span class="nc" id="L82">        filteredAbbreviations = new FilteredList&lt;&gt;(viewModel.abbreviationsProperty());</span>
+
+<span class="nc" id="L84">        setUpTable();</span>
+<span class="nc" id="L85">        setBindings();</span>
+<span class="nc" id="L86">        setAnimations();</span>
+
+<span class="nc" id="L88">        searchBox.setPromptText(Localization.lang(&quot;Search&quot;) + &quot;...&quot;);</span>
+<span class="nc" id="L89">        searchBox.setLeft(IconTheme.JabRefIcons.SEARCH.getGraphicNode());</span>
+<span class="nc" id="L90">    }</span>
+
+    private void setUpTable() {
+<span class="nc" id="L93">        journalTableNameColumn.setCellValueFactory(cellData -&gt; cellData.getValue().nameProperty());</span>
+<span class="nc" id="L94">        journalTableNameColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+
+<span class="nc" id="L96">        journalTableAbbreviationColumn.setCellValueFactory(cellData -&gt; cellData.getValue().abbreviationProperty());</span>
+<span class="nc" id="L97">        journalTableAbbreviationColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+
+<span class="nc" id="L99">        journalTableShortestUniqueAbbreviationColumn.setCellValueFactory(cellData -&gt; cellData.getValue().shortestUniqueAbbreviationProperty());</span>
+<span class="nc" id="L100">        journalTableShortestUniqueAbbreviationColumn.setCellFactory(TextFieldTableCell.forTableColumn());</span>
+
+<span class="nc" id="L102">        actionsColumn.setCellValueFactory(cellData -&gt; cellData.getValue().nameProperty());</span>
+<span class="nc" id="L103">        new ValueTableCellFactory&lt;AbbreviationViewModel, String&gt;()</span>
+<span class="nc" id="L104">                .withGraphic(name -&gt; IconTheme.JabRefIcons.DELETE_ENTRY.getGraphicNode())</span>
+<span class="nc" id="L105">                .withTooltip(name -&gt; Localization.lang(&quot;Remove journal '%0'&quot;, name))</span>
+<span class="nc" id="L106">                .withDisableExpression(item -&gt; viewModel.isEditableAndRemovableProperty().not())</span>
+<span class="nc" id="L107">                .withVisibleExpression(item -&gt; viewModel.isEditableAndRemovableProperty())</span>
+<span class="nc" id="L108">                .withOnMouseClickedEvent(item -&gt; evt -&gt;</span>
+<span class="nc" id="L109">                        viewModel.removeAbbreviation(journalAbbreviationsTable.getFocusModel().getFocusedItem()))</span>
+<span class="nc" id="L110">                .install(actionsColumn);</span>
+<span class="nc" id="L111">    }</span>
+
+    private void setBindings() {
+<span class="nc" id="L114">        journalAbbreviationsTable.setItems(filteredAbbreviations);</span>
+
+<span class="nc" id="L116">        EasyBind.subscribe(journalAbbreviationsTable.getSelectionModel().selectedItemProperty(), newValue -&gt;</span>
+<span class="nc" id="L117">                viewModel.currentAbbreviationProperty().set(newValue));</span>
+<span class="nc" id="L118">        EasyBind.subscribe(viewModel.currentAbbreviationProperty(), newValue -&gt;</span>
+<span class="nc" id="L119">                journalAbbreviationsTable.getSelectionModel().select(newValue));</span>
+
+<span class="nc" id="L121">        journalTableNameColumn.editableProperty().bind(viewModel.isAbbreviationEditableAndRemovable());</span>
+<span class="nc" id="L122">        journalTableAbbreviationColumn.editableProperty().bind(viewModel.isAbbreviationEditableAndRemovable());</span>
+<span class="nc" id="L123">        journalTableShortestUniqueAbbreviationColumn.editableProperty().bind(viewModel.isAbbreviationEditableAndRemovable());</span>
+
+<span class="nc" id="L125">        removeAbbreviationListButton.disableProperty().bind(viewModel.isFileRemovableProperty().not());</span>
+<span class="nc" id="L126">        journalFilesBox.itemsProperty().bindBidirectional(viewModel.journalFilesProperty());</span>
+<span class="nc" id="L127">        journalFilesBox.valueProperty().bindBidirectional(viewModel.currentFileProperty());</span>
+
+<span class="nc" id="L129">        addAbbreviationButton.disableProperty().bind(viewModel.isEditableAndRemovableProperty().not());</span>
+
+<span class="nc" id="L131">        loadingLabel.visibleProperty().bind(viewModel.isLoadingProperty());</span>
+<span class="nc" id="L132">        progressIndicator.visibleProperty().bind(viewModel.isLoadingProperty());</span>
+
+<span class="nc" id="L134">        searchBox.textProperty().addListener((observable, previousText, searchTerm) -&gt;</span>
+<span class="nc bnc" id="L135" title="All 4 branches missed.">                filteredAbbreviations.setPredicate(abbreviation -&gt; searchTerm.isEmpty() || abbreviation.containsCaseIndependent(searchTerm)));</span>
+
+<span class="nc" id="L137">        useFJournal.selectedProperty().bindBidirectional(viewModel.useFJournalProperty());</span>
+<span class="nc" id="L138">    }</span>
+
+    private void setAnimations() {
+<span class="nc" id="L141">        ObjectProperty&lt;Color&gt; flashingColor = new SimpleObjectProperty&lt;&gt;(Color.TRANSPARENT);</span>
+<span class="nc" id="L142">        StringProperty flashingColorStringProperty = createFlashingColorStringProperty(flashingColor);</span>
+
+<span class="nc" id="L144">        searchBox.styleProperty().bind(</span>
+<span class="nc" id="L145">                new SimpleStringProperty(&quot;-fx-control-inner-background: &quot;).concat(flashingColorStringProperty).concat(&quot;;&quot;)</span>
+        );
+<span class="nc" id="L147">        invalidateSearch = new Timeline(</span>
+<span class="nc" id="L148">                new KeyFrame(Duration.seconds(0), new KeyValue(flashingColor, Color.TRANSPARENT, Interpolator.LINEAR)),</span>
+<span class="nc" id="L149">                new KeyFrame(Duration.seconds(0.25), new KeyValue(flashingColor, Color.RED, Interpolator.LINEAR)),</span>
+<span class="nc" id="L150">                new KeyFrame(Duration.seconds(0.25), new KeyValue(searchBox.textProperty(), &quot;&quot;, Interpolator.DISCRETE)),</span>
+<span class="nc" id="L151">                new KeyFrame(Duration.seconds(0.25), (ActionEvent event) -&gt; addAbbreviationActions()),</span>
+<span class="nc" id="L152">                new KeyFrame(Duration.seconds(0.5), new KeyValue(flashingColor, Color.TRANSPARENT, Interpolator.LINEAR))</span>
+        );
+<span class="nc" id="L154">    }</span>
+
+    @FXML
+    private void addList() {
+<span class="nc" id="L158">        viewModel.addNewFile();</span>
+<span class="nc" id="L159">    }</span>
+
+    @FXML
+    private void openList() {
+<span class="nc" id="L163">        viewModel.openFile();</span>
+<span class="nc" id="L164">    }</span>
+
+    @FXML
+    private void removeList() {
+<span class="nc" id="L168">        viewModel.removeCurrentFile();</span>
+<span class="nc" id="L169">    }</span>
+
+    @FXML
+    private void addAbbreviation() {
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (!searchBox.getText().isEmpty()) {</span>
+<span class="nc" id="L174">            invalidateSearch.play();</span>
+        } else {
+<span class="nc" id="L176">            addAbbreviationActions();</span>
+        }
+<span class="nc" id="L178">    }</span>
+
+    private void addAbbreviationActions() {
+<span class="nc" id="L181">        viewModel.addAbbreviation();</span>
+<span class="nc" id="L182">        selectNewAbbreviation();</span>
+<span class="nc" id="L183">        editAbbreviation();</span>
+<span class="nc" id="L184">    }</span>
+
+    private static StringProperty createFlashingColorStringProperty(final ObjectProperty&lt;Color&gt; flashingColor) {
+<span class="nc" id="L187">        final StringProperty flashingColorStringProperty = new SimpleStringProperty();</span>
+<span class="nc" id="L188">        setColorStringFromColor(flashingColorStringProperty, flashingColor);</span>
+<span class="nc" id="L189">        flashingColor.addListener((observable, oldValue, newValue) -&gt; setColorStringFromColor(flashingColorStringProperty, flashingColor));</span>
+<span class="nc" id="L190">        return flashingColorStringProperty;</span>
+    }
+
+    private static void setColorStringFromColor(StringProperty colorStringProperty, ObjectProperty&lt;Color&gt; color) {
+<span class="nc" id="L194">        colorStringProperty.set(ColorUtil.toRGBACode(color.get()));</span>
+<span class="nc" id="L195">    }</span>
+
+    @FXML
+    private void editAbbreviation() {
+<span class="nc" id="L199">        journalAbbreviationsTable.edit(</span>
+<span class="nc" id="L200">                journalAbbreviationsTable.getSelectionModel().getSelectedIndex(),</span>
+                journalTableNameColumn);
+<span class="nc" id="L202">    }</span>
+
+    private void selectNewAbbreviation() {
+<span class="nc" id="L205">        int lastRow = viewModel.abbreviationsCountProperty().get() - 1;</span>
+<span class="nc" id="L206">        journalAbbreviationsTable.scrollTo(lastRow);</span>
+<span class="nc" id="L207">        journalAbbreviationsTable.getSelectionModel().select(lastRow);</span>
+<span class="nc" id="L208">        journalAbbreviationsTable.getFocusModel().focus(lastRow, journalTableNameColumn);</span>
+<span class="nc" id="L209">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L213">        return Localization.lang(&quot;Journal abbreviations&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

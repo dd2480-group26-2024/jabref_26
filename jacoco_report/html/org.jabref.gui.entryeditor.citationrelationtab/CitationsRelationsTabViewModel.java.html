@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitationsRelationsTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor.citationrelationtab</a> &gt; <span class="el_source">CitationsRelationsTabViewModel.java</span></div><h1>CitationsRelationsTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor.citationrelationtab;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import javax.swing.undo.UndoManager;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.entryeditor.citationrelationtab.semanticscholar.CitationFetcher;
+import org.jabref.gui.externalfiles.ImportHandler;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.citationkeypattern.CitationKeyGenerator;
+import org.jabref.logic.citationkeypattern.CitationKeyPatternPreferences;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+public class CitationsRelationsTabViewModel {
+
+    private final BibDatabaseContext databaseContext;
+    private final PreferencesService preferencesService;
+    private final UndoManager undoManager;
+    private final StateManager stateManager;
+    private final DialogService dialogService;
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final TaskExecutor taskExecutor;
+
+<span class="fc" id="L32">    public CitationsRelationsTabViewModel(BibDatabaseContext databaseContext, PreferencesService preferencesService, UndoManager undoManager, StateManager stateManager, DialogService dialogService, FileUpdateMonitor fileUpdateMonitor, TaskExecutor taskExecutor) {</span>
+<span class="fc" id="L33">        this.databaseContext = databaseContext;</span>
+<span class="fc" id="L34">        this.preferencesService = preferencesService;</span>
+<span class="fc" id="L35">        this.undoManager = undoManager;</span>
+<span class="fc" id="L36">        this.stateManager = stateManager;</span>
+<span class="fc" id="L37">        this.dialogService = dialogService;</span>
+<span class="fc" id="L38">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="fc" id="L39">        this.taskExecutor = taskExecutor;</span>
+<span class="fc" id="L40">    }</span>
+
+    public void importEntries(List&lt;CitationRelationItem&gt; entriesToImport, CitationFetcher.SearchType searchType, BibEntry existingEntry) {
+<span class="fc" id="L43">        List&lt;BibEntry&gt; entries = entriesToImport.stream().map(CitationRelationItem::entry).toList();</span>
+
+<span class="fc" id="L45">        ImportHandler importHandler = new ImportHandler(</span>
+                databaseContext,
+                preferencesService,
+                fileUpdateMonitor,
+                undoManager,
+                stateManager,
+                dialogService,
+                taskExecutor);
+
+<span class="pc bpc" id="L54" title="1 of 3 branches missed.">        switch (searchType) {</span>
+<span class="fc" id="L55">            case CITES -&gt; importCites(entries, existingEntry, importHandler);</span>
+<span class="fc" id="L56">            case CITED_BY -&gt; importCitedBy(entries, existingEntry, importHandler);</span>
+        }
+<span class="fc" id="L58">    }</span>
+
+    private void importCites(List&lt;BibEntry&gt; entries, BibEntry existingEntry, ImportHandler importHandler) {
+<span class="fc" id="L61">        CitationKeyPatternPreferences citationKeyPatternPreferences = preferencesService.getCitationKeyPatternPreferences();</span>
+<span class="fc" id="L62">        CitationKeyGenerator generator = new CitationKeyGenerator(databaseContext, citationKeyPatternPreferences);</span>
+<span class="fc" id="L63">        boolean generateNewKeyOnImport = preferencesService.getImporterPreferences().generateNewKeyOnImportProperty().get();</span>
+
+<span class="fc" id="L65">        List&lt;String&gt; citeKeys = getExistingEntriesFromCiteField(existingEntry);</span>
+<span class="fc" id="L66">        citeKeys.removeIf(String::isEmpty);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (BibEntry entryToCite : entries) {</span>
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">            if (generateNewKeyOnImport || entryToCite.getCitationKey().isEmpty()) {</span>
+<span class="nc" id="L69">                String key = generator.generateKey(entryToCite);</span>
+<span class="nc" id="L70">                entryToCite.setCitationKey(key);</span>
+<span class="nc" id="L71">                addToKeyToList(citeKeys, key);</span>
+<span class="nc" id="L72">            } else {</span>
+<span class="fc" id="L73">                addToKeyToList(citeKeys, entryToCite.getCitationKey().get());</span>
+            }
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">        existingEntry.setField(StandardField.CITES, toCommaSeparatedString(citeKeys));</span>
+<span class="fc" id="L77">        importHandler.importEntries(entries);</span>
+<span class="fc" id="L78">    }</span>
+
+    private void importCitedBy(List&lt;BibEntry&gt; entries, BibEntry existingEntry, ImportHandler importHandler) {
+<span class="fc" id="L81">        CitationKeyPatternPreferences citationKeyPatternPreferences = preferencesService.getCitationKeyPatternPreferences();</span>
+<span class="fc" id="L82">        CitationKeyGenerator generator = new CitationKeyGenerator(databaseContext, citationKeyPatternPreferences);</span>
+<span class="fc" id="L83">        boolean generateNewKeyOnImport = preferencesService.getImporterPreferences().generateNewKeyOnImportProperty().get();</span>
+
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (BibEntry entryThatCitesOurExistingEntry : entries) {</span>
+<span class="fc" id="L86">            List&lt;String&gt; existingCites = getExistingEntriesFromCiteField(entryThatCitesOurExistingEntry);</span>
+<span class="fc" id="L87">            existingCites.removeIf(String::isEmpty);</span>
+            String key;
+<span class="pc bpc" id="L89" title="2 of 4 branches missed.">            if (generateNewKeyOnImport || entryThatCitesOurExistingEntry.getCitationKey().isEmpty()) {</span>
+<span class="nc" id="L90">                key = generator.generateKey(entryThatCitesOurExistingEntry);</span>
+<span class="nc" id="L91">                entryThatCitesOurExistingEntry.setCitationKey(key);</span>
+            } else {
+<span class="fc" id="L93">                key = existingEntry.getCitationKey().get();</span>
+            }
+<span class="fc" id="L95">            addToKeyToList(existingCites, key);</span>
+<span class="fc" id="L96">            entryThatCitesOurExistingEntry.setField(StandardField.CITES, toCommaSeparatedString(existingCites));</span>
+<span class="fc" id="L97">        }</span>
+
+<span class="fc" id="L99">        importHandler.importEntries(entries);</span>
+<span class="fc" id="L100">    }</span>
+
+    private void addToKeyToList(List&lt;String&gt; list, String key) {
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (!list.contains(key)) {</span>
+<span class="fc" id="L104">            list.add(key);</span>
+        }
+<span class="fc" id="L106">    }</span>
+
+    private List&lt;String&gt; getExistingEntriesFromCiteField(BibEntry entry) {
+<span class="fc" id="L109">        return Arrays.stream(entry.getField(StandardField.CITES).orElse(&quot;&quot;).split(&quot;,&quot;)).collect(Collectors.toList());</span>
+    }
+
+    private String toCommaSeparatedString(List&lt;String&gt; citeentries) {
+<span class="fc" id="L113">        return String.join(&quot;,&quot;, citeentries);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

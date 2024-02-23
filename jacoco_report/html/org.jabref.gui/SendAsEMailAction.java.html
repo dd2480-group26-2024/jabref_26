@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SendAsEMailAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui</a> &gt; <span class="el_source">SendAsEMailAction.java</span></div><h1>SendAsEMailAction.java</h1><pre class="source lang-java linenums">package org.jabref.gui;
+
+import java.awt.Desktop;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.jabref.architecture.AllowedToUseAwt;
+import org.jabref.gui.actions.SimpleCommand;
+import org.jabref.gui.desktop.JabRefDesktop;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.util.io.FileUtil;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.PreferencesService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Sends the selected entry as email
+ * &lt;p&gt;
+ * It uses the mailto:-mechanism
+ * &lt;p&gt;
+ * Microsoft Outlook does not support attachments via mailto
+ * Therefore, the folder(s), where the file(s) belonging to the entry are stored,
+ * are opened. This feature is disabled by default and can be switched on at
+ * preferences/external programs
+ */
+@AllowedToUseAwt(&quot;Requires AWT to send an email&quot;)
+public abstract class SendAsEMailAction extends SimpleCommand {
+
+<span class="nc" id="L38">    private static final Logger LOGGER = LoggerFactory.getLogger(SendAsEMailAction.class);</span>
+    private final DialogService dialogService;
+    private final PreferencesService preferencesService;
+    private final StateManager stateManager;
+    private final TaskExecutor taskExecutor;
+
+    public SendAsEMailAction(DialogService dialogService,
+                             PreferencesService preferencesService,
+                             StateManager stateManager,
+<span class="nc" id="L47">                             TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L48">        this.dialogService = dialogService;</span>
+<span class="nc" id="L49">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L50">        this.stateManager = stateManager;</span>
+<span class="nc" id="L51">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L52">    }</span>
+
+    @Override
+    public void execute() {
+<span class="nc" id="L56">        BackgroundTask.wrap(this::sendEmail)</span>
+<span class="nc" id="L57">                      .onSuccess(dialogService::notify)</span>
+<span class="nc" id="L58">                      .onFailure(e -&gt; {</span>
+<span class="nc" id="L59">                          String message = Localization.lang(&quot;Error creating email&quot;);</span>
+<span class="nc" id="L60">                          LOGGER.warn(message, e);</span>
+<span class="nc" id="L61">                          dialogService.notify(message);</span>
+<span class="nc" id="L62">                      })</span>
+<span class="nc" id="L63">                      .executeWith(taskExecutor);</span>
+<span class="nc" id="L64">    }</span>
+
+    private String sendEmail() throws Exception {
+<span class="nc bnc" id="L67" title="All 4 branches missed.">        if (!Desktop.isDesktopSupported() || stateManager.getActiveDatabase().isEmpty()) {</span>
+<span class="nc" id="L68">            return Localization.lang(&quot;Error creating email&quot;);</span>
+        }
+
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (stateManager.getSelectedEntries().isEmpty()) {</span>
+<span class="nc" id="L72">            return Localization.lang(&quot;This operation requires one or more entries to be selected.&quot;);</span>
+        }
+
+<span class="nc" id="L75">        List&lt;BibEntry&gt; entries = stateManager.getSelectedEntries();</span>
+<span class="nc" id="L76">        URI uriMailTo = getUriMailTo(entries);</span>
+
+<span class="nc" id="L78">        Desktop desktop = Desktop.getDesktop();</span>
+<span class="nc" id="L79">        desktop.mail(uriMailTo);</span>
+
+<span class="nc" id="L81">        return &quot;%s: %d&quot;.formatted(Localization.lang(&quot;Entries added to an email&quot;), entries.size());</span>
+    }
+
+    private URI getUriMailTo(List&lt;BibEntry&gt; entries) throws URISyntaxException {
+<span class="nc" id="L85">        StringBuilder mailTo = new StringBuilder();</span>
+
+<span class="nc" id="L87">        mailTo.append(getEmailAddress());</span>
+<span class="nc" id="L88">        mailTo.append(&quot;?Body=&quot;).append(getBody());</span>
+<span class="nc" id="L89">        mailTo.append(&quot;&amp;Subject=&quot;).append(getSubject());</span>
+
+<span class="nc" id="L91">        List&lt;String&gt; attachments = getAttachments(entries);</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        for (String path : attachments) {</span>
+<span class="nc" id="L93">            mailTo.append(&quot;&amp;Attachment=\&quot;&quot;).append(path);</span>
+<span class="nc" id="L94">            mailTo.append(&quot;\&quot;&quot;);</span>
+<span class="nc" id="L95">        }</span>
+
+<span class="nc" id="L97">        return new URI(&quot;mailto&quot;, mailTo.toString(), null);</span>
+    }
+
+    private List&lt;String&gt; getAttachments(List&lt;BibEntry&gt; entries) {
+        // open folders is needed to indirectly support email programs, which cannot handle
+        //   the unofficial &quot;mailto:attachment&quot; property
+<span class="nc" id="L103">        boolean openFolders = preferencesService.getExternalApplicationsPreferences().shouldAutoOpenEmailAttachmentsFolder();</span>
+
+<span class="nc" id="L105">        BibDatabaseContext databaseContext = stateManager.getActiveDatabase().get();</span>
+<span class="nc" id="L106">        List&lt;Path&gt; fileList = FileUtil.getListOfLinkedFiles(entries, databaseContext.getFileDirectories(preferencesService.getFilePreferences()));</span>
+
+<span class="nc" id="L108">        List&lt;String&gt; attachments = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        for (Path path : fileList) {</span>
+<span class="nc" id="L110">            attachments.add(path.toAbsolutePath().toString());</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (openFolders) {</span>
+                try {
+<span class="nc" id="L113">                    JabRefDesktop.openFolderAndSelectFile(path.toAbsolutePath(), preferencesService.getExternalApplicationsPreferences(), dialogService);</span>
+<span class="nc" id="L114">                } catch (IOException e) {</span>
+<span class="nc" id="L115">                    LOGGER.debug(&quot;Cannot open file&quot;, e);</span>
+<span class="nc" id="L116">                }</span>
+            }
+<span class="nc" id="L118">        }</span>
+<span class="nc" id="L119">        return attachments;</span>
+    }
+
+    protected abstract String getEmailAddress();
+
+    protected abstract String getSubject();
+
+    protected abstract String getBody();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

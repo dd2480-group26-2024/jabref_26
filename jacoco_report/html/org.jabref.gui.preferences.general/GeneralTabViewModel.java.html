@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeneralTabViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.general</a> &gt; <span class="el_source">GeneralTabViewModel.java</span></div><h1>GeneralTabViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.general;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyListProperty;
+import javafx.beans.property.ReadOnlyListWrapper;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.scene.control.SpinnerValueFactory;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.Globals;
+import org.jabref.gui.desktop.JabRefDesktop;
+import org.jabref.gui.preferences.PreferenceTabViewModel;
+import org.jabref.gui.remote.CLIMessageHandler;
+import org.jabref.gui.theme.Theme;
+import org.jabref.gui.theme.ThemeTypes;
+import org.jabref.gui.util.DirectoryDialogConfiguration;
+import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.logic.l10n.Language;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.logic.net.ssl.TrustStoreManager;
+import org.jabref.logic.remote.RemotePreferences;
+import org.jabref.logic.remote.RemoteUtil;
+import org.jabref.logic.util.StandardFileType;
+import org.jabref.model.database.BibDatabaseMode;
+import org.jabref.model.entry.BibEntryTypesManager;
+import org.jabref.model.strings.StringUtil;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.FilePreferences;
+import org.jabref.preferences.InternalPreferences;
+import org.jabref.preferences.LibraryPreferences;
+import org.jabref.preferences.MergeDialogPreferences;
+import org.jabref.preferences.PreferencesService;
+import org.jabref.preferences.TelemetryPreferences;
+import org.jabref.preferences.WorkspacePreferences;
+
+import de.saxsys.mvvmfx.utils.validation.CompositeValidator;
+import de.saxsys.mvvmfx.utils.validation.FunctionBasedValidator;
+import de.saxsys.mvvmfx.utils.validation.ValidationMessage;
+import de.saxsys.mvvmfx.utils.validation.ValidationStatus;
+import de.saxsys.mvvmfx.utils.validation.Validator;
+
+public class GeneralTabViewModel implements PreferenceTabViewModel {
+
+<span class="nc" id="L57">    protected static SpinnerValueFactory&lt;Integer&gt; fontSizeValueFactory =</span>
+            new SpinnerValueFactory.IntegerSpinnerValueFactory(9, Integer.MAX_VALUE);
+
+<span class="nc" id="L60">    private final ReadOnlyListProperty&lt;Language&gt; languagesListProperty =</span>
+<span class="nc" id="L61">            new ReadOnlyListWrapper&lt;&gt;(FXCollections.observableArrayList(Language.getSorted()));</span>
+<span class="nc" id="L62">    private final ObjectProperty&lt;Language&gt; selectedLanguageProperty = new SimpleObjectProperty&lt;&gt;();</span>
+
+<span class="nc" id="L64">    private final ReadOnlyListProperty&lt;ThemeTypes&gt; themesListProperty =</span>
+<span class="nc" id="L65">            new ReadOnlyListWrapper&lt;&gt;(FXCollections.observableArrayList(ThemeTypes.values()));</span>
+<span class="nc" id="L66">    private final ObjectProperty&lt;ThemeTypes&gt; selectedThemeProperty = new SimpleObjectProperty&lt;&gt;();</span>
+
+<span class="nc" id="L68">    private final BooleanProperty themeSyncOsProperty = new SimpleBooleanProperty();</span>
+
+<span class="nc" id="L70">    private final StringProperty customPathToThemeProperty = new SimpleStringProperty();</span>
+
+<span class="nc" id="L72">    private final BooleanProperty fontOverrideProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L73">    private final StringProperty fontSizeProperty = new SimpleStringProperty();</span>
+
+<span class="nc" id="L75">    private final BooleanProperty openLastStartupProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L76">    private final BooleanProperty showAdvancedHintsProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L77">    private final BooleanProperty inspectionWarningDuplicateProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L78">    private final BooleanProperty confirmDeleteProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L79">    private final BooleanProperty collectTelemetryProperty = new SimpleBooleanProperty();</span>
+
+<span class="nc" id="L81">    private final ListProperty&lt;BibDatabaseMode&gt; bibliographyModeListProperty = new SimpleListProperty&lt;&gt;();</span>
+<span class="nc" id="L82">    private final ObjectProperty&lt;BibDatabaseMode&gt; selectedBiblatexModeProperty = new SimpleObjectProperty&lt;&gt;();</span>
+
+<span class="nc" id="L84">    private final BooleanProperty alwaysReformatBibProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L85">    private final BooleanProperty autosaveLocalLibraries = new SimpleBooleanProperty();</span>
+
+<span class="nc" id="L87">    private final BooleanProperty createBackupProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L88">    private final StringProperty backupDirectoryProperty = new SimpleStringProperty(&quot;&quot;);</span>
+
+    private final DialogService dialogService;
+    private final PreferencesService preferences;
+    private final WorkspacePreferences workspacePreferences;
+    private final TelemetryPreferences telemetryPreferences;
+    private final LibraryPreferences libraryPreferences;
+    private final FilePreferences filePreferences;
+    private final RemotePreferences remotePreferences;
+    private final MergeDialogPreferences mergeDialogPreferences;
+
+    private final Validator fontSizeValidator;
+    private final Validator customPathToThemeValidator;
+
+<span class="nc" id="L102">    private final List&lt;String&gt; restartWarning = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L103">    private final BooleanProperty remoteServerProperty = new SimpleBooleanProperty();</span>
+<span class="nc" id="L104">    private final StringProperty remotePortProperty = new SimpleStringProperty(&quot;&quot;);</span>
+    private final Validator remotePortValidator;
+    private final InternalPreferences internalPreferences;
+<span class="nc" id="L107">    private final BooleanProperty versionCheckProperty = new SimpleBooleanProperty();</span>
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final BibEntryTypesManager entryTypesManager;
+    private final TrustStoreManager trustStoreManager;
+
+<span class="nc" id="L112">    public GeneralTabViewModel(DialogService dialogService, PreferencesService preferences, FileUpdateMonitor fileUpdateMonitor, BibEntryTypesManager entryTypesManager) {</span>
+<span class="nc" id="L113">        this.dialogService = dialogService;</span>
+<span class="nc" id="L114">        this.preferences = preferences;</span>
+<span class="nc" id="L115">        this.workspacePreferences = preferences.getWorkspacePreferences();</span>
+<span class="nc" id="L116">        this.telemetryPreferences = preferences.getTelemetryPreferences();</span>
+<span class="nc" id="L117">        this.libraryPreferences = preferences.getLibraryPreferences();</span>
+<span class="nc" id="L118">        this.filePreferences = preferences.getFilePreferences();</span>
+<span class="nc" id="L119">        this.remotePreferences = preferences.getRemotePreferences();</span>
+<span class="nc" id="L120">        this.internalPreferences = preferences.getInternalPreferences();</span>
+<span class="nc" id="L121">        this.mergeDialogPreferences = preferences.getMergeDialogPreferences();</span>
+<span class="nc" id="L122">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="nc" id="L123">        this.entryTypesManager = entryTypesManager;</span>
+
+<span class="nc" id="L125">        fontSizeValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                fontSizeProperty,
+                input -&gt; {
+                    try {
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                        return Integer.parseInt(fontSizeProperty().getValue()) &gt; 8;</span>
+<span class="nc" id="L130">                    } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L131">                        return false;</span>
+                    }
+                },
+<span class="nc" id="L134">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L135">                        Localization.lang(&quot;General&quot;),</span>
+<span class="nc" id="L136">                        Localization.lang(&quot;Font settings&quot;),</span>
+<span class="nc" id="L137">                        Localization.lang(&quot;You must enter an integer value higher than 8.&quot;))));</span>
+
+<span class="nc" id="L139">        customPathToThemeValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                customPathToThemeProperty,
+<span class="nc bnc" id="L141" title="All 2 branches missed.">                input -&gt; !StringUtil.isNullOrEmpty(input),</span>
+<span class="nc" id="L142">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L143">                        Localization.lang(&quot;General&quot;),</span>
+<span class="nc" id="L144">                        Localization.lang(&quot;Visual theme&quot;),</span>
+<span class="nc" id="L145">                        Localization.lang(&quot;Please specify a css theme file.&quot;))));</span>
+
+<span class="nc" id="L147">        remotePortValidator = new FunctionBasedValidator&lt;&gt;(</span>
+                remotePortProperty,
+                input -&gt; {
+                    try {
+<span class="nc" id="L151">                        int portNumber = Integer.parseInt(remotePortProperty().getValue());</span>
+<span class="nc" id="L152">                        return RemoteUtil.isUserPort(portNumber);</span>
+<span class="nc" id="L153">                    } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L154">                        return false;</span>
+                    }
+                },
+<span class="nc" id="L157">                ValidationMessage.error(&quot;%s &gt; %s %n %n %s&quot;.formatted(</span>
+<span class="nc" id="L158">                        Localization.lang(&quot;Network&quot;),</span>
+<span class="nc" id="L159">                        Localization.lang(&quot;Remote operation&quot;),</span>
+<span class="nc" id="L160">                        Localization.lang(&quot;You must enter an integer value in the interval 1025-65535&quot;))));</span>
+
+<span class="nc" id="L162">        this.trustStoreManager = new TrustStoreManager(Path.of(preferences.getSSLPreferences().getTruststorePath()));</span>
+<span class="nc" id="L163">    }</span>
+
+    public ValidationStatus remotePortValidationStatus() {
+<span class="nc" id="L166">        return remotePortValidator.getValidationStatus();</span>
+    }
+
+    @Override
+    public void setValues() {
+<span class="nc" id="L171">        selectedLanguageProperty.setValue(workspacePreferences.getLanguage());</span>
+
+        // The light theme is in fact the absence of any theme modifying 'base.css'. Another embedded theme like
+        // 'dark.css', stored in the classpath, can be introduced in {@link org.jabref.gui.theme.Theme}.
+<span class="nc bnc" id="L175" title="All 4 branches missed.">        switch (workspacePreferences.getTheme().getType()) {</span>
+            case DEFAULT -&gt;
+<span class="nc" id="L177">                    selectedThemeProperty.setValue(ThemeTypes.LIGHT);</span>
+            case EMBEDDED -&gt;
+<span class="nc" id="L179">                    selectedThemeProperty.setValue(ThemeTypes.DARK);</span>
+            case CUSTOM -&gt; {
+<span class="nc" id="L181">                selectedThemeProperty.setValue(ThemeTypes.CUSTOM);</span>
+<span class="nc" id="L182">                customPathToThemeProperty.setValue(workspacePreferences.getTheme().getName());</span>
+            }
+        }
+<span class="nc" id="L185">        themeSyncOsProperty.setValue(workspacePreferences.shouldThemeSyncOs());</span>
+
+<span class="nc" id="L187">        fontOverrideProperty.setValue(workspacePreferences.shouldOverrideDefaultFontSize());</span>
+<span class="nc" id="L188">        fontSizeProperty.setValue(String.valueOf(workspacePreferences.getMainFontSize()));</span>
+
+<span class="nc" id="L190">        openLastStartupProperty.setValue(workspacePreferences.shouldOpenLastEdited());</span>
+<span class="nc" id="L191">        showAdvancedHintsProperty.setValue(workspacePreferences.shouldShowAdvancedHints());</span>
+<span class="nc" id="L192">        inspectionWarningDuplicateProperty.setValue(workspacePreferences.shouldWarnAboutDuplicatesInInspection());</span>
+
+<span class="nc" id="L194">        confirmDeleteProperty.setValue(workspacePreferences.shouldConfirmDelete());</span>
+
+<span class="nc" id="L196">        collectTelemetryProperty.setValue(telemetryPreferences.shouldCollectTelemetry());</span>
+
+<span class="nc" id="L198">        bibliographyModeListProperty.setValue(FXCollections.observableArrayList(BibDatabaseMode.values()));</span>
+<span class="nc" id="L199">        selectedBiblatexModeProperty.setValue(libraryPreferences.getDefaultBibDatabaseMode());</span>
+
+<span class="nc" id="L201">        alwaysReformatBibProperty.setValue(libraryPreferences.shouldAlwaysReformatOnSave());</span>
+<span class="nc" id="L202">        autosaveLocalLibraries.setValue(libraryPreferences.shouldAutoSave());</span>
+
+<span class="nc" id="L204">        createBackupProperty.setValue(filePreferences.shouldCreateBackup());</span>
+<span class="nc" id="L205">        backupDirectoryProperty.setValue(filePreferences.getBackupDirectory().toString());</span>
+
+<span class="nc" id="L207">        remoteServerProperty.setValue(remotePreferences.useRemoteServer());</span>
+<span class="nc" id="L208">        remotePortProperty.setValue(String.valueOf(remotePreferences.getPort()));</span>
+<span class="nc" id="L209">    }</span>
+
+    @Override
+    public void storeSettings() {
+<span class="nc" id="L213">        Language newLanguage = selectedLanguageProperty.getValue();</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (newLanguage != workspacePreferences.getLanguage()) {</span>
+<span class="nc" id="L215">            workspacePreferences.setLanguage(newLanguage);</span>
+<span class="nc" id="L216">            Localization.setLanguage(newLanguage);</span>
+<span class="nc" id="L217">            restartWarning.add(Localization.lang(&quot;Changed language&quot;) + &quot;: &quot; + newLanguage.getDisplayName());</span>
+        }
+
+<span class="nc" id="L220">        workspacePreferences.setShouldOverrideDefaultFontSize(fontOverrideProperty.getValue());</span>
+<span class="nc" id="L221">        workspacePreferences.setMainFontSize(Integer.parseInt(fontSizeProperty.getValue()));</span>
+
+<span class="nc bnc" id="L223" title="All 4 branches missed.">        switch (selectedThemeProperty.get()) {</span>
+            case LIGHT -&gt;
+<span class="nc" id="L225">                    workspacePreferences.setTheme(Theme.light());</span>
+            case DARK -&gt;
+<span class="nc" id="L227">                    workspacePreferences.setTheme(Theme.dark());</span>
+            case CUSTOM -&gt;
+<span class="nc" id="L229">                    workspacePreferences.setTheme(Theme.custom(customPathToThemeProperty.getValue()));</span>
+        }
+<span class="nc" id="L231">        workspacePreferences.setThemeSyncOs(themeSyncOsProperty.getValue());</span>
+
+<span class="nc" id="L233">        workspacePreferences.setOpenLastEdited(openLastStartupProperty.getValue());</span>
+<span class="nc" id="L234">        workspacePreferences.setShowAdvancedHints(showAdvancedHintsProperty.getValue());</span>
+<span class="nc" id="L235">        workspacePreferences.setWarnAboutDuplicatesInInspection(inspectionWarningDuplicateProperty.getValue());</span>
+
+<span class="nc" id="L237">        workspacePreferences.setConfirmDelete(confirmDeleteProperty.getValue());</span>
+
+<span class="nc" id="L239">        telemetryPreferences.setCollectTelemetry(collectTelemetryProperty.getValue());</span>
+
+<span class="nc" id="L241">        libraryPreferences.setDefaultBibDatabaseMode(selectedBiblatexModeProperty.getValue());</span>
+
+<span class="nc" id="L243">        libraryPreferences.setAlwaysReformatOnSave(alwaysReformatBibProperty.getValue());</span>
+<span class="nc" id="L244">        libraryPreferences.setAutoSave(autosaveLocalLibraries.getValue());</span>
+
+<span class="nc" id="L246">        filePreferences.createBackupProperty().setValue(createBackupProperty.getValue());</span>
+<span class="nc" id="L247">        filePreferences.backupDirectoryProperty().setValue(Path.of(backupDirectoryProperty.getValue()));</span>
+
+<span class="nc" id="L249">        getPortAsInt(remotePortProperty.getValue()).ifPresent(newPort -&gt; {</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            if (remotePreferences.isDifferentPort(newPort)) {</span>
+<span class="nc" id="L251">                remotePreferences.setPort(newPort);</span>
+            }
+<span class="nc" id="L253">        });</span>
+
+<span class="nc" id="L255">        internalPreferences.setVersionCheckEnabled(versionCheckProperty.getValue());</span>
+
+<span class="nc" id="L257">        getPortAsInt(remotePortProperty.getValue()).ifPresent(newPort -&gt; {</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">            if (remotePreferences.isDifferentPort(newPort)) {</span>
+<span class="nc" id="L259">                remotePreferences.setPort(newPort);</span>
+            }
+<span class="nc" id="L261">        });</span>
+
+        // stop in all cases, because the port might have changed
+<span class="nc" id="L264">        Globals.REMOTE_LISTENER.stop();</span>
+
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (remoteServerProperty.getValue()) {</span>
+<span class="nc" id="L267">            remotePreferences.setUseRemoteServer(true);</span>
+<span class="nc" id="L268">            Globals.REMOTE_LISTENER.openAndStart(new CLIMessageHandler(preferences, fileUpdateMonitor, entryTypesManager), remotePreferences.getPort());</span>
+        } else {
+<span class="nc" id="L270">            remotePreferences.setUseRemoteServer(false);</span>
+        }
+<span class="nc" id="L272">        trustStoreManager.flush();</span>
+
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (remoteServerProperty.getValue()) {</span>
+<span class="nc" id="L275">            remotePreferences.setUseRemoteServer(true);</span>
+<span class="nc" id="L276">            Globals.REMOTE_LISTENER.openAndStart(new CLIMessageHandler(preferences, fileUpdateMonitor, entryTypesManager), remotePreferences.getPort());</span>
+        } else {
+<span class="nc" id="L278">            remotePreferences.setUseRemoteServer(false);</span>
+<span class="nc" id="L279">            Globals.REMOTE_LISTENER.stop();</span>
+        }
+<span class="nc" id="L281">        trustStoreManager.flush();</span>
+<span class="nc" id="L282">    }</span>
+
+    public ValidationStatus fontSizeValidationStatus() {
+<span class="nc" id="L285">        return fontSizeValidator.getValidationStatus();</span>
+    }
+
+    public ValidationStatus customPathToThemeValidationStatus() {
+<span class="nc" id="L289">        return customPathToThemeValidator.getValidationStatus();</span>
+    }
+
+    @Override
+    public boolean validateSettings() {
+<span class="nc" id="L294">        CompositeValidator validator = new CompositeValidator();</span>
+
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (remoteServerProperty.getValue()) {</span>
+<span class="nc" id="L297">            validator.addValidators(remotePortValidator);</span>
+        }
+
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        if (fontOverrideProperty.getValue()) {</span>
+<span class="nc" id="L301">            validator.addValidators(fontSizeValidator);</span>
+        }
+
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        if (selectedThemeProperty.getValue() == ThemeTypes.CUSTOM) {</span>
+<span class="nc" id="L305">            validator.addValidators(customPathToThemeValidator);</span>
+        }
+
+<span class="nc" id="L308">        ValidationStatus validationStatus = validator.getValidationStatus();</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">        if (!validationStatus.isValid()) {</span>
+<span class="nc" id="L310">            validationStatus.getHighestMessage().ifPresent(message -&gt;</span>
+<span class="nc" id="L311">                    dialogService.showErrorDialogAndWait(message.getMessage()));</span>
+<span class="nc" id="L312">            return false;</span>
+        }
+<span class="nc" id="L314">        return true;</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getRestartWarnings() {
+<span class="nc" id="L319">        return restartWarning;</span>
+    }
+
+    public ReadOnlyListProperty&lt;Language&gt; languagesListProperty() {
+<span class="nc" id="L323">        return this.languagesListProperty;</span>
+    }
+
+    public ObjectProperty&lt;Language&gt; selectedLanguageProperty() {
+<span class="nc" id="L327">        return this.selectedLanguageProperty;</span>
+    }
+
+    public ReadOnlyListProperty&lt;ThemeTypes&gt; themesListProperty() {
+<span class="nc" id="L331">        return this.themesListProperty;</span>
+    }
+
+    public ObjectProperty&lt;ThemeTypes&gt; selectedThemeProperty() {
+<span class="nc" id="L335">        return this.selectedThemeProperty;</span>
+    }
+
+    public BooleanProperty themeSyncOsProperty() {
+<span class="nc" id="L339">        return this.themeSyncOsProperty;</span>
+    }
+
+    public StringProperty customPathToThemeProperty() {
+<span class="nc" id="L343">        return customPathToThemeProperty;</span>
+    }
+
+    public void importCSSFile() {
+<span class="nc" id="L347">        FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()</span>
+<span class="nc" id="L348">                .addExtensionFilter(StandardFileType.CSS)</span>
+<span class="nc" id="L349">                .withDefaultExtension(StandardFileType.CSS)</span>
+<span class="nc" id="L350">                .withInitialDirectory(preferences.getInternalPreferences().getLastPreferencesExportPath()).build();</span>
+
+<span class="nc" id="L352">        dialogService.showFileOpenDialog(fileDialogConfiguration).ifPresent(file -&gt;</span>
+<span class="nc" id="L353">                customPathToThemeProperty.setValue(file.toAbsolutePath().toString()));</span>
+<span class="nc" id="L354">    }</span>
+
+    public BooleanProperty fontOverrideProperty() {
+<span class="nc" id="L357">        return fontOverrideProperty;</span>
+    }
+
+    public StringProperty fontSizeProperty() {
+<span class="nc" id="L361">        return fontSizeProperty;</span>
+    }
+
+    public BooleanProperty openLastStartupProperty() {
+<span class="nc" id="L365">        return openLastStartupProperty;</span>
+    }
+
+    public BooleanProperty showAdvancedHintsProperty() {
+<span class="nc" id="L369">        return this.showAdvancedHintsProperty;</span>
+    }
+
+    public BooleanProperty inspectionWarningDuplicateProperty() {
+<span class="nc" id="L373">        return this.inspectionWarningDuplicateProperty;</span>
+    }
+
+    public BooleanProperty confirmDeleteProperty() {
+<span class="nc" id="L377">        return this.confirmDeleteProperty;</span>
+    }
+
+    public BooleanProperty collectTelemetryProperty() {
+<span class="nc" id="L381">        return this.collectTelemetryProperty;</span>
+    }
+
+    public ListProperty&lt;BibDatabaseMode&gt; biblatexModeListProperty() {
+<span class="nc" id="L385">        return this.bibliographyModeListProperty;</span>
+    }
+
+    public ObjectProperty&lt;BibDatabaseMode&gt; selectedBiblatexModeProperty() {
+<span class="nc" id="L389">        return this.selectedBiblatexModeProperty;</span>
+    }
+
+    public BooleanProperty alwaysReformatBibProperty() {
+<span class="nc" id="L393">        return alwaysReformatBibProperty;</span>
+    }
+
+    public BooleanProperty autosaveLocalLibrariesProperty() {
+<span class="nc" id="L397">        return autosaveLocalLibraries;</span>
+    }
+
+    public BooleanProperty createBackupProperty() {
+<span class="nc" id="L401">        return this.createBackupProperty;</span>
+    }
+
+    public StringProperty backupDirectoryProperty() {
+<span class="nc" id="L405">        return this.backupDirectoryProperty;</span>
+    }
+
+    public void backupFileDirBrowse() {
+<span class="nc" id="L409">        DirectoryDialogConfiguration dirDialogConfiguration =</span>
+<span class="nc" id="L410">                new DirectoryDialogConfiguration.Builder().withInitialDirectory(Path.of(backupDirectoryProperty().getValue())).build();</span>
+<span class="nc" id="L411">        dialogService.showDirectorySelectionDialog(dirDialogConfiguration)</span>
+<span class="nc" id="L412">                     .ifPresent(dir -&gt; backupDirectoryProperty.setValue(dir.toString()));</span>
+<span class="nc" id="L413">    }</span>
+
+    public BooleanProperty remoteServerProperty() {
+<span class="nc" id="L416">        return remoteServerProperty;</span>
+    }
+
+    public StringProperty remotePortProperty() {
+<span class="nc" id="L420">        return remotePortProperty;</span>
+    }
+
+    public void openBrowser() {
+<span class="nc" id="L424">        String url = &quot;https://themes.jabref.org&quot;;</span>
+        try {
+<span class="nc" id="L426">            JabRefDesktop.openBrowser(url, preferences.getFilePreferences());</span>
+<span class="nc" id="L427">        } catch (IOException e) {</span>
+<span class="nc" id="L428">            dialogService.showErrorDialogAndWait(Localization.lang(&quot;Could not open website.&quot;), e);</span>
+<span class="nc" id="L429">        }</span>
+<span class="nc" id="L430">    }</span>
+
+    private Optional&lt;Integer&gt; getPortAsInt(String value) {
+        try {
+<span class="nc" id="L434">            return Optional.of(Integer.parseInt(value));</span>
+<span class="nc" id="L435">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L436">            return Optional.empty();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

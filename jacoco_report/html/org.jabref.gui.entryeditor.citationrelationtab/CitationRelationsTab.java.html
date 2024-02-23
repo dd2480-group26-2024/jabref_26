@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitationRelationsTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.entryeditor.citationrelationtab</a> &gt; <span class="el_source">CitationRelationsTab.java</span></div><h1>CitationRelationsTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.entryeditor.citationrelationtab;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import javax.swing.undo.UndoManager;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.css.PseudoClass;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.Globals;
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.StateManager;
+import org.jabref.gui.entryeditor.EntryEditorPreferences;
+import org.jabref.gui.entryeditor.EntryEditorTab;
+import org.jabref.gui.entryeditor.citationrelationtab.semanticscholar.CitationFetcher;
+import org.jabref.gui.entryeditor.citationrelationtab.semanticscholar.SemanticScholarFetcher;
+import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.util.BackgroundTask;
+import org.jabref.gui.util.NoSelectionModel;
+import org.jabref.gui.util.TaskExecutor;
+import org.jabref.gui.util.ViewModelListCellFactory;
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.util.FileUpdateMonitor;
+import org.jabref.preferences.PreferencesService;
+
+import com.tobiasdiez.easybind.EasyBind;
+import org.controlsfx.control.CheckListView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * GUI for tab displaying an articles citation relations in two lists based on the currently selected BibEntry
+ */
+public class CitationRelationsTab extends EntryEditorTab {
+
+<span class="nc" id="L56">    private static final Logger LOGGER = LoggerFactory.getLogger(CitationRelationsTab.class);</span>
+
+    // Tasks used to implement asynchronous fetching of related articles
+    private static BackgroundTask&lt;List&lt;BibEntry&gt;&gt; citingTask;
+    private static BackgroundTask&lt;List&lt;BibEntry&gt;&gt; citedByTask;
+    private final EntryEditorPreferences preferences;
+    private final DialogService dialogService;
+    private final BibDatabaseContext databaseContext;
+    private final UndoManager undoManager;
+    private final StateManager stateManager;
+    private final FileUpdateMonitor fileUpdateMonitor;
+    private final PreferencesService preferencesService;
+    private final LibraryTab libraryTab;
+    private final TaskExecutor taskExecutor;
+    private final BibEntryRelationsRepository bibEntryRelationsRepository;
+    private final CitationsRelationsTabViewModel citationsRelationsTabViewModel;
+
+    public CitationRelationsTab(EntryEditorPreferences preferences, DialogService dialogService,
+                                BibDatabaseContext databaseContext, UndoManager undoManager,
+                                StateManager stateManager, FileUpdateMonitor fileUpdateMonitor,
+<span class="nc" id="L76">                                PreferencesService preferencesService, LibraryTab lTab, TaskExecutor taskExecutor) {</span>
+<span class="nc" id="L77">        this.preferences = preferences;</span>
+<span class="nc" id="L78">        this.dialogService = dialogService;</span>
+<span class="nc" id="L79">        this.databaseContext = databaseContext;</span>
+<span class="nc" id="L80">        this.undoManager = undoManager;</span>
+<span class="nc" id="L81">        this.stateManager = stateManager;</span>
+<span class="nc" id="L82">        this.fileUpdateMonitor = fileUpdateMonitor;</span>
+<span class="nc" id="L83">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L84">        this.libraryTab = lTab;</span>
+<span class="nc" id="L85">        this.taskExecutor = taskExecutor;</span>
+<span class="nc" id="L86">        setText(Localization.lang(&quot;Citation relations&quot;));</span>
+<span class="nc" id="L87">        setTooltip(new Tooltip(Localization.lang(&quot;Show articles related by citation&quot;)));</span>
+
+<span class="nc" id="L89">        this.bibEntryRelationsRepository = new BibEntryRelationsRepository(new SemanticScholarFetcher(preferencesService.getImporterPreferences()),</span>
+                new BibEntryRelationsCache());
+<span class="nc" id="L91">        citationsRelationsTabViewModel = new CitationsRelationsTabViewModel(databaseContext, preferencesService, undoManager, stateManager, dialogService, fileUpdateMonitor, Globals.TASK_EXECUTOR);</span>
+<span class="nc" id="L92">    }</span>
+
+    /**
+     * Method to create main SplitPane holding all lists, buttons and labels for tab and starts search
+     *
+     * @param entry BibEntry which is currently selected in JabRef Database
+     * @return SplitPane to display
+     */
+    private SplitPane getPaneAndStartSearch(BibEntry entry) {
+        // Create Layout Containers
+<span class="nc" id="L102">        VBox citingVBox = new VBox();</span>
+<span class="nc" id="L103">        VBox citedByVBox = new VBox();</span>
+<span class="nc" id="L104">        citingVBox.setFillWidth(true);</span>
+<span class="nc" id="L105">        citedByVBox.setFillWidth(true);</span>
+<span class="nc" id="L106">        citingVBox.setAlignment(Pos.TOP_CENTER);</span>
+<span class="nc" id="L107">        citedByVBox.setAlignment(Pos.TOP_CENTER);</span>
+<span class="nc" id="L108">        AnchorPane citingHBox = new AnchorPane();</span>
+<span class="nc" id="L109">        citingHBox.setPrefHeight(40);</span>
+<span class="nc" id="L110">        AnchorPane citedByHBox = new AnchorPane();</span>
+<span class="nc" id="L111">        citedByHBox.setPrefHeight(40);</span>
+
+        // Create Heading Lab
+<span class="nc" id="L114">        Label citingLabel = new Label(Localization.lang(&quot;Cites&quot;));</span>
+<span class="nc" id="L115">        styleLabel(citingLabel);</span>
+<span class="nc" id="L116">        Label citedByLabel = new Label(Localization.lang(&quot;Cited By&quot;));</span>
+<span class="nc" id="L117">        styleLabel(citedByLabel);</span>
+
+        // Create ListViews
+<span class="nc" id="L120">        CheckListView&lt;CitationRelationItem&gt; citingListView = new CheckListView&lt;&gt;();</span>
+<span class="nc" id="L121">        CheckListView&lt;CitationRelationItem&gt; citedByListView = new CheckListView&lt;&gt;();</span>
+
+        // Create refresh Buttons for both sides
+<span class="nc" id="L124">        Button refreshCitingButton = IconTheme.JabRefIcons.REFRESH.asButton();</span>
+<span class="nc" id="L125">        refreshCitingButton.setTooltip(new Tooltip(Localization.lang(&quot;Restart search&quot;)));</span>
+<span class="nc" id="L126">        styleTopBarNode(refreshCitingButton, 15.0);</span>
+<span class="nc" id="L127">        Button refreshCitedByButton = IconTheme.JabRefIcons.REFRESH.asButton();</span>
+<span class="nc" id="L128">        refreshCitedByButton.setTooltip(new Tooltip(Localization.lang(&quot;Restart search&quot;)));</span>
+<span class="nc" id="L129">        styleTopBarNode(refreshCitedByButton, 15.0);</span>
+
+        // Create abort buttons for both sides
+<span class="nc" id="L132">        Button abortCitingButton = IconTheme.JabRefIcons.CLOSE.asButton();</span>
+<span class="nc" id="L133">        abortCitingButton.getGraphic().resize(30, 30);</span>
+<span class="nc" id="L134">        abortCitingButton.setTooltip(new Tooltip(Localization.lang(&quot;Cancel search&quot;)));</span>
+<span class="nc" id="L135">        styleTopBarNode(abortCitingButton, 15.0);</span>
+<span class="nc" id="L136">        Button abortCitedButton = IconTheme.JabRefIcons.CLOSE.asButton();</span>
+<span class="nc" id="L137">        abortCitedButton.getGraphic().resize(30, 30);</span>
+<span class="nc" id="L138">        abortCitedButton.setTooltip(new Tooltip(Localization.lang(&quot;Cancel search&quot;)));</span>
+<span class="nc" id="L139">        styleTopBarNode(abortCitedButton, 15.0);</span>
+
+<span class="nc" id="L141">        ProgressIndicator citingProgress = new ProgressIndicator();</span>
+<span class="nc" id="L142">        citingProgress.setMaxSize(25, 25);</span>
+<span class="nc" id="L143">        styleTopBarNode(citingProgress, 50.0);</span>
+<span class="nc" id="L144">        ProgressIndicator citedByProgress = new ProgressIndicator();</span>
+<span class="nc" id="L145">        citedByProgress.setMaxSize(25, 25);</span>
+<span class="nc" id="L146">        styleTopBarNode(citedByProgress, 50.0);</span>
+
+        // Create import buttons for both sides
+<span class="nc" id="L149">        Button importCitingButton = IconTheme.JabRefIcons.ADD_ENTRY.asButton();</span>
+<span class="nc" id="L150">        importCitingButton.setTooltip(new Tooltip(Localization.lang(&quot;Add selected entries to database&quot;)));</span>
+<span class="nc" id="L151">        styleTopBarNode(importCitingButton, 50.0);</span>
+<span class="nc" id="L152">        Button importCitedByButton = IconTheme.JabRefIcons.ADD_ENTRY.asButton();</span>
+<span class="nc" id="L153">        importCitedByButton.setTooltip(new Tooltip(Localization.lang(&quot;Add selected entries to database&quot;)));</span>
+<span class="nc" id="L154">        styleTopBarNode(importCitedByButton, 50.0);</span>
+<span class="nc" id="L155">        hideNodes(importCitingButton, importCitedByButton);</span>
+
+<span class="nc" id="L157">        citingHBox.getChildren().addAll(citingLabel, refreshCitingButton, importCitingButton, citingProgress, abortCitingButton);</span>
+<span class="nc" id="L158">        citedByHBox.getChildren().addAll(citedByLabel, refreshCitedByButton, importCitedByButton, citedByProgress, abortCitedButton);</span>
+
+<span class="nc" id="L160">        VBox.setVgrow(citingListView, Priority.ALWAYS);</span>
+<span class="nc" id="L161">        VBox.setVgrow(citedByListView, Priority.ALWAYS);</span>
+<span class="nc" id="L162">        citingVBox.getChildren().addAll(citingHBox, citingListView);</span>
+<span class="nc" id="L163">        citedByVBox.getChildren().addAll(citedByHBox, citedByListView);</span>
+
+<span class="nc" id="L165">        refreshCitingButton.setOnMouseClicked(event -&gt; {</span>
+<span class="nc" id="L166">            searchForRelations(entry, citingListView, abortCitingButton,</span>
+                    refreshCitingButton, CitationFetcher.SearchType.CITES, importCitingButton, citingProgress, true);
+<span class="nc" id="L168">        });</span>
+
+<span class="nc" id="L170">        refreshCitedByButton.setOnMouseClicked(event -&gt; searchForRelations(entry, citedByListView, abortCitedButton,</span>
+                refreshCitedByButton, CitationFetcher.SearchType.CITED_BY, importCitedByButton, citedByProgress, true));
+
+        // Create SplitPane to hold all nodes above
+<span class="nc" id="L174">        SplitPane container = new SplitPane(citingVBox, citedByVBox);</span>
+<span class="nc" id="L175">        styleFetchedListView(citedByListView);</span>
+<span class="nc" id="L176">        styleFetchedListView(citingListView);</span>
+
+<span class="nc" id="L178">        searchForRelations(entry, citingListView, abortCitingButton, refreshCitingButton,</span>
+                CitationFetcher.SearchType.CITES, importCitingButton, citingProgress, false);
+
+<span class="nc" id="L181">        searchForRelations(entry, citedByListView, abortCitedButton, refreshCitedByButton,</span>
+                CitationFetcher.SearchType.CITED_BY, importCitedByButton, citedByProgress, false);
+
+<span class="nc" id="L184">        return container;</span>
+    }
+
+    /**
+     * Styles a given CheckListView to display BibEntries either with a hyperlink or an add button
+     *
+     * @param listView CheckListView to style
+     */
+    private void styleFetchedListView(CheckListView&lt;CitationRelationItem&gt; listView) {
+<span class="nc" id="L193">        PseudoClass entrySelected = PseudoClass.getPseudoClass(&quot;selected&quot;);</span>
+<span class="nc" id="L194">        new ViewModelListCellFactory&lt;CitationRelationItem&gt;()</span>
+<span class="nc" id="L195">                .withGraphic(entry -&gt; {</span>
+
+<span class="nc" id="L197">                    HBox separator = new HBox();</span>
+<span class="nc" id="L198">                    HBox.setHgrow(separator, Priority.SOMETIMES);</span>
+<span class="nc" id="L199">                    Node entryNode = BibEntryView.getEntryNode(entry.entry());</span>
+<span class="nc" id="L200">                    HBox.setHgrow(entryNode, Priority.ALWAYS);</span>
+<span class="nc" id="L201">                    HBox hContainer = new HBox();</span>
+<span class="nc" id="L202">                    hContainer.prefWidthProperty().bind(listView.widthProperty().subtract(25));</span>
+
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                    if (entry.isLocal()) {</span>
+<span class="nc" id="L205">                        Button jumpTo = IconTheme.JabRefIcons.LINK.asButton();</span>
+<span class="nc" id="L206">                        jumpTo.setTooltip(new Tooltip(Localization.lang(&quot;Jump to entry in library&quot;)));</span>
+<span class="nc" id="L207">                        jumpTo.getStyleClass().add(&quot;addEntryButton&quot;);</span>
+<span class="nc" id="L208">                        jumpTo.setOnMouseClicked(event -&gt; {</span>
+<span class="nc" id="L209">                            libraryTab.showAndEdit(entry.entry());</span>
+<span class="nc" id="L210">                            libraryTab.clearAndSelect(entry.entry());</span>
+<span class="nc" id="L211">                            citingTask.cancel();</span>
+<span class="nc" id="L212">                            citedByTask.cancel();</span>
+<span class="nc" id="L213">                        });</span>
+<span class="nc" id="L214">                        hContainer.getChildren().addAll(entryNode, separator, jumpTo);</span>
+<span class="nc" id="L215">                    } else {</span>
+<span class="nc" id="L216">                        ToggleButton addToggle = IconTheme.JabRefIcons.ADD.asToggleButton();</span>
+<span class="nc" id="L217">                        addToggle.setTooltip(new Tooltip(Localization.lang(&quot;Select entry&quot;)));</span>
+<span class="nc" id="L218">                        EasyBind.subscribe(addToggle.selectedProperty(), selected -&gt; {</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                            if (selected) {</span>
+<span class="nc" id="L220">                                addToggle.setGraphic(IconTheme.JabRefIcons.ADD_FILLED.withColor(IconTheme.SELECTED_COLOR).getGraphicNode());</span>
+                            } else {
+<span class="nc" id="L222">                                addToggle.setGraphic(IconTheme.JabRefIcons.ADD.getGraphicNode());</span>
+                            }
+<span class="nc" id="L224">                        });</span>
+<span class="nc" id="L225">                        addToggle.getStyleClass().add(&quot;addEntryButton&quot;);</span>
+<span class="nc" id="L226">                        addToggle.selectedProperty().bindBidirectional(listView.getItemBooleanProperty(entry));</span>
+<span class="nc" id="L227">                        hContainer.getChildren().addAll(entryNode, separator, addToggle);</span>
+                    }
+<span class="nc" id="L229">                    hContainer.getStyleClass().add(&quot;entry-container&quot;);</span>
+
+<span class="nc" id="L231">                    return hContainer;</span>
+                })
+<span class="nc" id="L233">                .withOnMouseClickedEvent((ee, event) -&gt; {</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                    if (!ee.isLocal()) {</span>
+<span class="nc" id="L235">                        listView.getCheckModel().toggleCheckState(ee);</span>
+                    }
+<span class="nc" id="L237">                })</span>
+<span class="nc" id="L238">                .withPseudoClass(entrySelected, listView::getItemBooleanProperty)</span>
+<span class="nc" id="L239">                .install(listView);</span>
+
+<span class="nc" id="L241">        listView.setSelectionModel(new NoSelectionModel&lt;&gt;());</span>
+<span class="nc" id="L242">    }</span>
+
+    /**
+     * Method to style heading labels
+     *
+     * @param label label to style
+     */
+    private void styleLabel(Label label) {
+<span class="nc" id="L250">        label.setStyle(&quot;-fx-padding: 5px&quot;);</span>
+<span class="nc" id="L251">        label.setAlignment(Pos.CENTER);</span>
+<span class="nc" id="L252">        AnchorPane.setTopAnchor(label, 0.0);</span>
+<span class="nc" id="L253">        AnchorPane.setLeftAnchor(label, 0.0);</span>
+<span class="nc" id="L254">        AnchorPane.setBottomAnchor(label, 0.0);</span>
+<span class="nc" id="L255">        AnchorPane.setRightAnchor(label, 0.0);</span>
+<span class="nc" id="L256">    }</span>
+
+    /**
+     * Method to style refresh buttons
+     *
+     * @param node node to style
+     */
+    private void styleTopBarNode(Node node, double offset) {
+<span class="nc" id="L264">        AnchorPane.setTopAnchor(node, 0.0);</span>
+<span class="nc" id="L265">        AnchorPane.setBottomAnchor(node, 0.0);</span>
+<span class="nc" id="L266">        AnchorPane.setRightAnchor(node, offset);</span>
+<span class="nc" id="L267">    }</span>
+
+    /**
+     * Determines if tab should be shown according to preferences
+     *
+     * @param entry Currently selected BibEntry
+     * @return whether tab should be shown
+     */
+    @Override
+    public boolean shouldShow(BibEntry entry) {
+        // TODO: Create a preference and show tab only if preference is enabled
+<span class="nc" id="L278">        return true;</span>
+    }
+
+    @Override
+    protected void bindToEntry(BibEntry entry) {
+<span class="nc" id="L283">        setContent(getPaneAndStartSearch(entry));</span>
+<span class="nc" id="L284">    }</span>
+
+    /**
+     * Method to start search for relations and display them in the associated ListView
+     *
+     * @param entry         BibEntry currently selected in Jabref Database
+     * @param listView      ListView to use
+     * @param abortButton   Button to stop the search
+     * @param refreshButton refresh Button to use
+     * @param searchType    type of search (CITING / CITEDBY)
+     */
+    private void searchForRelations(BibEntry entry, CheckListView&lt;CitationRelationItem&gt; listView, Button abortButton,
+                                    Button refreshButton, CitationFetcher.SearchType searchType, Button importButton,
+                                    ProgressIndicator progress, boolean shouldRefresh) {
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (entry.getDOI().isEmpty()) {</span>
+<span class="nc" id="L299">            hideNodes(abortButton, progress);</span>
+<span class="nc" id="L300">            showNodes(refreshButton);</span>
+<span class="nc" id="L301">            listView.getItems().clear();</span>
+<span class="nc" id="L302">            listView.setPlaceholder(</span>
+<span class="nc" id="L303">                    new Label(Localization.lang(&quot;The selected entry doesn't have a DOI linked to it. Lookup a DOI and try again.&quot;)));</span>
+<span class="nc" id="L304">            return;</span>
+        }
+
+<span class="nc" id="L307">        ObservableList&lt;CitationRelationItem&gt; observableList = FXCollections.observableArrayList();</span>
+
+<span class="nc" id="L309">        listView.setItems(observableList);</span>
+
+<span class="nc bnc" id="L311" title="All 6 branches missed.">        if (citingTask != null &amp;&amp; !citingTask.isCanceled() &amp;&amp; searchType == CitationFetcher.SearchType.CITES) {</span>
+<span class="nc" id="L312">            citingTask.cancel();</span>
+<span class="nc bnc" id="L313" title="All 6 branches missed.">        } else if (citedByTask != null &amp;&amp; !citedByTask.isCanceled() &amp;&amp; searchType == CitationFetcher.SearchType.CITED_BY) {</span>
+<span class="nc" id="L314">            citedByTask.cancel();</span>
+        }
+
+        BackgroundTask&lt;List&lt;BibEntry&gt;&gt; task;
+
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        if (searchType == CitationFetcher.SearchType.CITES) {</span>
+<span class="nc" id="L320">            task = BackgroundTask.wrap(() -&gt; {</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">                if (shouldRefresh) {</span>
+<span class="nc" id="L322">                    bibEntryRelationsRepository.forceRefreshReferences(entry);</span>
+                }
+<span class="nc" id="L324">                return bibEntryRelationsRepository.getReferences(entry);</span>
+            });
+<span class="nc" id="L326">            citingTask = task;</span>
+        } else {
+<span class="nc" id="L328">            task = BackgroundTask.wrap(() -&gt; {</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">                if (shouldRefresh) {</span>
+<span class="nc" id="L330">                    bibEntryRelationsRepository.forceRefreshCitations(entry);</span>
+                }
+<span class="nc" id="L332">                return bibEntryRelationsRepository.getCitations(entry);</span>
+            });
+<span class="nc" id="L334">            citedByTask = task;</span>
+        }
+
+<span class="nc" id="L337">        task.onRunning(() -&gt; prepareToSearchForRelations(abortButton, refreshButton, importButton, progress, task))</span>
+<span class="nc" id="L338">            .onSuccess(fetchedList -&gt; onSearchForRelationsSucceed(entry, listView, abortButton, refreshButton,</span>
+                    searchType, importButton, progress, fetchedList, observableList))
+<span class="nc" id="L340">            .onFailure(exception -&gt; {</span>
+<span class="nc" id="L341">                LOGGER.error(&quot;Error while fetching citing Articles&quot;, exception);</span>
+<span class="nc" id="L342">                hideNodes(abortButton, progress, importButton);</span>
+<span class="nc" id="L343">                listView.setPlaceholder(new Label(Localization.lang(&quot;Error while fetching citing entries: %0&quot;,</span>
+<span class="nc" id="L344">                        exception.getMessage())));</span>
+
+<span class="nc" id="L346">                refreshButton.setVisible(true);</span>
+<span class="nc" id="L347">                dialogService.notify(exception.getMessage());</span>
+<span class="nc" id="L348">            })</span>
+<span class="nc" id="L349">            .executeWith(taskExecutor);</span>
+<span class="nc" id="L350">    }</span>
+
+    private void onSearchForRelationsSucceed(BibEntry entry, CheckListView&lt;CitationRelationItem&gt; listView,
+                                             Button abortButton, Button refreshButton,
+                                             CitationFetcher.SearchType searchType, Button importButton,
+                                             ProgressIndicator progress, List&lt;BibEntry&gt; fetchedList,
+                                             ObservableList&lt;CitationRelationItem&gt; observableList) {
+<span class="nc" id="L357">        hideNodes(abortButton, progress);</span>
+
+<span class="nc" id="L359">        observableList.setAll(fetchedList.stream().map(entr -&gt; new CitationRelationItem(entr, false))</span>
+<span class="nc" id="L360">                                         .collect(Collectors.toList()));</span>
+
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (!observableList.isEmpty()) {</span>
+<span class="nc" id="L363">            listView.refresh();</span>
+        } else {
+<span class="nc" id="L365">            Label placeholder = new Label(Localization.lang(&quot;No articles found&quot;));</span>
+<span class="nc" id="L366">            listView.setPlaceholder(placeholder);</span>
+        }
+<span class="nc" id="L368">        BooleanBinding booleanBind = Bindings.isEmpty(listView.getCheckModel().getCheckedItems());</span>
+<span class="nc" id="L369">        importButton.disableProperty().bind(booleanBind);</span>
+<span class="nc" id="L370">        importButton.setOnMouseClicked(event -&gt; importEntries(listView.getCheckModel().getCheckedItems(), searchType, entry));</span>
+<span class="nc" id="L371">        showNodes(refreshButton, importButton);</span>
+<span class="nc" id="L372">    }</span>
+
+    private void prepareToSearchForRelations(Button abortButton, Button refreshButton, Button importButton,
+                                             ProgressIndicator progress, BackgroundTask&lt;List&lt;BibEntry&gt;&gt; task) {
+<span class="nc" id="L376">        showNodes(abortButton, progress);</span>
+<span class="nc" id="L377">        hideNodes(refreshButton, importButton);</span>
+
+<span class="nc" id="L379">        abortButton.setOnAction(event -&gt; {</span>
+<span class="nc" id="L380">            hideNodes(abortButton, progress, importButton);</span>
+<span class="nc" id="L381">            showNodes(refreshButton);</span>
+<span class="nc" id="L382">            task.cancel();</span>
+<span class="nc" id="L383">            dialogService.notify(Localization.lang(&quot;Search aborted!&quot;));</span>
+<span class="nc" id="L384">        });</span>
+<span class="nc" id="L385">    }</span>
+
+    private void hideNodes(Node... nodes) {
+<span class="nc" id="L388">        Arrays.stream(nodes).forEach(node -&gt; node.setVisible(false));</span>
+<span class="nc" id="L389">    }</span>
+
+    private void showNodes(Node... nodes) {
+<span class="nc" id="L392">        Arrays.stream(nodes).forEach(node -&gt; node.setVisible(true));</span>
+<span class="nc" id="L393">    }</span>
+
+    // Absolute-phase phenomena in photoionization with few-cycle laser pulses
+
+    /**
+     * Function to import selected entries to the database. Also writes the entries to import to the CITING/CITED field
+     *
+     * @param entriesToImport entries to import
+     */
+    private void importEntries(List&lt;CitationRelationItem&gt; entriesToImport, CitationFetcher.SearchType searchType, BibEntry existingEntry) {
+<span class="nc" id="L403">        citingTask.cancel();</span>
+<span class="nc" id="L404">        citedByTask.cancel();</span>
+
+<span class="nc" id="L406">        citationsRelationsTabViewModel.importEntries(entriesToImport, searchType, existingEntry);</span>
+
+<span class="nc" id="L408">        dialogService.notify(Localization.lang(&quot;Number of entries successfully imported&quot;) + &quot;: &quot; + entriesToImport.size());</span>
+<span class="nc" id="L409">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchQuery.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.search</a> &gt; <span class="el_source">SearchQuery.java</span></div><h1>SearchQuery.java</h1><pre class="source lang-java linenums">package org.jabref.logic.search;
+
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.jabref.logic.l10n.Localization;
+import org.jabref.model.entry.BibEntry;
+import org.jabref.model.search.SearchMatcher;
+import org.jabref.model.search.rules.ContainsBasedSearchRule;
+import org.jabref.model.search.rules.GrammarBasedSearchRule;
+import org.jabref.model.search.rules.SearchRule;
+import org.jabref.model.search.rules.SearchRules;
+import org.jabref.model.search.rules.SentenceAnalyzer;
+
+public class SearchQuery implements SearchMatcher {
+
+    /**
+     * The mode of escaping special characters in regular expressions
+     */
+<span class="fc" id="L26">    private enum EscapeMode {</span>
+        /**
+         * using \Q and \E marks
+         */
+<span class="fc" id="L30">        JAVA {</span>
+            @Override
+            String format(String regex) {
+<span class="fc" id="L33">                return Pattern.quote(regex);</span>
+            }
+        },
+        /**
+         * escaping all javascript regex special characters separately
+         */
+<span class="fc" id="L39">        JAVASCRIPT {</span>
+            @Override
+            String format(String regex) {
+<span class="fc" id="L42">                return JAVASCRIPT_ESCAPED_CHARS_PATTERN.matcher(regex).replaceAll(&quot;\\\\$0&quot;);</span>
+            }
+        };
+
+        /**
+         * Regex pattern for escaping special characters in javascript regular expressions
+         */
+<span class="fc" id="L49">        private static final Pattern JAVASCRIPT_ESCAPED_CHARS_PATTERN = Pattern.compile(&quot;[.*+?^${}()|\\[\\]\\\\/]&quot;);</span>
+
+        /**
+         * Attempt to escape all regex special characters.
+         *
+         * @param regex a string containing a regex expression
+         * @return a regex with all special characters escaped
+         */
+        abstract String format(String regex);
+    }
+
+    private final String query;
+    private EnumSet&lt;SearchRules.SearchFlags&gt; searchFlags;
+    private final SearchRule rule;
+
+<span class="fc" id="L64">    public SearchQuery(String query, EnumSet&lt;SearchRules.SearchFlags&gt; searchFlags) {</span>
+<span class="fc" id="L65">        this.query = Objects.requireNonNull(query);</span>
+<span class="fc" id="L66">        this.searchFlags = searchFlags;</span>
+<span class="fc" id="L67">        this.rule = SearchRules.getSearchRuleByQuery(query, searchFlags);</span>
+<span class="fc" id="L68">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L72">        return &quot;\&quot;%s\&quot; (%s, %s) %s&quot;.formatted(getQuery(), getCaseSensitiveDescription(), getRegularExpressionDescription(), searchFlags);</span>
+    }
+
+    @Override
+    public boolean isMatch(BibEntry entry) {
+<span class="fc" id="L77">        return rule.applyRule(getQuery(), entry);</span>
+    }
+
+    public boolean isValid() {
+<span class="fc" id="L81">        return rule.validateSearchStrings(getQuery());</span>
+    }
+
+    public boolean isContainsBasedSearch() {
+<span class="fc" id="L85">        return rule instanceof ContainsBasedSearchRule;</span>
+    }
+
+    private String getCaseSensitiveDescription() {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (searchFlags.contains(SearchRules.SearchFlags.CASE_SENSITIVE)) {</span>
+<span class="fc" id="L90">            return &quot;case sensitive&quot;;</span>
+        } else {
+<span class="fc" id="L92">            return &quot;case insensitive&quot;;</span>
+        }
+    }
+
+    private String getRegularExpressionDescription() {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (searchFlags.contains(SearchRules.SearchFlags.REGULAR_EXPRESSION)) {</span>
+<span class="fc" id="L98">            return &quot;regular expression&quot;;</span>
+        } else {
+<span class="fc" id="L100">            return &quot;plain text&quot;;</span>
+        }
+    }
+
+    public String localize() {
+<span class="nc" id="L105">        return &quot;\&quot;%s\&quot; (%s, %s)&quot;.formatted(</span>
+<span class="nc" id="L106">                getQuery(),</span>
+<span class="nc" id="L107">                getLocalizedCaseSensitiveDescription(),</span>
+<span class="nc" id="L108">                getLocalizedRegularExpressionDescription());</span>
+    }
+
+    private String getLocalizedCaseSensitiveDescription() {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (searchFlags.contains(SearchRules.SearchFlags.CASE_SENSITIVE)) {</span>
+<span class="nc" id="L113">            return Localization.lang(&quot;case sensitive&quot;);</span>
+        } else {
+<span class="nc" id="L115">            return Localization.lang(&quot;case insensitive&quot;);</span>
+        }
+    }
+
+    private String getLocalizedRegularExpressionDescription() {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (searchFlags.contains(SearchRules.SearchFlags.REGULAR_EXPRESSION)) {</span>
+<span class="nc" id="L121">            return Localization.lang(&quot;regular expression&quot;);</span>
+        } else {
+<span class="nc" id="L123">            return Localization.lang(&quot;plain text&quot;);</span>
+        }
+    }
+
+    /**
+     * Tests if the query is an advanced search query described as described in the help
+     *
+     * @return true if the query is an advanced search query
+     */
+    public boolean isGrammarBasedSearch() {
+<span class="fc" id="L133">        return rule instanceof GrammarBasedSearchRule;</span>
+    }
+
+    public String getQuery() {
+<span class="fc" id="L137">        return query;</span>
+    }
+
+    public EnumSet&lt;SearchRules.SearchFlags&gt; getSearchFlags() {
+<span class="nc" id="L141">        return searchFlags;</span>
+    }
+
+    /**
+     * Returns a list of words this query searches for. The returned strings can be a regular expression.
+     */
+    public List&lt;String&gt; getSearchWords() {
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (searchFlags.contains(SearchRules.SearchFlags.REGULAR_EXPRESSION)) {</span>
+<span class="fc" id="L149">            return Collections.singletonList(getQuery());</span>
+        } else {
+            // Parses the search query for valid words and returns a list these words.
+            // For example, &quot;The great Vikinger&quot; will give [&quot;The&quot;,&quot;great&quot;,&quot;Vikinger&quot;]
+<span class="fc" id="L153">            return (new SentenceAnalyzer(getQuery())).getWords();</span>
+        }
+    }
+
+    // Returns a regular expression pattern in the form (w1)|(w2)| ... wi are escaped if no regular expression search is enabled
+    public Optional&lt;Pattern&gt; getPatternForWords() {
+<span class="fc" id="L159">        return joinWordsToPattern(EscapeMode.JAVA);</span>
+    }
+
+    // Returns a regular expression pattern in the form (w1)|(w2)| ... wi are escaped for javascript if no regular expression search is enabled
+    public Optional&lt;Pattern&gt; getJavaScriptPatternForWords() {
+<span class="fc" id="L164">        return joinWordsToPattern(EscapeMode.JAVASCRIPT);</span>
+    }
+
+    /**
+     * Returns a regular expression pattern in the form (w1)|(w2)| ... wi are escaped if no regular expression search is enabled
+     *
+     * @param escapeMode the mode of escaping special characters in wi
+     */
+    private Optional&lt;Pattern&gt; joinWordsToPattern(EscapeMode escapeMode) {
+<span class="fc" id="L173">        List&lt;String&gt; words = getSearchWords();</span>
+
+<span class="pc bpc" id="L175" title="3 of 6 branches missed.">        if ((words == null) || words.isEmpty() || words.getFirst().isEmpty()) {</span>
+<span class="nc" id="L176">            return Optional.empty();</span>
+        }
+
+        // compile the words to a regular expression in the form (w1)|(w2)|(w3)
+<span class="fc" id="L180">        Stream&lt;String&gt; joiner = words.stream();</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (!searchFlags.contains(SearchRules.SearchFlags.REGULAR_EXPRESSION)) {</span>
+            // Reformat string when we are looking for a literal match
+<span class="fc" id="L183">            joiner = joiner.map(escapeMode::format);</span>
+        }
+<span class="fc" id="L185">        String searchPattern = joiner.collect(Collectors.joining(&quot;)|(&quot;, &quot;(&quot;, &quot;)&quot;));</span>
+
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (searchFlags.contains(SearchRules.SearchFlags.CASE_SENSITIVE)) {</span>
+<span class="nc" id="L188">            return Optional.of(Pattern.compile(searchPattern));</span>
+        } else {
+<span class="fc" id="L190">            return Optional.of(Pattern.compile(searchPattern, Pattern.CASE_INSENSITIVE));</span>
+        }
+    }
+
+    public SearchRule getRule() {
+<span class="nc" id="L195">        return rule;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

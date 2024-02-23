@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CitationKeyEditorViewModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.fieldeditors</a> &gt; <span class="el_source">CitationKeyEditorViewModel.java</span></div><h1>CitationKeyEditorViewModel.java</h1><pre class="source lang-java linenums">package org.jabref.gui.fieldeditors;
+
+import javax.swing.undo.UndoManager;
+
+import org.jabref.gui.DialogService;
+import org.jabref.gui.autocompleter.SuggestionProvider;
+import org.jabref.gui.citationkeypattern.GenerateCitationKeySingleAction;
+import org.jabref.logic.integrity.FieldCheckers;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.field.Field;
+import org.jabref.preferences.PreferencesService;
+
+import de.saxsys.mvvmfx.utils.commands.Command;
+
+public class CitationKeyEditorViewModel extends AbstractEditorViewModel {
+    private final PreferencesService preferencesService;
+    private final BibDatabaseContext databaseContext;
+    private final UndoManager undoManager;
+    private final DialogService dialogService;
+
+    public CitationKeyEditorViewModel(Field field,
+                                      SuggestionProvider&lt;?&gt; suggestionProvider,
+                                      FieldCheckers fieldCheckers,
+                                      PreferencesService preferencesService,
+                                      BibDatabaseContext databaseContext,
+                                      UndoManager undoManager,
+                                      DialogService dialogService) {
+<span class="nc" id="L28">        super(field, suggestionProvider, fieldCheckers, undoManager);</span>
+<span class="nc" id="L29">        this.preferencesService = preferencesService;</span>
+<span class="nc" id="L30">        this.databaseContext = databaseContext;</span>
+<span class="nc" id="L31">        this.undoManager = undoManager;</span>
+<span class="nc" id="L32">        this.dialogService = dialogService;</span>
+<span class="nc" id="L33">    }</span>
+
+    public Command getGenerateCiteKeyCommand() {
+<span class="nc" id="L36">        return new GenerateCitationKeySingleAction(entry, databaseContext, dialogService, preferencesService, undoManager);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

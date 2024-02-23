@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LinkedFilesTab.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.gui.preferences.linkedfiles</a> &gt; <span class="el_source">LinkedFilesTab.java</span></div><h1>LinkedFilesTab.java</h1><pre class="source lang-java linenums">package org.jabref.gui.preferences.linkedfiles;
+
+import javafx.application.Platform;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.TextField;
+
+import org.jabref.gui.Globals;
+import org.jabref.gui.actions.ActionFactory;
+import org.jabref.gui.actions.StandardActions;
+import org.jabref.gui.help.HelpAction;
+import org.jabref.gui.preferences.AbstractPreferenceTabView;
+import org.jabref.gui.preferences.PreferencesTab;
+import org.jabref.gui.util.IconValidationDecorator;
+import org.jabref.logic.help.HelpFile;
+import org.jabref.logic.l10n.Localization;
+
+import com.airhacks.afterburner.views.ViewLoader;
+import de.saxsys.mvvmfx.utils.validation.visualization.ControlsFxVisualizer;
+
+public class LinkedFilesTab extends AbstractPreferenceTabView&lt;LinkedFilesTabViewModel&gt; implements PreferencesTab {
+
+    @FXML private TextField mainFileDirectory;
+    @FXML private RadioButton useMainFileDirectory;
+    @FXML private RadioButton useBibLocationAsPrimary;
+    @FXML private Button browseDirectory;
+    @FXML private Button autolinkRegexHelp;
+    @FXML private RadioButton autolinkFileStartsBibtex;
+    @FXML private RadioButton autolinkFileExactBibtex;
+    @FXML private RadioButton autolinkUseRegex;
+    @FXML private TextField autolinkRegexKey;
+
+    @FXML private CheckBox fulltextIndex;
+
+    @FXML private ComboBox&lt;String&gt; fileNamePattern;
+    @FXML private TextField fileDirectoryPattern;
+
+<span class="nc" id="L41">    private final ControlsFxVisualizer validationVisualizer = new ControlsFxVisualizer();</span>
+
+<span class="nc" id="L43">    public LinkedFilesTab() {</span>
+<span class="nc" id="L44">        ViewLoader.view(this)</span>
+<span class="nc" id="L45">                  .root(this)</span>
+<span class="nc" id="L46">                  .load();</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public String getTabName() {
+<span class="nc" id="L51">        return Localization.lang(&quot;Linked files&quot;);</span>
+    }
+
+    public void initialize() {
+<span class="nc" id="L55">        this.viewModel = new LinkedFilesTabViewModel(dialogService, preferencesService);</span>
+
+<span class="nc" id="L57">        mainFileDirectory.textProperty().bindBidirectional(viewModel.mainFileDirectoryProperty());</span>
+<span class="nc" id="L58">        mainFileDirectory.disableProperty().bind(viewModel.useBibLocationAsPrimaryProperty());</span>
+<span class="nc" id="L59">        browseDirectory.disableProperty().bind(viewModel.useBibLocationAsPrimaryProperty());</span>
+<span class="nc" id="L60">        useBibLocationAsPrimary.selectedProperty().bindBidirectional(viewModel.useBibLocationAsPrimaryProperty());</span>
+<span class="nc" id="L61">        useMainFileDirectory.selectedProperty().bindBidirectional(viewModel.useMainFileDirectoryProperty());</span>
+
+<span class="nc" id="L63">        autolinkFileStartsBibtex.selectedProperty().bindBidirectional(viewModel.autolinkFileStartsBibtexProperty());</span>
+<span class="nc" id="L64">        autolinkFileExactBibtex.selectedProperty().bindBidirectional(viewModel.autolinkFileExactBibtexProperty());</span>
+<span class="nc" id="L65">        autolinkUseRegex.selectedProperty().bindBidirectional(viewModel.autolinkUseRegexProperty());</span>
+<span class="nc" id="L66">        autolinkRegexKey.textProperty().bindBidirectional(viewModel.autolinkRegexKeyProperty());</span>
+<span class="nc" id="L67">        autolinkRegexKey.disableProperty().bind(autolinkUseRegex.selectedProperty().not());</span>
+<span class="nc" id="L68">        fulltextIndex.selectedProperty().bindBidirectional(viewModel.fulltextIndexProperty());</span>
+<span class="nc" id="L69">        fileNamePattern.valueProperty().bindBidirectional(viewModel.fileNamePatternProperty());</span>
+<span class="nc" id="L70">        fileNamePattern.itemsProperty().bind(viewModel.defaultFileNamePatternsProperty());</span>
+<span class="nc" id="L71">        fileDirectoryPattern.textProperty().bindBidirectional(viewModel.fileDirectoryPatternProperty());</span>
+
+<span class="nc" id="L73">        ActionFactory actionFactory = new ActionFactory(Globals.getKeyPrefs());</span>
+<span class="nc" id="L74">        actionFactory.configureIconButton(StandardActions.HELP_REGEX_SEARCH, new HelpAction(HelpFile.REGEX_SEARCH, dialogService, preferencesService.getFilePreferences()), autolinkRegexHelp);</span>
+
+<span class="nc" id="L76">        validationVisualizer.setDecoration(new IconValidationDecorator());</span>
+<span class="nc" id="L77">        Platform.runLater(() -&gt; validationVisualizer.initVisualization(viewModel.mainFileDirValidationStatus(), mainFileDirectory));</span>
+<span class="nc" id="L78">    }</span>
+
+    public void mainFileDirBrowse() {
+<span class="nc" id="L81">        viewModel.mainFileDirBrowse();</span>
+<span class="nc" id="L82">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

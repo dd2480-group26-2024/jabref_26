@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtectedTermsList.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JabRef</a> &gt; <a href="index.source.html" class="el_package">org.jabref.logic.protectedterms</a> &gt; <span class="el_source">ProtectedTermsList.java</span></div><h1>ProtectedTermsList.java</h1><pre class="source lang-java linenums">package org.jabref.logic.protectedterms;
+
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.List;
+import java.util.Objects;
+
+import org.jabref.logic.util.OS;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ProtectedTermsList implements Comparable&lt;ProtectedTermsList&gt; {
+
+<span class="fc" id="L19">    private static final Logger LOGGER = LoggerFactory.getLogger(ProtectedTermsList.class);</span>
+
+    private String description;
+    private final List&lt;String&gt; termsList;
+    private final String location;
+    private final boolean internalList;
+    private boolean enabled;
+
+<span class="fc" id="L27">    public ProtectedTermsList(String description, List&lt;String&gt; termList, String location, boolean internalList) {</span>
+<span class="fc" id="L28">        this.description = Objects.requireNonNull(description);</span>
+<span class="fc" id="L29">        this.termsList = Objects.requireNonNull(termList);</span>
+<span class="fc" id="L30">        this.location = Objects.requireNonNull(location);</span>
+<span class="fc" id="L31">        this.internalList = internalList;</span>
+<span class="fc" id="L32">    }</span>
+
+    public ProtectedTermsList(String description, List&lt;String&gt; termList, String location) {
+<span class="fc" id="L35">        this(description, termList, location, false);</span>
+<span class="fc" id="L36">    }</span>
+
+    public String getDescription() {
+<span class="fc" id="L39">        return description;</span>
+    }
+
+    public List&lt;String&gt; getTermList() {
+<span class="fc" id="L43">        return termsList;</span>
+    }
+
+    public String getLocation() {
+<span class="fc" id="L47">        return location;</span>
+    }
+
+    public String getTermListing() {
+<span class="fc" id="L51">        return String.join(&quot;\n&quot;, termsList);</span>
+    }
+
+    @Override
+    public int compareTo(ProtectedTermsList otherList) {
+<span class="fc" id="L56">        return this.getDescription().compareTo(otherList.getDescription());</span>
+    }
+
+    public boolean isInternalList() {
+<span class="fc" id="L60">        return internalList;</span>
+    }
+
+    public void setEnabled(boolean enabled) {
+<span class="fc" id="L64">        this.enabled = enabled;</span>
+<span class="fc" id="L65">    }</span>
+
+    public boolean isEnabled() {
+<span class="fc" id="L68">        return enabled;</span>
+    }
+
+    public boolean createAndWriteHeading(String newDescription) {
+<span class="fc" id="L72">        description = newDescription;</span>
+<span class="fc" id="L73">        return addProtectedTerm(&quot;# &quot; + newDescription, true);</span>
+    }
+
+    public boolean addProtectedTerm(String term) {
+<span class="fc" id="L77">        return addProtectedTerm(term, false);</span>
+    }
+
+    public boolean addProtectedTerm(String term, boolean create) {
+<span class="fc" id="L81">        Objects.requireNonNull(term);</span>
+        // Cannot add to internal lists
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (internalList) {</span>
+<span class="fc" id="L84">            return false;</span>
+        }
+
+<span class="fc" id="L87">        Path p = Path.of(location);</span>
+<span class="fc" id="L88">        String s = OS.NEWLINE + term;</span>
+<span class="fc" id="L89">        try (BufferedWriter writer = Files.newBufferedWriter(p, StandardCharsets.UTF_8,</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                create ? StandardOpenOption.CREATE : StandardOpenOption.APPEND)) {</span>
+<span class="fc" id="L91">            writer.write(s);</span>
+<span class="fc" id="L92">            termsList.add(term);</span>
+<span class="nc" id="L93">        } catch (IOException ioe) {</span>
+<span class="nc" id="L94">            LOGGER.warn(&quot;Problem adding protected term to list&quot;, ioe);</span>
+<span class="nc" id="L95">            return false;</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc" id="L97">        return true;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (!(o instanceof ProtectedTermsList)) {</span>
+<span class="nc" id="L103">            return false;</span>
+        }
+<span class="fc" id="L105">        ProtectedTermsList otherList = (ProtectedTermsList) o;</span>
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">        return (this.location.equals(otherList.location)) &amp;&amp; (this.description.equals(otherList.description));</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L111">        return Objects.hash(location, description);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
