@@ -180,7 +180,7 @@ class RegExpBasedFileFinderTest {
 
 
     @Test
-    void findFileNonRecursiveTriggerID_1_3() throws Exception {
+    void findFileNoFilesWithDirectPathSpecification() throws Exception {
         BibEntry localEntry = new BibEntry(StandardEntryType.Article);
         localEntry.setCitationKey("pdfInSubdirectory");
         localEntry.setField(StandardField.YEAR, "2017");
