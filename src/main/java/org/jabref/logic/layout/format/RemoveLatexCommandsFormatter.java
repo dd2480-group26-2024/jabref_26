@@ -9,106 +9,79 @@ import java.util.Map;
 public class RemoveLatexCommandsFormatter implements LayoutFormatter {
     public static Map<Integer, Boolean> branchCoverage = new HashMap<>();
 
+    private static class CommandStatus {
+        boolean incommand;
+        boolean escaped;
+
+        CommandStatus(boolean incommand, boolean escaped) {
+            this.incommand = incommand;
+            this.escaped = escaped;
+        }
+    }
+
+    private final StringBuilder cleanedField = new StringBuilder();
+    private StringBuilder currentCommand = null;
+    private char currentCharacter;
+    private int currentFieldPosition;
     @Override
     public String format(String field) {
-        StringBuilder cleanedField = new StringBuilder();
-        StringBuilder currentCommand = null;
-        char currentCharacter;
-        boolean escaped = false;
-        boolean incommand = false;
-        int currentFieldPosition;
+
+        CommandStatus status = new CommandStatus(false, false);
+
         for (currentFieldPosition = 0; currentFieldPosition < field.length(); currentFieldPosition++) {
             branchCoverage.put(1, true);
             currentCharacter = field.charAt(currentFieldPosition);
-            if (escaped && (currentCharacter == '\\')) {
+            if (status.escaped && (currentCharacter == '\\')) {
                 branchCoverage.put(2, true);
                 branchCoverage.put(3, true);
                 cleanedField.append('\\');
-                escaped = false;
-                // \\ --> first \ begins the command, second \ ends the command
-                // \latexommand\\ -> \latexcommand is the command, terminated by \, which begins a new command
-                incommand = false;
+                status.escaped = false;
+                status.incommand = false;
             } else if (currentCharacter == '\\') {
                 branchCoverage.put(4, true);
-                escaped = true;
-                incommand = true;
+                status.escaped = true;
+                status.incommand = true;
                 currentCommand = new StringBuilder();
-            } else if (!incommand && ((currentCharacter == '{') || (currentCharacter == '}'))) {
+            } else if (!status.incommand && ((currentCharacter == '{') || (currentCharacter == '}'))) {
                 branchCoverage.put(5, true);
                 branchCoverage.put(6, true);
                 branchCoverage.put(7, true);
 
-                // Swallow the brace.
-            } else if (Character.isLetter(currentCharacter) || StringUtil.SPECIAL_COMMAND_CHARS.contains(String.valueOf(currentCharacter))) {
-                branchCoverage.put(8, true);
-                branchCoverage.put(9, true);
-
-                escaped = false;
-                if (incommand) {
-                    branchCoverage.put(10, true);
-                    currentCommand.append(currentCharacter);
-                    if ((currentCommand.length() == 1)
-                            && StringUtil.SPECIAL_COMMAND_CHARS.contains(currentCommand.toString())) {
-                        branchCoverage.put(11, true);
-                        branchCoverage.put(12, true);
-
-                        // This indicates that we are in a command of the type \^o or \~{n}
-                        incommand = false;
-                        escaped = false;
-                    }
-                } else {
-                    branchCoverage.put(13, true);
-
-                    cleanedField.append(currentCharacter);
-                }
-            } else if (Character.isLetter(currentCharacter)) {
-                branchCoverage.put(14, true);
-
-                escaped = false;
-                if (incommand) {
-                    branchCoverage.put(15, true);
-
-                    // We are in a command, and should not keep the letter.
-                    currentCommand.append(currentCharacter);
-                } else {
-                    branchCoverage.put(16, true);
-
-                    cleanedField.append(currentCharacter);
-                }
             } else {
-                branchCoverage.put(17, true);
-
-                if (!incommand || (!Character.isWhitespace(currentCharacter) && (currentCharacter != '{'))) {
-                    branchCoverage.put(18, true);
-                    branchCoverage.put(19, true);
-                    branchCoverage.put(20, true);
-                    cleanedField.append(currentCharacter);
-                } else {
-                    branchCoverage.put(21, true);
-
-                    if (!Character.isWhitespace(currentCharacter) && (currentCharacter != '{')) {
-                        branchCoverage.put(22, true);
-                        branchCoverage.put(23, true);
-                        // do not append the opening brace of a command parameter
-                        // do not append the whitespace character
-                        cleanedField.append(currentCharacter);
-                    }
-                    if (incommand) {
-                        branchCoverage.put(24, true);
-
-                        // eat up all whitespace characters
-                        while (currentFieldPosition + 1 < field.length() && Character.isWhitespace(field.charAt(currentFieldPosition + 1))) {
-                            branchCoverage.put(25, true);
-                            branchCoverage.put(26, true);
-                            currentFieldPosition++;
-                        }
-                    }
-                }
-                incommand = false;
-                escaped = false;
+                branchCoverage.put(8, true);
+                processLatexCommandCharacter( status, field);
             }
         }
 
         return cleanedField.toString();
+    }
+
+    private void processLatexCommandCharacter(CommandStatus status, String field) {
+        if (Character.isLetter(currentCharacter) || StringUtil.SPECIAL_COMMAND_CHARS.contains(String.valueOf(currentCharacter))) {
+            status.escaped = false;
+            if (status.incommand) {
+                currentCommand.append(currentCharacter);
+                if ((currentCommand.length() == 1)
+                        && StringUtil.SPECIAL_COMMAND_CHARS.contains(currentCommand.toString())) {
+                    status.incommand = false;
+                }
+            } else {
+                cleanedField.append(currentCharacter);
+            }
+        }
+        else {
+            if (!status.incommand || (!Character.isWhitespace(currentCharacter) && (currentCharacter != '{'))) {
+                cleanedField.append(currentCharacter);
+            } else {
+                if (!Character.isWhitespace(currentCharacter) && (currentCharacter != '{')) {
+                    cleanedField.append(currentCharacter);
+                }
+                while (currentFieldPosition + 1 < field.length() && Character.isWhitespace(field.charAt(currentFieldPosition + 1))) {
+                    currentFieldPosition++;
+                }
+            }
+            status.incommand = false;
+            status.escaped = false;
+        }
     }
 }
